@@ -26,6 +26,9 @@ type IncomingComment = {
   authorName?: unknown
   member?: unknown
   memberId?: unknown
+  task?: unknown
+  taskId?: unknown
+  taskTitle?: unknown
   reason?: unknown
   createdAt?: unknown
 }
@@ -191,17 +194,78 @@ const normalizeComments = (input: unknown, fallbackAuthorId: string) => {
           ? item.member.trim()
           : undefined
 
+      const taskId = typeof item.taskId === 'string'
+        ? item.taskId.trim()
+        : typeof item.task === 'string'
+          ? item.task.trim()
+          : undefined
+
       const createdAt = item.createdAt ? new Date(item.createdAt as string | number | Date) : new Date()
 
       return {
         author: new mongoose.Types.ObjectId(authorId),
         authorName: typeof item.authorName === 'string' && item.authorName.trim().length > 0 ? item.authorName.trim() : undefined,
         member: isValidObjectIdString(memberId) ? new mongoose.Types.ObjectId(memberId) : undefined,
+        task: isValidObjectIdString(taskId) ? new mongoose.Types.ObjectId(taskId) : undefined,
+        taskTitle: typeof item.taskTitle === 'string' && item.taskTitle.trim().length > 0 ? item.taskTitle.trim() : undefined,
         reason,
         createdAt: Number.isNaN(createdAt.getTime()) ? new Date() : createdAt
       }
     })
     .filter((comment): comment is NonNullable<typeof comment> => comment !== null)
+}
+
+const syncTaskAssigneesForAssignments = async (
+  projectId: string,
+  organizationId: string,
+  assignments: Array<{ member: mongoose.Types.ObjectId; task: mongoose.Types.ObjectId }>
+) => {
+  if (assignments.length === 0) return
+
+  const taskIds = Array.from(new Set(assignments.map((assignment) => assignment.task.toString())))
+  const tasks = await Task.find({
+    _id: { $in: taskIds },
+    project: projectId,
+    organization: organizationId,
+    archived: false
+  }).select('_id assignedTo')
+
+  const memberIdsByTask = new Map<string, Set<string>>()
+  for (const assignment of assignments) {
+    const taskId = assignment.task.toString()
+    const memberIds = memberIdsByTask.get(taskId) || new Set<string>()
+    memberIds.add(assignment.member.toString())
+    memberIdsByTask.set(taskId, memberIds)
+  }
+
+  for (const task of tasks as Array<any>) {
+    const taskId = task._id.toString()
+    const memberIds = memberIdsByTask.get(taskId)
+    if (!memberIds || memberIds.size === 0) continue
+
+    const existingAssigneeIds = new Set(
+      Array.isArray(task.assignedTo)
+        ? task.assignedTo
+            .map((entry: any) => entry?.user?.toString?.() || entry?.user?.toString?.() || '')
+            .filter((value: string) => value.length > 0)
+        : []
+    )
+
+    let changed = false
+    for (const memberId of Array.from(memberIds)) {
+      if (existingAssigneeIds.has(memberId)) {
+        continue
+      }
+      task.assignedTo = Array.isArray(task.assignedTo) ? task.assignedTo : []
+      task.assignedTo.push({ user: new mongoose.Types.ObjectId(memberId) })
+      existingAssigneeIds.add(memberId)
+      changed = true
+    }
+
+    if (changed) {
+      await task.save()
+    }
+  }
 }
 
 const buildProjectContext = async (projectId: string, userId: string, organizationId: string): Promise<
@@ -309,6 +373,8 @@ export async function GET(
       .populate('assignments.member', 'firstName lastName email avatar role')
       .populate('assignments.task', 'title status displayId priority')
       .populate('comments.author', 'firstName lastName email avatar role')
+      .populate('comments.member', 'firstName lastName email avatar role')
+      .populate('comments.task', 'title status displayId priority')
       .sort({ scheduledDate: 1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -316,9 +382,20 @@ export async function GET(
 
     const total = await StandupSchedule.countDocuments(filters)
 
+    // Batch-fetch summaries
+    const scheduleIds = schedules.map((s: any) => s._id)
+    const { StandupSummary } = await import('@/models/StandupSummary')
+    const summaries = await StandupSummary.find({ standupScheduleId: { $in: scheduleIds } })
+    const summaryMap = new Map(summaries.map((s: any) => [s.standupScheduleId.toString(), s.generatedSummary]))
+
+    const schedulesWithSummaries = schedules.map((s: any) => ({
+      ...s,
+      summary: summaryMap.get(s._id.toString())
+    }))
+
     return NextResponse.json({
       success: true,
-      data: schedules,
+      data: schedulesWithSummaries,
       pagination: {
         page,
         limit,
@@ -457,7 +534,6 @@ export async function POST(
       createdBy: user.id,
       participants: participantIds.map((memberId: string) => new mongoose.Types.ObjectId(memberId)),
       notes: typeof body?.notes === 'string' ? body.notes.trim() : undefined,
-      summary: typeof body?.summary === 'string' ? body.summary.trim() : undefined,
       actualDate,
       location: typeof body?.location === 'string' ? body.location.trim() : undefined,
       meetingLink: typeof body?.meetingLink === 'string' ? body.meetingLink.trim() : undefined,
@@ -467,6 +543,8 @@ export async function POST(
 
     await standupSchedule.save()
 
+    await syncTaskAssigneesForAssignments(projectId, user.organization, assignments)
+
     const populatedSchedule = await StandupSchedule.findById(standupSchedule._id)
       .populate('participants', 'firstName lastName email avatar role')
       .populate('facilitator', 'firstName lastName email avatar role')
@@ -474,6 +552,8 @@ export async function POST(
       .populate('assignments.member', 'firstName lastName email avatar role')
       .populate('assignments.task', 'title status displayId priority')
       .populate('comments.author', 'firstName lastName email avatar role')
+      .populate('comments.member', 'firstName lastName email avatar role')
+      .populate('comments.task', 'title status displayId priority')
 
     return NextResponse.json({ success: true, data: populatedSchedule }, { status: 201 })
   } catch (error) {

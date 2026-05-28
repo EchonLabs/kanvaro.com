@@ -45,6 +45,8 @@ export interface StandupScheduleComment {
   _id: string
   authorName: string
   memberId?: string
+  taskId?: string
+  taskTitle?: string
   reason: string
   createdAt: string
 }
@@ -53,7 +55,9 @@ export interface StandupTimelogItem {
   _id: string
   userId: string
   userName: string
+  taskId?: string
   taskTitle?: string
+  taskStatus?: string
   projectName: string
   startTime: string
   endTime?: string

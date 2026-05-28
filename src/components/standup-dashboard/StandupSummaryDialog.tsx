@@ -1,11 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { useNotify } from '@/lib/notify'
-import { formatToTitleCase } from '@/lib/utils'
-import { updateStandupSchedule } from './standup-schedule-storage'
+import { Loader2, Sparkles } from 'lucide-react'
 import type { StandupScheduleDetail } from './standup-dashboard-types'
 
 interface StandupSummaryDialogProps {
@@ -15,220 +14,186 @@ interface StandupSummaryDialogProps {
   onGenerated?: (summary: string) => void
 }
 
-const escapePdfText = (value: string) => value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
-
-const wrapText = (text: string, maxLength: number) => {
-  if (!text) return ['']
-  const words = text.split(/\s+/)
-  const lines: string[] = []
-  let currentLine = ''
-
-  words.forEach((word) => {
-    const candidate = currentLine ? `${currentLine} ${word}` : word
-    if (candidate.length > maxLength && currentLine) {
-      lines.push(currentLine)
-      currentLine = word
-      return
-    }
-    currentLine = candidate
-  })
-
-  if (currentLine) {
-    lines.push(currentLine)
-  }
-
-  return lines.length > 0 ? lines : ['']
-}
-
-const buildProcessedSummary = (detail: StandupScheduleDetail) => {
-  const completedCount = detail.memberSummaries.filter((member) => member.completedTasks > 0).length
-  const blockedCount = detail.memberSummaries.filter((member) => member.blockedTasks > 0).length
-  const totalLoggedMinutes = detail.timelogs.reduce((sum, log) => sum + log.duration, 0)
-  const notableMembers = detail.memberSummaries
-    .filter((member) => member.completedTasks > 0 || member.timeLoggedMinutes > 0 || member.notes.length > 0)
-    .slice(0, 6)
-
-  const lines: string[] = []
-  lines.push(`${detail.project.name} - ${detail.meeting.title}`)
-  lines.push(`Date: ${new Date(detail.meeting.date).toLocaleDateString()}`)
-  lines.push(`Status: ${formatToTitleCase(detail.meeting.status)}`)
-  lines.push('')
-  lines.push('Executive summary')
-  lines.push(`This standup captured ${detail.meeting.participants.length} participants, ${completedCount} members with completed work, ${blockedCount} blocked members, and ${Math.round(totalLoggedMinutes / 60 * 10) / 10} total logged hours.`)
-  lines.push(detail.meeting.notes || 'No separate standup notes were recorded for this meeting.')
-  lines.push('')
-  lines.push('Key highlights')
-  if (notableMembers.length > 0) {
-    notableMembers.forEach((member) => {
-      const noteSummary = member.notes.slice(0, 2).join('; ')
-      const highlight = [
-        `${member.firstName} ${member.lastName}`,
-        member.completedTasks > 0 ? `${member.completedTasks} completed tasks` : null,
-        member.timeLoggedMinutes > 0 ? `${Math.round(member.timeLoggedMinutes / 60 * 10) / 10}h logged` : null,
-        noteSummary || null
-      ].filter(Boolean).join(' · ')
-
-      lines.push(`- ${highlight}`)
-    })
-  } else {
-    lines.push('- No member-specific highlights were captured.')
-  }
-  lines.push('')
-  lines.push('Task recap')
-  detail.projectTasks.slice(0, 8).forEach((task) => {
-    lines.push(`- ${task.displayId ? `${task.displayId} ` : ''}${task.title} (${task.status || 'open'})`)
-  })
-  if (detail.projectTasks.length > 8) {
-    lines.push(`- ${detail.projectTasks.length - 8} additional tasks omitted from the processed summary.`)
-  }
-  return lines.join('\n')
-}
-
-const buildPdfBlob = (title: string, summary: string) => {
-  const pageWidth = 612
-  const pageHeight = 792
-  const marginLeft = 54
-  const marginTop = 72
-  const lineHeight = 14
-  const maxLinesPerPage = Math.floor((pageHeight - marginTop * 2) / lineHeight)
-  const wrappedLines = summary
-    .split('\n')
-    .flatMap((line) => (line.trim().length === 0 ? [''] : wrapText(line, 88)))
-
-  const pages: string[][] = []
-  for (let index = 0; index < wrappedLines.length; index += maxLinesPerPage) {
-    pages.push(wrappedLines.slice(index, index + maxLinesPerPage))
-  }
-
-  const objects: string[] = []
-  const pageObjectIds: number[] = []
-  const contentObjectIds: number[] = []
-  const totalPages = Math.max(pages.length, 1)
-
-  objects.push('1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj')
-
-  const pageKids: string[] = []
-  let objectId = 3
-  for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
-    const pageObjectId = objectId
-    const contentObjectId = objectId + 1
-    pageObjectIds.push(pageObjectId)
-    contentObjectIds.push(contentObjectId)
-    pageKids.push(`${pageObjectId} 0 R`)
-    objectId += 2
-  }
-
-  objects.push(`2 0 obj << /Type /Pages /Kids [ ${pageKids.join(' ')} ] /Count ${totalPages} >> endobj`)
-
-  for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
-    const pageObjectId = pageObjectIds[pageIndex]
-    const contentObjectId = contentObjectIds[pageIndex]
-    const pageLines = pages[pageIndex] || []
-    const lines: string[] = []
-    lines.push('BT')
-    lines.push('/F1 11 Tf')
-    lines.push(`${marginLeft} ${pageHeight - marginTop} Td`)
-    pageLines.forEach((line, lineIndex) => {
-      if (lineIndex === 0) {
-        lines.push(`(${escapePdfText(line)}) Tj`)
-      } else {
-        lines.push('T*')
-        lines.push(`(${escapePdfText(line)}) Tj`)
-      }
-    })
-    lines.push('ET')
-
-    const content = lines.join('\n')
-    objects.push(`${pageObjectId} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R >> >> /Contents ${contentObjectId} 0 R >> endobj`)
-    objects.push(`${contentObjectId} 0 obj << /Length ${content.length} >> stream\n${content}\nendstream endobj`)
-  }
-
-  objects.push('4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj')
-
-  const header = '%PDF-1.4\n'
-  let body = ''
-  const offsets: number[] = []
-  let byteLength = header.length
-
-  objects.forEach((object) => {
-    offsets.push(byteLength)
-    body += `${object}\n`
-    byteLength += `${object}\n`.length
-  })
-
-  const xrefOffset = byteLength
-  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
-  offsets.forEach((offset) => {
-    xref += `${String(offset).padStart(10, '0')} 00000 n \n`
-  })
-
-  const trailer = `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
-  const pdf = `${header}${body}${xref}${trailer}`
-  return new Blob([pdf], { type: 'application/pdf' })
-}
-
-const downloadPdf = (title: string, summary: string) => {
-  const blob = buildPdfBlob(title, summary)
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = `${title.replace(/[^a-z0-9\-]+/gi, '_').replace(/^_+|_+$/g, '') || 'standup_summary'}.pdf`
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
-}
-
 export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated }: StandupSummaryDialogProps) {
   const { success: notifySuccess, error: notifyError } = useNotify()
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [existingSummary, setExistingSummary] = useState<string | null>(null)
 
-  const summaryPreview = useMemo(() => buildProcessedSummary(detail), [detail])
+  // Fetch existing summary from dedicated backend summaries table
+  const fetchSummary = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/standup-schedules/${meetingId}/summary`, {
+        cache: 'no-store'
+      })
+      if (response.ok) {
+        const payload = await response.json()
+        if (payload?.success && payload?.data) {
+          setExistingSummary(payload.data.generatedSummary)
+        } else {
+          setExistingSummary(null)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load existing standup summary:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Trigger load when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchSummary()
+    }
+  }, [open, meetingId, projectId])
 
   const handleGenerate = async () => {
     setSaving(true)
     try {
-      const summary = buildProcessedSummary(detail)
-      await updateStandupSchedule(projectId, meetingId, {
-        summary,
-        status: 'completed'
+      const response = await fetch(`/api/projects/${projectId}/standup-schedules/${meetingId}/summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
       })
 
-      onGenerated?.(summary)
+      if (!response.ok) {
+        throw new Error('Summary generation failed')
+      }
 
-      downloadPdf(`${detail.project.name} - ${detail.meeting.title}`, summary)
-
-      notifySuccess({ title: 'Summary generated', message: 'The standup summary was saved and downloaded as a PDF.' })
-      setOpen(false)
+      const payload = await response.json()
+      if (payload?.success && payload?.data) {
+        const summaryText = payload.data.generatedSummary
+        setExistingSummary(summaryText)
+        onGenerated?.(summaryText)
+        notifySuccess({ 
+          title: 'Report Compiled', 
+          message: existingSummary ? 'The PM Standup summary was successfully updated.' : 'A new PM Standup summary has been compiled.' 
+        })
+      } else {
+        throw new Error('Invalid server response')
+      }
     } catch {
-      notifyError({ title: 'Unable to generate summary' })
+      notifyError({ title: 'Unable to compile summary report' })
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button variant="outline" onClick={() => setOpen(true)}>Generate Summary</Button>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Generate Standup Summary</DialogTitle>
-          <DialogDescription>Generate a processed summary for this completed standup and download it as a PDF.</DialogDescription>
-        </DialogHeader>
-        <DialogBody className="space-y-4">
-          <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">Preview</p>
-            <pre className="mt-2 whitespace-pre-wrap text-xs leading-6">{summaryPreview}</pre>
-          </div>
-        </DialogBody>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button onClick={handleGenerate} disabled={saving}>
-            {saving ? 'Generating...' : 'Generate and Export'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Button 
+        variant={existingSummary ? "outline" : "default"} 
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 shrink-0"
+      >
+        <Sparkles className="h-4 w-4 text-amber-500" />
+        {detail.meeting.summary || existingSummary ? 'Regenerate Summary' : 'Generate Summary'}
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col pointer-events-auto">
+          <DialogHeader className="flex-shrink-0 border-b pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-amber-500/10 p-2 text-amber-500">
+                  <Sparkles className="h-5 w-5 animate-pulse" />
+                </div>
+                <div>
+                  <DialogTitle>PM Standup Summary</DialogTitle>
+                  <DialogDescription>
+                    Intelligent analytical report compiling workload metrics, task progress, and logged activity anomalies.
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <DialogBody className="flex-1 overflow-y-auto space-y-4 py-4 min-h-[300px]">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-24 text-sm text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                Retrieving standup report...
+              </div>
+            ) : existingSummary ? (
+              <div className="rounded-xl border border-border bg-muted/20 p-5 font-sans leading-relaxed text-sm text-foreground shadow-sm">
+                <div className="prose dark:prose-invert max-w-none space-y-1">
+                  {existingSummary.split('\n').map((line, index) => {
+                    if (line.startsWith('###')) {
+                      return <h3 key={index} className="text-base font-bold text-foreground mt-4 mb-2 first:mt-0">{line.replace('###', '').trim()}</h3>
+                    }
+                    if (line.startsWith('####')) {
+                      return <h4 key={index} className="text-sm font-semibold text-foreground mt-3 mb-1.5">{line.replace('####', '').trim()}</h4>
+                    }
+                    if (line.startsWith('**Date:') || line.startsWith('**Scheduled Date:')) {
+                      return <p key={index} className="text-xs text-muted-foreground mb-3">{line.split('|').map((part, pIdx) => <span key={pIdx} className="mr-3">{part.trim()}</span>)}</p>
+                    }
+                    if (line.trim() === '---') {
+                      return <hr key={index} className="my-4 border-border/80" />
+                    }
+                    if (line.startsWith('-')) {
+                      // Parse inline bolding **text**
+                      const cleanLine = line.replace(/^-/, '').trim()
+                      const parts = cleanLine.split('**')
+                      return (
+                        <div key={index} className="flex gap-2 text-muted-foreground my-1.5 text-xs sm:text-sm pl-2">
+                          <span className="text-primary font-bold shrink-0">•</span>
+                          <span>
+                            {parts.map((part, pIdx) => pIdx % 2 === 1 ? <strong key={pIdx} className="text-foreground font-semibold">{part}</strong> : part)}
+                          </span>
+                        </div>
+                      )
+                    }
+                    return <p key={index} className="text-muted-foreground text-xs sm:text-sm my-1">{line}</p>
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center p-8 py-16 rounded-xl border border-dashed bg-muted/10 border-border/70 max-w-lg mx-auto">
+                <Sparkles className="h-10 w-10 text-amber-500/80 mb-4 animate-bounce" />
+                <h4 className="font-semibold text-foreground text-base">Compile PM Standup Summary</h4>
+                <p className="text-sm text-muted-foreground mt-2 max-w-sm">
+                  Run a lightweight logical PM analysis over participant workloads, stalled tasks, and actual time logs tracked for this meeting date.
+                </p>
+                <Button 
+                  onClick={handleGenerate} 
+                  disabled={saving} 
+                  className="mt-6"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : 'Compile Summary Report'}
+                </Button>
+              </div>
+            )}
+          </DialogBody>
+
+          <DialogFooter className="flex-shrink-0 border-t pt-4">
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+              Close
+            </Button>
+            {existingSummary && (
+              <Button onClick={handleGenerate} disabled={saving} className="bg-amber-500 hover:bg-amber-600 text-white font-medium">
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Regenerating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4 shrink-0" />
+                    Regenerate Report
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

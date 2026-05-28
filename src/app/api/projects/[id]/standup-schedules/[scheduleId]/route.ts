@@ -26,6 +26,9 @@ type IncomingComment = {
   authorName?: unknown
   member?: unknown
   memberId?: unknown
+  task?: unknown
+  taskId?: unknown
+  taskTitle?: unknown
   reason?: unknown
   createdAt?: unknown
 }
@@ -194,17 +197,78 @@ const normalizeComments = (input: unknown, fallbackAuthorId: string) => {
           ? item.member.trim()
           : undefined
 
+      const taskId = typeof item.taskId === 'string'
+        ? item.taskId.trim()
+        : typeof item.task === 'string'
+          ? item.task.trim()
+          : undefined
+
       const createdAt = item.createdAt ? new Date(item.createdAt as string | number | Date) : new Date()
 
       return {
         author: new mongoose.Types.ObjectId(authorId),
         authorName: typeof item.authorName === 'string' && item.authorName.trim().length > 0 ? item.authorName.trim() : undefined,
         member: isValidObjectIdString(memberId) ? new mongoose.Types.ObjectId(memberId) : undefined,
+        task: isValidObjectIdString(taskId) ? new mongoose.Types.ObjectId(taskId) : undefined,
+        taskTitle: typeof item.taskTitle === 'string' && item.taskTitle.trim().length > 0 ? item.taskTitle.trim() : undefined,
         reason,
         createdAt: Number.isNaN(createdAt.getTime()) ? new Date() : createdAt
       }
     })
     .filter((comment): comment is NonNullable<typeof comment> => comment !== null)
+}
+
+const syncTaskAssigneesForAssignments = async (
+  projectId: string,
+  organizationId: string,
+  assignments: Array<{ member: mongoose.Types.ObjectId; task: mongoose.Types.ObjectId }>
+) => {
+  if (assignments.length === 0) return
+
+  const taskIds = Array.from(new Set(assignments.map((assignment) => assignment.task.toString())))
+  const tasks = await Task.find({
+    _id: { $in: taskIds },
+    project: projectId,
+    organization: organizationId,
+    archived: false
+  }).select('_id assignedTo')
+
+  const memberIdsByTask = new Map<string, Set<string>>()
+  for (const assignment of assignments) {
+    const taskId = assignment.task.toString()
+    const memberIds = memberIdsByTask.get(taskId) || new Set<string>()
+    memberIds.add(assignment.member.toString())
+    memberIdsByTask.set(taskId, memberIds)
+  }
+
+  for (const task of tasks as Array<any>) {
+    const taskId = task._id.toString()
+    const memberIds = memberIdsByTask.get(taskId)
+    if (!memberIds || memberIds.size === 0) continue
+
+    const existingAssigneeIds = new Set(
+      Array.isArray(task.assignedTo)
+        ? task.assignedTo
+            .map((entry: any) => entry?.user?.toString?.() || entry?.user?.toString?.() || '')
+            .filter((value: string) => value.length > 0)
+        : []
+    )
+
+    let changed = false
+    for (const memberId of Array.from(memberIds)) {
+      if (existingAssigneeIds.has(memberId)) {
+        continue
+      }
+      task.assignedTo = Array.isArray(task.assignedTo) ? task.assignedTo : []
+      task.assignedTo.push({ user: new mongoose.Types.ObjectId(memberId) })
+      existingAssigneeIds.add(memberId)
+      changed = true
+    }
+
+    if (changed) {
+      await task.save()
+    }
+  }
 }
 
 const buildProjectContext = async (projectId: string, userId: string, organizationId: string): Promise<
@@ -266,12 +330,22 @@ export async function GET(
       .populate('assignments.member', 'firstName lastName email avatar role')
       .populate('assignments.task', 'title status displayId priority')
       .populate('comments.author', 'firstName lastName email avatar role')
+      .populate('comments.member', 'firstName lastName email avatar role')
+      .populate('comments.task', 'title status displayId priority')
 
     if (!standupSchedule) {
       return NextResponse.json({ error: 'Standup schedule not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ success: true, data: standupSchedule })
+    const { StandupSummary } = await import('@/models/StandupSummary')
+    const summaryDoc = await StandupSummary.findOne({ standupScheduleId: params.scheduleId })
+    
+    const scheduleObj = standupSchedule.toObject()
+    if (summaryDoc) {
+      scheduleObj.summary = summaryDoc.generatedSummary
+    }
+
+    return NextResponse.json({ success: true, data: scheduleObj })
   } catch (error) {
     console.error('Get standup schedule error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -436,14 +510,12 @@ export async function PUT(
       }
 
       standupSchedule.assignments = assignments as any
+
+      await syncTaskAssigneesForAssignments(params.id, user.organization, assignments)
     }
 
     if (body?.notes !== undefined) {
       standupSchedule.notes = typeof body.notes === 'string' ? body.notes.trim() : undefined
-    }
-
-    if (body?.summary !== undefined) {
-      standupSchedule.summary = typeof body.summary === 'string' ? body.summary.trim() : undefined
     }
 
     if (body?.actualDate !== undefined) {
@@ -462,7 +534,15 @@ export async function PUT(
       standupSchedule.meetingLink = typeof body.meetingLink === 'string' ? body.meetingLink.trim() : undefined
     }
 
-    if (body?.comments !== undefined) {
+    if (body?.comment !== undefined) {
+      const appendedComments = normalizeComments([body.comment], user.id)
+      if (appendedComments.length > 0) {
+        standupSchedule.comments = [
+          ...(standupSchedule.comments || []),
+          ...(appendedComments as any)
+        ] as any
+      }
+    } else if (body?.comments !== undefined) {
       standupSchedule.comments = normalizeComments(body.comments, user.id) as any
     }
 
@@ -475,8 +555,18 @@ export async function PUT(
       .populate('assignments.member', 'firstName lastName email avatar role')
       .populate('assignments.task', 'title status displayId priority')
       .populate('comments.author', 'firstName lastName email avatar role')
+      .populate('comments.member', 'firstName lastName email avatar role')
+      .populate('comments.task', 'title status displayId priority')
 
-    return NextResponse.json({ success: true, data: populatedSchedule })
+    const { StandupSummary } = await import('@/models/StandupSummary')
+    const summaryDoc = await StandupSummary.findOne({ standupScheduleId: standupSchedule._id })
+    
+    const scheduleObj = populatedSchedule ? populatedSchedule.toObject() : {}
+    if (summaryDoc) {
+      scheduleObj.summary = summaryDoc.generatedSummary
+    }
+
+    return NextResponse.json({ success: true, data: scheduleObj })
   } catch (error) {
     console.error('Update standup schedule error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -501,21 +591,21 @@ export async function DELETE(
       return NextResponse.json({ error: projectContext.error }, { status: projectContext.status })
     }
 
-    const standupSchedule = await StandupSchedule.findOne({
+    const standupSchedule = await StandupSchedule.findOneAndDelete({
       _id: params.scheduleId,
       project: params.id,
-      organization: user.organization,
-      archived: false
+      organization: user.organization
     })
 
     if (!standupSchedule) {
       return NextResponse.json({ error: 'Standup schedule not found' }, { status: 404 })
     }
 
-    standupSchedule.archived = true
-    await standupSchedule.save()
+    // Hard delete associated summaries
+    const { StandupSummary } = await import('@/models/StandupSummary')
+    await StandupSummary.deleteMany({ standupScheduleId: params.scheduleId })
 
-    return NextResponse.json({ success: true, message: 'Standup schedule archived successfully' })
+    return NextResponse.json({ success: true, message: 'Standup schedule deleted successfully' })
   } catch (error) {
     console.error('Delete standup schedule error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

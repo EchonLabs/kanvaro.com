@@ -19,6 +19,7 @@ import { fetchStandupProjectDetail } from '@/components/standup-dashboard/standu
 import { deleteStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
 import { StandupTimeline } from '@/components/standup-dashboard/StandupTimeline'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
  
 import type { StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 
@@ -35,6 +36,8 @@ export default function StandupProjectPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [standupDateFilter, setStandupDateFilter] = useState('')
+  const [deleteMeetingId, setDeleteMeetingId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -83,20 +86,28 @@ export default function StandupProjectPage() {
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
   const handleDeleteMeeting = async (meetingId: string) => {
     if (!project) return
-    if (!window.confirm('Delete this standup schedule? It will be archived from both upcoming and past views.')) return
+    setDeleteMeetingId(meetingId)
+  }
+
+  const handleConfirmDeleteMeeting = async () => {
+    if (!project || !deleteMeetingId) return
 
     try {
-      await deleteStandupSchedule(projectId, meetingId)
+      setDeleting(true)
+      await deleteStandupSchedule(projectId, deleteMeetingId)
       setProject((current) => {
         if (!current) return current
         return {
           ...current,
-          meetings: current.meetings.filter((meeting) => meeting._id !== meetingId),
-          timeline: current.timeline.filter((item) => !item._id.startsWith(`${meetingId}-`))
+          meetings: current.meetings.filter((meeting) => meeting._id !== deleteMeetingId),
+          timeline: current.timeline.filter((item) => !item._id.startsWith(`${deleteMeetingId}-`))
         }
       })
     } catch {
       setError('Unable to delete standup schedule')
+    } finally {
+      setDeleting(false)
+      setDeleteMeetingId(null)
     }
   }
 
@@ -361,6 +372,18 @@ export default function StandupProjectPage() {
           <StandupTimeline items={project.timeline} />
         </div>
       </PageContent>
+
+      <ConfirmationModal
+        isOpen={Boolean(deleteMeetingId)}
+        onClose={() => !deleting && setDeleteMeetingId(null)}
+        onConfirm={handleConfirmDeleteMeeting}
+        title="Delete Standup Schedule"
+        description="Are you sure you want to delete this standup schedule? This action permanently removes it from upcoming and past standup views."
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={deleting}
+      />
 
     </MainLayout>
   )

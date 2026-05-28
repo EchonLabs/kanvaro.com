@@ -25,7 +25,7 @@ import type { StandupMember, StandupProjectSummary } from '@/components/standup-
 import { ArrowLeft, CalendarIcon, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
 import { createStandupParticipantList, createStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
-import { formatToTitleCase } from '@/lib/utils'
+import { formatToTitleCase, truncateText } from '@/lib/utils'
 
 type MemberTaskRow = {
   id: string
@@ -359,7 +359,7 @@ export default function CreateStandupSchedulePage() {
                     )
                   })}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Badge variant="outline">{selectedCount} selected</Badge>
                   <span>Choose who should receive the schedule notification.</span>
                 </div>
@@ -368,7 +368,7 @@ export default function CreateStandupSchedulePage() {
               <div className="space-y-3">
                 <div>
                   <Label>Task assignments</Label>
-                  <p className="text-xs text-muted-foreground">Assign one of the project tasks to each selected member.</p>
+                  <p className="text-sm text-muted-foreground">Assign one of the project tasks to each selected member.</p>
                 </div>
 
                 <div className="grid gap-3">
@@ -380,7 +380,7 @@ export default function CreateStandupSchedulePage() {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="font-medium">{member.firstName} {member.lastName}</p>
-                            <p className="text-xs text-muted-foreground">{member.role}</p>
+                            <p className="text-sm text-muted-foreground">{member.role}</p>
                           </div>
                           <Badge variant="outline" className="shrink-0">{rows.length} task{rows.length === 1 ? '' : 's'}</Badge>
                         </div>
@@ -390,44 +390,56 @@ export default function CreateStandupSchedulePage() {
                             const selectedTask = projectTasks.find((task) => task._id === row.taskId)
 
                             return (
-                              <div key={row.id} className="space-y-3 rounded-md bg-muted/30 p-3">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="secondary">Task {index + 1}</Badge>
-                                    {selectedTask?.status ? (
-                                      <Badge variant="outline">{formatToTitleCase(selectedTask.status)}</Badge>
-                                    ) : null}
+                              <div 
+                                key={row.id} 
+                                className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card shadow-xs hover:border-border-hover transition-all"
+                              >
+                                <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0">
+                                  <div className="flex-1 min-w-0">
+                                    <Select 
+                                      value={row.taskId} 
+                                      onValueChange={(value) => handleSaveTaskAssignment(member._id, row.id, { taskId: value })}
+                                    >
+                                      <SelectTrigger className="w-full max-w-full min-w-0 overflow-hidden border-none shadow-none font-medium h-fit p-0 hover:bg-transparent">
+                                        <SelectValue placeholder="Choose a project task" />
+                                      </SelectTrigger>
+                                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[min(95vw,28rem)]">
+                                        {projectTasks.map((task) => {
+                                          const taskLabel = `${task.displayId ? `${task.displayId} · ` : ''}${task.title}`
+                                          const { truncated: truncatedTaskLabel } = truncateText(taskLabel, 48)
+
+                                          return (
+                                            <SelectItem key={task._id} value={task._id} className="max-w-full">
+                                              <span className="flex max-w-full items-center gap-2 text-sm text-foreground font-medium">
+                                                <span className="truncate" title={taskLabel}>{truncatedTaskLabel}</span>
+                                                {task.status ? (
+                                                  <span className="text-xs text-muted-foreground capitalize bg-muted px-1.5 py-0.5 rounded shrink-0">
+                                                    {formatToTitleCase(task.status)}
+                                                  </span>
+                                                ) : null}
+                                              </span>
+                                            </SelectItem>
+                                          )
+                                        })}
+                                      </SelectContent>
+                                    </Select>
                                   </div>
-                                  <Button variant="ghost" size="sm" onClick={() => handleRemoveTaskRow(member._id, row.id)} className="h-8 px-2 text-muted-foreground">
-                                    <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                    Remove
-                                  </Button>
+
+                                  {selectedTask?.status ? (
+                                    <Badge variant="outline" className="text-sm shrink-0 capitalize">
+                                      {formatToTitleCase(selectedTask.status)}
+                                    </Badge>
+                                  ) : null}
                                 </div>
 
-                                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-                                  <Select value={row.taskId} onValueChange={(value) => handleSaveTaskAssignment(member._id, row.id, { taskId: value })}>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Choose a project task" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {projectTasks.map((task) => (
-                                        <SelectItem key={task._id} value={task._id}>
-                                          <span className="flex items-center gap-2">
-                                            <span>{task.displayId ? `${task.displayId} · ` : ''}{task.title}</span>
-                                            {task.status ? <span className="text-xs text-muted-foreground">{formatToTitleCase(task.status)}</span> : null}
-                                          </span>
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-
-                                  <Textarea
-                                    rows={3}
-                                    value={row.notes}
-                                    onChange={(event) => handleSaveTaskAssignment(member._id, row.id, { notes: event.target.value })}
-                                    placeholder="Task notes, blockers, or handoff details"
-                                  />
-                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleRemoveTaskRow(member._id, row.id)} 
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             )
                           })}

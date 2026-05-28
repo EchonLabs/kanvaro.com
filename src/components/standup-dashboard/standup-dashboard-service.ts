@@ -215,10 +215,14 @@ const normalizeMeeting = (schedule: StandupScheduleApiItem): StandupMeeting => {
           role: 'Team Member'
         }
 
+        const taskObj = isObjectLike(comment.task) ? comment.task : undefined
+
         return {
           _id: comment._id || `comment-${Date.now()}`,
           authorName: comment.authorName || `${author.firstName} ${author.lastName}`.trim(),
           memberId: normalizeMember(comment.member)?._id,
+          taskId: taskObj?._id || (typeof comment.task === 'string' ? comment.task : undefined),
+          taskTitle: comment.taskTitle || taskObj?.title,
           reason: comment.reason || '',
           createdAt: comment.createdAt || new Date().toISOString()
         }
@@ -393,6 +397,7 @@ const mapTimeLog = (entry: TimeEntryApiItem): StandupTimelogItem => {
     _id: entry._id,
     userId,
     userName,
+    taskId: entry.task && typeof entry.task === 'object' ? entry.task._id : undefined,
     taskTitle: entry.task && typeof entry.task === 'object' ? (entry.task.title || undefined) : undefined,
     projectName: entry.project && typeof entry.project === 'object' ? (entry.project.name || 'Project') : 'Project',
     startTime: entry.startTime || new Date().toISOString(),
@@ -433,8 +438,37 @@ export async function fetchStandupScheduleDetail(projectId: string, meetingId: s
     assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : []
   }))
 
+  const timelogsWithStatus = timelogs.map((log) => {
+    const task = normalizedTaskCards.find((t) => t._id === log.taskId)
+    return {
+      ...log,
+      taskStatus: task?.status || 'todo'
+    }
+  })
+
+  const meetingDateKey = meeting.date.slice(0, 10)
+  const assignedTasksByMember = new Map<string, Set<string>>()
+
+  ;(meeting.assignments || []).forEach((assignment) => {
+    if (!assignment.memberId || !assignment.taskId) return
+    const existing = assignedTasksByMember.get(assignment.memberId) || new Set<string>()
+    existing.add(assignment.taskId)
+    assignedTasksByMember.set(assignment.memberId, existing)
+  })
+
+  const filteredTimelogs = timelogsWithStatus.filter((log) => {
+    if (!log.taskId || !log.userId || !log.startTime) return false
+    const allowedTasks = assignedTasksByMember.get(log.userId)
+    if (!allowedTasks || !allowedTasks.has(log.taskId)) return false
+
+    const logDate = new Date(log.startTime)
+    if (Number.isNaN(logDate.getTime())) return false
+
+    return logDate.toISOString().slice(0, 10) === meetingDateKey
+  })
+
   const memberSummaries: StandupScheduleMemberSummary[] = projectDetail.summary.teamMembers.map((member, index) => {
-    const memberTimelogs = timelogs.filter((log) => log.userId === member._id)
+    const memberTimelogs = filteredTimelogs.filter((log) => log.userId === member._id)
     const memberAssignments = meeting.assignments?.filter((assignment) => assignment.memberId === member._id) || []
     const memberTasks = normalizedTaskCards.filter((task) => task.assignedTo?.some((assignedMember) => {
       const assignedId = assignedMember._id
@@ -480,7 +514,7 @@ export async function fetchStandupScheduleDetail(projectId: string, meetingId: s
     meeting,
     pastMeetings,
     memberSummaries,
-    timelogs,
+    timelogs: filteredTimelogs,
     projectTasks: normalizedTaskCards
   }
 }

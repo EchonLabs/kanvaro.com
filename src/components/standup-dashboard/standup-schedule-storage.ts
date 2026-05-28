@@ -18,7 +18,9 @@ type StandupTaskRef = {
 type StandupScheduleApiComment = {
   _id?: string
   author?: StandupMemberRef
+  task?: StandupTaskRef | string
   authorName?: string
+  taskTitle?: string
   member?: StandupMemberRef
   reason?: string
   createdAt?: string
@@ -91,6 +93,12 @@ const normalizeComment = (comment: StandupScheduleApiComment): StandupScheduleCo
   const reason = typeof comment.reason === 'string' ? comment.reason.trim() : ''
   if (!reason) return null
 
+  const taskObj = isObjectLike(comment.task) ? comment.task : undefined
+  const taskId = taskObj?._id || (typeof comment.task === 'string' ? comment.task : undefined)
+  const taskTitle = typeof comment.taskTitle === 'string' && comment.taskTitle.trim()
+    ? comment.taskTitle.trim()
+    : taskObj?.title
+
   const author = normalizeMember(comment.author) || normalizeMember(comment.member) || {
     _id: 'unknown',
     firstName: 'Unknown',
@@ -103,6 +111,8 @@ const normalizeComment = (comment: StandupScheduleApiComment): StandupScheduleCo
     _id: comment._id || `comment-${Date.now()}`,
     authorName: typeof comment.authorName === 'string' && comment.authorName.trim() ? comment.authorName.trim() : `${author.firstName} ${author.lastName}`.trim(),
     memberId: normalizeMember(comment.member)?._id,
+    taskId,
+    taskTitle,
     reason,
     createdAt: comment.createdAt || new Date().toISOString()
   }

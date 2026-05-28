@@ -5,6 +5,8 @@ export interface IStandupScheduleComment {
   author: mongoose.Types.ObjectId
   authorName?: string
   member?: mongoose.Types.ObjectId
+  task?: mongoose.Types.ObjectId
+  taskTitle?: string
   reason: string
   createdAt: Date
 }
@@ -30,7 +32,6 @@ export interface IStandupSchedule extends Document {
   createdBy: mongoose.Types.ObjectId
   participants: mongoose.Types.ObjectId[]
   notes?: string
-  summary?: string
   actualDate?: Date
   location?: string
   meetingLink?: string
@@ -97,10 +98,6 @@ const StandupScheduleSchema = new Schema<IStandupSchedule>({
     type: String,
     maxlength: 5000
   },
-  summary: {
-    type: String,
-    maxlength: 5000
-  },
   actualDate: {
     type: Date
   },
@@ -126,6 +123,8 @@ const StandupScheduleSchema = new Schema<IStandupSchedule>({
     author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     authorName: { type: String, trim: true, maxlength: 200 },
     member: { type: Schema.Types.ObjectId, ref: 'User' },
+    task: { type: Schema.Types.ObjectId, ref: 'Task' },
+    taskTitle: { type: String, trim: true, maxlength: 200 },
     reason: { type: String, required: true, trim: true, maxlength: 2000 },
     createdAt: { type: Date, default: Date.now }
   }],
