@@ -1,3 +1,26 @@
+# [1.37.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.4...v1.37.0) (2026-05-29)
+
+
+### Features
+
+* add loading component for Standup Dashboard ([e67c2e1](https://github.com/EchonLabs/kanvaro.com/commit/e67c2e1a069cb68713bc4c285bebaeb3c6b80b3a))
+* add short format for logged hours in Standup Timelog utilities ([46c1a00](https://github.com/EchonLabs/kanvaro.com/commit/46c1a0090c8ecdfe590cd146379318525555d2ec))
+* add Standup Assignment and Schedule dialogs with form handling ([b2e2a04](https://github.com/EchonLabs/kanvaro.com/commit/b2e2a04d852c35742876000124549e772fd5d865))
+* add Standup Dashboard link to Sidebar and MobileMenu navigation ([85210ff](https://github.com/EchonLabs/kanvaro.com/commit/85210ff112affa9bbb609f1e5a1aba479584ff24))
+* add standup summary page and delay reasons handling ([0e3eae9](https://github.com/EchonLabs/kanvaro.com/commit/0e3eae92f735f0db728e31686f83538911b5266b))
+* add StandupSchedule model and API routes for managing standup schedules ([cefb8d7](https://github.com/EchonLabs/kanvaro.com/commit/cefb8d7640a1c35c268a08d28078458e8b2ad765))
+* create Standup Schedule page with form handling and project details ([b94f381](https://github.com/EchonLabs/kanvaro.com/commit/b94f3818c78f9b0af575fb847183f66413e72177))
+* enhance Standup Dashboard with detailed meeting view and local schedule management ([5596ef4](https://github.com/EchonLabs/kanvaro.com/commit/5596ef4f2174b931aea744409f55567f10351600))
+* enhance Standup Dashboard with new schedule management features and improved data handling ([34b7cd1](https://github.com/EchonLabs/kanvaro.com/commit/34b7cd15c15abcbd27fa9572535ba4d209a3e1f7))
+* Enhance Standup Dashboard with Unified Comments and Summary Generation ([51fd24f](https://github.com/EchonLabs/kanvaro.com/commit/51fd24ff348a56c0531db2a0a14b67592b6c1164))
+* enhance standup schedule creation with task assignments and notes and added summary generation ([1e7ba04](https://github.com/EchonLabs/kanvaro.com/commit/1e7ba04086ad47bc0cae60b333aca734ff7b87f1))
+* enhance standup scheduling with actual date handling and date key utilities ([7730eba](https://github.com/EchonLabs/kanvaro.com/commit/7730eba8a7b4f6a9a0fe7a08a3d50703690c110f))
+* enhanced the StandupSummaryDialog to parse and display existing summaries more intelligently, including section titles and comments. ([3a92bc1](https://github.com/EchonLabs/kanvaro.com/commit/3a92bc1de5bf5f1a6a6aa71ae1376208537c9636))
+* implement Standup Dashboard with project summaries and details ([e9dc33b](https://github.com/EchonLabs/kanvaro.com/commit/e9dc33bd676576d32ecd2856f6bf0f8db1139133))
+* improve date handling in standup schedule and dashboard components ([e4407d0](https://github.com/EchonLabs/kanvaro.com/commit/e4407d0b2ea8adf3ff92be75d5749fcfc99134fd))
+* refactor Standup Dashboard and Schedule pages for improved error handling and state management ([ebc6679](https://github.com/EchonLabs/kanvaro.com/commit/ebc66799964b0e0d29651040098d36ddd64666f1))
+* update breadcrumb management in Standup Dashboard and Schedule pages for improved navigation ([4ee138d](https://github.com/EchonLabs/kanvaro.com/commit/4ee138dc4ac58732f765e00e41e1e476a786b1db))
+
 ## [1.36.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.3...v1.36.4) (2026-05-27)
 
 
