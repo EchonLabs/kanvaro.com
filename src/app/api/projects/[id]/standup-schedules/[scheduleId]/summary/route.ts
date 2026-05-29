@@ -129,7 +129,14 @@ export async function POST(
       return NextResponse.json({ error: 'Standup schedule not found' }, { status: 404 })
     }
 
-    const dayBounds = getStandupDayBounds(schedule.actualDate || schedule.scheduledDate)
+    const summaryDate = schedule.status === 'completed' || schedule.status === 'missed'
+      ? (schedule.actualDate || schedule.scheduledDate)
+      : schedule.scheduledDate || schedule.actualDate
+    if (!summaryDate) {
+      return NextResponse.json({ error: 'Standup schedule date is invalid' }, { status: 400 })
+    }
+
+    const dayBounds = getStandupDayBounds(summaryDate)
     if (!dayBounds) {
       return NextResponse.json({ error: 'Standup schedule date is invalid' }, { status: 400 })
     }
@@ -224,13 +231,15 @@ export async function POST(
       meeting: {
         _id: String(schedule._id),
         title: schedule.title || 'Daily Standup',
-        date: (schedule.actualDate || schedule.scheduledDate).toISOString(),
+        date: summaryDate.toISOString(),
         time: schedule.time || '09:00',
         durationMinutes: schedule.durationMinutes || 15,
         participants: Array.isArray(schedule.participants) ? schedule.participants : [],
         status: (schedule.status as any) || 'scheduled',
         notes: schedule.notes,
-        actualDate: schedule.actualDate?.toISOString?.() || undefined,
+        actualDate: schedule.status === 'completed' || schedule.status === 'missed'
+          ? schedule.actualDate?.toISOString?.()
+          : undefined,
         facilitator: schedule.facilitator,
         createdBy: schedule.createdBy,
         location: undefined,

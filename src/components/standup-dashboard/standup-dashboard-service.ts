@@ -204,7 +204,9 @@ const normalizeMeeting = (schedule: StandupScheduleApiItem): StandupMeeting => {
     title: schedule.title || 'Daily Standup',
     date: displayDate ? displayDate.toISOString() : new Date().toISOString(),
     scheduledDate: scheduledDate ? scheduledDate.toISOString() : undefined,
-    actualDate: actualDate ? actualDate.toISOString() : undefined,
+    actualDate: (resolvedStatus === 'completed' || resolvedStatus === 'missed') && actualDate
+      ? actualDate.toISOString()
+      : undefined,
     time: schedule.time || '09:00',
     durationMinutes: typeof schedule.durationMinutes === 'number' ? schedule.durationMinutes : 15,
     participants: Array.isArray(schedule.participants)

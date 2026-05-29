@@ -19,7 +19,7 @@ import { deleteStandupSchedule } from '@/components/standup-dashboard/standup-sc
 import { StandupTimeline } from '@/components/standup-dashboard/StandupTimeline'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
-import { getLocalStandupDateKey } from '@/components/standup-dashboard/standup-date-utils'
+import { getStandupDateKey } from '@/components/standup-dashboard/standup-date-utils'
  
 import type { StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 
@@ -113,7 +113,7 @@ export default function StandupProjectPage() {
     .filter((meeting) => meeting.status !== 'completed' && meeting.status !== 'missed')
     .filter((meeting) => {
       if (!standupDateFilter) return true
-      const meetingDateKey = getLocalStandupDateKey(meeting.scheduledDate || meeting.date)
+      const meetingDateKey = getStandupDateKey(meeting.scheduledDate || meeting.date)
       return meetingDateKey === standupDateFilter
     })
     .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
