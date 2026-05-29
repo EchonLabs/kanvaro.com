@@ -12,7 +12,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useAuthContext } from '@/contexts/AuthContext'
-import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -39,7 +38,6 @@ export default function StandupScheduleDetailPage() {
   const router = useRouter()
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
   const { hasPermission, canManageProject } = usePermissions()
-  const { setItems } = useBreadcrumb()
   const { formatDate } = useDateTime()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const projectId = params.projectId as string
@@ -86,15 +84,12 @@ export default function StandupScheduleDetailPage() {
     return () => abortController.abort()
   }, [meetingId, projectId, user?.organization])
 
-  useEffect(() => {
-    if (detail?.project) {
-      setItems([
-        { label: 'Standup Dashboard', href: '/tasks/standup-dashboard' },
-        { label: detail.project.name, href: `/tasks/standup-dashboard/${projectId}` },
-        { label: detail.meeting.title }
-      ])
-    }
-  }, [detail, projectId, setItems])
+  const breadcrumbItems = [
+    { label: 'Tasks', href: '/tasks' },
+    { label: 'Standup Dashboard', href: '/tasks/standup-dashboard' },
+    { label: `${detail?.project?.name || 'Project'} Standups`, href: `/tasks/standup-dashboard/${projectId}` },
+    { label: 'View Details' }
+  ]
 
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
 
@@ -169,7 +164,7 @@ export default function StandupScheduleDetailPage() {
 
   if (loading || !detail) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <Card>
             <CardContent className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -183,7 +178,7 @@ export default function StandupScheduleDetailPage() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout breadcrumbItems={breadcrumbItems}>
       <PageContent>
         <div className="space-y-6 sm:space-y-8">
           {/* Main Title and Page Header layout */}

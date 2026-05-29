@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDistanceToNow } from 'date-fns'
 import { MessageSquare, Send, User2, Loader2 } from 'lucide-react'
 import type { StandupMember, StandupScheduleComment } from './standup-dashboard-types'
+import { truncateText } from '@/lib/utils'
 
 interface UnifiedCommentsSectionProps {
   comments: StandupScheduleComment[]
@@ -125,8 +126,12 @@ export function UnifiedCommentsSection({
                 <SelectContent>
                   <SelectItem value="none">No specific task</SelectItem>
                   {projectTasks.map((task) => (
-                    <SelectItem key={task._id} value={task._id} className="text-xs">
-                      {task.displayId ? `${task.displayId} · ` : ''}{task.title}
+                    <SelectItem key={task._id} value={task._id} className="text-xs" title={`${task.displayId ? `${task.displayId} · ` : ''}${task.title}`}>
+                      {(() => {
+                        const fullTaskLabel = `${task.displayId ? `${task.displayId} · ` : ''}${task.title}`
+                        const { truncated } = truncateText(fullTaskLabel, 48)
+                        return truncated
+                      })()}
                     </SelectItem>
                   ))}
                 </SelectContent>

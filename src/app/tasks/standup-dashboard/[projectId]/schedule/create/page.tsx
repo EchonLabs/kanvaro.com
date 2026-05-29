@@ -18,7 +18,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuthContext } from '@/contexts/AuthContext'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
-import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { fetchStandupProjectDetail } from '@/components/standup-dashboard/standup-dashboard-service'
 import type { StandupMember, StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
@@ -44,7 +43,6 @@ export default function CreateStandupSchedulePage() {
   const router = useRouter()
   const { isAuthenticated, isLoading: authLoading } = useAuthContext()
   const { hasPermission, canManageProject } = usePermissions()
-  const { setItems } = useBreadcrumb()
   const { formatDate } = useDateTime()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const projectId = params.projectId as string
@@ -102,15 +100,12 @@ export default function CreateStandupSchedulePage() {
     return () => abortController.abort()
   }, [projectId])
 
-  useEffect(() => {
-    if (project) {
-      setItems([
-        { label: 'Standup Dashboard', href: '/tasks/standup-dashboard' },
-        { label: project.name, href: `/tasks/standup-dashboard/${projectId}` },
-        { label: 'Create Schedule' }
-      ])
-    }
-  }, [project, projectId, setItems])
+  const breadcrumbItems = [
+    { label: 'Tasks', href: '/tasks' },
+    { label: 'Standup Dashboard', href: '/tasks/standup-dashboard' },
+    { label: `${project?.name || 'Project'} Standups`, href: `/tasks/standup-dashboard/${projectId}` },
+    { label: 'Create Standup' }
+  ]
 
   const selectedCount = useMemo(() => formState.attendeeIds.length, [formState.attendeeIds])
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
@@ -250,7 +245,7 @@ export default function CreateStandupSchedulePage() {
 
   if (loading || !project) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <Card>
             <CardContent className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -265,7 +260,7 @@ export default function CreateStandupSchedulePage() {
 
   if (!canManageStandup) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <Card className="max-w-2xl">
             <CardHeader>
@@ -283,7 +278,7 @@ export default function CreateStandupSchedulePage() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout breadcrumbItems={breadcrumbItems}>
       <PageContent>
         <div className="space-y-6 sm:space-y-8">
           <div className="flex items-start justify-between gap-4">

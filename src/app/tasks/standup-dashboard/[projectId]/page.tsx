@@ -11,7 +11,6 @@ import { Progress } from '@/components/ui/Progress'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
-import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { formatToTitleCase } from '@/lib/utils'
 import { Activity, ArrowLeft, CalendarDays, Clock3, Loader2, RefreshCw, Users, Eye, Trash2 } from 'lucide-react'
@@ -28,7 +27,6 @@ export default function StandupProjectPage() {
   const router = useRouter()
   const { isAuthenticated, isLoading: authLoading } = useAuthContext()
   const { hasPermission, canManageProject } = usePermissions()
-  const { setItems } = useBreadcrumb()
   const { formatDate, formatDateTimeSafe } = useDateTime()
   const projectId = params.projectId as string
   const [project, setProject] = useState<StandupProjectSummary | null>(null)
@@ -74,14 +72,11 @@ export default function StandupProjectPage() {
     return () => abortController.abort()
   }, [projectId])
 
-  useEffect(() => {
-    if (project) {
-      setItems([
-        { label: 'Standup Dashboard', href: '/tasks/standup-dashboard' },
-        { label: project.name }
-      ])
-    }
-  }, [project, setItems])
+  const breadcrumbItems = [
+    { label: 'Tasks', href: '/tasks' },
+    { label: 'Standup Dashboard', href: '/tasks/standup-dashboard' },
+    { label: project ? `${project.name} Standup` : 'Project Standup' }
+  ]
 
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
   const handleDeleteMeeting = async (meetingId: string) => {
@@ -123,7 +118,7 @@ export default function StandupProjectPage() {
 
   if (loading) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <Card>
             <CardContent className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -138,7 +133,7 @@ export default function StandupProjectPage() {
 
   if (!project) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <Card>
             <CardContent className="py-16 text-center space-y-3">
@@ -155,7 +150,7 @@ export default function StandupProjectPage() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout breadcrumbItems={breadcrumbItems}>
       <PageContent>
         <div className="space-y-6 sm:space-y-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
