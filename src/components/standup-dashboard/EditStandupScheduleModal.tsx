@@ -205,6 +205,7 @@ export function EditStandupScheduleModal({
         time: formState.time,
         durationMinutes: Number(formState.durationMinutes),
         status: formState.status,
+        actualDate: formState.status === 'completed' || formState.status === 'missed' ? (detail.meeting.actualDate || selectedDate.toISOString()) : null,
         participants: formState.attendeeIds,
         notes: formState.notes,
         assignments: assignmentsPayload

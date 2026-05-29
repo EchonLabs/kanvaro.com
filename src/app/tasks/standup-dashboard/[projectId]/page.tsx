@@ -19,6 +19,7 @@ import { deleteStandupSchedule } from '@/components/standup-dashboard/standup-sc
 import { StandupTimeline } from '@/components/standup-dashboard/StandupTimeline'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { getLocalStandupDateKey } from '@/components/standup-dashboard/standup-date-utils'
  
 import type { StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 
@@ -110,7 +111,11 @@ export default function StandupProjectPage() {
     .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
   const upcomingMeetings = mergedMeetings
     .filter((meeting) => meeting.status !== 'completed' && meeting.status !== 'missed')
-    .filter((meeting) => (standupDateFilter ? meeting.date.slice(0, 10) === standupDateFilter : true))
+    .filter((meeting) => {
+      if (!standupDateFilter) return true
+      const meetingDateKey = getLocalStandupDateKey(meeting.scheduledDate || meeting.date)
+      return meetingDateKey === standupDateFilter
+    })
     .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
   const pastMeetings = mergedMeetings
     .filter((meeting) => meeting.status === 'completed' || meeting.status === 'missed')
@@ -240,12 +245,14 @@ export default function StandupProjectPage() {
                     <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Date</span><span>{formatDate(meeting.date)}</span></div>
                     <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Time</span><span>{meeting.time}</span></div>
                     <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Duration</span><span>{meeting.durationMinutes} mins</span></div>
-                    <div>
-                      <div className="mb-2 text-muted-foreground">Participants</div>
-                      <div className="flex -space-x-2 overflow-hidden">
-                        {meeting.participants.map((participant) => (
-                          <GravatarAvatar key={participant._id} user={participant} size={28} className="h-7 w-7 border-2 border-background" />
-                        ))}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="text-muted-foreground">Participants</div>
+                        <div className="flex -space-x-2 overflow-hidden items-center">
+                          {meeting.participants.map((participant) => (
+                            <GravatarAvatar key={participant._id} user={participant} size={28} className="h-7 w-7 border-2 border-background" />
+                          ))}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center justify-end pt-2">
@@ -290,12 +297,14 @@ export default function StandupProjectPage() {
                     <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Date</span><span>{formatDate(meeting.date)}</span></div>
                     <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Time</span><span>{meeting.time}</span></div>
                     <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Duration</span><span>{meeting.durationMinutes} mins</span></div>
-                    <div>
-                      <div className="mb-2 text-muted-foreground">Participants</div>
-                      <div className="flex -space-x-2 overflow-hidden">
-                        {meeting.participants.map((participant) => (
-                          <GravatarAvatar key={participant._id} user={participant} size={28} className="h-7 w-7 border-2 border-background" />
-                        ))}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="text-muted-foreground">Participants</div>
+                        <div className="flex -space-x-2 overflow-hidden items-center">
+                          {meeting.participants.map((participant) => (
+                            <GravatarAvatar key={participant._id} user={participant} size={28} className="h-7 w-7 border-2 border-background" />
+                          ))}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center justify-end pt-2">

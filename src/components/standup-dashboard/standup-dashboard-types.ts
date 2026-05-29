@@ -23,6 +23,7 @@ export interface StandupMeeting {
   notes?: string
   facilitator?: StandupMember
   createdBy?: StandupMember
+  scheduledDate?: string
   actualDate?: string
   location?: string
   meetingLink?: string

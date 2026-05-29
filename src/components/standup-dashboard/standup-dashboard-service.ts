@@ -178,7 +178,14 @@ const normalizeTask = (task: TaskApiItem) => ({
 })
 
 const normalizeMeeting = (schedule: StandupScheduleApiItem): StandupMeeting => {
-  const scheduledDateTime = buildScheduledDateTime(schedule.actualDate || schedule.scheduledDate, schedule.time)
+  const scheduledDate = schedule.scheduledDate ? new Date(schedule.scheduledDate) : null
+  const actualDate = schedule.actualDate ? new Date(schedule.actualDate) : null
+  const scheduledDateTime = buildScheduledDateTime(
+    schedule.status === 'completed' || schedule.status === 'missed'
+      ? (schedule.actualDate || schedule.scheduledDate)
+      : schedule.scheduledDate || schedule.actualDate,
+    schedule.time
+  )
   const resolvedStatus = schedule.status === 'in_progress'
     ? 'in_progress'
     : schedule.status === 'completed'
@@ -188,12 +195,16 @@ const normalizeMeeting = (schedule: StandupScheduleApiItem): StandupMeeting => {
         : scheduledDateTime && scheduledDateTime < new Date()
           ? 'completed'
           : 'scheduled'
+  const displayDate = resolvedStatus === 'completed' || resolvedStatus === 'missed'
+    ? actualDate || scheduledDate
+    : scheduledDate || actualDate
 
   return {
     _id: schedule._id,
     title: schedule.title || 'Daily Standup',
-    date: schedule.actualDate || schedule.scheduledDate || new Date().toISOString(),
-    actualDate: schedule.actualDate,
+    date: displayDate ? displayDate.toISOString() : new Date().toISOString(),
+    scheduledDate: scheduledDate ? scheduledDate.toISOString() : undefined,
+    actualDate: actualDate ? actualDate.toISOString() : undefined,
     time: schedule.time || '09:00',
     durationMinutes: typeof schedule.durationMinutes === 'number' ? schedule.durationMinutes : 15,
     participants: Array.isArray(schedule.participants)

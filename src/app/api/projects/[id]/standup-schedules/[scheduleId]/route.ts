@@ -437,6 +437,9 @@ export async function PUT(
         return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
       }
       standupSchedule.status = status as typeof standupSchedule.status
+      if (status === 'scheduled' || status === 'in_progress' || status === 'cancelled') {
+        standupSchedule.actualDate = undefined
+      }
     }
 
     if (body?.facilitator !== undefined || body?.facilitatorId !== undefined) {
