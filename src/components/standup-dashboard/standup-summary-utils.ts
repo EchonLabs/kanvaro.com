@@ -112,6 +112,22 @@ const formatGmt530Time = (value?: string | Date) => {
   return `${hour12}:${minuteLabel} ${period} GMT +5:30`
 }
 
+const formatGmt530TimeShort = (value?: string | Date) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const offsetMinutes = 330
+  const shifted = new Date(date.getTime() + offsetMinutes * 60 * 1000)
+  const hours = shifted.getUTCHours()
+  const minutes = shifted.getUTCMinutes()
+  const period = hours >= 12 ? 'PM' : 'AM'
+  const hour12 = hours % 12 || 12
+  const minuteLabel = String(minutes).padStart(2, '0')
+
+  return `${hour12}:${minuteLabel} ${period}`
+}
+
 const formatDateKeyLabel = (value?: string | Date) => {
   const dateKey = getStandupDateKey(value)
   if (!dateKey) return 'an unknown date'
@@ -242,11 +258,11 @@ const buildTaskTransitionLines = (tasks: SummaryTask[], activities: SummaryActiv
           return
         }
 
-        const timeLabel = formatGmt530Time(activity.createdAt)
+        const timeLabel = formatGmt530TimeShort(activity.createdAt)
         if (!timeLabel) return
 
         const actorLabel = activity.userName ? ` by ${activity.userName}` : ''
-        const taskLabel = formatTaskLabel(task)
+        const taskLabel = `Task: ${formatTaskLabel(task)}`
         lines.push(`${timeLabel} · ${taskLabel} · ${formatTaskStatusLabel(fromStatus)} → ${formatTaskStatusLabel(toStatus)}${actorLabel}`)
       })
       return
@@ -298,7 +314,8 @@ const buildLoggedHourMaps = (timelogs: StandupTimelogItem[]) => {
 const buildMemberHourLines = (participants: StandupMember[], minutesByMember: Map<string, number>) => {
   return participants.map((member) => {
     const memberName = `${member.firstName} ${member.lastName}`.trim()
-    return `${memberName} logged ${formatLoggedHours(minutesByMember.get(member._id) || 0)} during this standup day.`
+    const key = String((member as any)._id || (member as any).id || '')
+    return `${memberName} logged ${formatLoggedHours(minutesByMember.get(key) || 0)} during this standup day.`
   })
 }
 
@@ -306,6 +323,7 @@ const buildEstimationAnalysisLines = (tasks: SummaryTask[], minutesByTask: Map<s
   const lines: string[] = []
 
   tasks.forEach((task) => {
+    const labeledTask = `Task: ${formatTaskLabel(task)}`
     const estimatedHours = typeof task.estimatedHours === 'number' && task.estimatedHours > 0 ? task.estimatedHours : null
     const loggedMinutes = minutesByTask.get(task._id) || 0
     const loggedHours = roundLoggedHours(loggedMinutes)
@@ -313,9 +331,9 @@ const buildEstimationAnalysisLines = (tasks: SummaryTask[], minutesByTask: Map<s
 
     if (estimatedHours === null) {
       if (loggedHours > 0) {
-        lines.push(`${formatTaskLabel(task)} has ${formatHourValue(loggedHours)} logged but no estimate yet. Add an estimate so scope drift can be tracked.`)
+        lines.push(`${labeledTask} has ${formatHourValue(loggedHours)} logged but no estimate yet. Add an estimate so scope drift can be tracked.`)
       } else {
-        lines.push(`${formatTaskLabel(task)} has no estimate yet. Add one before more work continues so progress can be compared against a target.`)
+        lines.push(`${labeledTask} has no estimate yet. Add one before more work continues so progress can be compared against a target.`)
       }
       return
     }
@@ -328,7 +346,7 @@ const buildEstimationAnalysisLines = (tasks: SummaryTask[], minutesByTask: Map<s
     const effortRatio = loggedHours / estimatedHours
 
     if (effortRatio >= 1.5) {
-      lines.push(`${formatTaskLabel(task)} is overdue. Logged ${formatHourValue(loggedHours)} against a ${formatHourValue(estimatedHours)} estimate. It is far above estimate and should be reviewed.`)
+      lines.push(`${labeledTask} is overdue. Logged ${formatHourValue(loggedHours)} against a ${formatHourValue(estimatedHours)} estimate. It is far above estimate and should be reviewed.`)
       if (delayReason) {
         lines.push(`Reason for delay: ${delayReason}`)
       }
@@ -336,7 +354,7 @@ const buildEstimationAnalysisLines = (tasks: SummaryTask[], minutesByTask: Map<s
     }
 
     if (effortRatio > 1) {
-      lines.push(`${formatTaskLabel(task)} is overdue. Logged ${formatHourValue(loggedHours)} against a ${formatHourValue(estimatedHours)} estimate. It is above estimate and may need attention.`)
+      lines.push(`${labeledTask} is overdue. Logged ${formatHourValue(loggedHours)} against a ${formatHourValue(estimatedHours)} estimate. It is above estimate and may need attention.`)
       if (delayReason) {
         lines.push(`Reason for delay: ${delayReason}`)
       }
@@ -344,11 +362,11 @@ const buildEstimationAnalysisLines = (tasks: SummaryTask[], minutesByTask: Map<s
     }
 
     if (effortRatio >= 0.85) {
-      lines.push(`${formatTaskLabel(task)} is approaching its ${formatHourValue(estimatedHours)} estimate with ${formatHourValue(loggedHours)} already logged.`)
+      lines.push(`${labeledTask} is approaching its ${formatHourValue(estimatedHours)} estimate with ${formatHourValue(loggedHours)} already logged.`)
       return
     }
 
-    lines.push(`${formatTaskLabel(task)} is progressing within its ${formatHourValue(estimatedHours)} estimate with ${formatHourValue(loggedHours)} logged so far.`)
+    lines.push(`${labeledTask} is progressing within its ${formatHourValue(estimatedHours)} estimate with ${formatHourValue(loggedHours)} logged so far.`)
   })
 
   if (lines.length === 0) {
@@ -368,8 +386,9 @@ const buildDueDateAnalysisLines = (tasks: SummaryTask[], standupDate: string | D
   const lines: string[] = []
 
   tasks.forEach((task) => {
+    const labeledTask = `Task: ${formatTaskLabel(task)}`
     if (!task.dueDate) {
-      lines.push(`${formatTaskLabel(task)} does not have a due date yet. Add one so delivery risk can be tracked.`)
+      lines.push(`${labeledTask} does not have a due date yet. Add one so delivery risk can be tracked.`)
       return
     }
 
@@ -382,30 +401,30 @@ const buildDueDateAnalysisLines = (tasks: SummaryTask[], standupDate: string | D
     const status = normalizeStatus(task.status)
 
     if (completedTime !== null && completedTime < dueTime) {
-      lines.push(`${formatTaskLabel(task)} was completed before its due date.`)
+      lines.push(`${labeledTask} was completed before its due date.`)
       return
     }
 
     if (dueTime < standupTime && status !== 'done' && status !== 'completed') {
       const statusLabel = formatStatusLabel(status)
       const overdueDays = Math.max(1, Math.round((standupTime - dueTime) / (1000 * 60 * 60 * 24)))
-      lines.push(`${formatTaskLabel(task)} is overdue by ${overdueDays} day${overdueDays === 1 ? '' : 's'} and still ${statusLabel.toLowerCase()}.`)
+      lines.push(`${labeledTask} is overdue by ${overdueDays} day${overdueDays === 1 ? '' : 's'} and still ${statusLabel.toLowerCase()}.`)
       return
     }
 
     const daysUntilDue = Math.round((dueTime - standupTime) / (1000 * 60 * 60 * 24))
     if (daysUntilDue === 0) {
-      lines.push(`${formatTaskLabel(task)} is due today.`)
+      lines.push(`${labeledTask} is due today.`)
       return
     }
 
     if (daysUntilDue === 1) {
-      lines.push(`${formatTaskLabel(task)} is due tomorrow.`)
+      lines.push(`${labeledTask} is due tomorrow.`)
       return
     }
 
     if (daysUntilDue > 1 && daysUntilDue <= 3) {
-      lines.push(`${formatTaskLabel(task)} is due in ${daysUntilDue} days.`)
+      lines.push(`${labeledTask} is due in ${daysUntilDue} days.`)
     }
   })
 
@@ -446,7 +465,7 @@ export const buildStandupSummaryMarkdown = (params: BuildStandupSummaryParams) =
     if (rows.length === 0) return []
 
     return [title as string, ...rows.slice(0, 5).map((entry) => {
-      const timeLabel = formatGmt530Time(entry.createdAt)
+      const timeLabel = formatGmt530TimeShort(entry.createdAt)
       const taskLabel = entry.taskTitle ? ` on ${entry.taskTitle}` : ''
       const prefix = entry.source === 'note' ? 'Standup notes' : entry.authorName
       return `${timeLabel ? `${timeLabel} ` : ''}${prefix}${taskLabel}: ${entry.reason}`

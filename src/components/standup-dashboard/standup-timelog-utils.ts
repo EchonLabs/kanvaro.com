@@ -7,8 +7,13 @@ export const roundLoggedHours = (minutes: number): number => {
 }
 
 export const formatLoggedHours = (minutes: number): string => {
-  const roundedHours = roundLoggedHours(minutes)
-  return `${Number.isInteger(roundedHours) ? roundedHours.toFixed(0) : roundedHours.toFixed(1)}h`
+  const safeMinutes = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0
+  if (safeMinutes < 60) {
+    return `${safeMinutes}m`
+  }
+
+  const hours = Math.round((safeMinutes / 60) * 10) / 10
+  return `${Number.isInteger(hours) ? hours.toFixed(0) : hours.toFixed(1)}h`
 }
 
 interface FilterStandupTimelogsParams {
