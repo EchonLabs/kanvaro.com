@@ -4,6 +4,7 @@ export interface IStandupSummary extends Document {
   standupScheduleId: mongoose.Types.ObjectId
   projectId: mongoose.Types.ObjectId
   generatedSummary: string
+  delayReasons?: Record<string, string>
   generatedDate: Date
   createdAt: Date
   updatedAt: Date
@@ -24,6 +25,10 @@ const StandupSummarySchema = new Schema<IStandupSummary>({
   generatedSummary: {
     type: String,
     required: true
+  },
+  delayReasons: {
+    type: Schema.Types.Mixed,
+    default: {}
   },
   generatedDate: {
     type: Date,

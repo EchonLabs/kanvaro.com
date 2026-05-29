@@ -90,6 +90,10 @@ export interface StandupScheduleDetail {
     status?: string
     priority?: string
     displayId?: string
+    estimatedHours?: number
+    dueDate?: string
+    completedAt?: string
+    actualHours?: number
     assignedTo?: Array<{
       _id?: string
       user?: { _id?: string }

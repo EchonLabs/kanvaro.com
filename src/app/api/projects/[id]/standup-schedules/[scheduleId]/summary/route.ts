@@ -101,6 +101,8 @@ export async function POST(
   try {
     await connectDB()
 
+    const body = await request.json().catch(() => ({} as any))
+
     const authResult = await authenticateUser()
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status })
@@ -254,7 +256,10 @@ export async function POST(
         taskTitle: comment.taskTitle || comment.task?.title,
         reason: comment.reason || '',
         createdAt: comment.createdAt || new Date().toISOString()
-      })) : []
+      })) : [],
+      delayReasons: body?.delayReasons && typeof body.delayReasons === 'object'
+        ? Object.fromEntries(Object.entries(body.delayReasons).map(([key, value]) => [key, typeof value === 'string' ? value : '']))
+        : {}
     })
 
     // Database Restructuring Logic: Only ONE summary entry per standup schedule/day
@@ -264,6 +269,7 @@ export async function POST(
       {
         projectId: params.id,
         generatedSummary: markdownSummary,
+        delayReasons: body?.delayReasons && typeof body.delayReasons === 'object' ? body.delayReasons : {},
         generatedDate: new Date()
       },
       { new: true, upsert: true }

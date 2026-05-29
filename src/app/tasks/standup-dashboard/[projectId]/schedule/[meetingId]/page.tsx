@@ -23,7 +23,7 @@ import { UnifiedCommentsSection } from '@/components/standup-dashboard/UnifiedCo
 import { deleteStandupSchedule, updateStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
 import { useNotify } from '@/lib/notify'
 import { StandupTimelogList } from '@/components/standup-dashboard/StandupTimelogList'
-import { ArrowLeft, CalendarDays, Clock3, Loader2, Trash2, Edit3, MessageSquare, Users, X } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Clock3, Loader2, Trash2, Edit3, MessageSquare, Users, X, Sparkles } from 'lucide-react'
 import { formatToTitleCase } from '@/lib/utils'
 
 const statusLabels: Record<StandupMeetingStatus, string> = {
@@ -92,6 +92,9 @@ export default function StandupScheduleDetailPage() {
   ]
 
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
+  const handleViewSummary = () => {
+    router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meetingId}/summary`)
+  }
 
   const handleDeleteSchedule = async () => {
     if (!user?.organization) {
@@ -229,6 +232,10 @@ export default function StandupScheduleDetailPage() {
                   Delete
                 </Button>
               ) : null}
+              <Button variant="outline" onClick={handleViewSummary}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                View Summary
+              </Button>
               {detail.meeting.status === 'completed' ? (
                 <StandupSummaryDialog 
                   projectId={projectId} 

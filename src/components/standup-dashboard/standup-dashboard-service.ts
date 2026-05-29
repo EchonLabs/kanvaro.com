@@ -64,6 +64,10 @@ type TaskApiItem = {
   priority?: string
   displayId?: string
   taskNumber?: number
+  estimatedHours?: number
+  dueDate?: string
+  completedAt?: string
+  actualHours?: number
   sprint?: string | { _id?: string }
   assignedTo?: Array<{
     user?: { _id?: string; firstName?: string; lastName?: string; email?: string; avatar?: string; role?: string; customRole?: { name?: string } }
@@ -164,6 +168,10 @@ const normalizeTask = (task: TaskApiItem) => ({
   status: task.status || 'todo',
   priority: task.priority || 'medium',
   displayId: task.displayId || (task.taskNumber ? `#${task.taskNumber}` : ''),
+  estimatedHours: task.estimatedHours,
+  dueDate: task.dueDate,
+  completedAt: task.completedAt,
+  actualHours: task.actualHours,
   assignedTo: Array.isArray(task.assignedTo)
     ? task.assignedTo.map((entry) => normalizeMember(entry)).filter(Boolean) as StandupMember[]
     : []
@@ -447,6 +455,10 @@ export async function fetchStandupScheduleDetail(projectId: string, meetingId: s
     status: task.status,
     priority: task.priority,
     displayId: task.displayId,
+    estimatedHours: task.estimatedHours,
+    dueDate: task.dueDate,
+    completedAt: task.completedAt,
+    actualHours: task.actualHours,
     assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : []
   }))
 

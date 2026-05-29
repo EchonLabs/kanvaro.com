@@ -39,6 +39,7 @@ type BuildStandupSummaryParams = {
   taskActivities: SummaryActivity[]
   taskComments: SummaryTask[]
   standupComments: StandupScheduleComment[]
+  delayReasons?: Record<string, string>
 }
 
 type CommentEntry = {
@@ -66,11 +67,49 @@ const formatStatusLabel = (value?: string) => {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
-const formatUtcTime = (value?: string | Date) => {
+const allowedTaskStatuses = new Set(['backlog', 'todo', 'to do', 'inprogress', 'in progress', 'inreview', 'in review', 'testing', 'done'])
+
+const normalizeTaskStatus = (value?: string) => {
+  const normalized = (value || '').trim().toLowerCase().replace(/[_-]/g, ' ').replace(/\s+/g, ' ')
+  if (normalized === 'to do') return 'todo'
+  if (normalized === 'in progress') return 'inprogress'
+  if (normalized === 'in review') return 'inreview'
+  return normalized
+}
+
+const formatTaskStatusLabel = (value: string) => {
+  switch (value) {
+    case 'backlog':
+      return 'Backlog'
+    case 'todo':
+      return 'ToDo'
+    case 'inprogress':
+      return 'InProgress'
+    case 'inreview':
+      return 'InReview'
+    case 'testing':
+      return 'Testing'
+    case 'done':
+      return 'Done'
+    default:
+      return value
+  }
+}
+
+const formatGmt530Time = (value?: string | Date) => {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return `${date.toISOString().slice(11, 16)} UTC`
+
+  const offsetMinutes = 330
+  const shifted = new Date(date.getTime() + offsetMinutes * 60 * 1000)
+  const hours = shifted.getUTCHours()
+  const minutes = shifted.getUTCMinutes()
+  const period = hours >= 12 ? 'PM' : 'AM'
+  const hour12 = hours % 12 || 12
+  const minuteLabel = String(minutes).padStart(2, '0')
+
+  return `${hour12}:${minuteLabel} ${period} GMT +5:30`
 }
 
 const formatDateKeyLabel = (value?: string | Date) => {
@@ -182,7 +221,6 @@ const groupByTheme = (entries: CommentEntry[]) => {
 
 const buildTaskTransitionLines = (tasks: SummaryTask[], activities: SummaryActivity[], timelogs: StandupTimelogItem[]) => {
   const lines: string[] = []
-  const { minutesByTask } = buildLoggedHourMaps(timelogs)
 
   const activitiesByTask = activities.reduce((acc, activity) => {
     const list = acc.get(activity.taskId) || []
@@ -195,29 +233,28 @@ const buildTaskTransitionLines = (tasks: SummaryTask[], activities: SummaryActiv
     const taskActivities = (activitiesByTask.get(task._id) || [])
       .filter((activity) => activity.oldValue || activity.newValue)
       .sort((left, right) => new Date(left.createdAt || 0).getTime() - new Date(right.createdAt || 0).getTime())
-    const loggedMinutes = minutesByTask.get(task._id) || 0
-    const loggedLabel = loggedMinutes > 0 ? ` ${formatLoggedHours(loggedMinutes)} were logged on this task that day.` : ''
 
     if (taskActivities.length > 0) {
       taskActivities.forEach((activity) => {
-        const fromStatus = formatStatusLabel(activity.oldValue)
-        const toStatus = formatStatusLabel(activity.newValue)
+        const fromStatus = normalizeTaskStatus(activity.oldValue)
+        const toStatus = normalizeTaskStatus(activity.newValue)
+        if (!allowedTaskStatuses.has(fromStatus) || !allowedTaskStatuses.has(toStatus) || fromStatus === toStatus) {
+          return
+        }
+
+        const timeLabel = formatGmt530Time(activity.createdAt)
+        if (!timeLabel) return
+
         const actorLabel = activity.userName ? ` by ${activity.userName}` : ''
-        const timeLabel = formatUtcTime(activity.createdAt)
-        const timeClause = timeLabel ? ` at ${timeLabel}` : ''
-        lines.push(`${formatTaskLabel(task)} changed from ${fromStatus} to ${toStatus}${timeClause}${actorLabel}.${loggedLabel}`.trim())
+        const taskLabel = formatTaskLabel(task)
+        lines.push(`${timeLabel} · ${taskLabel} · ${formatTaskStatusLabel(fromStatus)} → ${formatTaskStatusLabel(toStatus)}${actorLabel}`)
       })
       return
-    }
-
-    const currentStatus = formatStatusLabel(task.status)
-    if (loggedMinutes > 0) {
-      lines.push(`${formatTaskLabel(task)} had ${formatLoggedHours(loggedMinutes)} logged on the standup day while its current status is ${currentStatus}.`)
     }
   })
 
   if (lines.length === 0) {
-    lines.push('No task status changes or same-day logging activity were recorded for this standup day.')
+    lines.push('No task status changes were recorded for this standup day.')
   }
 
   return lines
@@ -265,13 +302,14 @@ const buildMemberHourLines = (participants: StandupMember[], minutesByMember: Ma
   })
 }
 
-const buildEstimationAnalysisLines = (tasks: SummaryTask[], minutesByTask: Map<string, number>) => {
+const buildEstimationAnalysisLines = (tasks: SummaryTask[], minutesByTask: Map<string, number>, delayReasons?: Record<string, string>) => {
   const lines: string[] = []
 
   tasks.forEach((task) => {
     const estimatedHours = typeof task.estimatedHours === 'number' && task.estimatedHours > 0 ? task.estimatedHours : null
     const loggedMinutes = minutesByTask.get(task._id) || 0
     const loggedHours = roundLoggedHours(loggedMinutes)
+    const delayReason = typeof delayReasons?.[task._id] === 'string' ? delayReasons[task._id].trim() : ''
 
     if (estimatedHours === null) {
       if (loggedHours > 0) {
@@ -290,12 +328,18 @@ const buildEstimationAnalysisLines = (tasks: SummaryTask[], minutesByTask: Map<s
     const effortRatio = loggedHours / estimatedHours
 
     if (effortRatio >= 1.5) {
-      lines.push(`${formatTaskLabel(task)} has ${formatHourValue(loggedHours)} logged against a ${formatHourValue(estimatedHours)} estimate. It is far above estimate and should be reviewed.`)
+      lines.push(`${formatTaskLabel(task)} is overdue. Logged ${formatHourValue(loggedHours)} against a ${formatHourValue(estimatedHours)} estimate. It is far above estimate and should be reviewed.`)
+      if (delayReason) {
+        lines.push(`Reason for delay: ${delayReason}`)
+      }
       return
     }
 
     if (effortRatio > 1) {
-      lines.push(`${formatTaskLabel(task)} has ${formatHourValue(loggedHours)} logged against a ${formatHourValue(estimatedHours)} estimate. It is above estimate and may need attention.`)
+      lines.push(`${formatTaskLabel(task)} is overdue. Logged ${formatHourValue(loggedHours)} against a ${formatHourValue(estimatedHours)} estimate. It is above estimate and may need attention.`)
+      if (delayReason) {
+        lines.push(`Reason for delay: ${delayReason}`)
+      }
       return
     }
 
@@ -402,7 +446,7 @@ export const buildStandupSummaryMarkdown = (params: BuildStandupSummaryParams) =
     if (rows.length === 0) return []
 
     return [title as string, ...rows.slice(0, 5).map((entry) => {
-      const timeLabel = formatUtcTime(entry.createdAt)
+      const timeLabel = formatGmt530Time(entry.createdAt)
       const taskLabel = entry.taskTitle ? ` on ${entry.taskTitle}` : ''
       const prefix = entry.source === 'note' ? 'Standup notes' : entry.authorName
       return `${timeLabel ? `${timeLabel} ` : ''}${prefix}${taskLabel}: ${entry.reason}`
@@ -427,7 +471,7 @@ export const buildStandupSummaryMarkdown = (params: BuildStandupSummaryParams) =
     ...buildTaskTransitionLines(analysisTasks, params.taskActivities, params.timelogs),
     '',
     'Estimation Check',
-    ...buildEstimationAnalysisLines(analysisTasks, minutesByTask),
+    ...buildEstimationAnalysisLines(analysisTasks, minutesByTask, params.delayReasons),
     '',
     'Due Date Watch',
     ...buildDueDateAnalysisLines(analysisTasks, params.meeting.actualDate || params.meeting.date),

@@ -2,10 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { useNotify } from '@/lib/notify'
 import { Loader2, Sparkles } from 'lucide-react'
 import type { StandupScheduleDetail } from './standup-dashboard-types'
+import { parseStandupSummary } from './standup-summary-parser'
+import { getDelayedTasks } from './standup-delay-reason-utils'
+import { formatLoggedHours } from './standup-timelog-utils'
 
 interface StandupSummaryDialogProps {
   projectId: string
@@ -19,58 +25,20 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [confirmDoneOpen, setConfirmDoneOpen] = useState(false)
   const [existingSummary, setExistingSummary] = useState<string | null>(null)
+  const [delayReasons, setDelayReasons] = useState<Record<string, string>>({})
 
-  const parsedSummary = useMemo(() => {
-    if (!existingSummary) return null
+  const parsedSummary = useMemo(() => parseStandupSummary(existingSummary), [existingSummary])
+  const delayedTasks = useMemo(() => getDelayedTasks(detail.projectTasks, detail.timelogs), [detail.projectTasks, detail.timelogs])
 
-    const sectionTitles = new Set([
-      'Sprint Health',
-      'Team Time',
-      'Task Changes',
-      'Estimation Check',
-      'Due Date Watch',
-      'Discussion Notes'
-    ])
+  const missingDelayReasons = delayedTasks.some((task) => !delayReasons[task._id]?.trim())
 
-    const lines = existingSummary.split(/\r?\n/)
-    const metaLines: string[] = []
-    const sections: Array<{ title: string; lines: string[] }> = []
-    let title = 'Standup Summary'
-    let currentSection: { title: string; lines: string[] } | null = null
-
-    lines.forEach((rawLine) => {
-      const line = rawLine
-        .replace(/^#{1,6}\s*/, '')
-        .replace(/^\*\*(.*)\*\*$/, '$1')
-        .replace(/^[-•]\s*/, '')
-        .trim()
-
-      if (!line || line === '---' || line.startsWith('This report is compiled')) {
-        return
-      }
-
-      if (/^Standup Summary:/i.test(line)) {
-        title = line.replace(/^Standup Summary:\s*/i, '').trim() || title
-        return
-      }
-
-      if (sectionTitles.has(line)) {
-        currentSection = { title: line, lines: [] }
-        sections.push(currentSection)
-        return
-      }
-
-      if (!currentSection) {
-        metaLines.push(line)
-        return
-      }
-
-      currentSection.lines.push(line)
-    })
-
-    return { title, metaLines, sections }
-  }, [existingSummary])
+  const buildSummaryRequestBody = () => ({
+    delayReasons: Object.fromEntries(
+      delayedTasks.map((task) => [task._id, delayReasons[task._id]?.trim() || ''])
+    )
+  })
 
   // Fetch existing summary from dedicated backend summaries table
   const fetchSummary = async () => {
@@ -83,8 +51,10 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
         const payload = await response.json()
         if (payload?.success && payload?.data) {
           setExistingSummary(payload.data.generatedSummary)
+          setDelayReasons(payload.data.delayReasons || {})
         } else {
           setExistingSummary(null)
+          setDelayReasons({})
         }
       }
     } catch (error) {
@@ -106,7 +76,8 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
     try {
       const response = await fetch(`/api/projects/${projectId}/standup-schedules/${meetingId}/summary`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildSummaryRequestBody())
       })
 
       if (!response.ok) {
@@ -117,6 +88,7 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
       if (payload?.success && payload?.data) {
         const summaryText = payload.data.generatedSummary
         setExistingSummary(summaryText)
+        setDelayReasons(payload.data.delayReasons || delayReasons)
         onGenerated?.(summaryText)
         notifySuccess({ 
           title: 'Report Compiled', 
@@ -130,6 +102,64 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleDone = () => {
+    if (missingDelayReasons) {
+      setConfirmDoneOpen(true)
+      return
+    }
+
+    setOpen(false)
+  }
+
+  const renderEstimationEditor = () => {
+    if (delayedTasks.length === 0) {
+      return (
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/10 p-4 text-sm text-muted-foreground">
+          No delayed tasks were detected for this standup date.
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-3">
+        {delayedTasks.map((task) => {
+          const taskLabel = `${task.displayId ? `${task.displayId} · ` : ''}${task.title}`
+          const reasonValue = delayReasons[task._id] || ''
+
+          return (
+            <div key={task._id} className="rounded-xl border border-border/70 bg-background/80 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-foreground truncate">{taskLabel}</p>
+                    <Badge className="bg-red-500/10 text-red-600 border-red-500/20">overdue</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatLoggedHours(Math.round(task.loggedHours * 60))} logged against {task.estimateHours}h estimate
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">Reason for delay</span>
+              </div>
+
+              <Textarea
+                value={reasonValue}
+                onChange={(event) => setDelayReasons((current) => ({ ...current, [task._id]: event.target.value }))}
+                onInput={(event) => {
+                  const target = event.currentTarget
+                  target.style.height = 'auto'
+                  target.style.height = `${target.scrollHeight}px`
+                }}
+                placeholder="Add a short reason..."
+                rows={1}
+                className="mt-3 min-h-[42px] resize-none overflow-hidden border-border bg-background text-sm"
+              />
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   return (
@@ -167,12 +197,12 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 Retrieving standup report...
               </div>
-            ) : parsedSummary ? (
+            ) : (
               <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-5 shadow-sm">
                 <div className="rounded-xl border border-border/70 bg-background/80 p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Standup Summary</p>
-                  <h3 className="mt-1 text-xl font-bold tracking-tight text-foreground">{parsedSummary.title}</h3>
-                  {parsedSummary.metaLines.length > 0 && (
+                  <h3 className="mt-1 text-xl font-bold tracking-tight text-foreground">{parsedSummary?.title || detail.meeting.title}</h3>
+                  {parsedSummary ? (
                     <div className="mt-4 grid gap-2 sm:grid-cols-2">
                       {parsedSummary.metaLines.map((line) => {
                         const [label, ...rest] = line.split(':')
@@ -185,46 +215,43 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
                         )
                       })}
                     </div>
+                  ) : (
+                    <div className="mt-3 text-sm text-muted-foreground">
+                      This is a live preview of the completed standup. Generate the summary to capture it in the database.
+                    </div>
                   )}
                 </div>
 
                 <div className="space-y-4">
-                  {parsedSummary.sections.map((section) => (
+                  {(parsedSummary?.sections || [
+                    { title: 'Sprint Health', lines: [`${detail.project.name} has ${detail.project.teamMembers.length} team members in this standup.`] },
+                    { title: 'Team Time', lines: [`${detail.timelogs.length} time log${detail.timelogs.length === 1 ? '' : 's'} were captured for this meeting date.`] },
+                    { title: 'Task Changes', lines: ['Task status changes are shown after summary generation.'] },
+                    { title: 'Estimation Check', lines: [] },
+                    { title: 'Due Date Watch', lines: ['Due-date checks are shown after summary generation.'] },
+                    { title: 'Discussion Notes', lines: detail.meeting.notes ? [detail.meeting.notes] : ['No standup notes were recorded.'] }
+                  ]).map((section) => (
                     <section key={section.title} className="rounded-xl border border-border/70 bg-background/70 p-4">
                       <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-2">
                         <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-foreground">{section.title}</h4>
-                        <span className="text-[11px] text-muted-foreground">{section.lines.length} item{section.lines.length === 1 ? '' : 's'}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {section.title === 'Estimation Check' ? `${delayedTasks.length} task${delayedTasks.length === 1 ? '' : 's'}` : `${section.lines.length} item${section.lines.length === 1 ? '' : 's'}`}
+                        </span>
                       </div>
                       <div className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
-                        {section.lines.map((line, index) => (
-                          <p key={`${section.title}-${index}`} className={index === 0 ? 'text-foreground' : ''}>
-                            {line}
-                          </p>
-                        ))}
+                        {section.title === 'Estimation Check' ? (
+                          renderEstimationEditor()
+                        ) : (
+                          section.lines.map((line, index) => (
+                            <p key={`${section.title}-${index}`} className={index === 0 ? 'text-foreground' : ''}>
+                              {line}
+                            </p>
+                          ))
+                        )}
                       </div>
                     </section>
                   ))}
                 </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center text-center p-8 py-16 rounded-xl border border-dashed bg-muted/10 border-border/70 max-w-lg mx-auto">
-                <Sparkles className="h-10 w-10 text-amber-500/80 mb-4 animate-bounce" />
-                <h4 className="font-semibold text-foreground text-base">Compile PM Standup Summary</h4>
-                <p className="text-sm text-muted-foreground mt-2 max-w-sm">
-                  Run a lightweight logical PM analysis over participant workloads, stalled tasks, and actual time logs tracked for this meeting date.
-                </p>
-                <Button 
-                  onClick={handleGenerate} 
-                  disabled={saving} 
-                  className="mt-6"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : 'Compile Summary Report'}
-                </Button>
               </div>
             )}
           </DialogBody>
@@ -233,24 +260,39 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
             <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
               Close
             </Button>
-            {existingSummary && (
-              <Button onClick={handleGenerate} disabled={saving} className="bg-amber-500 hover:bg-amber-600 text-white font-medium">
-                {saving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Regenerating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4 shrink-0" />
-                    Regenerate Report
-                  </>
-                )}
-              </Button>
-            )}
+            <Button onClick={handleGenerate} disabled={saving} className="bg-amber-500 hover:bg-amber-600 text-white font-medium">
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {existingSummary ? 'Regenerating...' : 'Generating...'}
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4 shrink-0" />
+                  {existingSummary ? 'Regenerate Summary' : 'Generate Summary'}
+                </>
+              )}
+            </Button>
+            <Button variant="outline" onClick={handleDone} disabled={saving}>
+              Done
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmationModal
+        isOpen={confirmDoneOpen}
+        onClose={() => setConfirmDoneOpen(false)}
+        onConfirm={() => {
+          setConfirmDoneOpen(false)
+          setOpen(false)
+        }}
+        title="Are you sure?"
+        description="Some delayed tasks do not have a reason yet. You can add reasons later."
+        confirmText="Yes, Done"
+        cancelText="Keep Editing"
+        variant="default"
+      />
     </>
   )
 }
