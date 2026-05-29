@@ -18,6 +18,8 @@ import {
   fetchStandupSchedule,
   type StandupScheduleApiItem
 } from './standup-schedule-storage'
+import { filterStandupTimelogs } from './standup-timelog-utils'
+import { getStandupDateKey } from './standup-date-utils'
 
 type ProjectApiItem = {
   _id: string
@@ -52,6 +54,7 @@ type SprintApiItem = {
   capacity?: number
   velocity?: number
   project?: { _id?: string; name?: string } | string
+  tasks?: Array<string | { _id?: string }>
 }
 
 type TaskApiItem = {
@@ -61,6 +64,7 @@ type TaskApiItem = {
   priority?: string
   displayId?: string
   taskNumber?: number
+  sprint?: string | { _id?: string }
   assignedTo?: Array<{
     user?: { _id?: string; firstName?: string; lastName?: string; email?: string; avatar?: string; role?: string; customRole?: { name?: string } }
     firstName?: string
@@ -71,6 +75,12 @@ type TaskApiItem = {
     customRole?: { name?: string }
     hourlyRate?: number
     _id?: string
+  }>
+  comments?: Array<{
+    _id?: string
+    content?: string
+    createdAt?: string
+    author?: { _id?: string; firstName?: string; lastName?: string; email?: string; avatar?: string; role?: string }
   }>
 }
 
@@ -417,8 +427,10 @@ export async function fetchStandupScheduleDetail(projectId: string, meetingId: s
     throw new Error('Standup schedule not found')
   }
 
+  const meetingDateKey = getStandupDateKey(meeting.actualDate || meeting.date) || meeting.date.slice(0, 10)
+
   const [logResponse, taskResponse] = await Promise.all([
-    fetchJson<{ success?: boolean; timeEntries?: TimeEntryApiItem[]; data?: TimeEntryApiItem[] }>(`/api/time-tracking/entries?organizationId=${encodeURIComponent(organizationId)}&projectId=${encodeURIComponent(projectId)}&startDate=${encodeURIComponent(meeting.date.slice(0, 10))}&endDate=${encodeURIComponent(meeting.date.slice(0, 10))}&limit=200`, signal),
+    fetchJson<{ success?: boolean; timeEntries?: TimeEntryApiItem[]; data?: TimeEntryApiItem[] }>(`/api/time-tracking/entries?organizationId=${encodeURIComponent(organizationId)}&projectId=${encodeURIComponent(projectId)}&startDate=${encodeURIComponent(meetingDateKey)}&endDate=${encodeURIComponent(meetingDateKey)}&limit=200`, signal),
     fetchJson<{ success?: boolean; data?: TaskApiItem[] }>(`/api/projects/${projectId}/tasks`, signal)
   ])
 
@@ -438,33 +450,30 @@ export async function fetchStandupScheduleDetail(projectId: string, meetingId: s
     assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : []
   }))
 
-  const timelogsWithStatus = timelogs.map((log) => {
-    const task = normalizedTaskCards.find((t) => t._id === log.taskId)
-    return {
-      ...log,
-      taskStatus: task?.status || 'todo'
+  const participantIds = new Set((meeting.participants || []).map((member) => member._id))
+  const currentSprint = projectDetail.sprint
+  const sprintTaskIds = new Set<string>(Array.isArray(currentSprint?.tasks) ? currentSprint!.tasks.map((taskId) => String(taskId)) : [])
+
+  const assignedTaskIds = new Set<string>((meeting.assignments || []).map((assignment) => assignment.taskId).filter(Boolean))
+
+  normalizedTaskCards.forEach((task) => {
+    const assignedToParticipant = task.assignedTo?.some((assignedMember) => participantIds.has(assignedMember._id))
+    if (assignedToParticipant) {
+      assignedTaskIds.add(task._id)
     }
   })
 
-  const meetingDateKey = meeting.date.slice(0, 10)
-  const assignedTasksByMember = new Map<string, Set<string>>()
-
-  ;(meeting.assignments || []).forEach((assignment) => {
-    if (!assignment.memberId || !assignment.taskId) return
-    const existing = assignedTasksByMember.get(assignment.memberId) || new Set<string>()
-    existing.add(assignment.taskId)
-    assignedTasksByMember.set(assignment.memberId, existing)
-  })
-
-  const filteredTimelogs = timelogsWithStatus.filter((log) => {
-    if (!log.taskId || !log.userId || !log.startTime) return false
-    const allowedTasks = assignedTasksByMember.get(log.userId)
-    if (!allowedTasks || !allowedTasks.has(log.taskId)) return false
-
-    const logDate = new Date(log.startTime)
-    if (Number.isNaN(logDate.getTime())) return false
-
-    return logDate.toISOString().slice(0, 10) === meetingDateKey
+  const filteredTimelogs = filterStandupTimelogs({
+    timelogs: timelogs.map((log) => {
+      const task = normalizedTaskCards.find((t) => t._id === log.taskId)
+      return {
+        ...log,
+        taskStatus: task?.status || 'todo'
+      }
+    }),
+    standupDate: meeting.actualDate || meeting.date,
+    memberIds: Array.from(participantIds),
+    taskIds: Array.from(new Set([...Array.from(assignedTaskIds), ...Array.from(sprintTaskIds)]))
   })
 
   const memberSummaries: StandupScheduleMemberSummary[] = projectDetail.summary.teamMembers.map((member, index) => {

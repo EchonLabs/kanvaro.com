@@ -4,11 +4,16 @@ import connectDB from '@/lib/db-config'
 import '@/models/registry'
 import { Project } from '@/models/Project'
 import { Task } from '@/models/Task'
+import { TaskActivity } from '@/models/TaskActivity'
 import { StandupSchedule } from '@/models/StandupSchedule'
 import { StandupSummary } from '@/models/StandupSummary'
 import { TimeEntry } from '@/models/TimeEntry'
+import { Sprint } from '@/models/Sprint'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { buildStandupSummaryMarkdown } from '@/components/standup-dashboard/standup-summary-utils'
+import { filterStandupTimelogs } from '@/components/standup-dashboard/standup-timelog-utils'
+import { getStandupDayBounds } from '@/components/standup-dashboard/standup-date-utils'
 
 const isValidObjectIdString = (value: unknown): value is string => {
   return typeof value === 'string' && value.trim().length > 0 && mongoose.Types.ObjectId.isValid(value.trim())
@@ -39,6 +44,27 @@ const buildProjectContext = async (projectId: string, userId: string, organizati
   )
 
   return { project, teamMemberIds }
+}
+
+type StandupSummarySchedule = {
+  _id: any
+  title?: string
+  scheduledDate: Date
+  actualDate?: Date
+  time?: string
+  durationMinutes?: number
+  status?: string
+  facilitator?: any
+  createdBy?: any
+  participants?: any[]
+  notes?: string
+  comments?: any[]
+  assignments?: any[]
+}
+
+type StandupSummaryProject = {
+  _id: any
+  name?: string
 }
 
 export async function GET(
@@ -92,132 +118,144 @@ export async function POST(
       organization: user.organization,
       archived: false
     })
+      .populate('participants', 'firstName lastName email avatar role customRole')
+      .populate('facilitator', 'firstName lastName email avatar role customRole')
+      .populate('createdBy', 'firstName lastName email avatar role customRole')
+      .lean<StandupSummarySchedule>()
 
     if (!schedule) {
       return NextResponse.json({ error: 'Standup schedule not found' }, { status: 404 })
     }
 
-    // Load necessary context for analysis
-    const dateStr = schedule.scheduledDate.toISOString().slice(0, 10)
-    const startOfDay = new Date(`${dateStr}T00:00:00.000Z`)
-    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`)
+    const dayBounds = getStandupDayBounds(schedule.actualDate || schedule.scheduledDate)
+    if (!dayBounds) {
+      return NextResponse.json({ error: 'Standup schedule date is invalid' }, { status: 400 })
+    }
 
-    const [projectWithMembers, projectTasks, timeEntries] = await Promise.all([
-      Project.findById(params.id).populate('teamMembers.memberId', 'firstName lastName email avatar role'),
-      Task.find({ project: params.id, organization: user.organization, archived: false }),
+    const [projectRecord, projectTasks, timeEntries, taskActivities, sprintDocs] = await Promise.all([
+      Project.findById(params.id).select('name').lean<StandupSummaryProject>(),
+      Task.find({ project: params.id, organization: user.organization, archived: false })
+        .populate('comments.author', 'firstName lastName email avatar role customRole')
+        .select('_id title status priority displayId taskNumber assignedTo sprint completedAt dueDate estimatedHours actualHours comments')
+        .lean(),
       TimeEntry.find({
         project: params.id,
         organization: user.organization,
-        startTime: { $gte: startOfDay, $lte: endOfDay }
-      }).populate('user', 'firstName lastName email')
+        startTime: { $gte: dayBounds.start, $lte: dayBounds.end }
+      }).populate('user', 'firstName lastName email avatar role').populate('task', 'title status displayId').lean(),
+      TaskActivity.find({
+        organization: user.organization,
+        createdAt: { $gte: dayBounds.start, $lte: dayBounds.end }
+      }).populate('user', 'firstName lastName email avatar role').lean(),
+      Sprint.find({ project: params.id, organization: user.organization, archived: false }).select('_id name status startDate endDate tasks').lean()
     ])
 
-    // Core Logical PM Analysis
-    const memberAnalysis: string[] = []
-    const taskAnalysis: string[] = []
+    const participantIds = new Set((Array.isArray(schedule.participants) ? schedule.participants : []).map((member: any) => String(member._id || member)))
+    const scopedMemberIds = new Set<string>([...Array.from(projectContext.teamMemberIds), ...Array.from(participantIds)])
+    const currentSprint = sprintDocs.find((sprint: any) => sprint.status === 'active')
+      || sprintDocs.find((sprint: any) => sprint.status === 'planning')
+      || sprintDocs[0]
 
-    const totalLoggedMinutes = timeEntries.reduce((sum, log) => sum + log.duration, 0)
-    const totalLoggedHours = totalLoggedMinutes / 60
+    const sprintTaskIds = new Set<string>(Array.isArray(currentSprint?.tasks) ? currentSprint.tasks.map((taskId: any) => String(taskId)) : [])
 
-    // Analyze each member's workload, productivity, and activity
-    const members = (projectWithMembers?.teamMembers || [])
-      .map((m: any) => m.memberId)
-      .filter((m: any) => m !== null && m !== undefined)
+    const taskCards = (projectTasks || []).map((task: any) => ({
+      _id: String(task._id),
+      title: task.title || 'Untitled task',
+      status: task.status,
+      displayId: task.displayId,
+      dueDate: task.dueDate,
+      estimatedHours: task.estimatedHours,
+      completedAt: task.completedAt,
+      actualHours: task.actualHours,
+      comments: Array.isArray(task.comments) ? task.comments.map((comment: any) => ({
+        content: comment.content,
+        createdAt: comment.createdAt,
+        author: comment.author ? {
+          firstName: comment.author.firstName,
+          lastName: comment.author.lastName,
+          email: comment.author.email
+        } : undefined
+      })) : [],
+      assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : []
+    }))
 
-    members.forEach((member: any) => {
-      const memberIdStr = member._id.toString()
+    const projectTaskIds = new Set<string>(taskCards.map((task) => task._id))
+    const sprintTasks = currentSprint
+      ? taskCards.filter((task) => sprintTaskIds.has(task._id))
+      : taskCards
 
-      // Find active tasks assigned to this member
-      const memberTasks = projectTasks.filter((task: any) =>
-        (task.assignedTo || []).some((assignee: any) => assignee.user?.toString() === memberIdStr)
-      )
-      const activeTasks = memberTasks.filter((task: any) => !['done', 'cancelled'].includes(task.status))
-      const completedTasksToday = memberTasks.filter((task: any) =>
-        task.status === 'done' && task.completedAt &&
-        task.completedAt >= startOfDay && task.completedAt <= endOfDay
-      )
-
-      // Time logged by member today
-      const memberTimeEntries = timeEntries.filter((log: any) => log.user?._id?.toString() === memberIdStr)
-      const memberMinutes = memberTimeEntries.reduce((sum: number, entry: any) => sum + entry.duration, 0)
-      const memberHours = memberMinutes / 60
-
-      const isScheduledParticipant = schedule.participants.some((pId: any) => pId.toString() === memberIdStr)
-
-      // Workload detection
-      if (activeTasks.length >= 4) {
-        memberAnalysis.push(`- **${member.firstName} ${member.lastName}** is currently managing a heavy workload with **${activeTasks.length} active tasks**, which may affect delivery timelines if not balanced.`)
-      }
-
-      // Productivity trends
-      if (memberHours >= 4) {
-        memberAnalysis.push(`- **${member.firstName} ${member.lastName}** demonstrated strong progress today, logging **${memberHours.toFixed(1)} hours** across their tasks.`)
-      } else if (isScheduledParticipant && memberHours === 0 && completedTasksToday.length === 0) {
-        // Inactive member detection
-        memberAnalysis.push(`- **${member.firstName} ${member.lastName}** (scheduled participant) had no active task timelogs or completed updates recorded today.`)
-      }
+    const standupTimelogs = filterStandupTimelogs({
+      timelogs: (timeEntries || []).map((entry: any) => ({
+        _id: String(entry._id),
+        userId: String(entry.user?._id || entry.user || ''),
+        userName: typeof entry.user === 'object' && entry.user
+          ? `${entry.user.firstName || ''} ${entry.user.lastName || ''}`.trim() || entry.user.email || 'Unknown member'
+          : 'Unknown member',
+        taskId: String(entry.task?._id || entry.task || ''),
+        taskTitle: typeof entry.task === 'object' && entry.task ? entry.task.title || undefined : undefined,
+        taskStatus: undefined,
+        projectName: projectRecord?.name || 'Project',
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        duration: entry.duration || 0,
+        description: entry.description || '',
+        isBillable: !!entry.isBillable,
+        status: entry.status || 'completed'
+      })),
+      standupDate: schedule.actualDate || schedule.scheduledDate,
+      memberIds: Array.from(scopedMemberIds),
+      requireTaskId: false
     })
 
-    // Analyze task estimation, status accuracy, and stalled progress
-    projectTasks.forEach((task: any) => {
-      const taskIdStr = task._id.toString()
+    const timelogs = standupTimelogs.filter((entry) => entry.userId)
 
-      // Find all timelogs for this task today
-      const taskLogsToday = timeEntries.filter((log: any) => log.task?.toString() === taskIdStr)
-      const taskMinutesToday = taskLogsToday.reduce((sum: number, entry: any) => sum + entry.duration, 0)
+    const activities = (taskActivities || []).map((activity: any) => ({
+      taskId: String(activity.task?._id || activity.task || ''),
+      taskTitle: taskCards.find((task) => task._id === String(activity.task?._id || activity.task || ''))?.title || 'Untitled task',
+      oldValue: activity.oldValue,
+      newValue: activity.newValue,
+      createdAt: activity.createdAt,
+      userName: activity.user ? `${activity.user.firstName || ''} ${activity.user.lastName || ''}`.trim() || activity.user.email || 'Unknown member' : 'Unknown member'
+    })).filter((activity: any) => activity.taskId && projectTaskIds.has(activity.taskId))
 
-      // Get cumulative tracked minutes for this task across ALL time entries
-      // Note: we can sum this up asynchronously to see if task exceeds overall estimate
-      const hasTrackedToday = taskMinutesToday > 0
-
-      // Missing status updates (timelogs exist but status is TODO/BACKLOG)
-      if (hasTrackedToday && ['todo', 'backlog'].includes(task.status)) {
-        taskAnalysis.push(`- **Work has started** on "${task.title}" (logged ${taskMinutesToday} mins today), but the task status is still marked as **${task.status.toUpperCase()}**. Please prompt the team to update its status.`)
-      }
-
-      // Check if task estimation exceeded
-      if (task.estimatedHours && task.actualHours && task.actualHours > task.estimatedHours) {
-        taskAnalysis.push(`- **Estimation Alert**: "${task.title}" has exceeded its original estimate of **${task.estimatedHours}h** (currently at **${task.actualHours.toFixed(1)}h** logged), indicating potential blockers or initial underestimation.`)
-      }
-
-      // Stalled progress detection
-      const isAssignedToStandup = schedule.assignments.some((assign: any) => assign.task?.toString() === taskIdStr)
-      if (isAssignedToStandup && task.status === 'in_progress' && !hasTrackedToday) {
-        taskAnalysis.push(`- **Stalled Progress**: "${task.title}" is in progress but had no timelog activity logged during today's standup window.`)
-      }
+    const markdownSummary = buildStandupSummaryMarkdown({
+      meeting: {
+        _id: String(schedule._id),
+        title: schedule.title || 'Daily Standup',
+        date: (schedule.actualDate || schedule.scheduledDate).toISOString(),
+        time: schedule.time || '09:00',
+        durationMinutes: schedule.durationMinutes || 15,
+        participants: Array.isArray(schedule.participants) ? schedule.participants : [],
+        status: (schedule.status as any) || 'scheduled',
+        notes: schedule.notes,
+        actualDate: schedule.actualDate?.toISOString?.() || undefined,
+        facilitator: schedule.facilitator,
+        createdBy: schedule.createdBy,
+        location: undefined,
+        meetingLink: undefined,
+        assignments: Array.isArray(schedule.assignments) ? schedule.assignments : [],
+        comments: Array.isArray(schedule.comments) ? schedule.comments : [],
+        summary: undefined
+      },
+      projectName: projectRecord?.name || 'Untitled Project',
+      sprintName: currentSprint?.name,
+      sprintStatus: currentSprint?.status,
+      sprintTasks,
+      allTasks: taskCards,
+      participants: Array.isArray(schedule.participants) ? schedule.participants : [],
+      timelogs,
+      taskActivities: activities,
+      taskComments: sprintTasks,
+      standupComments: Array.isArray(schedule.comments) ? schedule.comments.map((comment: any) => ({
+        _id: String(comment._id || ''),
+        authorName: comment.authorName || 'Unknown member',
+        memberId: comment.member?._id?.toString?.() || comment.member?.toString?.(),
+        taskId: comment.task?._id?.toString?.() || comment.task?.toString?.(),
+        taskTitle: comment.taskTitle || comment.task?.title,
+        reason: comment.reason || '',
+        createdAt: comment.createdAt || new Date().toISOString()
+      })) : []
     })
-
-    // Fallback notes if analysis is empty
-    if (memberAnalysis.length === 0) {
-      memberAnalysis.push('- Team members are operating within standard workload limits, and active contributors are progressing consistently.')
-    }
-    if (taskAnalysis.length === 0) {
-      taskAnalysis.push('- Tasks appear aligned with status updates and estimates. No anomalies detected.')
-    }
-
-    // Build the Markdown summary
-    const completedCount = schedule.assignments.filter((a: any) => a.taskStatus === 'done' || a.taskStatus === 'completed').length
-    const totalAssignments = schedule.assignments.length
-
-    const markdownSummary = `### 📋 PM Standup Report: ${schedule.title}
-
-**Scheduled Date:** ${dateStr}
-**Participation:** ${schedule.participants.length} scheduled attendees | Facilitated by ${schedule.facilitator ? 'Project Manager' : 'Facilitator'}
-**Logged Workload:** ${totalLoggedHours.toFixed(1)} total hours tracked today
-
----
-
-#### 👥 Member Workload & Activity
-${memberAnalysis.join('\n')}
-
----
-
-#### 📌 Task Status & Estimation Insights
-${taskAnalysis.join('\n')}
-
----
-
-*This report was automatically compiled using Kanvaro logical PM analysis on today's active tasks, assignments, and time logs.*`
 
     // Database Restructuring Logic: Only ONE summary entry per standup schedule/day
     // Uses findOneAndUpdate with upsert to prevent race conditions or duplicates

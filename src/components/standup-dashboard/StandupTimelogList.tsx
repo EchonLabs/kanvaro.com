@@ -4,24 +4,32 @@ import { useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { formatToTitleCase } from '@/lib/utils'
 import { Clock } from 'lucide-react'
 import type { StandupMember, StandupTimelogItem } from './standup-dashboard-types'
+import { filterStandupTimelogs, formatLoggedHours } from './standup-timelog-utils'
 
 interface StandupTimelogListProps {
   timelogs: StandupTimelogItem[]
   members: StandupMember[]
+  standupDate: string | Date
 }
 
-export function StandupTimelogList({ timelogs, members }: StandupTimelogListProps) {
+export function StandupTimelogList({ timelogs, members, standupDate }: StandupTimelogListProps) {
   const [selectedMemberId, setSelectedMemberId] = useState('all')
 
   const filteredTimelogs = useMemo(() => {
+    const dateScopedTimelogs = filterStandupTimelogs({
+      timelogs,
+      standupDate,
+      memberIds: selectedMemberId === 'all' ? undefined : [selectedMemberId]
+    })
+
     if (selectedMemberId === 'all') {
-      return timelogs
+      return dateScopedTimelogs
     }
-    return timelogs.filter((timelog) => timelog.userId === selectedMemberId)
-  }, [selectedMemberId, timelogs])
+
+    return dateScopedTimelogs.filter((timelog) => timelog.userId === selectedMemberId)
+  }, [selectedMemberId, standupDate, timelogs])
 
   return (
     <Card className="shadow-xs border-border/80">
@@ -54,11 +62,11 @@ export function StandupTimelogList({ timelogs, members }: StandupTimelogListProp
       
       <CardContent className="pt-2">
         {filteredTimelogs.length > 0 ? (
-          <div className="grid gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+          <ul className="divide-y divide-border/60 max-h-[300px] overflow-y-auto pr-1">
             {filteredTimelogs.map((log) => (
-              <div 
+              <li 
                 key={log._id} 
-                className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-card hover:bg-muted/10 hover:border-border transition-all text-sm"
+                className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0 text-sm"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="flex flex-col min-w-0">
@@ -71,23 +79,20 @@ export function StandupTimelogList({ timelogs, members }: StandupTimelogListProp
                   </div>
                   {log.taskStatus && (
                     <Badge variant="secondary" className="text-[9px] sm:text-[10px] capitalize h-fit py-0.5 px-1.5 shrink-0 font-medium bg-muted text-muted-foreground">
-                      {formatToTitleCase(log.taskStatus)}
+                      {log.taskStatus.replace(/_/g, ' ')}
                     </Badge>
                   )}
                 </div>
                 
-                <div className="font-bold text-foreground text-xs sm:text-sm shrink-0 pl-2">
-                  {log.duration >= 60 
-                    ? `${Math.round(log.duration / 60 * 10) / 10}h` 
-                    : `${Math.round(log.duration)}m`
-                  }
+                <div className="font-bold text-foreground text-xs sm:text-sm shrink-0 pl-2 tabular-nums">
+                  {formatLoggedHours(log.duration)}
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         ) : (
           <div className="rounded-xl border border-dashed border-border/70 py-8 text-center text-sm text-muted-foreground bg-muted/5">
-            No timelogs were tracked for this schedule date.
+            No time logs available for this standup date yet.
           </div>
         )}
       </CardContent>

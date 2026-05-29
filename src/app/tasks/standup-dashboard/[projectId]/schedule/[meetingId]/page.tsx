@@ -245,18 +245,6 @@ export default function StandupScheduleDetailPage() {
             </div>
           </div>
 
-          {/* Standup date notes/summary info */}
-          <Card className="shadow-xs border-border/80">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base sm:text-lg">Day Summary</CardTitle>
-              <CardDescription>Overall status for this standup date.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm text-foreground">
-              <p>{overallSummary}</p>
-              <p className="text-muted-foreground">{detail.meeting.notes || 'No standup notes were recorded.'}</p>
-            </CardContent>
-          </Card>
-
           {/* Member outcomes cards */}
           <section className="space-y-4">
             <div>
@@ -335,7 +323,19 @@ export default function StandupScheduleDetailPage() {
           </section>
 
           {/* Sleek compact timelogs */}
-          <StandupTimelogList timelogs={detail.timelogs} members={detail.project.teamMembers} />
+          <StandupTimelogList timelogs={detail.timelogs} members={detail.meeting.participants} standupDate={detail.meeting.date} />
+
+          {/* Standup date notes/summary info */}
+          <Card className="shadow-xs border-border/80">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base sm:text-lg">Day Summary</CardTitle>
+              <CardDescription>Overall status for this standup date.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-foreground">
+              <p>{overallSummary}</p>
+              <p className="text-muted-foreground">{detail.meeting.notes || 'No standup notes were recorded.'}</p>
+            </CardContent>
+          </Card>
 
           {/* Unified Discussion Stream */}
           <UnifiedCommentsSection 

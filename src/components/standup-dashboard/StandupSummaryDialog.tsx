@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { useNotify } from '@/lib/notify'
@@ -20,6 +20,57 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [existingSummary, setExistingSummary] = useState<string | null>(null)
+
+  const parsedSummary = useMemo(() => {
+    if (!existingSummary) return null
+
+    const sectionTitles = new Set([
+      'Sprint Health',
+      'Team Time',
+      'Task Changes',
+      'Estimation Check',
+      'Due Date Watch',
+      'Discussion Notes'
+    ])
+
+    const lines = existingSummary.split(/\r?\n/)
+    const metaLines: string[] = []
+    const sections: Array<{ title: string; lines: string[] }> = []
+    let title = 'Standup Summary'
+    let currentSection: { title: string; lines: string[] } | null = null
+
+    lines.forEach((rawLine) => {
+      const line = rawLine
+        .replace(/^#{1,6}\s*/, '')
+        .replace(/^\*\*(.*)\*\*$/, '$1')
+        .replace(/^[-•]\s*/, '')
+        .trim()
+
+      if (!line || line === '---' || line.startsWith('This report is compiled')) {
+        return
+      }
+
+      if (/^Standup Summary:/i.test(line)) {
+        title = line.replace(/^Standup Summary:\s*/i, '').trim() || title
+        return
+      }
+
+      if (sectionTitles.has(line)) {
+        currentSection = { title: line, lines: [] }
+        sections.push(currentSection)
+        return
+      }
+
+      if (!currentSection) {
+        metaLines.push(line)
+        return
+      }
+
+      currentSection.lines.push(line)
+    })
+
+    return { title, metaLines, sections }
+  }, [existingSummary])
 
   // Fetch existing summary from dedicated backend summaries table
   const fetchSummary = async () => {
@@ -103,7 +154,7 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
                 <div>
                   <DialogTitle>PM Standup Summary</DialogTitle>
                   <DialogDescription>
-                    Intelligent analytical report compiling workload metrics, task progress, and logged activity anomalies.
+                    Operational report compiling real sprint activity, task transitions, comments, and logged work for this standup date.
                   </DialogDescription>
                 </div>
               </div>
@@ -116,37 +167,43 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 Retrieving standup report...
               </div>
-            ) : existingSummary ? (
-              <div className="rounded-xl border border-border bg-muted/20 p-5 font-sans leading-relaxed text-sm text-foreground shadow-sm">
-                <div className="prose dark:prose-invert max-w-none space-y-1">
-                  {existingSummary.split('\n').map((line, index) => {
-                    if (line.startsWith('###')) {
-                      return <h3 key={index} className="text-base font-bold text-foreground mt-4 mb-2 first:mt-0">{line.replace('###', '').trim()}</h3>
-                    }
-                    if (line.startsWith('####')) {
-                      return <h4 key={index} className="text-sm font-semibold text-foreground mt-3 mb-1.5">{line.replace('####', '').trim()}</h4>
-                    }
-                    if (line.startsWith('**Date:') || line.startsWith('**Scheduled Date:')) {
-                      return <p key={index} className="text-xs text-muted-foreground mb-3">{line.split('|').map((part, pIdx) => <span key={pIdx} className="mr-3">{part.trim()}</span>)}</p>
-                    }
-                    if (line.trim() === '---') {
-                      return <hr key={index} className="my-4 border-border/80" />
-                    }
-                    if (line.startsWith('-')) {
-                      // Parse inline bolding **text**
-                      const cleanLine = line.replace(/^-/, '').trim()
-                      const parts = cleanLine.split('**')
-                      return (
-                        <div key={index} className="flex gap-2 text-muted-foreground my-1.5 text-xs sm:text-sm pl-2">
-                          <span className="text-primary font-bold shrink-0">•</span>
-                          <span>
-                            {parts.map((part, pIdx) => pIdx % 2 === 1 ? <strong key={pIdx} className="text-foreground font-semibold">{part}</strong> : part)}
-                          </span>
-                        </div>
-                      )
-                    }
-                    return <p key={index} className="text-muted-foreground text-xs sm:text-sm my-1">{line}</p>
-                  })}
+            ) : parsedSummary ? (
+              <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-5 shadow-sm">
+                <div className="rounded-xl border border-border/70 bg-background/80 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Standup Summary</p>
+                  <h3 className="mt-1 text-xl font-bold tracking-tight text-foreground">{parsedSummary.title}</h3>
+                  {parsedSummary.metaLines.length > 0 && (
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      {parsedSummary.metaLines.map((line) => {
+                        const [label, ...rest] = line.split(':')
+                        const value = rest.join(':').trim()
+                        return (
+                          <div key={line} className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label.trim()}</div>
+                            <div className="mt-0.5 text-foreground">{value || '—'}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  {parsedSummary.sections.map((section) => (
+                    <section key={section.title} className="rounded-xl border border-border/70 bg-background/70 p-4">
+                      <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-2">
+                        <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-foreground">{section.title}</h4>
+                        <span className="text-[11px] text-muted-foreground">{section.lines.length} item{section.lines.length === 1 ? '' : 's'}</span>
+                      </div>
+                      <div className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+                        {section.lines.map((line, index) => (
+                          <p key={`${section.title}-${index}`} className={index === 0 ? 'text-foreground' : ''}>
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               </div>
             ) : (
