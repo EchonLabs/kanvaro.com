@@ -206,7 +206,7 @@ export default function DashboardPage() {
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-            <div className="lg:col-span-2 flex flex-col gap-4 sm:gap-6">
+            <div className="order-2 lg:order-none lg:col-span-2 flex flex-col gap-4 sm:gap-6">
               <StatsCards
                 stats={dashboardData?.stats}
                 changes={dashboardData?.changes}
@@ -228,7 +228,7 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-3 sm:gap-4">
+            <div className="order-1 lg:order-none flex flex-col gap-3 sm:gap-4">
               {user.id && user.organization  && (
                 <TimeTrackingWidget
                   userId={user.id}
