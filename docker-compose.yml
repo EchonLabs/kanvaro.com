@@ -50,23 +50,6 @@ services:
       timeout: 10s
       retries: 3
 
-      #commented changes for the devops approval:
-  # worker:
-  #   build: .
-  #   command: npm run worker
-  #   environment:
-  #     - NODE_ENV=production
-  #     - REDIS_URL=redis://redis:6379
-  #     - MONGODB_URI=${MONGODB_URI}
-  #     - GROQ_API_KEY=${GROQ_API_KEY}
-  #     - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
-  #   depends_on:
-  #     - mongodb
-  #     - redis
-  #   volumes:
-  #     - ./config.json:/app/config.json
-  #   restart: unless-stopped
-
 volumes:
   mongodb_data:
   redis_data:
