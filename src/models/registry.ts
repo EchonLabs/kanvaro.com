@@ -39,6 +39,8 @@ import './Counter'
 import './Notification'
 import './StandupSchedule'
 import './StandupSummary'
+import './AIProjectReport'
+import './StandupCronJob'
 
 // Export all models for convenience
 export * from './index'
