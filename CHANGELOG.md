@@ -1,13 +1,3 @@
-# [1.38.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.37.0...v1.38.0) (2026-06-02)
-
-
-### Features
-
-* Add notification creation for AI report delivery to members ([de6db5f](https://github.com/EchonLabs/kanvaro.com/commit/de6db5f6db157bfef5a0f22e0203dd989019cb9d))
-* add scheduled automation for AI tracker and summary generator ([7e47187](https://github.com/EchonLabs/kanvaro.com/commit/7e47187ecda857ee42e6c534dbdd012a9fcdbd61))
-* Enhance AI report generation with customizable report types and email sending options ([65147df](https://github.com/EchonLabs/kanvaro.com/commit/65147dfc1b6bb0883f875b482956523d06aa080f))
-* Implement AI Project Tracker API and UI ([509b9bc](https://github.com/EchonLabs/kanvaro.com/commit/509b9bcae559c67b61c969caf7bd108e2adcf7cd))
-
 # [1.37.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.4...v1.37.0) (2026-05-29)
 
 
