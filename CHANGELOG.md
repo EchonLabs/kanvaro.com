@@ -1,3 +1,11 @@
+## [1.38.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.0...v1.38.1) (2026-06-02)
+
+
+### Reverts
+
+* Revert "chore(release): 1.38.0 [skip ci]" ([01d28ce](https://github.com/EchonLabs/kanvaro.com/commit/01d28ce888238b9011c4ae8050bebf31fecfe903))
+* Revert "Merge pull request [#843](https://github.com/EchonLabs/kanvaro.com/issues/843) from EchonLabs/improvments/AI-Feature-report-gen" ([5613e8a](https://github.com/EchonLabs/kanvaro.com/commit/5613e8afd36519bd49114bc11f08eb015f4b084f))
+
 # [1.37.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.4...v1.37.0) (2026-05-29)
 
 
