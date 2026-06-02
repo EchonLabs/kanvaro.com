@@ -13,7 +13,7 @@ import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { formatToTitleCase } from '@/lib/utils'
-import { Activity, ArrowLeft, Brain, CalendarDays, Clock3, History, Loader2, RefreshCw, Users, Eye, Trash2 } from 'lucide-react'
+import { Activity, ArrowLeft, Brain, CalendarDays, ChevronDown, ChevronUp, Clock3, History, Loader2, RefreshCw, Settings2, Users, Eye, Trash2 } from 'lucide-react'
 import { fetchStandupProjectDetail } from '@/components/standup-dashboard/standup-dashboard-service'
 import { deleteStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
 import { StandupTimeline } from '@/components/standup-dashboard/StandupTimeline'
@@ -22,13 +22,14 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { getStandupDateKey } from '@/components/standup-dashboard/standup-date-utils'
 import { AITrackerModal } from '@/components/standup-dashboard/AITrackerModal'
 import { PastAIReportsModal } from '@/components/standup-dashboard/PastAIReportsModal'
+import { CronScheduleSettings } from '@/components/standup-dashboard/CronScheduleSettings'
  
 import type { StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 
 export default function StandupProjectPage() {
   const params = useParams()
   const router = useRouter()
-  const { isAuthenticated, isLoading: authLoading } = useAuthContext()
+  const { isAuthenticated, isLoading: authLoading, user: authUser } = useAuthContext()
   const { hasPermission, canManageProject } = usePermissions()
   const { formatDate, formatDateTimeSafe } = useDateTime()
   const projectId = params.projectId as string
@@ -41,6 +42,7 @@ export default function StandupProjectPage() {
   const [deleting, setDeleting] = useState(false)
   const [aiTrackerOpen, setAiTrackerOpen] = useState(false)
   const [pastReportsOpen, setPastReportsOpen] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -84,6 +86,7 @@ export default function StandupProjectPage() {
   ]
 
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
+  const canManageSchedule = canManageStandup || ['admin', 'hr', 'project_manager'].includes(authUser?.role || '')
   const handleDeleteMeeting = async (meetingId: string) => {
     if (!project) return
     setDeleteMeetingId(meetingId)
@@ -384,6 +387,27 @@ export default function StandupProjectPage() {
           )}
 
           
+
+          {canManageSchedule && (
+            <section className="space-y-3">
+              <button
+                onClick={() => setScheduleOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Settings2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold">Scheduled Automation</span>
+                  <span className="text-xs text-muted-foreground">— auto-run AI tracker &amp; summary generator</span>
+                </div>
+                {scheduleOpen
+                  ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </button>
+              {scheduleOpen && (
+                <CronScheduleSettings projectId={projectId} canManage={canManageSchedule} />
+              )}
+            </section>
+          )}
 
           <StandupTimeline items={project.timeline} />
         </div>
