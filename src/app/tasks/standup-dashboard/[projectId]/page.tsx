@@ -13,13 +13,15 @@ import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { formatToTitleCase } from '@/lib/utils'
-import { Activity, ArrowLeft, CalendarDays, Clock3, Loader2, RefreshCw, Users, Eye, Trash2 } from 'lucide-react'
+import { Activity, ArrowLeft, Brain, CalendarDays, Clock3, History, Loader2, RefreshCw, Users, Eye, Trash2 } from 'lucide-react'
 import { fetchStandupProjectDetail } from '@/components/standup-dashboard/standup-dashboard-service'
 import { deleteStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
 import { StandupTimeline } from '@/components/standup-dashboard/StandupTimeline'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { getStandupDateKey } from '@/components/standup-dashboard/standup-date-utils'
+import { AITrackerModal } from '@/components/standup-dashboard/AITrackerModal'
+import { PastAIReportsModal } from '@/components/standup-dashboard/PastAIReportsModal'
  
 import type { StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 
@@ -37,6 +39,8 @@ export default function StandupProjectPage() {
   const [standupDateFilter, setStandupDateFilter] = useState('')
   const [deleteMeetingId, setDeleteMeetingId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [aiTrackerOpen, setAiTrackerOpen] = useState(false)
+  const [pastReportsOpen, setPastReportsOpen] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -177,6 +181,14 @@ export default function StandupProjectPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPastReportsOpen(true)}>
+                <History className="mr-2 h-4 w-4" />
+                Past AI Reports
+              </Button>
+              <Button size="sm" onClick={() => setAiTrackerOpen(true)} className="bg-violet-600 hover:bg-violet-700 text-white">
+                <Brain className="mr-2 h-4 w-4" />
+                AI-Project Tracker
+              </Button>
               <Button variant="outline" onClick={() => router.push(`/tasks/standup-dashboard/${projectId}/schedule/create`)} disabled={!canManageStandup}>
                 <CalendarDays className="mr-2 h-4 w-4" />
                 Create Standup Schedule
@@ -376,6 +388,20 @@ export default function StandupProjectPage() {
           <StandupTimeline items={project.timeline} />
         </div>
       </PageContent>
+
+      <AITrackerModal
+        projectId={projectId}
+        projectName={project?.name || projectId}
+        isOpen={aiTrackerOpen}
+        onClose={() => setAiTrackerOpen(false)}
+      />
+
+      <PastAIReportsModal
+        projectId={projectId}
+        projectName={project?.name || projectId}
+        isOpen={pastReportsOpen}
+        onClose={() => setPastReportsOpen(false)}
+      />
 
       <ConfirmationModal
         isOpen={Boolean(deleteMeetingId)}
