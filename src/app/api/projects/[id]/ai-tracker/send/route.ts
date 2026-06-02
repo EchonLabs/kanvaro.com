@@ -1,13 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
+import mongoose from 'mongoose'
 import connectDB from '@/lib/db-config'
 import '@/models/registry'
 import { AIProjectReport } from '@/models/AIProjectReport'
 import { User } from '@/models/User'
+import { Notification } from '@/models/Notification'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { emailService } from '@/lib/email/EmailService'
 
 type ReportType = 'project' | 'personal' | 'both'
+
+const reportTypeLabel: Record<ReportType, string> = {
+  project: 'AI Project Tracking Report',
+  personal: 'Personal Performance Report',
+  both: 'AI Project Tracking Report & Personal Performance Report'
+}
+
+async function createReportNotification(
+  userId: string,
+  organizationId: string,
+  projectId: string,
+  projectName: string,
+  reportType: ReportType,
+  memberEmail: string
+) {
+  await Notification.create({
+    user: new mongoose.Types.ObjectId(userId),
+    organization: new mongoose.Types.ObjectId(organizationId),
+    type: 'project',
+    title: `AI Report Ready — ${projectName}`,
+    message: `Your ${reportTypeLabel[reportType]} has been sent to ${memberEmail}. Check your inbox.`,
+    data: {
+      entityType: 'project',
+      entityId: new mongoose.Types.ObjectId(projectId),
+      action: 'updated',
+      priority: 'medium',
+      url: `/tasks/standup-dashboard/${projectId}`,
+      metadata: { reportType, projectName }
+    },
+    isRead: false,
+    sentVia: { inApp: true, email: true, push: false },
+    emailSent: true
+  })
+}
 
 export async function POST(
   request: NextRequest,
@@ -97,7 +133,17 @@ export async function POST(
       }
 
       results.push({ memberId, memberName: personal.memberName, email: personal.memberEmail, success: sent })
-      if (sent) newlySentTo.add(memberId)
+      if (sent) {
+        newlySentTo.add(memberId)
+        await createReportNotification(
+          memberId,
+          user.organization,
+          params.id,
+          report.projectName,
+          reportType,
+          personal.memberEmail
+        ).catch(() => {})
+      }
     }
 
     // Send copy to sender if requested
@@ -138,6 +184,14 @@ export async function POST(
       }
 
       results.push({ memberId: 'sender', memberName: `${senderName} (you)`, email: senderEmail, success: true })
+      await createReportNotification(
+        user.id,
+        user.organization,
+        params.id,
+        report.projectName,
+        reportType,
+        senderEmail
+      ).catch(() => {})
     }
 
     await AIProjectReport.findByIdAndUpdate(reportId, { sentTo: Array.from(newlySentTo) })
