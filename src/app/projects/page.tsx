@@ -313,7 +313,6 @@ export default function ProjectsPage() {
               >
                 <Plus className="h-4 w-4" />
                 <span className="sm:inline">Create New Project</span>
-                <span className="sm:hidden">New Project</span>
               </Button>
             </PermissionGate>
           </div>

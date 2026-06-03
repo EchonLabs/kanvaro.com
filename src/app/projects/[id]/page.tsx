@@ -254,6 +254,40 @@ export default function ProjectDetailPage() {
   const canViewIncome = !permissionsLoading && hasPermission(Permission.FINANCIAL_VIEW_INCOME, projectId)
   const canCreateIncome = !permissionsLoading && hasPermission(Permission.FINANCIAL_CREATE_INCOME, projectId)
 
+  const tabs = [
+    { id: 'overview', label: 'Overview', order: 1 },
+    { id: 'team', label: 'Team', order: 2 },
+    { id: 'attachments', label: 'Attachments', order: 3 },
+    { id: 'budget', label: 'Budget', order: 4 },
+    { id: 'tasks', label: 'Tasks', order: 5 },
+    { id: 'kanban', label: 'Kanban', order: 6 },
+    { id: 'calendar', label: 'Calendar', order: 7 },
+    { id: 'backlog', label: 'Backlog', order: 8 },
+    ...(canManageTests ? [{ id: 'testing', label: 'Testing' }] : []),
+    { id: 'reports', label: 'Reports' },
+    { id: 'settings', label: 'Settings' },
+  ].map((tab, idx) => ({ ...tab, order: idx + 1 }))
+
+  const currentTabIndex = tabs.findIndex(tab => tab.id === activeTab)
+  const prevTab = currentTabIndex > 0 ? tabs[currentTabIndex - 1] : null
+  const nextTab = currentTabIndex < tabs.length - 1 ? tabs[currentTabIndex + 1] : null
+
+  const handlePrevTab = () => {
+    if (prevTab) {
+      const newSearchParams = new URLSearchParams(searchParams.toString())
+      newSearchParams.set('tab', prevTab.id)
+      router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
+    }
+  }
+
+  const handleNextTab = () => {
+    if (nextTab) {
+      const newSearchParams = new URLSearchParams(searchParams.toString())
+      newSearchParams.set('tab', nextTab.id)
+      router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
+    }
+  }
+
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -778,16 +812,21 @@ export default function ProjectDetailPage() {
       <MainLayout>
         <div className="space-y-8 mt-4">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1 min-w-0">
-              <Button variant="outline" size="sm" onClick={() => router.back()} className="w-full sm:w-auto">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 flex-1 min-w-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.back()}
+                className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto hidden sm:inline-flex"
+              >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
                   <h1
-                    className="text-2xl sm:text-3xl font-bold text-foreground line-clamp-2 max-w-full"
+                    className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground leading-tight tracking-tight line-clamp-2 max-w-full break-words"
                     title={project.name}
                   >
                     {project.name}
@@ -810,26 +849,28 @@ export default function ProjectDetailPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto sm:mt-4 lg:mt-6">
-              {canUpdateProject && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/projects/create?edit=${projectId}`)}
-                  className="w-full sm:w-auto"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Project
-                </Button>
-              )}
+            <div className="flex flex-col items-stretch gap-2 w-full sm:w-auto sm:justify-end">
+              <div className="flex flex-wrap items-stretch gap-2 sm:justify-end">
+                {canUpdateProject && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/projects/create?edit=${projectId}`)}
+                    className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Project
+                  </Button>
+                )}
+                {canCreateTask && (
+                  <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Task
+                  </Button>
+                )}
+              </div>
               {canCreateTask && (
-                <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Task
-                </Button>
-              )}
-              {canCreateTask && (
-                <Button size="sm" variant="outline" onClick={() => setShowBulkUploadDialog(true)} className="w-full sm:w-auto">
+                <Button size="sm" variant="outline" onClick={() => setShowBulkUploadDialog(true)} className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto">
                   <Upload className="h-4 w-4 mr-2" />
                   Bulk Upload
                 </Button>
@@ -915,18 +956,70 @@ export default function ProjectDetailPage() {
             newSearchParams.set('tab', value)
             router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
           }} className="space-y-8">
-            <TabsList className={`grid w-full gap-1 overflow-x-auto mt-2 ${canManageTests ? 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-11' : 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-10'}`}>
-              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-              <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
-              <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
-              <TabsTrigger value="budget" className="text-xs sm:text-sm">Budget</TabsTrigger>
-              <TabsTrigger value="tasks" className="text-xs sm:text-sm">Tasks</TabsTrigger>
-              <TabsTrigger value="kanban" className="text-xs sm:text-sm">Kanban</TabsTrigger>
-              <TabsTrigger value="calendar" className="text-xs sm:text-sm">Calendar</TabsTrigger>
-              <TabsTrigger value="backlog" className="text-xs sm:text-sm">Backlog</TabsTrigger>
-              {canManageTests && <TabsTrigger value="testing" className="text-xs sm:text-sm">Testing</TabsTrigger>}
-              <TabsTrigger value="reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
-              <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
+            <div className="mt-2 sm:hidden">
+              <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-background via-background to-muted/30 p-3 shadow-sm ring-1 ring-black/5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                    Tab {currentTabIndex + 1} of {tabs.length}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleNextTab}
+                    disabled={!nextTab}
+                    className="h-7 w-7"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
+                  <div className="min-w-0 rounded-xl bg-primary/8 px-3 py-2 ring-1 ring-primary/10">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground shadow-sm">
+                        {currentTabIndex + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-medium uppercase tracking-wide text-primary/70">
+                          Current
+                        </p>
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {tabs.find(tab => tab.id === activeTab)?.label || activeTab}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center text-muted-foreground">
+                    <ArrowRight className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 rounded-xl border border-border/70 bg-muted/40 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-background text-[11px] font-semibold text-foreground ring-1 ring-border/70">
+                        {nextTab ? nextTab.order : '✓'}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {nextTab ? 'Next' : 'Done'}
+                        </p>
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {nextTab ? nextTab.label : 'All tabs viewed'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <TabsList className={'mt-2 hidden h-auto w-full gap-1 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-sm sm:grid ' + (canManageTests ? 'sm:grid-cols-11' : 'sm:grid-cols-10')}>
+              {tabs.map((tab) => (
+                <TabsTrigger key={tab.id} value={tab.id} className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    {tab.order}
+                  </span>
+                  <span>{tab.label}</span>
+                </TabsTrigger>
+              ))}
             </TabsList>
 
             <TabsContent value="overview" className="space-y-8">

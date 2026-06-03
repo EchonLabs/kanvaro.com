@@ -223,6 +223,9 @@ export default function CreateProjectPage() {
     { id: 7, title: 'Review', description: 'Review and create project' }
   ]
 
+  const currentStepConfig = steps.find((step) => step.id === currentStep)
+  const nextStepConfig = steps.find((step) => step.id === currentStep + 1)
+
   const getStatusBadgeStyles = (status: string) => {
     switch (status) {
       case 'draft':
@@ -985,10 +988,10 @@ export default function CreateProjectPage() {
                 Back
               </Button>
               <div>
-                <h1 className="text-3xl font-bold text-foreground">
+                <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
                   {isEditMode ? 'Edit Project' : 'Create New Project'}
                 </h1>
-                <p className="text-muted-foreground">
+                <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
                   {isEditMode ? 'Update project details and configuration' : 'Set up a new project with detailed configuration'}
                 </p>
               </div>
@@ -1004,9 +1007,9 @@ export default function CreateProjectPage() {
                 <span className="text-sm text-muted-foreground">{currentStep} of {steps.length} steps</span>
               </div>
               <Progress value={progress} className="h-2" />
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between gap-2 text-sm">
                 {steps.map((step) => (
-                  <div key={step.id} className="flex items-center space-x-2">
+                  <div key={step.id} className="flex min-w-0 items-center space-x-2">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= step.id
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground'
@@ -1017,9 +1020,13 @@ export default function CreateProjectPage() {
                         step.id
                       )}
                     </div>
-                    <div className="hidden sm:block">
-                      <div className="font-medium text-foreground">{step.title}</div>
-                      <div className="text-xs text-muted-foreground">{step.description}</div>
+                    <div className="hidden min-w-0 sm:block">
+                      <div className="max-w-[90px] truncate text-xs font-medium text-foreground md:max-w-[110px] md:text-sm lg:max-w-[140px] xl:max-w-none">
+                        {step.title}
+                      </div>
+                      <div className="hidden max-w-[160px] truncate text-xs text-muted-foreground xl:block">
+                        {step.description}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1041,14 +1048,99 @@ export default function CreateProjectPage() {
             setCurrentStep(targetStep)
           }
         }}>
-          <TabsList className="grid w-full grid-cols-7 mt-2">
-            <TabsTrigger value="1">Basic</TabsTrigger>
-            <TabsTrigger value="2">Timeline</TabsTrigger>
-            <TabsTrigger value="3">Budget</TabsTrigger>
-            <TabsTrigger value="4">Team</TabsTrigger>
-            <TabsTrigger value="5">Attachments</TabsTrigger>
-            <TabsTrigger value="6">Settings</TabsTrigger>
-            <TabsTrigger value="7">Review</TabsTrigger>
+          <div className="mt-2 sm:hidden">
+            <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-background via-background to-muted/30 p-3 shadow-sm ring-1 ring-black/5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  Step {currentStep}
+                </div>
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  of {steps.length}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
+                <div className="min-w-0 rounded-xl bg-primary/8 px-3 py-2 ring-1 ring-primary/10">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground shadow-sm">
+                      {currentStep}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-medium uppercase tracking-wide text-primary/70">
+                        Current
+                      </p>
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {currentStepConfig?.title}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-center text-muted-foreground">
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 rounded-xl border border-border/70 bg-muted/40 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-background text-[11px] font-semibold text-foreground ring-1 ring-border/70">
+                      {nextStepConfig?.id ?? currentStep}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Next
+                      </p>
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {nextStepConfig?.title ?? 'Completed'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <TabsList className="mt-2 hidden h-auto w-full grid-cols-7 gap-1 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-sm sm:grid">
+            <TabsTrigger value="1" className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                1
+              </span>
+              <span>Basic</span>
+            </TabsTrigger>
+            <TabsTrigger value="2" className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                2
+              </span>
+              <span>Timeline</span>
+            </TabsTrigger>
+            <TabsTrigger value="3" className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                3
+              </span>
+              <span>Budget</span>
+            </TabsTrigger>
+            <TabsTrigger value="4" className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                4
+              </span>
+              <span>Team</span>
+            </TabsTrigger>
+            <TabsTrigger value="5" className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                5
+              </span>
+              <span>Attachments</span>
+            </TabsTrigger>
+            <TabsTrigger value="6" className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                6
+              </span>
+              <span>Settings</span>
+            </TabsTrigger>
+            <TabsTrigger value="7" className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                7
+              </span>
+              <span>Review</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Step 1: Basic Information */}
