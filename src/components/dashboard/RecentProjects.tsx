@@ -45,7 +45,7 @@ function getStatusConfig(status: string) {
 
 /* Format minutes into compact form — no trailing label, just the time */
 function formatHoursTracked(minutes?: number): string {
-  if (!minutes || minutes === 0) return '—'
+  if (!minutes || minutes === 0) return 'No Time Tracked'
   const hours = Math.floor(minutes / 60)
   const mins  = Math.floor(minutes % 60)
   if (hours === 0) return `${mins}m`
@@ -132,7 +132,7 @@ function ProjectAvatar({ name, gradient }: { name: string; gradient: string }) {
 // ─── Hours cell ───────────────────────────────────────────────────────────────
 /*
  * Compact: "{hours}" + a green blinking TrendingUp icon.
- * The icon is hidden when there's no data (shows "—").
+ * The icon is hidden when there's no data (shows "No Time Tracked").
  */
 function HoursCell({ minutes }: { minutes?: number }) {
   const text = formatHoursTracked(minutes)
@@ -142,11 +142,14 @@ function HoursCell({ minutes }: { minutes?: number }) {
       <span className="text-sm font-apple-mono font-semibold text-[var(--apple-secondary-label)] tabular-nums">
         {text}
       </span>
-      {hasData && (
+      {hasData && ( 
+        <>
         <TrendingUp
           className="h-3.5 w-3.5 flex-shrink-0 text-[var(--apple-system-green)]"
           style={{ animation: 'status-pulse 2s ease-in-out infinite' }}
         />
+        <span className="text-sm font-apple-mono font-semibold text-[var(--apple-secondary-label)] tabular-nums">Tracked</span>
+        </>
       )}
     </div>
   )

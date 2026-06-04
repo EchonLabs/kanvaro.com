@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { startTransition } from 'react'
 import Link from 'next/link'
-import { X, Menu, ChevronRight } from 'lucide-react'
+import { X, Menu, ChevronRight, Sun, Moon, Monitor } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
@@ -299,10 +300,14 @@ interface MobileMenuProps {
 
 export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([])
+  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const { organization, loading } = useOrganization()
   const { hasPermission } = usePermissions()
+  const { theme, setTheme } = useTheme()
+
+  useEffect(() => { setMounted(true) }, [])
 
   const toggleExpanded = (itemId: string) => {
     setExpandedItems(prev => 
@@ -396,8 +401,36 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
           </nav>
         </div>
 
+        {/* Appearance — theme toggle */}
+        {mounted && (
+          <div className="border-t border-[var(--apple-separator)] px-2 py-3">
+            <p className="apple-section-label px-1 mb-2">Appearance</p>
+            <div className="flex items-center bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-pill)] p-0.5 gap-0.5">
+              {([
+                { value: 'light',  Icon: Sun,     label: 'Light' },
+                { value: 'dark',   Icon: Moon,    label: 'Dark' },
+                { value: 'system', Icon: Monitor, label: 'System' },
+              ] as const).map(({ value, Icon, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setTheme(value)}
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[var(--apple-radius-pill)] text-[13px] font-medium apple-transition',
+                    theme === value
+                      ? 'bg-card shadow-sm text-[var(--apple-label)]'
+                      : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]',
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Sign Out */}
-        <div className="border-t border-[var(--apple-separator)] p-2 mt-auto">
+        <div className="border-t border-[var(--apple-separator)] p-2">
           <Button
             variant="ghost"
             className="w-full justify-start h-8 rounded-[12px] text-[var(--apple-system-red)] hover:bg-[var(--apple-system-red)]/10 hover:text-[var(--apple-system-red)] px-3"
