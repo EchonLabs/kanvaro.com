@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@400;500;600&family=Nunito+Sans:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -20,84 +22,213 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-  
+
+  /* Apple HIG font utilities */
+  .font-apple {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+  }
+  .font-apple-rounded {
+    font-family: 'Nunito Sans', 'SF Pro Rounded', system-ui, sans-serif;
+  }
+  .font-apple-mono {
+    font-family: 'JetBrains Mono', 'SF Mono', 'Menlo', ui-monospace, monospace;
+  }
+
+  /* Apple HIG glass material — header, popovers */
+  .apple-glass {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+  .dark .apple-glass {
+    background: rgba(22, 22, 24, 0.78);
+  }
+
+  /* Apple HIG sidebar material */
+  .apple-sidebar-material {
+    background: rgba(246, 246, 248, 0.94);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+  .dark .apple-sidebar-material {
+    background: rgba(16, 16, 18, 0.94);
+  }
+
+  /* Apple HIG section header label */
+  .apple-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--apple-tertiary-label);
+  }
+
+  /* Apple HIG spring-like easing transition */
+  .apple-transition {
+    transition: all 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
 }
 
 @layer base {
   * {
     box-sizing: border-box;
   }
-  
+
   html,
   body {
     overflow-x: hidden;
     width: 100%;
     position: relative;
   }
-  
+
   /* Prevent horizontal scrolling on all containers */
   body > * {
     max-width: 100%;
     overflow-x: hidden;
   }
-  
+
   /* Ensure images and media don't overflow */
   img, video, iframe, embed, object {
     max-width: 100% !important;
     height: auto;
   }
-  
+
   /* Prevent text overflow */
   p, span, div, h1, h2, h3, h4, h5, h6 {
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
-  
+
   :root {
-    /* Light theme - High contrast, accessible colors */
-    --background: 0 0% 100%; /* Pure white */
-    --foreground: 0 0% 0%; /* Pure black */
-    --card: 0 0% 100%; /* Pure white */
-    --card-foreground: 0 0% 0%; /* Pure black */
-    --popover: 0 0% 100%; /* Pure white */
-    --popover-foreground: 0 0% 0%; /* Pure black */
-    --primary: 0 0% 0%; /* Pure black for primary actions */
-    --primary-foreground: 0 0% 100%; /* Pure white text on primary */
-    --secondary: 0 0% 96%; /* Very light gray */
-    --secondary-foreground: 0 0% 0%; /* Pure black */
-    --muted: 0 0% 96%; /* Very light gray */
-    --muted-foreground: 0 0% 45%; /* Dark gray for muted text */
-    --accent: 0 0% 96%; /* Very light gray */
-    --accent-foreground: 0 0% 0%; /* Pure black */
-    --destructive: 0 84% 60%; /* High contrast red for destructive actions */
-    --destructive-foreground: 0 0% 100%; /* White text on destructive */
-    --border: 0 0% 90%; /* Light gray borders */
-    --input: 0 0% 96%; /* Light gray input backgrounds */
-    --ring: 0 0% 0%; /* Black focus rings */
-    --radius: 0.5rem;
+    /* ============================================================
+       shadcn/ui tokens — updated to Apple HIG light mode values
+       ============================================================ */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 211 100% 50%;          /* Apple Blue #007AFF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;          /* #F2F2F7 Apple secondary bg */
+    --secondary-foreground: 0 0% 0%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 3% 46%;   /* Approx rgba(60,60,67,.60) */
+    --accent: 240 5% 96%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 3 100% 59%;        /* #FF3B30 Apple red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 90%;
+    --input: 240 5% 96%;
+    --ring: 211 100% 50%;             /* Apple Blue focus ring */
+    --radius: 0.875rem;               /* 14px — Apple HIG md radius */
+
+    /* ============================================================
+       Apple HIG semantic color tokens
+       ============================================================ */
+    --apple-system-blue: #007AFF;
+    --apple-system-green: #34C759;
+    --apple-system-orange: #FF9500;
+    --apple-system-red: #FF3B30;
+    --apple-system-yellow: #FFCC00;
+    --apple-system-purple: #AF52DE;
+    --apple-system-gray: #8E8E93;
+    --apple-system-cyan: #32ADE6;
+    --apple-system-teal: #30B0C7;
+
+    /* Background hierarchy */
+    --apple-system-background: #FFFFFF;
+    --apple-secondary-system-background: #F2F2F7;
+    --apple-tertiary-system-background: #FFFFFF;
+    --apple-system-grouped-background: #F2F2F7;
+    --apple-secondary-system-grouped-background: #FFFFFF;
+    --apple-tertiary-system-grouped-background: #F2F2F7;
+
+    /* Label hierarchy */
+    --apple-label: #000000;
+    --apple-secondary-label: rgba(60, 60, 67, 0.60);
+    --apple-tertiary-label: rgba(60, 60, 67, 0.30);
+    --apple-quaternary-label: rgba(60, 60, 67, 0.18);
+
+    /* Fill hierarchy */
+    --apple-fill: rgba(120, 120, 128, 0.20);
+    --apple-secondary-fill: rgba(120, 120, 128, 0.16);
+    --apple-tertiary-fill: rgba(118, 118, 128, 0.12);
+    --apple-quaternary-fill: rgba(116, 116, 128, 0.08);
+
+    /* Separators */
+    --apple-separator: rgba(60, 60, 67, 0.22);
+    --apple-opaque-separator: #C6C6C8;
+
+    /* Radius tokens */
+    --apple-radius-sm: 10px;
+    --apple-radius-md: 14px;
+    --apple-radius-lg: 16px;
+    --apple-radius-xl: 20px;
+    --apple-radius-pill: 999px;
   }
 
   .dark {
-    /* Dark theme - High contrast, accessible colors */
-    --background: 0 0% 8%; /* Very dark gray */
-    --foreground: 0 0% 100%; /* Pure white */
-    --card: 0 0% 8%; /* Very dark gray */
-    --card-foreground: 0 0% 100%; /* Pure white */
-    --popover: 0 0% 8%; /* Very dark gray */
-    --popover-foreground: 0 0% 100%; /* Pure white */
-    --primary: 0 0% 100%; /* Pure white for primary actions */
-    --primary-foreground: 0 0% 0%; /* Black text on primary */
-    --secondary: 0 0% 15%; /* Dark gray */
-    --secondary-foreground: 0 0% 100%; /* Pure white */
-    --muted: 0 0% 15%; /* Dark gray */
-    --muted-foreground: 0 0% 70%; /* Light gray for muted text */
-    --accent: 0 0% 15%; /* Dark gray */
-    --accent-foreground: 0 0% 100%; /* Pure white */
-    --destructive: 0 84% 60%; /* High contrast red for destructive actions */
-    --destructive-foreground: 0 0% 100%; /* White text on destructive */
-    --border: 0 0% 20%; /* Dark gray borders */
-    --input: 0 0% 15%; /* Dark gray input backgrounds */
-    --ring: 0 0% 100%; /* White focus rings */
+    /* ============================================================
+       shadcn/ui tokens — Apple HIG true dark mode values
+       ============================================================ */
+    --background: 0 0% 0%;            /* #000000 TRUE black */
+    --foreground: 0 0% 100%;
+    --card: 0 0% 11%;                 /* #1C1C1E Apple secondary bg */
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 17%;              /* #2C2C2E Apple tertiary bg */
+    --popover-foreground: 0 0% 100%;
+    --primary: 211 100% 53%;          /* #0A84FF Apple Blue dark */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 11%;            /* #1C1C1E */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 11%;
+    --muted-foreground: 0 0% 60%;     /* Approx rgba(235,235,245,.60) */
+    --accent: 0 0% 17%;               /* #2C2C2E */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 3 100% 61%;        /* #FF453A Apple red dark */
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 2% 26%;             /* Approx rgba(84,84,88,.55) */
+    --input: 0 0% 11%;
+    --ring: 211 100% 53%;
+
+    /* ============================================================
+       Apple HIG dark semantic color tokens
+       ============================================================ */
+    --apple-system-blue: #0A84FF;
+    --apple-system-green: #30D158;
+    --apple-system-orange: #FF9F0A;
+    --apple-system-red: #FF453A;
+    --apple-system-yellow: #FFD60A;
+    --apple-system-purple: #BF5AF2;
+    --apple-system-gray: #8E8E93;
+    --apple-system-cyan: #64D2FF;
+    --apple-system-teal: #40C8E0;
+
+    /* Background hierarchy — dark */
+    --apple-system-background: #000000;
+    --apple-secondary-system-background: #1C1C1E;
+    --apple-tertiary-system-background: #2C2C2E;
+    --apple-system-grouped-background: #000000;
+    --apple-secondary-system-grouped-background: #1C1C1E;
+    --apple-tertiary-system-grouped-background: #2C2C2E;
+
+    /* Label hierarchy — dark */
+    --apple-label: #FFFFFF;
+    --apple-secondary-label: rgba(235, 235, 245, 0.60);
+    --apple-tertiary-label: rgba(235, 235, 245, 0.30);
+    --apple-quaternary-label: rgba(235, 235, 245, 0.18);
+
+    /* Fill hierarchy — dark */
+    --apple-fill: rgba(120, 120, 128, 0.36);
+    --apple-secondary-fill: rgba(120, 120, 128, 0.32);
+    --apple-tertiary-fill: rgba(118, 118, 128, 0.24);
+    --apple-quaternary-fill: rgba(118, 118, 128, 0.18);
+
+    /* Separators — dark */
+    --apple-separator: rgba(84, 84, 88, 0.55);
+    --apple-opaque-separator: #38383A;
   }
 }
 
@@ -107,30 +238,34 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
   }
-  
+
   /* Remove margin-top from layout content */
   main {
     margin-top: 0 !important;
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — Apple HIG style */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground));
-  border-radius: 3px;
+  background: var(--apple-fill);
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary));
+  background: var(--apple-secondary-fill);
 }
 
 /* Loading animation */
@@ -144,7 +279,7 @@
   animation: spin 1s linear infinite;
 }
 
-/* Setup wizard specific styles - Modern accessible design */
+/* Setup wizard specific styles */
 .setup-wizard {
   background: hsl(var(--background));
   min-height: 100vh;
@@ -156,12 +291,12 @@
     flex-wrap: wrap;
     gap: 1rem;
   }
-  
+
   .progress-steps li {
     flex: 1 1 calc(50% - 0.5rem);
     min-width: 150px;
   }
-  
+
   .progress-steps .connector-line {
     display: none;
   }
@@ -173,13 +308,13 @@
     align-items: flex-start;
     gap: 1rem;
   }
-  
+
   .progress-steps li {
     flex-direction: row;
     width: 100%;
     max-width: none;
   }
-  
+
   .progress-steps .connector-line {
     display: none;
   }
@@ -223,7 +358,7 @@
 
 /* Keep links blue */
 .rich-text-editor a {
-  color: rgb(59, 130, 246) !important;
+  color: var(--apple-system-blue) !important;
   background-color: transparent !important;
 }
 
@@ -237,7 +372,7 @@
   background-color: transparent !important;
 }
 
-/* Task description display - Override prose styles for proper theme colors */
+/* Task description display */
 .task-description {
   color: hsl(var(--foreground)) !important;
 }
@@ -266,19 +401,19 @@
 }
 
 .task-description a {
-  color: rgb(59, 130, 246) !important;
+  color: var(--apple-system-blue) !important;
   background-color: transparent !important;
 }
 
 .task-description img {
   max-width: 100% !important;
   height: auto !important;
-  border-radius: 0.5rem;
+  border-radius: var(--apple-radius-sm);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   background-color: transparent !important;
 }
 
-/* Task description formatting (Tailwind preflight removes default margins/list styles) */
+/* Task description formatting */
 .task-description p {
   margin: 0.5rem 0;
 }
