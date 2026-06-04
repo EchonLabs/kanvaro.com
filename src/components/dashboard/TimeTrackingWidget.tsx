@@ -299,138 +299,134 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   }
 
   return (
-    <div className="space-y-3">
-      {/* Active Timer Widget - Conditionally Visible */}
+    <div className="space-y-4">
+      {/* ─── Active Timer Card ─── */}
       {activeTimer && (
-        <Card className="overflow-x-hidden border-primary/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Clock className="h-4 w-4 text-primary flex-shrink-0" />
-              <span className="truncate">Active Timer</span>
-            </CardTitle>
+        <Card className="overflow-x-hidden border-[var(--apple-system-blue)]/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-[var(--apple-label)]">Active Timer</span>
+              </div>
+              {/* "• Live" indicator */}
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--apple-radius-pill)] bg-[var(--apple-system-green)]/15 text-[var(--apple-system-green)] text-[11px] font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--apple-system-green)] animate-pulse" />
+                Live
+              </span>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-center py-1">
-              <div className="text-2xl sm:text-3xl font-mono font-bold text-primary break-words mb-1">
+          <CardContent className="space-y-3">
+            {/* Large monospace clock */}
+            <div className="text-center py-2">
+              <div className="text-[36px] font-apple-mono font-semibold text-[var(--apple-label)] tracking-wider leading-none">
                 {displayTime}
               </div>
             </div>
 
-            <div className="border-t pt-2 space-y-1.5">
-              <div className="text-xs break-words">
-                <span className="font-semibold text-foreground">Project:</span>{' '}
-                {activeTimer.project?.name ? (
-                  <span
-                    className={activeTimer.project.name.length > 20 ? 'truncate' : ''}
-                    title={activeTimer.project.name.length > 20 ? activeTimer.project.name : undefined}
-                  >
-                    {activeTimer.project.name.length > 20
-                      ? `${activeTimer.project.name.slice(0, 20)}…`
-                      : activeTimer.project.name}
-                  </span>
-                ) : (
-                  <span className="italic text-muted-foreground">Unknown project</span>
-                )}
+            {/* Project / Task / Memo */}
+            <div className="space-y-1 border-t border-[var(--apple-separator)] pt-3">
+              <div className="flex gap-3">
+                <span className="text-xs text-[var(--apple-tertiary-label)] w-14 flex-shrink-0">Project</span>
+                <span className="text-xs font-medium text-[var(--apple-label)] truncate">
+                  {activeTimer.project?.name || <span className="italic text-[var(--apple-tertiary-label)]">Unknown</span>}
+                </span>
               </div>
               {activeTimer.task && (
-                <div className="text-xs break-words">
-                  <span className="font-semibold text-foreground">Task:</span>{' '}
-                  <span className="break-words whitespace-normal" title={activeTimer.task.title}>
-                    {activeTimer.task.title}
-                  </span>
-                </div>
-              )}
-              {activeTimer.description && (
-                <div className="text-xs">
-                  <span className="font-semibold text-foreground">Memo:</span>{' '}
+                <div className="flex gap-3">
+                  <span className="text-xs text-[var(--apple-tertiary-label)] w-14 flex-shrink-0">Task</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="break-words whitespace-normal">
-                        {truncateWords(activeTimer.description, 5)}
+                      <span className="text-xs font-medium text-[var(--apple-label)] truncate cursor-default">
+                        {activeTimer.task.title}
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="max-w-xs break-words">{activeTimer.description}</p>
-                    </TooltipContent>
+                    <TooltipContent><p className="max-w-xs">{activeTimer.task.title}</p></TooltipContent>
                   </Tooltip>
                 </div>
               )}
-              <div className="flex flex-wrap items-center gap-1 pt-1">
-                <Badge
-                  variant={activeTimer.isPaused ? 'secondary' : 'default'}
-                  className={`text-xs flex-shrink-0 hover:!bg-secondary dark:hover:!bg-secondary ${activeTimer.isPaused ? '' : 'hover:!bg-primary dark:hover:!bg-primary'}`}
-                >
-                  {activeTimer.isPaused ? 'Paused' : 'Running'}
-                </Badge>
-                {activeTimer.isBillable && (
-                  <Badge variant="outline" className="text-xs flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent">Billable</Badge>
-                )}
-              </div>
+              {activeTimer.description && (
+                <div className="flex gap-3">
+                  <span className="text-xs text-[var(--apple-tertiary-label)] w-14 flex-shrink-0">Memo</span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs text-[var(--apple-secondary-label)] truncate cursor-default">
+                        {truncateWords(activeTimer.description, 5)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent><p className="max-w-xs">{activeTimer.description}</p></TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-3 gap-1.5 pt-1">
+            {/* Status badges */}
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-[var(--apple-radius-pill)] text-[11px] font-medium ${
+                activeTimer.isPaused
+                  ? 'bg-[var(--apple-system-orange)]/15 text-[var(--apple-system-orange)]'
+                  : 'bg-[var(--apple-system-green)]/15 text-[var(--apple-system-green)]'
+              }`}>
+                {activeTimer.isPaused ? 'Paused' : 'Running'}
+              </span>
+              {activeTimer.isBillable && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-[var(--apple-radius-pill)] text-[11px] font-medium bg-[var(--apple-system-blue)]/15 text-[var(--apple-system-blue)]">
+                  Billable
+                </span>
+              )}
+            </div>
+
+            {/* 3 action buttons */}
+            <div className="grid grid-cols-3 gap-2">
               <Button
                 size="sm"
                 variant="outline"
                 disabled={isLoading}
                 onClick={() => updateTimerAction(activeTimer.isPaused ? 'resume' : 'pause')}
-                className="w-full text-xs whitespace-nowrap px-2 py-1 h-auto"
+                className="text-xs"
               >
-                {activeTimer.isPaused ? (
-                  <>
-                    <Play className="h-3 w-3 mr-1" />
-                    Resume
-                  </>
-                ) : (
-                  <>
-                    <Pause className="h-3 w-3 mr-1" />
-                    Pause
-                  </>
-                )}
+                {activeTimer.isPaused ? <><Play className="h-3 w-3 mr-1" />Resume</> : <><Pause className="h-3 w-3 mr-1" />Pause</>}
               </Button>
               <Button
                 size="sm"
                 variant="destructive"
                 disabled={isLoading}
                 onClick={() => setShowStopConfirm(true)}
-                className="w-full text-xs whitespace-nowrap px-2 py-1 h-auto"
+                className="text-xs"
               >
-                <Square className="h-3 w-3 mr-1" />
-                Stop
+                <Square className="h-3 w-3 mr-1" />Stop
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  const pid = activeTimer.project && activeTimer.project._id ? `projectId=${encodeURIComponent(activeTimer.project._id)}` : ''
-                  const pname = activeTimer.project && activeTimer.project.name ? `projectName=${encodeURIComponent(activeTimer.project.name)}` : ''
-                  const tid = activeTimer.task && activeTimer.task._id ? `taskId=${encodeURIComponent(activeTimer.task._id)}` : ''
-                  const tname = activeTimer.task && activeTimer.task.title ? `taskName=${encodeURIComponent(activeTimer.task.title)}` : ''
+                  const pid = activeTimer.project?._id ? `projectId=${encodeURIComponent(activeTimer.project._id)}` : ''
+                  const pname = activeTimer.project?.name ? `projectName=${encodeURIComponent(activeTimer.project.name)}` : ''
+                  const tid = activeTimer.task?._id ? `taskId=${encodeURIComponent(activeTimer.task._id)}` : ''
+                  const tname = activeTimer.task?.title ? `taskName=${encodeURIComponent(activeTimer.task.title)}` : ''
                   const qs = [pid, pname, tid, tname].filter(Boolean).join('&')
                   router.push(qs ? `/time-tracking/timer?${qs}` : '/time-tracking/timer')
                 }}
-                className="w-full text-xs whitespace-nowrap px-2 py-1 h-auto"
+                className="text-xs"
               >
-                <Clock className="h-3 w-3 mr-1" />
-                Info
+                <Clock className="h-3 w-3 mr-1" />Info
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Stop Timer Confirmation Dialog */}
+      {/* Stop Timer Confirmation Dialog — logic unchanged */}
       <Dialog open={showStopConfirm} onOpenChange={setShowStopConfirm}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <AlertTriangle className="h-5 w-5 text-[var(--apple-system-red)]" />
               Stop Timer
             </DialogTitle>
             <DialogDescription>
               Are you sure you want to stop the active timer?
               {activeTimer && (
-                <span className="block mt-2 text-foreground font-medium">
+                <span className="block mt-2 text-[var(--apple-label)] font-medium">
                   {activeTimer.project?.name || 'Unknown project'}
                   {activeTimer.task && ` • ${activeTimer.task.title}`}
                 </span>
@@ -438,100 +434,74 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStopConfirm(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setShowStopConfirm(false)
-                updateTimerAction('stop')
-              }}
-            >
-              <Square className="h-4 w-4 mr-2" />
-              Stop Timer
+            <Button variant="outline" onClick={() => setShowStopConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { setShowStopConfirm(false); updateTimerAction('stop') }}>
+              <Square className="h-4 w-4 mr-2" />Stop Timer
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Time Tracking Widget - Always Visible */}
+      {/* ─── Time Tracking Overview Card ─── */}
       <Card className="overflow-x-hidden">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <span className="truncate">Time Tracking</span>
-          </CardTitle>
+        <CardHeader>
+          <CardTitle>Time Tracking</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-3">
           {error && (
             <Alert variant="destructive">
-              <AlertDescription className="text-xs break-words">{error}</AlertDescription>
+              <AlertDescription className="text-xs">{error}</AlertDescription>
             </Alert>
           )}
 
+          {/* Today / Week / Month stats — compact single row */}
           {timeStats && (
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <div className="text-base sm:text-lg font-bold text-primary break-words">
+            <div className="grid grid-cols-3 divide-x divide-[var(--apple-separator)] rounded-[var(--apple-radius-md)] bg-[var(--apple-quaternary-fill)] overflow-hidden">
+              <div className="text-center px-2 py-2">
+                <div className="text-sm font-bold font-apple-mono text-[var(--apple-label)] leading-tight tabular-nums">
                   {formatDuration(timeStats.todayDuration + (activeTimer ? runningTimerMinutes : 0))}
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">Today</div>
+                <div className="apple-section-label mt-0.5">Today</div>
               </div>
-              <div>
-                <div className="text-base sm:text-lg font-bold text-blue-600 break-words">
+              <div className="text-center px-2 py-2">
+                <div className="text-sm font-bold font-apple-mono text-[var(--apple-system-blue)] leading-tight tabular-nums">
                   {formatDuration(timeStats.weekDuration)}
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">Week</div>
+                <div className="apple-section-label mt-0.5">Week</div>
               </div>
-              <div>
-                <div className="text-base sm:text-lg font-bold text-green-600 break-words">
+              <div className="text-center px-2 py-2">
+                <div className="text-sm font-bold font-apple-mono text-[var(--apple-system-green)] leading-tight tabular-nums">
                   {formatDuration(timeStats.monthDuration)}
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">Month</div>
+                <div className="apple-section-label mt-0.5">Month</div>
               </div>
             </div>
           )}
 
+          {/* Cost row — only if there's billing data */}
           {timeStats && (timeStats.todayCost > 0 || timeStats.weekCost > 0 || timeStats.monthCost > 0) && (
-            <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t">
-              <div>
-                <div className="text-xs sm:text-sm font-semibold text-green-600 break-words">
-                  {formatCurrency(timeStats.todayCost)}
+            <div className="grid grid-cols-3 divide-x divide-[var(--apple-separator)] rounded-[var(--apple-radius-md)] bg-[var(--apple-quaternary-fill)] overflow-hidden">
+              {[
+                { val: timeStats.todayCost, label: 'Today' },
+                { val: timeStats.weekCost,  label: 'Week' },
+                { val: timeStats.monthCost, label: 'Month' },
+              ].map(({ val, label }) => (
+                <div key={label} className="text-center px-2 py-2">
+                  <div className="text-xs font-semibold font-apple-mono text-[var(--apple-system-green)]">{formatCurrency(val)}</div>
+                  <div className="apple-section-label mt-0.5">{label}</div>
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">Today</div>
-              </div>
-              <div>
-                <div className="text-xs sm:text-sm font-semibold text-green-600 break-words">
-                  {formatCurrency(timeStats.weekCost)}
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5">Week</div>
-              </div>
-              <div>
-                <div className="text-xs sm:text-sm font-semibold text-green-600 break-words">
-                  {formatCurrency(timeStats.monthCost)}
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5">Month</div>
-              </div>
+              ))}
             </div>
           )}
 
-          <div className="flex flex-col gap-1.5 pt-1">
-            <Button
-              size="sm"
-              onClick={() => router.push('/time-tracking')}
-              className="w-full text-xs py-1 h-auto"
-            >
-              <Play className="h-3 w-3 mr-1.5" />
+          {/* Action buttons */}
+          <div className="flex flex-col gap-2 pt-1">
+            <Button size="sm" onClick={() => router.push('/time-tracking')} className="w-full">
+              <Play className="h-3.5 w-3.5 mr-1.5" />
               Time Tracking Details
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => router.push('/time-tracking/logs')}
-              className="w-full text-xs py-1 h-auto"
-            >
-              <TrendingUp className="h-3 w-3 mr-1.5" />
+            <Button size="sm" variant="outline" onClick={() => router.push('/time-tracking/logs')} className="w-full">
+              <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
               View Logs
             </Button>
           </div>

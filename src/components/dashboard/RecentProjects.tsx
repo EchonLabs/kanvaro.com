@@ -1,12 +1,9 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { formatToTitleCase } from '@/lib/utils'
+import { formatToTitleCase, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
-import { useDateTime } from '@/components/providers/DateTimeProvider'
-import { Progress } from '@/components/ui/Progress'
-import { Calendar, Users, ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowRight, FolderOpen } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface RecentProjectsProps {
@@ -14,56 +11,60 @@ interface RecentProjectsProps {
   isLoading?: boolean
 }
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'draft':
-      return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900'
-    case 'active':
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
-    case 'planning':
-      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-    case 'on_hold':
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
-    case 'completed':
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    case 'cancelled':
-      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-    default:
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-  }
+/* Apple HIG semantic status styles */
+const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
+  active:    { bg: 'bg-[var(--apple-system-green)]/15',  text: 'text-[var(--apple-system-green)]'  },
+  planning:  { bg: 'bg-[var(--apple-system-blue)]/15',   text: 'text-[var(--apple-system-blue)]'   },
+  on_hold:   { bg: 'bg-[var(--apple-system-yellow)]/20', text: 'text-[var(--apple-system-yellow)]' },
+  completed: { bg: 'bg-[var(--apple-system-gray)]/15',   text: 'text-[var(--apple-system-gray)]'   },
+  cancelled: { bg: 'bg-[var(--apple-system-red)]/15',    text: 'text-[var(--apple-system-red)]'    },
+  draft:     { bg: 'bg-[var(--apple-system-orange)]/15', text: 'text-[var(--apple-system-orange)]' },
+}
+
+/* Cycling colors for progress bars — each project gets a distinct Apple accent */
+const PROJECT_BAR_COLORS = [
+  'var(--apple-system-blue)',
+  'var(--apple-system-purple)',
+  'var(--apple-system-green)',
+  'var(--apple-system-orange)',
+  'var(--apple-system-teal)',
+  'var(--apple-system-red)',
+]
+
+function getStatusStyle(status: string) {
+  return STATUS_STYLES[status] || STATUS_STYLES.draft
+}
+
+function formatHoursTracked(minutes?: number) {
+  if (!minutes || minutes === 0) return '—'
+  const hours = Math.floor(minutes / 60)
+  const mins = Math.floor(minutes % 60)
+  if (hours === 0) return `${mins}m`
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
 }
 
 export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
   const router = useRouter()
-  const { formatDate } = useDateTime()
 
   if (isLoading) {
     return (
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Recent Projects</CardTitle>
-            <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-36 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+            <div className="h-4 w-24 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="border rounded-lg p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
-                    <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                  </div>
-                  <div className="flex space-x-2">
-                    <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                    <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                  </div>
+              <div key={i} className="px-3 py-2 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-4 flex-1 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+                  <div className="h-5 w-16 bg-[var(--apple-tertiary-fill)] rounded-full animate-pulse" />
+                  <div className="h-4 w-10 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
                 </div>
-                <div className="space-y-2">
-                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                  <div className="h-2 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                </div>
+                <div className="h-2 w-full bg-[var(--apple-tertiary-fill)] rounded-full animate-pulse" />
               </div>
             ))}
           </div>
@@ -77,25 +78,17 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Recent Projects</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/projects')}
-            >
-              View All
-              <ArrowRight className="h-4 w-4 ml-1" />
+            <CardTitle>Projects Overview</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => router.push('/projects')}>
+              View All <ArrowRight className="h-3.5 w-3.5 ml-1" />
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">No projects found</p>
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => router.push('/projects/create')}
-            >
+          <div className="text-center py-10">
+            <FolderOpen className="h-8 w-8 text-[var(--apple-tertiary-label)] mx-auto mb-3" />
+            <p className="text-sm text-[var(--apple-secondary-label)] mb-4">No projects found</p>
+            <Button variant="default" size="sm" onClick={() => router.push('/projects/create')}>
               Create Your First Project
             </Button>
           </div>
@@ -106,74 +99,65 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
 
   return (
     <Card className="overflow-x-hidden">
-      <CardHeader className="p-4 sm:p-6">
-        <div className="flex flex-row items-center justify-between gap-2">
-          <CardTitle className="text-base sm:text-lg truncate">Recent Projects</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Projects Overview</CardTitle>
+          <button
             onClick={() => router.push('/projects')}
-            className="flex-shrink-0"
+            className="text-sm text-[var(--apple-system-blue)] hover:opacity-80 apple-transition flex items-center gap-1"
           >
-            View All
-            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
-          </Button>
+            View all projects <ArrowRight className="h-3.5 w-3.5" />
+          </button>
         </div>
       </CardHeader>
-      <CardContent className="p-4 sm:p-6 pt-0">
-        <div className="space-y-3 sm:space-y-4">
-          {projects.map((project) => (
-            <div
-              key={project._id}
-              className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer overflow-x-hidden"
-              onClick={() => router.push(`/projects/${project._id}`)}
-            >
-              <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-0 mb-3">
-                <div className="flex-1 min-w-0">
-                  <h3
-                    className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate"
+      <CardContent className="pt-0 px-4 pb-4">
+        <div className="space-y-0">
+          {projects.map((project, idx) => {
+            const style = getStatusStyle(project.status)
+            const barColor = PROJECT_BAR_COLORS[idx % PROJECT_BAR_COLORS.length]
+            const progress = project.progress || 0
+            const hoursText = formatHoursTracked(project.hoursTracked)
+
+            return (
+              <div
+                key={project._id}
+                className="px-3 py-3 hover:bg-[var(--apple-quaternary-fill)] apple-transition rounded-[var(--apple-radius-md)] cursor-pointer border-b border-[var(--apple-separator)] last:border-0"
+                onClick={() => router.push(`/projects/${project._id}`)}
+              >
+                {/* Top row: project name + status badge + hours */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="text-sm font-medium text-[var(--apple-label)] truncate flex-1 min-w-0"
                     title={project.name}
                   >
                     {project.name}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 break-words line-clamp-2">
-                    {project.description || 'No description available'}
-                  </p>
-                </div>
-                <div className="flex flex-shrink-0">
-                  <Badge className={`${getStatusColor(project.status)} text-xs`}>
+                  </span>
+                  <span className={cn(
+                    'inline-flex items-center px-2 py-0.5 rounded-[var(--apple-radius-pill)] text-[10px] font-medium flex-shrink-0',
+                    style.bg, style.text
+                  )}>
                     {formatToTitleCase(project.status)}
-                  </Badge>
+                  </span>
+                  <span className="text-xs font-apple-mono text-[var(--apple-secondary-label)] flex-shrink-0 w-12 text-right">
+                    {hoursText}
+                  </span>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs sm:text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Progress</span>
-                  <span className="font-medium">{project.progress || 0}%</span>
-                </div>
-                <Progress value={project.progress || 0} className="h-2" />
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 mt-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                  {project.endDate && (
-                    <div className="flex items-center whitespace-nowrap">
-                      <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                      <span className="truncate">{formatDate(project.endDate)}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center whitespace-nowrap">
-                    <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                    <span>{project.teamMembers?.length || 0} members</span>
+                {/* Bottom row: full-width progress bar + percentage */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{ width: `${progress}%`, backgroundColor: barColor }}
+                    />
                   </div>
+                  <span className="text-[10px] text-[var(--apple-tertiary-label)] flex-shrink-0 w-7 text-right">
+                    {progress}%
+                  </span>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => router.push(`/projects/${project._id}`)} className="w-full sm:w-auto flex-shrink-0">
-                  View Details
-                </Button>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </CardContent>
     </Card>

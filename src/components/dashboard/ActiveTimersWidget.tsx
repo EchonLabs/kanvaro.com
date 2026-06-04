@@ -333,108 +333,76 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
 
   return (
     <Card className="overflow-x-hidden">
-      <CardHeader className="p-4 sm:p-6">
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base sm:text-lg truncate flex items-center gap-2">
-            <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
-            Active Timers
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+            <CardTitle>Active Timers</CardTitle>
+          </div>
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={fetchActiveTimers}
             disabled={isLoading}
-            className="h-8 w-8 p-0"
+            className="h-7 w-7 rounded-full"
           >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 text-[var(--apple-secondary-label)] ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
+      <CardContent className="space-y-3">
         {/* Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <Select 
-            value={selectedEmployeeId || 'all'} 
-            onValueChange={(value) => {
-              setSelectedEmployeeId(value === 'all' ? '' : value)
-              setEmployeeSearch('') // Clear search when selection changes
-            }}
-            onOpenChange={(open) => {
-              if (!open) setEmployeeSearch('') // Clear search when dropdown closes
-            }}
+          <Select
+            value={selectedEmployeeId || 'all'}
+            onValueChange={(value) => { setSelectedEmployeeId(value === 'all' ? '' : value); setEmployeeSearch('') }}
+            onOpenChange={(open) => { if (!open) setEmployeeSearch('') }}
           >
-            <SelectTrigger className="w-full text-sm">
+            <SelectTrigger className="w-full text-sm h-8 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]">
               <SelectValue placeholder="All Employees" />
             </SelectTrigger>
-            <SelectContent>
-              <div className="p-2 border-b">
+            <SelectContent className="rounded-[var(--apple-radius-md)] border-[var(--apple-separator)]">
+              <div className="p-2 border-b border-[var(--apple-separator)]">
                 <div className="relative">
-                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search employees..."
-                    value={employeeSearch}
-                    onChange={(e) => setEmployeeSearch(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    className="h-8 pl-7 text-xs"
-                  />
+                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" />
+                  <Input placeholder="Search employees..." value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="h-7 pl-7 text-xs" />
                 </div>
               </div>
               <div className="max-h-[200px] overflow-y-auto">
                 <SelectItem value="all">All Employees</SelectItem>
                 {filteredMembers.length === 0 ? (
-                  <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                    No employees found
-                  </div>
+                  <div className="px-2 py-4 text-center text-xs text-[var(--apple-secondary-label)]">No employees found</div>
                 ) : (
                   filteredMembers.map(member => (
-                    <SelectItem key={member._id} value={member._id}>
-                      {member.firstName} {member.lastName}
-                    </SelectItem>
+                    <SelectItem key={member._id} value={member._id}>{member.firstName} {member.lastName}</SelectItem>
                   ))
                 )}
               </div>
             </SelectContent>
           </Select>
 
-          <Select 
-            value={selectedProjectId || 'all'} 
-            onValueChange={(value) => {
-              setSelectedProjectId(value === 'all' ? '' : value)
-              setProjectSearch('') // Clear search when selection changes
-            }}
-            onOpenChange={(open) => {
-              if (!open) setProjectSearch('') // Clear search when dropdown closes
-            }}
+          <Select
+            value={selectedProjectId || 'all'}
+            onValueChange={(value) => { setSelectedProjectId(value === 'all' ? '' : value); setProjectSearch('') }}
+            onOpenChange={(open) => { if (!open) setProjectSearch('') }}
           >
-            <SelectTrigger className="w-full text-sm">
+            <SelectTrigger className="w-full text-sm h-8 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]">
               <SelectValue placeholder="All Projects" />
             </SelectTrigger>
-            <SelectContent>
-              <div className="p-2 border-b">
+            <SelectContent className="rounded-[var(--apple-radius-md)] border-[var(--apple-separator)]">
+              <div className="p-2 border-b border-[var(--apple-separator)]">
                 <div className="relative">
-                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search projects..."
-                    value={projectSearch}
-                    onChange={(e) => setProjectSearch(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    className="h-8 pl-7 text-xs"
-                  />
+                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" />
+                  <Input placeholder="Search projects..." value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="h-7 pl-7 text-xs" />
                 </div>
               </div>
               <div className="max-h-[200px] overflow-y-auto">
                 <SelectItem value="all">All Projects</SelectItem>
                 {filteredProjects.length === 0 ? (
-                  <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                    No projects found
-                  </div>
+                  <div className="px-2 py-4 text-center text-xs text-[var(--apple-secondary-label)]">No projects found</div>
                 ) : (
                   filteredProjects.map(project => (
-                    <SelectItem key={project._id} value={project._id}>
-                      {project.name}
-                    </SelectItem>
+                    <SelectItem key={project._id} value={project._id}>{project.name}</SelectItem>
                   ))
                 )}
               </div>
@@ -445,52 +413,52 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
         {/* Timers List */}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--apple-secondary-label)]" />
           </div>
         ) : filteredTimers.length === 0 ? (
-          <div className="text-center py-8 text-sm text-muted-foreground">
+          <div className="text-center py-8 text-sm text-[var(--apple-secondary-label)]">
             No active timers
           </div>
         ) : (
-          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+          <div className="space-y-2 max-h-[360px] overflow-y-auto">
             {filteredTimers.map(timer => {
               const derivedMinutes = deriveTimerMinutes(timer)
               const displayTime = displayTimes[timer._id] || formatDuration(derivedMinutes)
               return (
                 <div
                   key={timer._id}
-                  className="border rounded-lg p-3 space-y-2 hover:bg-muted/50 transition-colors"
+                  className="rounded-[var(--apple-radius-md)] p-3 border border-[var(--apple-separator)] hover:bg-[var(--apple-quaternary-fill)] apple-transition space-y-1.5"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0 overflow-x-hidden">
-                      <div className="flex items-center gap-2 mb-1">
-                        <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                        <span className="text-sm font-medium truncate">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <User className="h-3 w-3 text-[var(--apple-tertiary-label)] flex-shrink-0" />
+                        <span className="text-sm font-medium text-[var(--apple-label)] truncate">
                           {timer.user.firstName} {timer.user.lastName}
                         </span>
                         {timer.isPaused && (
-                          <Badge variant="secondary" className="text-xs">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-[var(--apple-radius-pill)] text-[10px] font-medium bg-[var(--apple-system-orange)]/15 text-[var(--apple-system-orange)]">
                             Paused
-                          </Badge>
+                          </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-xs text-[var(--apple-secondary-label)]">
                         <FolderOpen className="h-3 w-3 flex-shrink-0" />
                         <span className="truncate">{timer.project.name}</span>
                       </div>
                       {timer.task && (
-                        <div className="text-xs text-muted-foreground ml-5 break-words whitespace-normal" title={timer.task.title}>
-                          Task: {timer.task.title}
+                        <div className="text-[11px] text-[var(--apple-secondary-label)] ml-4 truncate" title={timer.task.title}>
+                          {timer.task.title}
                         </div>
                       )}
                       {timer.description && (
-                        <div className="text-xs text-muted-foreground mt-1 break-words whitespace-pre-wrap" title={timer.description}>
+                        <div className="text-[11px] text-[var(--apple-tertiary-label)] ml-4 truncate" title={timer.description}>
                           {timer.description}
                         </div>
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                      <div className="text-sm font-mono font-semibold">
+                      <div className="text-sm font-apple-mono font-semibold text-[var(--apple-label)]">
                         {displayTime}
                       </div>
                       <Button
@@ -503,10 +471,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
                         {isStopping === timer._id ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <>
-                            <Square className="h-3 w-3 mr-1" />
-                            Stop
-                          </>
+                          <><Square className="h-3 w-3 mr-1" />Stop</>
                         )}
                       </Button>
                     </div>
@@ -518,18 +483,18 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
         )}
       </CardContent>
 
-      {/* Stop Timer Confirmation Dialog */}
+      {/* Stop Timer Confirmation Dialog — logic unchanged */}
       <Dialog open={!!stopConfirmTimerId} onOpenChange={(open) => !open && setStopConfirmTimerId(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <AlertTriangle className="h-5 w-5 text-[var(--apple-system-red)]" />
               Stop Timer
             </DialogTitle>
             <DialogDescription>
               Are you sure you want to stop this timer?
               {timerToStop && (
-                <span className="block mt-2 text-foreground font-medium">
+                <span className="block mt-2 text-[var(--apple-label)] font-medium">
                   {timerToStop.user.firstName} {timerToStop.user.lastName} — {timerToStop.project.name}
                   {timerToStop.task && ` • ${timerToStop.task.title}`}
                 </span>
@@ -537,15 +502,9 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setStopConfirmTimerId(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => stopConfirmTimerId && handleStopTimer(stopConfirmTimerId)}
-            >
-              <Square className="h-4 w-4 mr-2" />
-              Stop Timer
+            <Button variant="outline" onClick={() => setStopConfirmTimerId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => stopConfirmTimerId && handleStopTimer(stopConfirmTimerId)}>
+              <Square className="h-4 w-4 mr-2" />Stop Timer
             </Button>
           </DialogFooter>
         </DialogContent>

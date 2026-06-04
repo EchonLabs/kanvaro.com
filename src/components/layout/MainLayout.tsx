@@ -71,9 +71,9 @@ export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
   return (
     <DateTimeProvider>
       <BreadcrumbProvider>
-        <div className="flex h-screen bg-background overflow-x-hidden">
+        <div className="flex h-screen bg-[var(--apple-system-grouped-background)] overflow-x-hidden">
         {/* Desktop Sidebar */}
-        <div className="hidden lg:block">
+        <div className="hidden lg:block flex-shrink-0">
           <Sidebar
             collapsed={sidebarCollapsed}
             onToggle={async () => {
@@ -93,23 +93,23 @@ export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
             }}
           />
         </div>
-        
+
         {/* Mobile Menu */}
-        <MobileMenu 
+        <MobileMenu
           isOpen={mobileMenuOpen}
           onClose={() => setMobileMenuOpen(false)}
         />
-        
+
         {/* Main Content */}
         <div className="flex flex-1 flex-col overflow-hidden min-h-0">
           {/* Header */}
           <Header onMobileMenuToggle={() => setMobileMenuOpen(true)} />
-          
+
           {/* Breadcrumb */}
-          <div className="mb-4">
+          <div className="mb-2">
             <Breadcrumb items={breadcrumbItems} />
           </div>
-          
+
           {/* Page Content */}
           <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6 min-h-0">
             <div className="mx-auto max-w-7xl">
