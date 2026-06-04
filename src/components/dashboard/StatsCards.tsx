@@ -218,12 +218,12 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
             <div className="px-4 pt-4 pb-2">
               {/* Label + circle indicator — matches mockup */}
               <div className="flex items-center justify-between mb-3">
-                <span className="apple-section-label">{stat.title}</span>
+                <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-label)]">{stat.title}</span>
                 <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 ${isEmpty ? 'border-[var(--apple-system-gray)]/40' : 'border-[var(--apple-separator)]'}`} />
               </div>
 
               {/* Large value */}
-              <div className={`text-[32px] sm:text-[36px] font-bold tracking-tight leading-none mb-2 ${isEmpty ? 'text-[var(--apple-secondary-label)]' : 'text-[var(--apple-label)]'}`}>
+              <div className={`text-[34px] sm:text-[38px] font-bold tracking-tight leading-none mb-2 ${isEmpty ? 'text-[var(--apple-secondary-label)]' : 'text-[var(--apple-label)]'}`}>
                 {stat.formattedValue}
               </div>
 
@@ -231,15 +231,15 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
               {hasChange && (
                 <div className="flex items-center gap-1 flex-wrap">
                   <ChangeIcon className={`h-3 w-3 flex-shrink-0 ${changeColorClass}`} />
-                  <span className={`text-[11px] font-medium ${changeColorClass}`}>{stat.change}</span>
+                  <span className={`text-xs font-medium ${changeColorClass}`}>{stat.change}</span>
                   {stat.changePercentage && (
-                    <span className={`text-[11px] ${changeColorClass}`}>({stat.changePercentage})</span>
+                    <span className={`text-xs ${changeColorClass}`}>({stat.changePercentage})</span>
                   )}
-                  <span className="text-[11px] text-[var(--apple-tertiary-label)]">vs last mo.</span>
+                  <span className="text-xs text-[var(--apple-tertiary-label)]">vs last month</span>
                 </div>
               )}
               {!hasChange && stat.value > 0 && (
-                <span className="text-[11px] text-[var(--apple-tertiary-label)]">No change from last month</span>
+                <span className="text-xs text-[var(--apple-tertiary-label)]">No change from last month</span>
               )}
             </div>
 

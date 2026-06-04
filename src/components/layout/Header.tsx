@@ -171,9 +171,9 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
             </Tooltip>
             <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 p-0 rounded-[var(--apple-radius-lg)] border-[var(--apple-separator)] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.12)]" align="end">
               <div className="px-4 py-3 border-b border-[var(--apple-separator)] flex items-center justify-between">
-                <h4 className="font-semibold text-sm text-[var(--apple-label)]">Notifications</h4>
+                <h4 className="font-semibold text-[15px] text-[var(--apple-label)]">Notifications</h4>
                 {unreadCount > 0 && (
-                  <Button variant="ghost" size="sm" onClick={markAllAsRead} className="h-7 px-2 text-[11px] text-[var(--apple-system-blue)]">
+                  <Button variant="ghost" size="sm" onClick={markAllAsRead} className="h-7 px-2 text-[13px] text-[var(--apple-system-blue)]">
                     <Check className="h-3 w-3 mr-1" />
                     Mark All Read
                   </Button>
@@ -199,16 +199,16 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                         )}
                       >
                         <div className="h-7 w-7 rounded-full bg-[var(--apple-tertiary-fill)] flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-[11px] font-semibold text-[var(--apple-secondary-label)]">
+                          <span className="text-[13px] font-semibold text-[var(--apple-secondary-label)]">
                             {notification.type.charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className={cn('text-xs font-medium break-words text-[var(--apple-label)]', !notification.isRead && 'font-semibold')}>{notification.title}</p>
-                          <p className="text-[11px] text-[var(--apple-secondary-label)] break-words mt-0.5 line-clamp-2">
+                          <p className={cn('text-sm font-medium break-words text-[var(--apple-label)]', !notification.isRead && 'font-semibold')}>{notification.title}</p>
+                          <p className="text-[13px] text-[var(--apple-secondary-label)] break-words mt-0.5 line-clamp-2">
                             {notification.message}
                           </p>
-                          <p className="text-[10px] text-[var(--apple-tertiary-label)] mt-0.5">
+                          <p className="text-xs text-[var(--apple-tertiary-label)] mt-0.5">
                             {new Date(notification.createdAt).toLocaleString()}
                           </p>
                         </div>

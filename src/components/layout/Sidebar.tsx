@@ -492,7 +492,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && (
           <div className="px-2 pb-1.5 flex items-center justify-between">
             <span className="apple-section-label">Version</span>
-            <span className="font-apple-mono text-[10px] text-[var(--apple-tertiary-label)]">{packageJson.version}</span>
+            <span className="font-apple-mono text-xs text-[var(--apple-tertiary-label)]">{packageJson.version}</span>
           </div>
         )}
         <Button
@@ -505,7 +505,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           onClick={() => setShowLogoutConfirm(true)}
         >
           <LogOut className={cn('h-4 w-4 flex-shrink-0', collapsed ? 'mx-auto' : 'mr-2')} />
-          {!collapsed && <span className="text-sm">Sign out</span>}
+          {!collapsed && <span className="text-[15px]">Sign out</span>}
         </Button>
       </div>
     </div>
@@ -568,7 +568,7 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
                   <Button
                     variant="ghost"
                     className={cn(
-                      'w-full justify-start text-sm h-8 rounded-[10px] apple-transition',
+                      'w-full justify-start text-[14px] h-8 rounded-[10px] apple-transition',
                       pathname === child.path
                         ? 'bg-[var(--apple-system-blue)]/12 text-[var(--apple-system-blue)] font-medium'
                         : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
@@ -623,7 +623,7 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
           )} />
           {!collapsed && (
             <>
-              <span className="flex-1 text-left text-sm">{item.label}</span>
+              <span className="flex-1 text-left text-[15px]">{item.label}</span>
               {hasChildren && (
                 <ChevronRight
                   className={cn(
@@ -646,7 +646,7 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
                   <Button
                     variant="ghost"
                     className={cn(
-                      'w-full justify-start text-sm h-7 rounded-[10px] apple-transition px-2',
+                      'w-full justify-start text-[14px] h-7 rounded-[10px] apple-transition px-2',
                       isChildActive
                         ? 'bg-[var(--apple-system-blue)]/12 text-[var(--apple-system-blue)] font-medium'
                         : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'

@@ -36,7 +36,7 @@ function StatusBadge({ status }: { status: string }) {
   const style = STATUS_STYLES[status] || STATUS_STYLES.todo
   return (
     <span className={cn(
-      'inline-flex items-center px-2 py-0.5 rounded-[var(--apple-radius-pill)] text-[10px] font-medium whitespace-nowrap',
+      'inline-flex items-center px-2 py-0.5 rounded-[var(--apple-radius-pill)] text-xs font-medium whitespace-nowrap',
       style.bg, style.text
     )}>
       {formatToTitleCase(status)}
@@ -48,7 +48,7 @@ function PriorityBadge({ priority }: { priority: string }) {
   const style = PRIORITY_STYLES[priority] || PRIORITY_STYLES.medium
   return (
     <span className={cn(
-      'inline-flex items-center px-2 py-0.5 rounded-[var(--apple-radius-pill)] text-[10px] font-medium whitespace-nowrap',
+      'inline-flex items-center px-2 py-0.5 rounded-[var(--apple-radius-pill)] text-xs font-medium whitespace-nowrap',
       style.bg, style.text
     )}>
       {formatToTitleCase(priority)}
@@ -115,7 +115,7 @@ export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps
           <CardTitle>Recent Tasks</CardTitle>
           <button
             onClick={() => router.push('/tasks')}
-            className="text-sm text-[var(--apple-system-blue)] hover:opacity-80 apple-transition flex items-center gap-1"
+            className="text-[15px] text-[var(--apple-system-blue)] hover:opacity-80 apple-transition flex items-center gap-1"
           >
             View all <ArrowRight className="h-3.5 w-3.5" />
           </button>
@@ -134,7 +134,7 @@ export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps
                 <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 min-w-0">
                   <h4
                     className={cn(
-                      'text-sm font-medium truncate min-w-0',
+                      'text-[15px] font-medium truncate min-w-0',
                       task.status === 'done'
                         ? 'line-through text-[var(--apple-tertiary-label)]'
                         : 'text-[var(--apple-label)]'
@@ -150,7 +150,7 @@ export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps
                 </div>
 
                 {/* Meta row */}
-                <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-[var(--apple-secondary-label)]">
+                <div className="flex flex-wrap items-center gap-2 mt-1 text-[13px] text-[var(--apple-secondary-label)]">
                   <span className="font-medium truncate" title={task.project?.name}>
                     {task.project?.name || 'No Project'}
                   </span>

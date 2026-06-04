@@ -306,10 +306,10 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-[var(--apple-label)]">Active Timer</span>
+                <span className="text-[15px] font-semibold text-[var(--apple-label)]">Active Timer</span>
               </div>
               {/* "• Live" indicator */}
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--apple-radius-pill)] bg-[var(--apple-system-green)]/15 text-[var(--apple-system-green)] text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--apple-radius-pill)] bg-[var(--apple-system-green)]/15 text-[var(--apple-system-green)] text-[13px] font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-[var(--apple-system-green)] animate-pulse" />
                 Live
               </span>
@@ -326,17 +326,17 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
             {/* Project / Task / Memo */}
             <div className="space-y-1 border-t border-[var(--apple-separator)] pt-3">
               <div className="flex gap-3">
-                <span className="text-xs text-[var(--apple-tertiary-label)] w-14 flex-shrink-0">Project</span>
-                <span className="text-xs font-medium text-[var(--apple-label)] truncate">
+                <span className="text-sm text-[var(--apple-tertiary-label)] w-14 flex-shrink-0">Project</span>
+                <span className="text-sm font-medium text-[var(--apple-label)] truncate">
                   {activeTimer.project?.name || <span className="italic text-[var(--apple-tertiary-label)]">Unknown</span>}
                 </span>
               </div>
               {activeTimer.task && (
                 <div className="flex gap-3">
-                  <span className="text-xs text-[var(--apple-tertiary-label)] w-14 flex-shrink-0">Task</span>
+                  <span className="text-sm text-[var(--apple-tertiary-label)] w-14 flex-shrink-0">Task</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="text-xs font-medium text-[var(--apple-label)] truncate cursor-default">
+                      <span className="text-sm font-medium text-[var(--apple-label)] truncate cursor-default">
                         {activeTimer.task.title}
                       </span>
                     </TooltipTrigger>
@@ -346,10 +346,10 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
               )}
               {activeTimer.description && (
                 <div className="flex gap-3">
-                  <span className="text-xs text-[var(--apple-tertiary-label)] w-14 flex-shrink-0">Memo</span>
+                  <span className="text-sm text-[var(--apple-tertiary-label)] w-14 flex-shrink-0">Memo</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="text-xs text-[var(--apple-secondary-label)] truncate cursor-default">
+                      <span className="text-sm text-[var(--apple-secondary-label)] truncate cursor-default">
                         {truncateWords(activeTimer.description, 5)}
                       </span>
                     </TooltipTrigger>
@@ -361,7 +361,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
 
             {/* Status badges */}
             <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-[var(--apple-radius-pill)] text-[11px] font-medium ${
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-[var(--apple-radius-pill)] text-[13px] font-medium ${
                 activeTimer.isPaused
                   ? 'bg-[var(--apple-system-orange)]/15 text-[var(--apple-system-orange)]'
                   : 'bg-[var(--apple-system-green)]/15 text-[var(--apple-system-green)]'
@@ -369,7 +369,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
                 {activeTimer.isPaused ? 'Paused' : 'Running'}
               </span>
               {activeTimer.isBillable && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-[var(--apple-radius-pill)] text-[11px] font-medium bg-[var(--apple-system-blue)]/15 text-[var(--apple-system-blue)]">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-[var(--apple-radius-pill)] text-[13px] font-medium bg-[var(--apple-system-blue)]/15 text-[var(--apple-system-blue)]">
                   Billable
                 </span>
               )}

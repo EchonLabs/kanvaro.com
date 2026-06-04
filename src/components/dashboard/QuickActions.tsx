@@ -86,7 +86,7 @@ export function QuickActions() {
               >
                 <Icon className="h-4 w-4 text-white" />
               </div>
-              <span className="text-[11px] font-medium text-[var(--apple-label)] text-center leading-tight">
+              <span className="text-[13px] font-medium text-[var(--apple-label)] text-center leading-tight">
                 {action.title}
               </span>
             </div>

@@ -54,7 +54,7 @@ export function NotificationsWidget() {
               variant="ghost"
               size="sm"
               onClick={markAllAsRead}
-              className="h-7 px-2 text-[11px] text-[var(--apple-system-blue)]"
+              className="h-7 px-2 text-[13px] text-[var(--apple-system-blue)]"
             >
               <Check className="h-3 w-3 mr-1" />
               Mark All Read
@@ -68,7 +68,7 @@ export function NotificationsWidget() {
             <Loader2 className="h-5 w-5 animate-spin text-[var(--apple-secondary-label)]" />
           </div>
         ) : notifications.length === 0 ? (
-          <div className="text-center py-8 text-sm text-[var(--apple-secondary-label)]">
+          <div className="text-center py-8 text-[15px] text-[var(--apple-secondary-label)]">
             No notifications
           </div>
         ) : (
@@ -91,7 +91,7 @@ export function NotificationsWidget() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-0.5">
                       <h4 className={cn(
-                        'text-xs text-[var(--apple-label)] break-words',
+                        'text-sm text-[var(--apple-label)] break-words',
                         isUnread ? 'font-semibold' : 'font-medium'
                       )}>
                         {notification.title}
@@ -100,11 +100,11 @@ export function NotificationsWidget() {
                         <div className="h-2 w-2 rounded-full bg-[var(--apple-system-blue)] flex-shrink-0 mt-1" />
                       )}
                     </div>
-                    <p className="text-[11px] text-[var(--apple-secondary-label)] line-clamp-2 mb-1">
+                    <p className="text-[13px] text-[var(--apple-secondary-label)] line-clamp-2 mb-1">
                       {notification.message}
                     </p>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-[var(--apple-tertiary-label)]">
+                      <span className="text-xs text-[var(--apple-tertiary-label)]">
                         {formatDistanceToNow(createdAt, { addSuffix: true })}
                       </span>
                       {notification.data?.url && (

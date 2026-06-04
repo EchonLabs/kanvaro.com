@@ -110,7 +110,7 @@ export function TeamActivity({ activities, isLoading }: TeamActivityProps) {
           <CardTitle>Recent Activity</CardTitle>
           <button
             onClick={() => router.push('/activity')}
-            className="text-sm text-[var(--apple-system-blue)] hover:opacity-80 apple-transition flex items-center gap-1"
+            className="text-[15px] text-[var(--apple-system-blue)] hover:opacity-80 apple-transition flex items-center gap-1"
           >
             View all activity <ArrowRight className="h-3.5 w-3.5" />
           </button>
@@ -133,7 +133,7 @@ export function TeamActivity({ activities, isLoading }: TeamActivityProps) {
 
               {/* Activity text */}
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-[var(--apple-label)] leading-snug">
+                <p className="text-[15px] text-[var(--apple-label)] leading-snug">
                   <span className="font-medium">
                     {activity.user?.firstName} {activity.user?.lastName}
                   </span>{' '}
@@ -143,14 +143,14 @@ export function TeamActivity({ activities, isLoading }: TeamActivityProps) {
                   </span>
                 </p>
                 {(activity.project) && (
-                  <p className="text-[11px] text-[var(--apple-secondary-label)] mt-0.5 truncate">
+                  <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5 truncate">
                     {activity.project}
                   </p>
                 )}
               </div>
 
               {/* Timestamp — right-aligned */}
-              <span className="text-[11px] text-[var(--apple-secondary-label)] whitespace-nowrap flex-shrink-0 mt-0.5">
+              <span className="text-[13px] text-[var(--apple-secondary-label)] whitespace-nowrap flex-shrink-0 mt-0.5">
                 {formatTimestamp(activity.timestamp)}
               </span>
             </div>

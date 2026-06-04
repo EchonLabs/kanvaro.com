@@ -351,58 +351,92 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {/*
+         * Filters — same line, no label.
+         * Each SelectContent uses overflow-hidden so only the inner list div
+         * creates a scrollbar, eliminating the double-scrollbar issue.
+         * All onValueChange / onOpenChange filtering logic is untouched.
+         */}
+        {/*
+         * ── Filters: same line, no label ─────────────────────────────────
+         * SelectContent has overflow-hidden (from select.tsx base); the inner
+         * max-h div is the ONLY scrollable element → one scrollbar, no double.
+         */}
+        <div className="flex gap-2">
+          {/* Employee filter */}
           <Select
             value={selectedEmployeeId || 'all'}
             onValueChange={(value) => { setSelectedEmployeeId(value === 'all' ? '' : value); setEmployeeSearch('') }}
             onOpenChange={(open) => { if (!open) setEmployeeSearch('') }}
           >
-            <SelectTrigger className="w-full text-sm h-8 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]">
-              <SelectValue placeholder="All Employees" />
+            <SelectTrigger className="flex-1 h-8 text-sm min-w-0">
+              <User className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] mr-1.5 flex-shrink-0" />
+              <SelectValue placeholder="Employee" />
             </SelectTrigger>
-            <SelectContent className="rounded-[var(--apple-radius-md)] border-[var(--apple-separator)]">
+            <SelectContent>
+              {/* Pinned search — not inside any overflow container */}
               <div className="p-2 border-b border-[var(--apple-separator)]">
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" />
-                  <Input placeholder="Search employees..." value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="h-7 pl-7 text-xs" />
+                  <Input
+                    placeholder="Search…"
+                    value={employeeSearch}
+                    onChange={(e) => setEmployeeSearch(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    className="h-7 pl-7 text-xs bg-white dark:bg-[#3A3A3C] border-[var(--apple-separator)] text-[var(--apple-label)] placeholder:text-[var(--apple-tertiary-label)]"
+                  />
                 </div>
               </div>
-              <div className="max-h-[200px] overflow-y-auto">
+              {/* Single scrollable item list */}
+              <div className="max-h-48 overflow-y-auto p-1">
                 <SelectItem value="all">All Employees</SelectItem>
                 {filteredMembers.length === 0 ? (
                   <div className="px-2 py-4 text-center text-xs text-[var(--apple-secondary-label)]">No employees found</div>
                 ) : (
                   filteredMembers.map(member => (
-                    <SelectItem key={member._id} value={member._id}>{member.firstName} {member.lastName}</SelectItem>
+                    <SelectItem key={member._id} value={member._id}>
+                      {member.firstName} {member.lastName}
+                    </SelectItem>
                   ))
                 )}
               </div>
             </SelectContent>
           </Select>
 
+          {/* Project filter */}
           <Select
             value={selectedProjectId || 'all'}
             onValueChange={(value) => { setSelectedProjectId(value === 'all' ? '' : value); setProjectSearch('') }}
             onOpenChange={(open) => { if (!open) setProjectSearch('') }}
           >
-            <SelectTrigger className="w-full text-sm h-8 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]">
-              <SelectValue placeholder="All Projects" />
+            <SelectTrigger className="flex-1 h-8 text-sm min-w-0">
+              <FolderOpen className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] mr-1.5 flex-shrink-0" />
+              <SelectValue placeholder="Project" />
             </SelectTrigger>
-            <SelectContent className="rounded-[var(--apple-radius-md)] border-[var(--apple-separator)]">
+            <SelectContent>
               <div className="p-2 border-b border-[var(--apple-separator)]">
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" />
-                  <Input placeholder="Search projects..." value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="h-7 pl-7 text-xs" />
+                  <Input
+                    placeholder="Search…"
+                    value={projectSearch}
+                    onChange={(e) => setProjectSearch(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    className="h-7 pl-7 text-xs bg-white dark:bg-[#3A3A3C] border-[var(--apple-separator)] text-[var(--apple-label)] placeholder:text-[var(--apple-tertiary-label)]"
+                  />
                 </div>
               </div>
-              <div className="max-h-[200px] overflow-y-auto">
+              <div className="max-h-48 overflow-y-auto p-1">
                 <SelectItem value="all">All Projects</SelectItem>
                 {filteredProjects.length === 0 ? (
                   <div className="px-2 py-4 text-center text-xs text-[var(--apple-secondary-label)]">No projects found</div>
                 ) : (
                   filteredProjects.map(project => (
-                    <SelectItem key={project._id} value={project._id}>{project.name}</SelectItem>
+                    <SelectItem key={project._id} value={project._id}>
+                      {project.name}
+                    </SelectItem>
                   ))
                 )}
               </div>
@@ -433,32 +467,32 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-1">
                         <User className="h-3 w-3 text-[var(--apple-tertiary-label)] flex-shrink-0" />
-                        <span className="text-sm font-medium text-[var(--apple-label)] truncate">
+                        <span className="text-[15px] font-medium text-[var(--apple-label)] truncate">
                           {timer.user.firstName} {timer.user.lastName}
                         </span>
                         {timer.isPaused && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-[var(--apple-radius-pill)] text-[10px] font-medium bg-[var(--apple-system-orange)]/15 text-[var(--apple-system-orange)]">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-[var(--apple-radius-pill)] text-xs font-medium bg-[var(--apple-system-orange)]/15 text-[var(--apple-system-orange)]">
                             Paused
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs text-[var(--apple-secondary-label)]">
+                      <div className="flex items-center gap-1.5 text-sm text-[var(--apple-secondary-label)]">
                         <FolderOpen className="h-3 w-3 flex-shrink-0" />
                         <span className="truncate">{timer.project.name}</span>
                       </div>
                       {timer.task && (
-                        <div className="text-[11px] text-[var(--apple-secondary-label)] ml-4 truncate" title={timer.task.title}>
+                        <div className="text-[13px] text-[var(--apple-secondary-label)] ml-4 truncate" title={timer.task.title}>
                           {timer.task.title}
                         </div>
                       )}
                       {timer.description && (
-                        <div className="text-[11px] text-[var(--apple-tertiary-label)] ml-4 truncate" title={timer.description}>
+                        <div className="text-[13px] text-[var(--apple-tertiary-label)] ml-4 truncate" title={timer.description}>
                           {timer.description}
                         </div>
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                      <div className="text-sm font-apple-mono font-semibold text-[var(--apple-label)]">
+                      <div className="text-[15px] font-apple-mono font-semibold text-[var(--apple-label)]">
                         {displayTime}
                       </div>
                       <Button

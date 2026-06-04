@@ -21,11 +21,11 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
   return (
     <div>
-      <h1 className="text-[26px] sm:text-[28px] font-bold leading-tight tracking-tight text-[var(--apple-label)]">
+      <h1 className="text-[28px] sm:text-[30px] font-bold leading-tight tracking-tight text-[var(--apple-label)]">
         Welcome back,{' '}
         <span className="text-[var(--apple-system-blue)]">{user?.firstName || 'User'}!</span>
       </h1>
-      <div className="flex items-center gap-2 mt-0.5 text-sm text-[var(--apple-secondary-label)]">
+      <div className="flex items-center gap-2 mt-0.5 text-[15px] text-[var(--apple-secondary-label)]">
         <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
         <span>{currentDate}</span>
         <span className="text-[var(--apple-tertiary-label)]">•</span>

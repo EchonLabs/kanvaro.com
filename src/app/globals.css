@@ -67,6 +67,35 @@
   .apple-transition {
     transition: all 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
+
+  /* Progress bar shimmer sweep — light passes left-to-right then pauses */
+  .progress-shimmer {
+    animation: shimmer-sweep 2s ease-in-out infinite;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.42) 50%,
+      transparent 100%
+    );
+  }
+}
+
+/* Shimmer keyframe — defined outside @layer so Tailwind arbitrary can reference it */
+@keyframes shimmer-sweep {
+  0%          { transform: translateX(-100%); }
+  55%, 100%   { transform: translateX(250%);  }
+}
+
+/* Status dot pulse — scale+opacity for the inner dot */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1);    }
+  50%      { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* Status badge border pulse — glowing ring around the badge using currentColor */
+@keyframes badge-border-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px currentColor;       opacity: 0.85;    }
+  50%       { box-shadow: 0 0 0 0px currentColor;       opacity: 1; }
 }
 
 @layer base {
@@ -114,7 +143,7 @@
     --secondary: 240 5% 96%;          /* #F2F2F7 Apple secondary bg */
     --secondary-foreground: 0 0% 0%;
     --muted: 240 5% 96%;
-    --muted-foreground: 240 3% 46%;   /* Approx rgba(60,60,67,.60) */
+    --muted-foreground: 240 3% 36%;   /* Darker muted text for light mode readability */
     --accent: 240 5% 96%;
     --accent-foreground: 0 0% 0%;
     --destructive: 3 100% 59%;        /* #FF3B30 Apple red */
@@ -145,11 +174,11 @@
     --apple-secondary-system-grouped-background: #FFFFFF;
     --apple-tertiary-system-grouped-background: #F2F2F7;
 
-    /* Label hierarchy */
+    /* Label hierarchy — slightly stronger in light mode for web readability */
     --apple-label: #000000;
-    --apple-secondary-label: rgba(60, 60, 67, 0.60);
-    --apple-tertiary-label: rgba(60, 60, 67, 0.30);
-    --apple-quaternary-label: rgba(60, 60, 67, 0.18);
+    --apple-secondary-label: rgba(60, 60, 67, 0.80);
+    --apple-tertiary-label: rgba(60, 60, 67, 0.52);
+    --apple-quaternary-label: rgba(60, 60, 67, 0.26);
 
     /* Fill hierarchy */
     --apple-fill: rgba(120, 120, 128, 0.20);
