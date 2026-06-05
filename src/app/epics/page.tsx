@@ -72,6 +72,22 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  StatusBadge,
+  PriorityBadge,
+  GradientProgress,
+  PageHeader,
+  TasksEmptyState,
+  CardGridSkeleton,
+  PaginationBar,
+  MetaChip,
+  FullPageLoader,
+  ViewSwitcher,
+  cardShell,
+  cardHover,
+  TASK_STATUS_CONFIG,
+} from "@/components/tasks/TasksShared";
 
 // Added Project interface for type safety
 interface Project {
@@ -431,63 +447,145 @@ export default function EpicsPage() {
   if (loading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading epics...</p>
-          </div>
-        </div>
+        <FullPageLoader label="Loading epics..." />
       </MainLayout>
     );
   }
 
   return (
     <MainLayout>
-      <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-              Epics
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Manage your product epics and large features
-            </p>
-          </div>
-          <PermissionGate permission={Permission.EPIC_CREATE}>
-            <Button
-              onClick={() => {
-                if (!canCreateEpic) return;
-                router.push("/epics/create-epic");
-              }}
-              disabled={!canCreateEpic}
-              title={
-                !canCreateEpic
-                  ? "You need epic:create permission to create an epic."
-                  : undefined
-              }
-              className="w-full sm:w-auto"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Epic
-            </Button>
-          </PermissionGate>
+      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
+
+        {/* Page Header */}
+        <PageHeader
+          title="Epics"
+          subtitle="Manage your product epics and large features"
+          actions={
+            <PermissionGate permission={Permission.EPIC_CREATE}>
+              <Button
+                onClick={() => {
+                  if (!canCreateEpic) return;
+                  router.push("/epics/create-epic");
+                }}
+                disabled={!canCreateEpic}
+                title={
+                  !canCreateEpic
+                    ? "You need epic:create permission to create an epic."
+                    : undefined
+                }
+                className="h-9 px-4 rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] text-white hover:opacity-90 apple-transition text-[14px] font-medium"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Epic
+              </Button>
+            </PermissionGate>
+          }
+        />
+
+        {/* ── Filter Toolbar ───────────────────────────────────────────────── */}
+
+        {/* Row 1: Search (50%) + Status (25%) + Priority (25%) — Desktop */}
+        <div className="hidden sm:flex items-center gap-2">
+            <div className="relative w-1/2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" />
+                <input
+                    placeholder="Search epics..."
+                    value={localSearch}
+                    onChange={(e) => setLocalSearch(e.target.value)}
+                    className="w-full pl-10 pr-9 h-10 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                />
+                {localSearch && (
+                    <button
+                        type="button"
+                        onClick={() => setLocalSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
+                        aria-label="Clear search"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                )}
+            </div>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-1/4 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                    <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="backlog">Backlog</SelectItem>
+                    <SelectItem value="todo">To Do</SelectItem>
+                    <SelectItem value="inprogress">In Progress</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+            </Select>
+
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="w-1/4 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                    <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                </SelectContent>
+            </Select>
         </div>
 
-        {/* Search and Filters */}
-        <div className="space-y-3">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search epics..."
-              value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
-              className="pl-10 w-full"
-            />
-          </div>
-          {/* Filter options - compact grid layout */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {/* Project Filter */}
+        {/* Row 1: Mobile layout (stack) */}
+        <div className="flex sm:hidden flex-col gap-2">
+            <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" />
+                <input
+                    placeholder="Search epics..."
+                    value={localSearch}
+                    onChange={(e) => setLocalSearch(e.target.value)}
+                    className="w-full pl-10 pr-9 h-10 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                />
+                {localSearch && (
+                    <button
+                        type="button"
+                        onClick={() => setLocalSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
+                        aria-label="Clear search"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                )}
+            </div>
+            <div className="flex gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-1/2 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                        <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="backlog">Backlog</SelectItem>
+                        <SelectItem value="todo">To Do</SelectItem>
+                        <SelectItem value="inprogress">In Progress</SelectItem>
+                        <SelectItem value="done">Done</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <SelectTrigger className="w-1/2 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                        <SelectValue placeholder="Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Priority</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        </div>
+
+        {/* Row 2: Secondary Filters (Grid 20% each on Desktop, 2 cols on mobile) */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2">
             <Select
               value={projectFilter}
               onValueChange={setProjectFilter}
@@ -495,8 +593,8 @@ export default function EpicsPage() {
                 if (open) focusSearchInput(projectFilterInputRef.current);
               }}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Project" />
+              <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px]">
+                <SelectValue placeholder="All Projects" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
                 <div className="p-2">
@@ -506,7 +604,7 @@ export default function EpicsPage() {
                       value={projectFilterQuery}
                       onChange={(e) => setProjectFilterQuery(e.target.value)}
                       placeholder="Search projects"
-                      className="pr-10"
+                      className="pr-10 text-[13px]"
                       onKeyDown={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                     />
@@ -519,7 +617,7 @@ export default function EpicsPage() {
                           setProjectFilterQuery("");
                           setProjectFilter("all");
                         }}
-                        className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                        className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
                         aria-label="Clear project filter"
                       >
                         <X className="h-4 w-4" />
@@ -529,7 +627,7 @@ export default function EpicsPage() {
                   <div className="max-h-56 overflow-y-auto">
                     <SelectItem value="all">All Projects</SelectItem>
                     {filteredProjectOptions.length === 0 ? (
-                      <div className="px-2 py-1 text-xs text-muted-foreground">
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">
                         No matching projects
                       </div>
                     ) : (
@@ -543,485 +641,382 @@ export default function EpicsPage() {
                 </div>
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="backlog">Backlog</SelectItem>
-                <SelectItem value="todo">To Do</SelectItem>
-                <SelectItem value="inprogress">In Progress</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Epic count */}
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {localSearch
-                ? `${displayedEpics.length} of ${totalCount}`
-                : totalEpicsCount}{" "}
-              epic
-              {(localSearch ? displayedEpics.length : totalEpicsCount) !== 1
-                ? "s"
-                : ""}{" "}
-              found
-            </p>
-          </div>
         </div>
 
-        {/* Epics View */}
-        <div>
-          <Tabs
-            value={viewMode}
-            onValueChange={(value) => setViewMode(value as "grid" | "list")}
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="grid">Grid View</TabsTrigger>
-              <TabsTrigger value="list">List View</TabsTrigger>
-            </TabsList>
+        {/* Row 3: Active Filters & Clear */}
+        {(statusFilter !== 'all' || priorityFilter !== 'all' || projectFilter !== 'all' || localSearch) && (
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t border-[var(--apple-separator)]">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[12px] font-medium text-[var(--apple-secondary-label)] uppercase tracking-wider mr-1">
+                        Active Filters:
+                    </span>
+                    {localSearch && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Search: {localSearch}
+                            <button onClick={() => setLocalSearch('')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                        </Badge>
+                    )}
+                    {statusFilter !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Status: {formatToTitleCase(statusFilter)}
+                            <button onClick={() => setStatusFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                        </Badge>
+                    )}
+                    {priorityFilter !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Priority: {formatToTitleCase(priorityFilter)}
+                            <button onClick={() => setPriorityFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                        </Badge>
+                    )}
+                    {projectFilter !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Project: {projects.find(p => p._id === projectFilter)?.name || 'Selected'}
+                            <button onClick={() => setProjectFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                        </Badge>
+                    )}
+                </div>
+                <Button
+                    variant="ghost"
+                    onClick={() => {
+                        setLocalSearch('');
+                        setStatusFilter('all');
+                        setPriorityFilter('all');
+                        setProjectFilter('all');
+                    }}
+                    className="h-8 px-3 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] rounded-full"
+                >
+                    Clear All
+                </Button>
+            </div>
+        )}
 
-            <TabsContent value="grid" className="space-y-4">
-              <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                {displayedEpics.map((epic) => {
-                  const epicIsCreator = isCreator(epic);
-                  const viewAllowed = canViewEpic(epic);
-                  const editAllowed = canEditEpic(epic);
-                  const deleteAllowed = canDeleteEpic(epic);
-                  return (
-                    <Card
-                      key={epic?._id}
-                      className={`hover:shadow-md transition-shadow overflow-x-hidden ${viewAllowed ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
-                      onClick={() => {
-                        if (!viewAllowed) return;
-                        router.push(`/epics/${epic?._id}`);
-                      }}
-                    >
-                      <CardHeader className="p-3 sm:p-6">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="space-y-1 flex-1 min-w-0">
-                            <CardTitle
-                              className="text-base sm:text-lg flex items-center space-x-2 min-w-0"
-                              title={epic?.title}
-                            >
-                              <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
-                              <span className="truncate">{epic?.title}</span>
-                            </CardTitle>
-                            <CardDescription
-                              className="line-clamp-2 text-xs sm:text-sm"
-                              title={epic?.description || "No description"}
-                            >
-                              {epic?.description || "No description"}
-                            </CardDescription>
+        {/* Count + View Switcher */}
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[13px] text-[var(--apple-secondary-label)]">
+            <span className="font-apple-mono font-medium text-[var(--apple-label)]">
+              {localSearch ? displayedEpics.length : totalEpicsCount}
+            </span>
+            {localSearch && (
+              <span className="text-[var(--apple-tertiary-label)]">
+                {" "}of {totalEpicsCount}
+              </span>
+            )}{" "}
+            epic{(localSearch ? displayedEpics.length : totalEpicsCount) !== 1 ? "s" : ""}
+          </p>
+          <ViewSwitcher
+            value={viewMode}
+            onChange={(v) => setViewMode(v as "grid" | "list")}
+            options={["grid", "list"]}
+          />
+        </div>
+
+        {/* Epics Content */}
+        {displayedEpics.length === 0 ? (
+          <TasksEmptyState
+            icon={<Layers className="h-10 w-10" />}
+            title="No epics found"
+            description="Create your first epic to track large-scale features."
+          />
+        ) : viewMode === "grid" ? (
+          /* ── Grid View ── */
+          <div className="grid gap-4 sm:gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            {displayedEpics.map((epic) => {
+              const viewAllowed = canViewEpic(epic);
+              const editAllowed = canEditEpic(epic);
+              const deleteAllowed = canDeleteEpic(epic);
+
+              const gradients = [
+                { g: "from-purple-500 to-violet-600", glow: "rgba(139,92,246,0.2)" },
+                { g: "from-blue-500 to-cyan-500",     glow: "rgba(59,130,246,0.2)" },
+                { g: "from-emerald-500 to-teal-500",  glow: "rgba(16,185,129,0.2)" },
+                { g: "from-orange-500 to-amber-500",  glow: "rgba(249,115,22,0.2)" },
+                { g: "from-rose-500 to-pink-500",     glow: "rgba(244,63,94,0.2)"  },
+                { g: "from-sky-500 to-indigo-500",    glow: "rgba(14,165,233,0.2)" },
+              ];
+              const gradient = gradients[displayedEpics.indexOf(epic) % gradients.length];
+              const pct = epic.progress?.completionPercentage ?? 0;
+
+              return (
+                <div
+                  key={epic._id}
+                  className={cn(
+                    "group rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card overflow-hidden",
+                    "shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none",
+                    "hover:shadow-[0_10px_40px_rgba(0,0,0,0.13)] dark:hover:shadow-[0_10px_40px_rgba(0,0,0,0.42)]",
+                    "hover:-translate-y-1 apple-transition",
+                    viewAllowed ? "cursor-pointer" : "opacity-60 cursor-not-allowed"
+                  )}
+                  onClick={() => viewAllowed && router.push(`/epics/${epic._id}`)}
+                >
+                  {/* Gradient header bar */}
+                  <div className={cn("h-1.5 w-full bg-gradient-to-r", gradient.g)} />
+
+                  <div className="p-5 space-y-4">
+                    {/* Title row */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={cn("h-8 w-8 rounded-[var(--apple-radius-sm)] bg-gradient-to-br flex items-center justify-center flex-shrink-0", gradient.g)}>
+                            <Layers className="h-4 w-4 text-white" />
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex-shrink-0"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                          <h3
+                            className="text-[16px] font-semibold text-[var(--apple-label)] truncate"
+                            title={epic.title}
+                          >
+                            {epic.title}
+                          </h3>
+                        </div>
+                        {epic.description && (
+                          <p className="text-[13px] text-[var(--apple-secondary-label)] line-clamp-2 pl-10">
+                            {epic.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition flex-shrink-0"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={!viewAllowed}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!viewAllowed) return;
+                              router.push(`/epics/${epic._id}`);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Epic
+                          </DropdownMenuItem>
+                          {editAllowed && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/epics/${epic._id}/edit`);
+                              }}
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Epic
+                            </DropdownMenuItem>
+                          )}
+                          {deleteAllowed && (
+                            <>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                disabled={!viewAllowed}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  if (!viewAllowed) return;
-                                  router.push(`/epics/${epic._id}`);
+                                  handleDeleteClick(epic);
                                 }}
+                                className="text-destructive focus:text-destructive"
                               >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Epic
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Epic
                               </DropdownMenuItem>
-                              {editAllowed && (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/epics/${epic._id}/edit`);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Epic
-                                </DropdownMenuItem>
-                              )}
-                              {deleteAllowed && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteClick(epic);
-                                    }}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete Epic
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-3 sm:p-6 pt-0 space-y-3 sm:space-y-4">
-                        <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                          <Badge
-                            className={`${getStatusColor(epic?.status)} text-xs`}
-                          >
-                            {getStatusIcon(epic?.status)}
-                            <span className="ml-1 hidden sm:inline">
-                              {formatToTitleCase(epic?.status)}
-                            </span>
-                          </Badge>
-                          <Badge
-                            className={`${getPriorityColor(epic?.priority)} text-xs`}
-                          >
-                            {formatToTitleCase(epic?.priority)}
-                          </Badge>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs sm:text-sm">
-                            <span className="text-muted-foreground">
-                              Progress
-                            </span>
-                            <span className="font-medium">
-                              {epic?.progress?.completionPercentage || 0}%
-                            </span>
-                          </div>
-                          <Progress
-                            value={epic?.progress?.completionPercentage || 0}
-                            className="h-1.5 sm:h-2"
-                          />
-                          <div className="text-xs text-muted-foreground">
-                            {epic?.progress?.storiesCompleted || 0} of{" "}
-                            {epic?.progress?.totalStories || 0} stories
-                            completed
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs sm:text-sm">
-                            <span className="text-muted-foreground">
-                              Story Points
-                            </span>
-                            <span className="font-medium">
-                              {epic?.progress?.storyPointsCompleted || 0} /{" "}
-                              {epic?.progress?.totalStoryPoints || 0}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
-                          <div className="flex items-center space-x-1 min-w-0">
-                            <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                            <span
-                              className="truncate"
-                              title={
-                                epic?.project?.name &&
-                                epic?.project?.name.length > 10
-                                  ? epic?.project?.name
-                                  : undefined
-                              }
-                            >
-                              {epic?.project?.name &&
-                              epic?.project?.name.length > 10
-                                ? `${epic?.project?.name.slice(0, 10)}…`
-                                : epic?.project?.name}
-                            </span>
-                          </div>
-                          {epic?.dueDate && (
-                            <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
-                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>Due {formatDate(epic?.dueDate)}</span>
-                            </div>
+                            </>
                           )}
-                        </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
 
-                        {epic?.tags?.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {epic?.tags?.slice(0, 3).map((label, index) => (
-                              <Badge
-                                key={index}
-                                variant="outline"
-                                className="text-xs hover:bg-transparent dark:hover:bg-transparent"
-                              >
-                                {label}
-                              </Badge>
-                            ))}
-                            {epic?.tags?.length > 3 && (
-                              <Badge
-                                variant="outline"
-                                className="text-xs hover:bg-transparent dark:hover:bg-transparent"
-                              >
-                                +{epic?.tags?.length - 3} more
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </TabsContent>
+                    {/* Badges row */}
+                    <div className="flex flex-wrap gap-1.5">
+                      <StatusBadge status={epic.status} size="sm" />
+                      <PriorityBadge priority={epic.priority} size="sm" />
+                    </div>
 
-            <TabsContent value="list" className="space-y-4">
-              <div className="space-y-4">
-                {displayedEpics.map((epic) => {
-                  const viewAllowed = canViewEpic(epic);
-                  const editAllowed = canEditEpic(epic);
-                  const deleteAllowed = canDeleteEpic(epic);
-                  return (
-                    <Card
-                      key={epic?._id}
-                      className={`hover:shadow-md transition-shadow overflow-x-hidden ${viewAllowed ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
-                      onClick={() => {
-                        if (!viewAllowed) return;
-                        router.push(`/epics/${epic?._id}`);
-                      }}
-                    >
-                      <CardContent className="p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
-                          <div className="flex-1 min-w-0 w-full">
-                            <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 mb-2">
-                              <Badge
-                                className={`${getStatusColor(epic?.status)} text-xs`}
-                              >
-                                {getStatusIcon(epic?.status)}
-                                <span className="ml-1 hidden sm:inline">
-                                  {formatToTitleCase(epic?.status)}
-                                </span>
-                              </Badge>
-                              <Badge
-                                className={`${getPriorityColor(epic?.priority)} text-xs`}
-                              >
-                                {formatToTitleCase(epic?.priority)}
-                              </Badge>
-                            </div>
-                            <div className="flex items-start gap-2 mb-2">
-                              <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0 mt-0.5" />
-                              <h3
-                                className="font-medium text-sm sm:text-base text-foreground truncate flex-1 min-w-0"
-                                title={epic?.title}
-                              >
-                                {epic?.title}
-                              </h3>
-                            </div>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
-                                    {epic?.description || "No description"}
-                                  </p>
-                                </TooltipTrigger>
-                                {epic?.description &&
-                                  epic.description.length > 0 && (
-                                    <TooltipContent>
-                                      <p className="max-w-xs break-words">
-                                        {epic.description}
-                                      </p>
-                                    </TooltipContent>
-                                  )}
-                              </Tooltip>
-                            </TooltipProvider>
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                              <div className="flex items-center space-x-1 min-w-0">
-                                <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                <span
-                                  className="truncate"
-                                  title={
-                                    epic?.project?.name &&
-                                    epic?.project?.name.length > 10
-                                      ? epic?.project?.name
-                                      : undefined
-                                  }
-                                >
-                                  {epic?.project?.name &&
-                                  epic?.project?.name.length > 10
-                                    ? `${epic?.project?.name.slice(0, 10)}…`
-                                    : epic?.project?.name}
-                                </span>
-                              </div>
-                              {epic?.dueDate && (
-                                <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
-                                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>Due {formatDate(epic?.dueDate)}</span>
-                                </div>
-                              )}
-                              {epic?.storyPoints && (
-                                <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
-                                  <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>{epic?.storyPoints} pts</span>
-                                </div>
-                              )}
-                              {epic?.estimatedHours && (
-                                <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
-                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>{epic?.estimatedHours}h</span>
-                                </div>
-                              )}
-                              {epic?.tags?.length > 0 && (
-                                <div className="flex items-center space-x-1 min-w-0">
-                                  <Star className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                  <span className="truncate">
-                                    {epic?.tags?.slice(0, 2).join(", ")}
-                                  </span>
-                                  {epic?.tags?.length > 2 && (
-                                    <span className="flex-shrink-0">
-                                      +{epic?.tags?.length - 2} more
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-                            <div className="text-right sm:text-left">
-                              <div className="text-xs sm:text-sm font-medium text-foreground">
-                                {epic?.progress?.completionPercentage || 0}%
-                              </div>
-                              <div className="w-16 sm:w-20 bg-gray-200 rounded-full h-1.5 sm:h-2">
-                                <div
-                                  className="bg-purple-600 h-1.5 sm:h-2 rounded-full"
-                                  style={{
-                                    width: `${epic?.progress?.completionPercentage || 0}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="flex-shrink-0"
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  disabled={!viewAllowed}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (!viewAllowed) return;
-                                    router.push(`/epics/${epic._id}`);
-                                  }}
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Epic
-                                </DropdownMenuItem>
-                                {editAllowed && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/epics/${epic._id}/edit`);
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Epic
-                                  </DropdownMenuItem>
-                                )}
-                                {deleteAllowed && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteClick(epic);
-                                      }}
-                                      className="text-destructive focus:text-destructive"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Delete Epic
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </TabsContent>
-          </Tabs>
+                    {/* Progress */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-[var(--apple-tertiary-label)] apple-section-label">
+                          Progress
+                        </span>
+                        <span className="text-[12px] font-apple-mono text-[var(--apple-secondary-label)]">
+                          {epic.progress?.storiesCompleted ?? 0}/{epic.progress?.totalStories ?? 0} stories
+                        </span>
+                      </div>
+                      <GradientProgress
+                        pct={pct}
+                        colorIndex={displayedEpics.indexOf(epic)}
+                        showPct={true}
+                      />
+                    </div>
 
-          {/* Pagination Controls */}
-          {displayedEpics.length > 0 && !localSearch && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Items per page:</span>
-                <Select
-                  value={pageSize.toString()}
-                  onValueChange={(value) => {
-                    setPageSize(parseInt(value));
-                    setCurrentPage(1);
-                  }}
+                    {/* Meta info */}
+                    <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                      <MetaChip
+                        icon={<Target className="h-3.5 w-3.5" />}
+                        label={epic.project?.name || "—"}
+                      />
+                      {epic.dueDate && (
+                        <MetaChip
+                          icon={<Calendar className="h-3.5 w-3.5" />}
+                          label={`Due ${formatDate(epic.dueDate)}`}
+                        />
+                      )}
+                      {epic.storyPoints && (
+                        <MetaChip
+                          icon={<BarChart3 className="h-3.5 w-3.5" />}
+                          label={`${epic.storyPoints} pts`}
+                        />
+                      )}
+                      {epic.assignedTo && (
+                        <MetaChip
+                          icon={<User className="h-3.5 w-3.5" />}
+                          label={`${epic.assignedTo.firstName} ${epic.assignedTo.lastName}`}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* ── List View ── */
+          <div className="space-y-2">
+            {displayedEpics.map((epic) => {
+              const viewAllowed = canViewEpic(epic);
+              const editAllowed = canEditEpic(epic);
+              const deleteAllowed = canDeleteEpic(epic);
+
+              return (
+                <div
+                  key={epic._id}
+                  className={cn(
+                    "group flex items-start gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card",
+                    "apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px",
+                    viewAllowed ? "cursor-pointer" : "opacity-60 cursor-not-allowed"
+                  )}
+                  onClick={() => viewAllowed && router.push(`/epics/${epic._id}`)}
                 >
-                  <SelectTrigger className="w-20 h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span>
-                  {localSearch
-                    ? `Showing ${displayedEpics.length} of ${totalCount} filtered results`
-                    : `Showing ${pageStartIndex} to ${pageEndIndex} of ${totalEpicsCount}`}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={currentPage === 1 || loading}
-                  variant="outline"
-                  size="sm"
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground px-2">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage >= totalPages || loading}
-                  variant="outline"
-                  size="sm"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+                  {/* Icon */}
+                  <div className="h-10 w-10 rounded-[var(--apple-radius-md)] bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center flex-shrink-0">
+                    <Layers className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <h3 className="text-[15px] font-semibold text-[var(--apple-label)] truncate">
+                        {epic.title}
+                      </h3>
+                      <StatusBadge status={epic.status} size="sm" />
+                      <PriorityBadge priority={epic.priority} size="sm" />
+                    </div>
+                    {epic.description && (
+                      <p className="text-[13px] text-[var(--apple-secondary-label)] line-clamp-1">
+                        {epic.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                      <MetaChip
+                        icon={<Target className="h-3.5 w-3.5" />}
+                        label={epic.project?.name || "—"}
+                      />
+                      {epic.dueDate && (
+                        <MetaChip
+                          icon={<Calendar className="h-3.5 w-3.5" />}
+                          label={formatDate(epic.dueDate)}
+                        />
+                      )}
+                      <MetaChip
+                        icon={<BarChart3 className="h-3.5 w-3.5" />}
+                        label={`${epic.progress?.storiesCompleted ?? 0}/${epic.progress?.totalStories ?? 0} stories`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-28 flex-shrink-0 hidden md:block pt-1">
+                    <GradientProgress
+                      pct={epic.progress?.completionPercentage ?? 0}
+                      showPct={true}
+                    />
+                  </div>
+
+                  {/* Actions */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition flex-shrink-0"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        disabled={!viewAllowed}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!viewAllowed) return;
+                          router.push(`/epics/${epic._id}`);
+                        }}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Epic
+                      </DropdownMenuItem>
+                      {editAllowed && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/epics/${epic._id}/edit`);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Epic
+                        </DropdownMenuItem>
+                      )}
+                      {deleteAllowed && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(epic);
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Epic
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {displayedEpics.length > 0 && !localSearch && (
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalCount={totalEpicsCount}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(s) => {
+              setPageSize(s);
+              setCurrentPage(1);
+            }}
+          />
+        )}
       </div>
+
+      {/* Delete Confirmation Modal */}
       <ConfirmationModal
         isOpen={showDeleteConfirmModal}
         onClose={() => {
