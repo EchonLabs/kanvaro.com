@@ -413,13 +413,13 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         collapsed ? 'w-16' : 'w-64'
       )}
     >
-      {/* Sidebar Header — 44px toolbar height */}
-      <div className="flex h-11 items-center justify-between px-3 border-b border-[var(--apple-separator)]">
+      {/* Sidebar Header — 56px toolbar height matches main header */}
+      <div className="flex h-14 items-center justify-between px-3 border-b border-[var(--apple-separator)]">
         {!collapsed && (
-          <div className="flex items-center space-x-2 min-w-0">
+          <div className="flex items-center min-w-0 flex-1">
             {!mounted || loading ? (
-              <div className="h-7 w-7 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] animate-pulse" />
-            ) : (
+              <div className="h-7 w-28 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] animate-pulse" />
+            ) : organization?.logo || organization?.darkLogo ? (
               <OrganizationLogo
                 lightLogo={organization?.logo}
                 darkLogo={organization?.darkLogo}
@@ -427,6 +427,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 fallbackText={organization?.name?.charAt(0) || 'K'}
                 size="sm"
                 className="rounded-[var(--apple-radius-sm)]"
+              />
+            ) : (
+              <img
+                src="/Kanvaro.svg"
+                alt="Kanvaro"
+                className="h-8 w-auto object-contain dark:brightness-0 dark:invert"
               />
             )}
           </div>

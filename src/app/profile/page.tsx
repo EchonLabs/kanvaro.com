@@ -528,7 +528,7 @@ export default function ProfilePage() {
                         email: profile?.email
                       }}
                       size={120}
-                      className="h-32 w-32 ring-4 ring-background shadow-lg"
+                      className="h-32 w-32 ring-0 ring-background shadow-lg"
                     />
                     <div className="flex-1 space-y-3 text-center md:text-left">
                       <div>

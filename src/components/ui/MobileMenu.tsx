@@ -353,11 +353,11 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
       {/* Mobile Drawer */}
       <div className="fixed inset-y-0 left-0 w-72 apple-sidebar-material border-r border-[var(--apple-separator)] z-50 lg:hidden overflow-y-auto">
         {/* Header */}
-        <div className="flex h-11 items-center justify-between px-3 border-b border-[var(--apple-separator)]">
-          <div className="flex items-center space-x-2">
+        <div className="flex h-14 items-center justify-between px-3 border-b border-[var(--apple-separator)]">
+          <div className="flex items-center min-w-0 flex-1">
             {loading ? (
-              <div className="h-7 w-7 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] animate-pulse" />
-            ) : (
+              <div className="h-7 w-28 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] animate-pulse" />
+            ) : organization?.logo || organization?.darkLogo ? (
               <OrganizationLogo
                 lightLogo={organization?.logo}
                 darkLogo={organization?.darkLogo}
@@ -365,6 +365,12 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
                 fallbackText={organization?.name?.charAt(0) || 'K'}
                 size="sm"
                 className="rounded-[var(--apple-radius-sm)]"
+              />
+            ) : (
+              <img
+                src="/Kanvaro.svg"
+                alt="Kanvaro"
+                className="h-8 w-auto object-contain dark:brightness-0 dark:invert"
               />
             )}
           </div>

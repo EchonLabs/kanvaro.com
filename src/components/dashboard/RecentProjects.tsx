@@ -143,13 +143,12 @@ function HoursCell({ minutes }: { minutes?: number }) {
         {text}
       </span>
       {hasData && ( 
-        <>
+        
         <TrendingUp
           className="h-3.5 w-3.5 flex-shrink-0 text-[var(--apple-system-green)]"
           style={{ animation: 'status-pulse 2s ease-in-out infinite' }}
         />
-        <span className="text-sm font-apple-mono font-semibold text-[var(--apple-secondary-label)] tabular-nums">Tracked</span>
-        </>
+        
       )}
     </div>
   )

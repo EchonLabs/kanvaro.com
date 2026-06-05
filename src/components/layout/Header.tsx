@@ -59,7 +59,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
 
   return (
     <>
-    <header className="flex h-11 items-center border-b border-[var(--apple-separator)] apple-glass px-3 sm:px-4 sticky top-0 z-30">
+    <header className="flex h-14 items-center border-b border-[var(--apple-separator)] apple-glass px-3 sm:px-4 sticky top-0 z-30">
       {/* Mobile Menu Button */}
       <TooltipProvider>
         <Tooltip>

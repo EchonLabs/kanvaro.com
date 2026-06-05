@@ -130,6 +130,82 @@
   50%       { box-shadow: 0 0 0 0px currentColor;       opacity: 1; }
 }
 
+/* Transitions.dev — Number pop-in */
+:root {
+  --digit-dur: 500ms;
+  --digit-distance: 8px;
+  --digit-stagger: 70ms;
+  --digit-blur: 2px;
+  --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --digit-dir-x: 0;
+  --digit-dir-y: 1;
+}
+
+@keyframes t-digit-pop-in {
+  0%   {
+    transform: translate(
+      calc(var(--digit-distance) * var(--digit-dir-x)),
+      calc(var(--digit-distance) * var(--digit-dir-y))
+    );
+    opacity: 0;
+    filter: blur(var(--digit-blur));
+  }
+  100% { transform: translate(0, 0); opacity: 1; filter: blur(0); }
+}
+
+.t-digit-group {
+  display: inline-flex;
+  align-items: baseline;
+}
+.t-digit {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+}
+.t-digit-group.is-animating .t-digit {
+  animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
+}
+.t-digit-group.is-animating .t-digit[data-stagger="1"] {
+  animation-delay: var(--digit-stagger);
+}
+.t-digit-group.is-animating .t-digit[data-stagger="2"] {
+  animation-delay: calc(var(--digit-stagger) * 2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-digit-group .t-digit { animation: none !important; }
+}
+
+/* Number Digit Flip — re-fires every time a digit value changes (live timer) */
+:root {
+  --ndf-dur: 180ms;
+  --ndf-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ndf-distance: 50%;
+  --ndf-blur: 3px;
+}
+
+@keyframes number-digit-flip {
+  0% {
+    transform: translateY(var(--ndf-distance));
+    opacity: 0;
+    filter: blur(var(--ndf-blur));
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.number-digit-flip {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+  animation: number-digit-flip var(--ndf-dur) var(--ndf-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .number-digit-flip { animation: none !important; }
+}
+
 @layer base {
   * {
     box-sizing: border-box;
