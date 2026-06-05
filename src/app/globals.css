@@ -68,6 +68,26 @@
     transition: all 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
+  /* Card resize / view-switch container — use with key={viewMode} to retrigger */
+  .view-transition-container {
+    animation: view-fade-scale 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  }
+
+  /* Individual card stagger inside a view-transition-container */
+  .view-transition-container > * {
+    animation: card-enter 0.20s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  }
+  .view-transition-container > *:nth-child(1)  { animation-delay:   0ms; }
+  .view-transition-container > *:nth-child(2)  { animation-delay:  25ms; }
+  .view-transition-container > *:nth-child(3)  { animation-delay:  50ms; }
+  .view-transition-container > *:nth-child(4)  { animation-delay:  75ms; }
+  .view-transition-container > *:nth-child(5)  { animation-delay: 100ms; }
+  .view-transition-container > *:nth-child(6)  { animation-delay: 125ms; }
+  .view-transition-container > *:nth-child(7)  { animation-delay: 150ms; }
+  .view-transition-container > *:nth-child(8)  { animation-delay: 175ms; }
+  .view-transition-container > *:nth-child(9)  { animation-delay: 200ms; }
+  .view-transition-container > *:nth-child(n+10) { animation-delay: 200ms; }
+
   /* Progress bar shimmer sweep — light passes left-to-right then pauses */
   .progress-shimmer {
     animation: shimmer-sweep 2s ease-in-out infinite;
@@ -78,6 +98,18 @@
       transparent 100%
     );
   }
+}
+
+/* View-switch container fade+scale */
+@keyframes view-fade-scale {
+  from { opacity: 0; transform: scale(0.975) translateY(3px); }
+  to   { opacity: 1; transform: scale(1)     translateY(0);   }
+}
+
+/* Per-card stagger enter inside view-transition-container */
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
 }
 
 /* Shimmer keyframe — defined outside @layer so Tailwind arbitrary can reference it */

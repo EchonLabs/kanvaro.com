@@ -1739,84 +1739,33 @@ export default function TasksClient({
                                                     {/* Middle: title + meta */}
                                                     <div className="flex-1 min-w-0 space-y-1.5">
                                                         {/* Title row */}
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                {/* Mobile-only: inline status dot */}
-                                                                <div
-                                                                    className={cn(
-                                                                        'flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center sm:hidden',
-                                                                        statusCfg.bg
-                                                                    )}
-                                                                >
-                                                                    <span className={cn('h-2 w-2 rounded-full flex-shrink-0', statusCfg.dot, 'status-pulse')} />
-                                                                </div>
-                                                                <TooltipProvider delayDuration={150}>
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <span className="text-[14px] sm:text-[15px] font-semibold text-[var(--apple-label)] truncate">
-                                                                                {task.title}
-                                                                            </span>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent side="top" align="start" className="max-w-xs break-words">
-                                                                            {task.title}
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                </TooltipProvider>
-                                                                {task.displayId && (
-                                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[11px] font-apple-mono text-[var(--apple-tertiary-label)] flex-shrink-0">
-                                                                        {task.displayId}
-                                                                    </span>
+                                                        <div className="flex items-center gap-2">
+                                                            {/* Mobile-only: inline status dot */}
+                                                            <div
+                                                                className={cn(
+                                                                    'flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center sm:hidden',
+                                                                    statusCfg.bg
                                                                 )}
+                                                            >
+                                                                <span className={cn('h-2 w-2 rounded-full flex-shrink-0', statusCfg.dot, 'status-pulse')} />
                                                             </div>
-
-                                                            {/* Mobile Actions Dropdown */}
-                                                            <div className="sm:hidden flex-shrink-0">
-                                                                <DropdownMenu>
-                                                                    <DropdownMenuTrigger asChild>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            className="h-8 w-8 p-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] rounded-[var(--apple-radius-sm)] bg-[var(--apple-quaternary-fill)] sm:bg-transparent"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                        >
-                                                                            <MoreHorizontal className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end" className="z-[10050]">
-                                                                        <DropdownMenuItem onClick={(e) => {
-                                                                            e.stopPropagation()
-                                                                            router.push(`/tasks/${task._id}`)
-                                                                        }}>
-                                                                            <Eye className="h-4 w-4 mr-2" />
-                                                                            View Task
-                                                                        </DropdownMenuItem>
-                                                                        <DropdownMenuItem
-                                                                            disabled={!canEditTask(task)}
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation()
-                                                                                if (!canEditTask(task)) return
-                                                                                router.push(`/tasks/${task._id}/edit`)
-                                                                            }}
-                                                                        >
-                                                                            <Edit className="h-4 w-4 mr-2" />
-                                                                            Edit Task
-                                                                        </DropdownMenuItem>
-                                                                        <DropdownMenuSeparator />
-                                                                        <DropdownMenuItem
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation()
-                                                                                if (!canDeleteTask(task)) return
-                                                                                handleDeleteClick(task)
-                                                                            }}
-                                                                            disabled={!canDeleteTask(task)}
-                                                                            className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
-                                                                        >
-                                                                            <Trash2 className="h-4 w-4 mr-2" />
-                                                                            Delete
-                                                                        </DropdownMenuItem>
-                                                                    </DropdownMenuContent>
-                                                                </DropdownMenu>
-                                                            </div>
+                                                            <TooltipProvider delayDuration={150}>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <span className="text-[14px] sm:text-[15px] font-semibold text-[var(--apple-label)] truncate">
+                                                                            {task.title}
+                                                                        </span>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent side="top" align="start" className="max-w-xs break-words">
+                                                                        {task.title}
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                            {task.displayId && (
+                                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[11px] font-apple-mono text-[var(--apple-tertiary-label)] flex-shrink-0">
+                                                                    {task.displayId}
+                                                                </span>
+                                                            )}
                                                         </div>
 
                                                         {/* Badges row — visible on mobile below title */}
