@@ -4,10 +4,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { formatToTitleCase } from '@/lib/utils'
 import { Permission } from '@/lib/permissions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -24,9 +22,13 @@ import {
   BarChart3,
   Folder,
   FileText,
-  Calendar,
-  Users,
-  TrendingUp
+  TrendingUp,
+  ArrowRight,
+  ChevronRight,
+  Layers,
+  FlaskConical,
+  ListChecks,
+  Activity,
 } from 'lucide-react'
 import TestSuiteCards from '@/components/test-management/TestSuiteCards'
 import TestCaseList from '@/components/test-management/TestCaseList'
@@ -34,6 +36,7 @@ import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmD
 import { TestSuiteDetailDialog } from '@/components/test-management/TestSuiteDetailDialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useNotify } from '@/lib/notify'
+import { cn } from '@/lib/utils'
 
 interface TestSummary {
   totalTestCases: number
@@ -52,6 +55,22 @@ interface Project {
   testSummary?: TestSummary
 }
 
+const EXEC_STATUS_CONFIG = {
+  passed:  { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'Passed' },
+  failed:  { bg: 'bg-red-50 dark:bg-red-950/30',         text: 'text-red-600 dark:text-red-400',         dot: 'bg-red-500',    border: 'border-red-200 dark:border-red-800',   label: 'Failed' },
+  blocked: { bg: 'bg-amber-50 dark:bg-amber-950/30',     text: 'text-amber-600 dark:text-amber-400',     dot: 'bg-amber-500',  border: 'border-amber-200 dark:border-amber-800', label: 'Blocked' },
+  skipped: { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',       dot: 'bg-gray-400',   border: 'border-gray-200 dark:border-gray-700',  label: 'Skipped' },
+  in_progress: { bg: 'bg-blue-50 dark:bg-blue-950/30',   text: 'text-blue-600 dark:text-blue-400',       dot: 'bg-blue-500',   border: 'border-blue-200 dark:border-blue-800',  label: 'In Progress' },
+} as const
+
+const QUICK_LINKS = [
+  { label: 'Test Suites', icon: Folder, href: '/test-management/suites', gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.20)', description: 'Organize cases into suites' },
+  { label: 'Test Cases', icon: FileText, href: '/test-management/cases', gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.20)', description: 'Manage individual test cases' },
+  { label: 'Test Plans', icon: ListChecks, href: '/test-management/plans', gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.20)', description: 'Plan and schedule test runs' },
+  { label: 'Executions', icon: Play, href: '/test-management/executions', gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.20)', description: 'Track execution results' },
+  { label: 'Reports', icon: BarChart3, href: '/test-management/reports', gradient: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)', glow: 'rgba(48,176,199,0.20)', description: 'Analytics and insights' },
+]
+
 export default function TestManagementPage() {
   const router = useRouter()
   const { setItems } = useBreadcrumb()
@@ -66,8 +85,6 @@ export default function TestManagementPage() {
   const [parentSuiteIdForCreate, setParentSuiteIdForCreate] = useState<string | undefined>(undefined)
   const [suitesRefreshCounter, setSuitesRefreshCounter] = useState(0)
   const [selectedSuiteId, setSelectedSuiteId] = useState<string | null>(null)
-  const [selectedSuiteDetails, setSelectedSuiteDetails] = useState<any | null>(null)
-  const [suiteDetailsLoading, setSuiteDetailsLoading] = useState(false)
   const [suiteDetailDialogOpen, setSuiteDetailDialogOpen] = useState(false)
   const [detailSuiteId, setDetailSuiteId] = useState<string | null>(null)
   const [suiteDetailRefreshKey, setSuiteDetailRefreshKey] = useState(0)
@@ -91,27 +108,20 @@ export default function TestManagementPage() {
   }, [executions])
 
   useEffect(() => {
-    // Set breadcrumb
     setItems([
       { label: 'Test Management', href: '/test-management' },
       { label: 'Dashboard' }
     ])
   }, [setItems])
 
-  useEffect(() => {
-    fetchProjects()
-  }, [])
+  useEffect(() => { fetchProjects() }, [])
 
   const fetchProjects = async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/projects')
       const data = await response.json()
-
-      if (data.success) {
-        setProjects(Array.isArray(data.data) ? data.data : [])
-        // Do not auto-select a project on load (dashboard starts empty until user selects)
-      }
+      if (data.success) setProjects(Array.isArray(data.data) ? data.data : [])
     } catch (error) {
       console.error('Error fetching projects:', error)
     } finally {
@@ -119,81 +129,36 @@ export default function TestManagementPage() {
     }
   }
 
-  // Fetch test executions for selected project (dashboard shows latest 20)
   useEffect(() => {
     const fetchExecutions = async () => {
-      if (!selectedProject) {
-        setExecutions([])
-        setExecutionsTotal(0)
-        return
-      }
+      if (!selectedProject) { setExecutions([]); setExecutionsTotal(0); return }
       try {
         setExecutionsLoading(true)
-        setExecutions([])
-        setExecutionsTotal(0)
-        const limit = 20
-        const res = await fetch(
-          `/api/test-executions?projectId=${encodeURIComponent(selectedProject)}&page=1&limit=${limit}`
-        )
+        const res = await fetch(`/api/test-executions?projectId=${encodeURIComponent(selectedProject)}&page=1&limit=20`)
         const data = await res.json().catch(() => ({}))
         if (res.ok && data?.success && Array.isArray(data.data)) {
           setExecutions(data.data)
-          const totalFromApi = Number(data?.pagination?.total)
-          setExecutionsTotal(Number.isFinite(totalFromApi) ? totalFromApi : data.data.length)
-        } else {
-          setExecutions([])
-          setExecutionsTotal(0)
-        }
-      } catch (e) {
-        console.error('Error fetching test executions:', e)
-        setExecutions([])
-        setExecutionsTotal(0)
-      } finally {
-        setExecutionsLoading(false)
-      }
+          const t = Number(data?.pagination?.total)
+          setExecutionsTotal(Number.isFinite(t) ? t : data.data.length)
+        } else { setExecutions([]); setExecutionsTotal(0) }
+      } catch { setExecutions([]); setExecutionsTotal(0) }
+      finally { setExecutionsLoading(false) }
     }
     fetchExecutions()
   }, [selectedProject, executionsRefreshCounter])
 
-  // Fetch counts for suites and cases for Overview
   useEffect(() => {
     const fetchCounts = async () => {
-      if (!selectedProject) {
-        setSuiteCount(0)
-        setCaseCount(0)
-        return
-      }
+      if (!selectedProject) { setSuiteCount(0); setCaseCount(0); return }
       try {
-        setSuiteCount(0)
-        setCaseCount(0)
-        // Use pagination totals to avoid fetching entire datasets
-        const [suitesRes, casesRes] = await Promise.all([
+        const [sr, cr] = await Promise.all([
           fetch(`/api/test-suites?projectId=${encodeURIComponent(selectedProject)}&page=1&limit=1`),
           fetch(`/api/test-cases?projectId=${encodeURIComponent(selectedProject)}&page=1&limit=1`)
         ])
-        const [suitesData, casesData] = await Promise.all([
-          suitesRes.json().catch(() => ({})),
-          casesRes.json().catch(() => ({}))
-        ])
-
-        if (suitesRes.ok && suitesData?.success) {
-          const totalSuites = Number(suitesData?.pagination?.total)
-          setSuiteCount(Number.isFinite(totalSuites) ? totalSuites : (Array.isArray(suitesData.data) ? suitesData.data.length : 0))
-        } else {
-          setSuiteCount(0)
-        }
-
-        if (casesRes.ok && casesData?.success) {
-          const totalCases = Number(casesData?.pagination?.total)
-          setCaseCount(Number.isFinite(totalCases) ? totalCases : (Array.isArray(casesData.data) ? casesData.data.length : 0))
-        } else {
-          setCaseCount(0)
-        }
-      } catch (e) {
-        console.error('Error fetching overview counts:', e)
-        setSuiteCount(0)
-        setCaseCount(0)
-      }
+        const [sd, cd] = await Promise.all([sr.json().catch(() => ({})), cr.json().catch(() => ({}))])
+        setSuiteCount(sr.ok && sd?.success ? (Number.isFinite(Number(sd?.pagination?.total)) ? Number(sd.pagination.total) : (Array.isArray(sd.data) ? sd.data.length : 0)) : 0)
+        setCaseCount(cr.ok && cd?.success ? (Number.isFinite(Number(cd?.pagination?.total)) ? Number(cd.pagination.total) : (Array.isArray(cd.data) ? cd.data.length : 0)) : 0)
+      } catch { setSuiteCount(0); setCaseCount(0) }
     }
     fetchCounts()
   }, [selectedProject])
@@ -204,109 +169,48 @@ export default function TestManagementPage() {
       if (res.ok) {
         notifySuccess({ title: 'Test Suite deleted successfully.' })
         setSuitesRefreshCounter(c => c + 1)
-        // Clear details panel if the deleted suite was selected
-        if (selectedSuiteId === suiteId) {
-          setSelectedSuiteId(null)
-          setSelectedSuiteDetails(null)
-        }
-      } else {
-        const data = await res.json().catch(() => ({}))
-        console.error('Failed to delete test suite', data)
+        if (selectedSuiteId === suiteId) { setSelectedSuiteId(null) }
       }
-    } catch (err) {
-      console.error('Error deleting test suite:', err)
-    }
+    } catch (err) { console.error('Error deleting test suite:', err) }
   }
 
-  const fetchSuiteDetails = async (suiteId: string) => {
-    try {
-      setSuiteDetailsLoading(true)
-      const res = await fetch(`/api/test-suites/${suiteId}`)
-      const data = await res.json()
-      if (res.ok && data?.success) {
-        setSelectedSuiteDetails(data.data)
-      } else {
-        setSelectedSuiteDetails(null)
-      }
-    } catch (e) {
-      setSelectedSuiteDetails(null)
-    } finally {
-      setSuiteDetailsLoading(false)
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'passed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'failed': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      case 'blocked': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      case 'skipped': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      default: return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'passed': return <CheckCircle className="h-4 w-4 text-green-600" />
-      case 'failed': return <XCircle className="h-4 w-4 text-red-600" />
-      case 'blocked': return <AlertTriangle className="h-4 w-4 text-yellow-600" />
-      case 'skipped': return <Clock className="h-4 w-4 text-gray-600" />
-      default: return <Play className="h-4 w-4 text-blue-600" />
-    }
-  }
+  const passRate = useMemo(() => {
+    if (executions.length === 0) return 0
+    return Math.round((executions.filter(e => e.status === 'passed').length / executions.length) * 100)
+  }, [executions])
 
   const formatDuration = (seconds: number) => {
     if (!seconds || seconds <= 0) return 'N/A'
-    const m = Math.floor(seconds / 60)
-    const s = seconds % 60
-    return `${m}m ${s}s`
+    return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
   }
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '—'
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-    })
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
-  const displayedExecutionsCount = executions.length
-  const passRate = (() => {
-    if (displayedExecutionsCount === 0) return 0
-    const passed = executions.filter(e => e.status === 'passed').length
-    return Math.round((passed / displayedExecutionsCount) * 100)
-  })()
-
-  const handleCreateTestPlan = () => {
-    const qs = selectedProject ? `?projectId=${encodeURIComponent(selectedProject)}` : ''
-    router.push(`/test-management/plans/new${qs}`)
-  }
-
-  const handleStartTestExecution = () => {
-    if (!selectedProject) return
-    router.push(`/test-management/executions/new?projectId=${encodeURIComponent(selectedProject)}`)
-  }
+  const STATS = [
+    { label: 'Test Suites', value: suiteCount, icon: Folder, gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.25)', loading: !selectedProject },
+    { label: 'Test Cases', value: caseCount, icon: FileText, gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.25)', loading: !selectedProject },
+    { label: 'Executions', value: executionsTotal, icon: Play, gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.25)', loading: executionsLoading },
+    { label: 'Pass Rate', value: selectedProject ? `${passRate}%` : '—', icon: TrendingUp, gradient: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)', glow: 'rgba(48,176,199,0.25)', loading: executionsLoading },
+  ]
 
   if (loading) {
     return (
       <MainLayout>
         <div className="space-y-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Dashboard</h1>
-              <p className="text-muted-foreground">Select a project to manage test suites, cases, and executions</p>
+          {/* Header skeleton */}
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] animate-pulse" />
+            <div className="space-y-2">
+              <div className="h-7 w-52 rounded-lg bg-[var(--apple-tertiary-fill)] animate-pulse" />
+              <div className="h-4 w-80 rounded-md bg-[var(--apple-tertiary-fill)] animate-pulse" />
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <div className="space-y-2">
-                    <div className="h-4 bg-muted animate-pulse rounded w-1/2" />
-                    <div className="h-8 bg-muted animate-pulse rounded w-1/3" />
-                  </div>
-                </CardContent>
-              </Card>
+              <div key={i} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-5 h-24 animate-pulse" />
             ))}
           </div>
         </div>
@@ -318,355 +222,390 @@ export default function TestManagementPage() {
     <MainLayout>
       <PermissionGate permission={Permission.TEST_MANAGE}>
         <div className="space-y-8">
+
+          {/* ── Page Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Dashboard</h1>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">Select a project to manage test suites, cases, and executions</p>
+            <div className="flex items-center gap-4">
+              <div
+                className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center shadow-lg"
+                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 16px rgba(0,122,255,0.35)' }}
+              >
+                <FlaskConical className="h-7 w-7 text-white" strokeWidth={1.8} />
+              </div>
+              <div>
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Dashboard</h1>
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                  Select a project to manage test suites, cases, and executions
+                </p>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-              <Button variant="outline" onClick={() => router.push('/test-management/reports')} className="w-full sm:w-auto">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Reports
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={() => router.push('/test-management/reports')}
+                className="flex-1 sm:flex-none h-9 gap-1.5 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] apple-transition"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span className="text-[13px]">Reports</span>
               </Button>
-              <Button onClick={handleCreateTestPlan} className="w-full sm:w-auto" disabled={!selectedProject}>
-                <TestTube className="h-4 w-4 mr-2" />
-                New Test Plan
+              <Button
+                onClick={() => { const qs = selectedProject ? `?projectId=${encodeURIComponent(selectedProject)}` : ''; router.push(`/test-management/plans/new${qs}`) }}
+                className="flex-1 sm:flex-none h-9 gap-1.5 rounded-[var(--apple-radius-sm)] apple-transition"
+                disabled={!selectedProject}
+                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+              >
+                <TestTube className="h-4 w-4" />
+                <span className="text-[13px]">New Test Plan</span>
               </Button>
             </div>
           </div>
 
           {projects.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 sm:p-8 text-center">
-                <TestTube className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-base sm:text-lg font-semibold mb-2">No Projects Found</h3>
-                <p className="text-sm sm:text-base text-muted-foreground mb-4">
-                  You need to be assigned to a project to access test management features.
-                </p>
-                <Button onClick={() => router.push('/projects/create')} className="w-full sm:w-auto">
-                  <TestTube className="h-4 w-4 mr-2" />
-                  Create Test Project
-                </Button>
-              </CardContent>
-            </Card>
+            /* ── Empty state ── */
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-12 text-center">
+              <div className="mx-auto w-16 h-16 rounded-[var(--apple-radius-md)] flex items-center justify-center mb-4"
+                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 16px rgba(0,122,255,0.30)' }}>
+                <TestTube className="h-8 w-8 text-white" strokeWidth={1.8} />
+              </div>
+              <h3 className="text-[17px] font-semibold text-[var(--apple-label)] mb-2">No Projects Found</h3>
+              <p className="text-[15px] text-[var(--apple-secondary-label)] mb-6 max-w-xs mx-auto">
+                You need to be assigned to a project to access test management features.
+              </p>
+              <Button onClick={() => router.push('/projects/create')} className="rounded-[var(--apple-radius-sm)]"
+                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}>
+                Create Project
+              </Button>
+            </div>
           ) : (
             <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                <span className="text-sm font-medium">Project:</span>
+
+              {/* ── Project Selector Toolbar ── */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]">
+                <span className="apple-section-label whitespace-nowrap">Project</span>
                 <Select
                   value={selectedProject || undefined}
-                  onValueChange={(value) => {
-                    setSelectedProject(value)
-                    setActiveTab('overview')
-                  }}
+                  onValueChange={(value) => { setSelectedProject(value); setActiveTab('overview') }}
                 >
-                  <SelectTrigger className="w-full sm:w-96">
-                    <SelectValue placeholder="Select a project" />
+                  <SelectTrigger className="h-8 w-full sm:w-72 text-[13px] rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-card">
+                    <SelectValue placeholder="Select a project…" />
                   </SelectTrigger>
                   <SelectContent>
                     {projects.map((p) => (
-                      <SelectItem key={p._id} value={p._id}>
-                        {p.name}
-                      </SelectItem>
+                      <SelectItem key={p._id} value={p._id} className="text-[13px]">{p.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               {!selectedProject ? (
-                <Card>
-                  <CardContent className="p-6 sm:p-8 text-center">
-                    <TestTube className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-base sm:text-lg font-semibold mb-2">Select a Project</h3>
-                    <p className="text-sm sm:text-base text-muted-foreground">
-                      Choose a project to view test suites, cases, and executions.
-                    </p>
-                  </CardContent>
-                </Card>
+                /* ── Quick-link hub (no project selected) ── */
+                <div className="space-y-6">
+                  <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-8 text-center">
+                    <TestTube className="h-10 w-10 mx-auto mb-3 text-[var(--apple-tertiary-label)]" />
+                    <h3 className="text-[17px] font-semibold text-[var(--apple-label)] mb-1">Select a Project</h3>
+                    <p className="text-[15px] text-[var(--apple-secondary-label)]">Choose a project above to view its test data.</p>
+                  </div>
+                  <div>
+                    <p className="apple-section-label mb-3 px-1">Quick Access</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                      {QUICK_LINKS.map((link) => (
+                        <button
+                          key={link.href}
+                          onClick={() => router.push(link.href)}
+                          className="group relative rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-left apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] hover:-translate-y-0.5 dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] focus:outline-none"
+                        >
+                          <div className="w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center mb-3"
+                            style={{ background: link.gradient, boxShadow: `0 4px 12px ${link.glow}` }}>
+                            <link.icon className="h-5 w-5 text-white" strokeWidth={1.8} />
+                          </div>
+                          <p className="text-[15px] font-semibold text-[var(--apple-label)]">{link.label}</p>
+                          <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{link.description}</p>
+                          <ArrowRight className="absolute top-4 right-4 h-4 w-4 text-[var(--apple-tertiary-label)] opacity-0 group-hover:opacity-100 apple-transition" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto mb-4">
-                <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-                <TabsTrigger value="suites" className="text-xs sm:text-sm">Test Suites</TabsTrigger>
-                <TabsTrigger value="cases" className="text-xs sm:text-sm">Test Cases</TabsTrigger>
-                <TabsTrigger value="executions" className="text-xs sm:text-sm">Executions</TabsTrigger>
-              </TabsList>
+                /* ── Project-scoped content ── */
+                <div className="space-y-6">
 
-              <TabsContent value="overview" className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center space-x-2">
-                        <Folder className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium">Test Suites</span>
-                      </div>
-                      <div className="text-2xl font-bold mt-2">{suiteCount}</div>
-                      <p className="text-xs text-muted-foreground">Total suites</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center space-x-2">
-                        <FileText className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium">Test Cases</span>
-                      </div>
-                      <div className="text-2xl font-bold mt-2">{caseCount}</div>
-                      <p className="text-xs text-muted-foreground">Total cases</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center space-x-2">
-                        <Play className="h-4 w-4 text-purple-600" />
-                        <span className="text-sm font-medium">Executions</span>
-                      </div>
-                      <div className="text-2xl font-bold mt-2">{executionsTotal}</div>
-                      <p className="text-xs text-muted-foreground">Total runs</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center space-x-2">
-                        <TrendingUp className="h-4 w-4 text-orange-600" />
-                        <span className="text-sm font-medium">Pass Rate</span>
-                      </div>
-                      <div className="text-2xl font-bold mt-2">{passRate}%</div>
-                      <p className="text-xs text-muted-foreground">Success rate</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Recent Executions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {executionsLoading ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Play className="h-8 w-8 mx-auto mb-2 animate-pulse" />
-                          <p className="text-sm sm:text-base">Loading recent executions…</p>
+                  {/* Stats Bar */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {STATS.map((stat) => (
+                      <div key={stat.label}
+                        className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 flex items-center gap-3 apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
+                          style={{ background: stat.gradient, boxShadow: `0 4px 12px ${stat.glow}` }}>
+                          <stat.icon className="h-5 w-5 text-white" strokeWidth={1.8} />
                         </div>
-                      ) : executions.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Play className="h-8 w-8 mx-auto mb-2" />
-                          <p className="text-sm sm:text-base">No recent executions</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {executions.slice(0, 5).map((exe: any) => (
-                            <div key={exe._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between border rounded-lg p-3 gap-3">
-                              <div className="flex-1 min-w-0 w-full sm:w-auto">
-                                <div className="text-xs sm:text-sm font-medium truncate">{exe?.testCase?.title || exe.testCase}</div>
-                                <div className="text-xs text-muted-foreground truncate mt-1">
-                                  {exe?.testPlan?.name || 'No Plan'} · {exe.environment || '—'} · {exe.version || '—'}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto flex-shrink-0">
-                                <Badge className={getStatusColor(exe.status) + ' text-xs flex-shrink-0'}>
-                                  {exe.status.charAt(0).toUpperCase() + exe.status.slice(1)}
-                                </Badge>
-                                <div className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 hidden sm:block">
-                                  {exe?.executedAt ? new Date(exe.executedAt).toLocaleString() : '—'}
-                                </div>
-                                <Button size="sm" variant="outline" onClick={() => router.push(`/test-management/executions/${exe._id}`)} className="flex-1 sm:flex-initial">
-                                  View
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Execution Status</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                            <span className="text-sm">Passed</span>
-                          </div>
-                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                            {executionStatusCounts.passed}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <XCircle className="h-4 w-4 text-red-600" />
-                            <span className="text-sm">Failed</span>
-                          </div>
-                          <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                            {executionStatusCounts.failed}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                            <span className="text-sm">Blocked</span>
-                          </div>
-                          <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                            {executionStatusCounts.blocked}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-gray-600" />
-                            <span className="text-sm">Skipped</span>
-                          </div>
-                          <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
-                            {executionStatusCounts.skipped}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="suites" className="space-y-8">
-                <TestSuiteCards
-                  key={`${selectedProject}-${suitesRefreshCounter}`}
-                  projectId={selectedProject}
-                  onSuiteView={(suite) => {
-                    setDetailSuiteId(suite._id)
-                    setSuiteDetailDialogOpen(true)
-                  }}
-                  onSuiteCreate={(parentSuiteId) => {
-                    setEditingSuite(null)
-                    setParentSuiteIdForCreate(parentSuiteId)
-                    setSuiteDialogOpen(true)
-                  }}
-                  onSuiteEdit={(suite) => {
-                    setEditingSuite(suite)
-                    setParentSuiteIdForCreate(undefined)
-                    setSuiteDialogOpen(true)
-                  }}
-                  onSuiteDelete={(suiteId) => handleDeleteSuite(suiteId)}
-                />
-              </TabsContent>
-
-              <TabsContent value="cases" className="space-y-8">
-                <TestCaseList
-                  projectId={selectedProject}
-                  key={`${selectedProject}-${testCasesRefreshCounter}-${selectedSuiteId ?? 'all'}`}
-                  onTestCaseSelect={(testCase) => console.log('Selected test case:', testCase)}
-                  onTestCaseCreate={(testSuiteId) => {
-                    const qp = new URLSearchParams({ projectId: selectedProject })
-                    if (testSuiteId) qp.set('testSuiteId', testSuiteId)
-                    router.push(`/test-management/cases/new?${qp.toString()}`)
-                  }}
-                  onTestCaseEdit={(testCase) => {
-                    router.push(
-                      `/test-management/cases/${encodeURIComponent(testCase._id)}/edit?projectId=${encodeURIComponent(selectedProject)}`
-                    )
-                  }}
-                  onTestCaseDelete={(testCaseId, testCaseTitle) => {
-                    setDeleteItem({ id: testCaseId, name: testCaseTitle || '' })
-                    setDeleteDialogOpen(true)
-                  }}
-                  onTestCaseExecute={(testCase) => {
-                    if (!selectedProject) return
-                    router.push(
-                      `/test-management/executions/new?projectId=${encodeURIComponent(selectedProject)}&testCaseId=${encodeURIComponent(testCase._id)}`
-                    )
-                  }}
-                />
-              </TabsContent>
-
-              <TabsContent value="executions" className="space-y-8">
-                <Card>
-                  <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <CardTitle className="text-xl sm:text-2xl">Test Executions</CardTitle>
-                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                      <Button
-                        variant="outline"
-                        onClick={() => router.push(`/test-management/executions?projectId=${encodeURIComponent(selectedProject)}`)}
-                        className="w-full sm:w-auto"
-                      >
-                        View All
-                      </Button>
-                      <Button onClick={handleStartTestExecution} className="w-full sm:w-auto">
-                        <Play className="h-4 w-4 mr-2" />
-                        Record Execution
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs sm:text-sm">Test Case</TableHead>
-                            <TableHead className="text-xs sm:text-sm">Test Plan</TableHead>
-                            <TableHead className="text-xs sm:text-sm">Project</TableHead>
-                            <TableHead className="text-xs sm:text-sm">Status</TableHead>
-                            <TableHead className="text-xs sm:text-sm">Tester</TableHead>
-                            <TableHead className="text-xs sm:text-sm">Duration</TableHead>
-                            <TableHead className="text-xs sm:text-sm">Executed</TableHead>
-                            <TableHead className="text-xs sm:text-sm">Version</TableHead>
-                            <TableHead className="text-xs sm:text-sm w-12">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {executionsLoading ? (
-                            <TableRow>
-                              <TableCell colSpan={9} className="text-xs sm:text-sm">Loading…</TableCell>
-                            </TableRow>
-                          ) : executions.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={9} className="text-xs sm:text-sm">No test executions found</TableCell>
-                            </TableRow>
+                        <div>
+                          {stat.loading ? (
+                            <div className="h-6 w-10 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
                           ) : (
-                            executions.map((execution: any) => (
-                              <TableRow key={execution._id}>
-                                <TableCell className="font-medium text-xs sm:text-sm truncate max-w-[200px]">{execution?.testCase?.title || execution.testCase}</TableCell>
-                                <TableCell className="text-xs sm:text-sm truncate max-w-[150px]">{execution?.testPlan?.name || 'N/A'}</TableCell>
-                                <TableCell className="text-xs sm:text-sm truncate max-w-[150px]">{execution?.project?.name || '—'}</TableCell>
-                                <TableCell className="text-xs sm:text-sm">
-                                  <div className="flex items-center space-x-2">
-                                    {getStatusIcon(execution.status)}
-                                    <Badge className={getStatusColor(execution.status) + ' text-xs'}>
-                                      {execution.status.charAt(0).toUpperCase() + execution.status.slice(1)}
-                                    </Badge>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm truncate max-w-[150px]">{(execution?.executedBy?.firstName || '') + ' ' + (execution?.executedBy?.lastName || '') || execution?.executedBy?.email || '—'}</TableCell>
-                                <TableCell className="text-xs sm:text-sm">{formatDuration(execution.executionTime)}</TableCell>
-                                <TableCell className="text-xs sm:text-sm whitespace-nowrap">{formatDate(execution.executedAt)}</TableCell>
-                                <TableCell className="text-xs sm:text-sm">{execution.version || '—'}</TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => router.push(`/test-management/executions/${encodeURIComponent(execution._id)}`)}
-                                    className="text-xs sm:text-sm"
-                                  >
-                                    View
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                            <p className="text-[22px] font-bold tracking-tight text-[var(--apple-label)] font-apple-mono tabular-nums leading-none">{stat.value}</p>
                           )}
-                        </TableBody>
-                      </Table>
+                          <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{stat.label}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Apple-style Tabs */}
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
+                    <div className="flex items-center">
+                      <TabsList className="h-9 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] p-0.5 gap-0.5">
+                        {[
+                          { value: 'overview', label: 'Overview', icon: Activity },
+                          { value: 'suites', label: 'Suites', icon: Layers },
+                          { value: 'cases', label: 'Cases', icon: FileText },
+                          { value: 'executions', label: 'Executions', icon: Play },
+                        ].map((tab) => (
+                          <TabsTrigger
+                            key={tab.value}
+                            value={tab.value}
+                            className="h-8 px-3 gap-1.5 text-[13px] rounded-[8px] data-[state=active]:bg-card data-[state=active]:shadow-sm apple-transition"
+                          >
+                            <tab.icon className="h-3.5 w-3.5" />
+                            {tab.label}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-                </Tabs>
+
+                    {/* Overview Tab */}
+                    <TabsContent value="overview" className="space-y-5 mt-0">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        {/* Recent Executions */}
+                        <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
+                          <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center justify-between">
+                            <div>
+                              <p className="text-[17px] font-semibold text-[var(--apple-label)]">Recent Executions</p>
+                              <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">Latest 5 test runs</p>
+                            </div>
+                            <Button size="sm" variant="ghost"
+                              className="h-7 px-2 text-[12px] text-[var(--apple-system-blue)] hover:bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-sm)]"
+                              onClick={() => router.push(`/test-management/executions?projectId=${encodeURIComponent(selectedProject)}`)}>
+                              View all <ChevronRight className="h-3 w-3 ml-0.5" />
+                            </Button>
+                          </div>
+                          <div className="divide-y divide-[var(--apple-separator)]">
+                            {executionsLoading ? (
+                              [...Array(3)].map((_, i) => (
+                                <div key={i} className="px-5 py-3 flex items-center gap-3">
+                                  <div className="h-5 w-5 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                                  <div className="flex-1 space-y-1.5">
+                                    <div className="h-3.5 w-48 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                                    <div className="h-3 w-32 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                                  </div>
+                                  <div className="h-5 w-14 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                                </div>
+                              ))
+                            ) : executions.length === 0 ? (
+                              <div className="px-5 py-10 text-center text-[var(--apple-tertiary-label)]">
+                                <Play className="h-7 w-7 mx-auto mb-2 opacity-40" />
+                                <p className="text-[13px]">No executions yet</p>
+                              </div>
+                            ) : (
+                              executions.slice(0, 5).map((exe: any) => {
+                                const cfg = EXEC_STATUS_CONFIG[exe.status as keyof typeof EXEC_STATUS_CONFIG] ?? EXEC_STATUS_CONFIG.skipped
+                                return (
+                                  <div key={exe._id} className="px-5 py-3 flex items-center gap-3 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                                    <div className={cn('flex-shrink-0 w-2 h-2 rounded-full animate-[status-pulse_2.4s_ease-in-out_infinite]', cfg.dot)} />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[13px] font-medium text-[var(--apple-label)] truncate">{exe?.testCase?.title || exe.testCase}</p>
+                                      <p className="text-[11px] text-[var(--apple-tertiary-label)] truncate mt-0.5">
+                                        {exe?.testPlan?.name || 'No Plan'} · {exe.environment || '—'}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border animate-[badge-border-pulse_3s_ease-in-out_infinite]', cfg.bg, cfg.text, cfg.border)}>
+                                        {cfg.label}
+                                      </span>
+                                      <Button size="sm" variant="ghost"
+                                        className="h-6 px-2 text-[11px] rounded-[var(--apple-radius-sm)] text-[var(--apple-system-blue)]"
+                                        onClick={() => router.push(`/test-management/executions/${exe._id}`)}>
+                                        View
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )
+                              })
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Execution Status Summary */}
+                        <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
+                          <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                            <p className="text-[17px] font-semibold text-[var(--apple-label)]">Execution Status</p>
+                            <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">Distribution across last 20 runs</p>
+                          </div>
+                          <div className="px-5 py-4 space-y-3">
+                            {[
+                              { key: 'passed',  icon: CheckCircle,  color: 'text-emerald-500', label: 'Passed',  cfg: EXEC_STATUS_CONFIG.passed },
+                              { key: 'failed',  icon: XCircle,      color: 'text-red-500',     label: 'Failed',  cfg: EXEC_STATUS_CONFIG.failed },
+                              { key: 'blocked', icon: AlertTriangle, color: 'text-amber-500',   label: 'Blocked', cfg: EXEC_STATUS_CONFIG.blocked },
+                              { key: 'skipped', icon: Clock,        color: 'text-gray-400',    label: 'Skipped', cfg: EXEC_STATUS_CONFIG.skipped },
+                            ].map(({ key, icon: Icon, color, label, cfg }) => {
+                              const count = executionStatusCounts[key] ?? 0
+                              const total = executions.length
+                              const pct = total > 0 ? Math.round((count / total) * 100) : 0
+                              return (
+                                <div key={key} className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Icon className={cn('h-3.5 w-3.5', color)} />
+                                      <span className="text-[13px] text-[var(--apple-label)]">{label}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[13px] font-medium font-apple-mono tabular-nums text-[var(--apple-secondary-label)]">{count}</span>
+                                      <span className={cn('text-[11px] font-medium px-2 py-0.5 rounded-full border', cfg.bg, cfg.text, cfg.border)}>
+                                        {pct}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {total > 0 && (
+                                    <div className="relative h-[5px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                                      <div className="absolute inset-y-0 left-0 rounded-full" style={{
+                                        width: `${pct}%`,
+                                        background: key === 'passed' ? 'linear-gradient(90deg,#34C759,#30D158)' :
+                                                    key === 'failed' ? 'linear-gradient(90deg,#FF3B30,#FF453A)' :
+                                                    key === 'blocked' ? 'linear-gradient(90deg,#FF9500,#FFD60A)' :
+                                                    'linear-gradient(90deg,#8E8E93,#AEAEB2)',
+                                        transition: 'width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+                                      }} />
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <div className="px-5 pb-4">
+                            <div className="rounded-[var(--apple-radius-sm)] bg-[var(--apple-quaternary-fill)] px-4 py-3 flex items-center justify-between">
+                              <span className="text-[12px] text-[var(--apple-secondary-label)]">Overall Pass Rate</span>
+                              <span className="text-[22px] font-bold text-[var(--apple-label)] font-apple-mono tabular-nums">{passRate}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    {/* Suites Tab */}
+                    <TabsContent value="suites" className="mt-0">
+                      <TestSuiteCards
+                        key={`${selectedProject}-${suitesRefreshCounter}`}
+                        projectId={selectedProject}
+                        onSuiteView={(suite) => { setDetailSuiteId(suite._id); setSuiteDetailDialogOpen(true) }}
+                        onSuiteCreate={(parentSuiteId) => { setEditingSuite(null); setParentSuiteIdForCreate(parentSuiteId); setSuiteDialogOpen(true) }}
+                        onSuiteEdit={(suite) => { setEditingSuite(suite); setParentSuiteIdForCreate(undefined); setSuiteDialogOpen(true) }}
+                        onSuiteDelete={(suiteId) => handleDeleteSuite(suiteId)}
+                      />
+                    </TabsContent>
+
+                    {/* Cases Tab */}
+                    <TabsContent value="cases" className="mt-0">
+                      <TestCaseList
+                        projectId={selectedProject}
+                        key={`${selectedProject}-${testCasesRefreshCounter}-${selectedSuiteId ?? 'all'}`}
+                        onTestCaseSelect={(testCase) => console.log('Selected test case:', testCase)}
+                        onTestCaseCreate={(testSuiteId) => {
+                          const qp = new URLSearchParams({ projectId: selectedProject })
+                          if (testSuiteId) qp.set('testSuiteId', testSuiteId)
+                          router.push(`/test-management/cases/new?${qp.toString()}`)
+                        }}
+                        onTestCaseEdit={(testCase) => router.push(`/test-management/cases/${encodeURIComponent(testCase._id)}/edit?projectId=${encodeURIComponent(selectedProject)}`)}
+                        onTestCaseDelete={(testCaseId, testCaseTitle) => { setDeleteItem({ id: testCaseId, name: testCaseTitle || '' }); setDeleteDialogOpen(true) }}
+                        onTestCaseExecute={(testCase) => {
+                          if (!selectedProject) return
+                          router.push(`/test-management/executions/new?projectId=${encodeURIComponent(selectedProject)}&testCaseId=${encodeURIComponent(testCase._id)}`)
+                        }}
+                      />
+                    </TabsContent>
+
+                    {/* Executions Tab */}
+                    <TabsContent value="executions" className="mt-0">
+                      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
+                        <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[17px] font-semibold text-[var(--apple-label)]">Test Executions</p>
+                            <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">Latest execution results for this project</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm"
+                              className="h-8 text-[12px] rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)]"
+                              onClick={() => router.push(`/test-management/executions?projectId=${encodeURIComponent(selectedProject)}`)}>
+                              View All
+                            </Button>
+                            <Button size="sm"
+                              className="h-8 text-[12px] rounded-[var(--apple-radius-sm)] gap-1"
+                              style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' }}
+                              onClick={() => router.push(`/test-management/executions/new?projectId=${encodeURIComponent(selectedProject)}`)}>
+                              <Play className="h-3 w-3" /> Record
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-[var(--apple-separator)]">
+                                {['Test Case', 'Test Plan', 'Status', 'Tester', 'Duration', 'Executed', ''].map(h => (
+                                  <TableHead key={h} className="text-[11px] font-semibold tracking-wide uppercase text-[var(--apple-tertiary-label)] h-10">{h}</TableHead>
+                                ))}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {executionsLoading ? (
+                                [...Array(4)].map((_, i) => (
+                                  <TableRow key={i} className="border-[var(--apple-separator)]">
+                                    {[...Array(7)].map((_, j) => (
+                                      <TableCell key={j}><div className="h-4 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" style={{ width: `${60 + j * 8}%` }} /></TableCell>
+                                    ))}
+                                  </TableRow>
+                                ))
+                              ) : executions.length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={7} className="text-center py-10 text-[var(--apple-tertiary-label)] text-[13px]">No test executions found</TableCell>
+                                </TableRow>
+                              ) : executions.map((execution: any) => {
+                                const cfg = EXEC_STATUS_CONFIG[execution.status as keyof typeof EXEC_STATUS_CONFIG] ?? EXEC_STATUS_CONFIG.skipped
+                                return (
+                                  <TableRow key={execution._id} className="border-[var(--apple-separator)] apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                                    <TableCell className="text-[13px] font-medium text-[var(--apple-label)] max-w-[180px] truncate">{execution?.testCase?.title || execution.testCase}</TableCell>
+                                    <TableCell className="text-[13px] text-[var(--apple-secondary-label)] max-w-[140px] truncate">{execution?.testPlan?.name || '—'}</TableCell>
+                                    <TableCell>
+                                      <span className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border animate-[badge-border-pulse_3s_ease-in-out_infinite]', cfg.bg, cfg.text, cfg.border)}>
+                                        <span className={cn('w-1.5 h-1.5 rounded-full animate-[status-pulse_2.4s_ease-in-out_infinite]', cfg.dot)} />
+                                        {cfg.label}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-[13px] text-[var(--apple-secondary-label)]">
+                                      {((execution?.executedBy?.firstName || '') + ' ' + (execution?.executedBy?.lastName || '')).trim() || execution?.executedBy?.email || '—'}
+                                    </TableCell>
+                                    <TableCell className="text-[13px] font-apple-mono tabular-nums text-[var(--apple-secondary-label)]">{formatDuration(execution.executionTime)}</TableCell>
+                                    <TableCell className="text-[13px] text-[var(--apple-tertiary-label)] whitespace-nowrap">{formatDate(execution.executedAt)}</TableCell>
+                                    <TableCell>
+                                      <Button variant="ghost" size="sm"
+                                        className="h-7 px-2 text-[12px] rounded-[var(--apple-radius-sm)] text-[var(--apple-system-blue)]"
+                                        onClick={() => router.push(`/test-management/executions/${encodeURIComponent(execution._id)}`)}>
+                                        View
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
               )}
             </div>
           )}
 
-          {/* Dialogs */}
+          {/* ── Dialogs ── */}
           <ResponsiveDialog
             open={suiteDialogOpen}
             onOpenChange={setSuiteDialogOpen}
@@ -699,29 +638,16 @@ export default function TestManagementPage() {
                     setEditingSuite(null)
                     setParentSuiteIdForCreate(undefined)
                     setSuitesRefreshCounter(c => c + 1)
-                    // Reopen detail dialog if it was open before
-                    if (detailSuiteId) {
-                      setSuiteDetailRefreshKey(k => k + 1)
-                      setSuiteDetailDialogOpen(true)
-                    }
-                  } else {
-                    const data = await res.json().catch(() => ({}))
-                    console.error('Failed to save test suite', data)
+                    if (detailSuiteId) { setSuiteDetailRefreshKey(k => k + 1); setSuiteDetailDialogOpen(true) }
                   }
-                } catch (e) {
-                  console.error('Error saving test suite:', e)
-                } finally {
-                  setSuiteSaving(false)
-                }
+                } catch (e) { console.error('Error saving test suite:', e) }
+                finally { setSuiteSaving(false) }
               }}
               onCancel={() => {
                 setSuiteDialogOpen(false)
                 setEditingSuite(null)
                 setParentSuiteIdForCreate(undefined)
-                // Reopen detail dialog if it was open before
-                if (detailSuiteId) {
-                  setSuiteDetailDialogOpen(true)
-                }
+                if (detailSuiteId) setSuiteDetailDialogOpen(true)
               }}
               loading={suiteSaving}
             />
@@ -734,20 +660,11 @@ export default function TestManagementPage() {
             refreshKey={suiteDetailRefreshKey}
             onEdit={(suite) => {
               setSuiteDetailDialogOpen(false)
-              setEditingSuite({
-                _id: suite._id,
-                name: suite.name,
-                description: suite.description,
-                parentSuite: suite.parentSuite?._id,
-                project: selectedProject,
-              })
+              setEditingSuite({ _id: suite._id, name: suite.name, description: suite.description, parentSuite: suite.parentSuite?._id, project: selectedProject })
               setParentSuiteIdForCreate(undefined)
               setSuiteDialogOpen(true)
             }}
-            onDelete={(suiteId) => {
-              setSuiteDetailDialogOpen(false)
-              handleDeleteSuite(suiteId)
-            }}
+            onDelete={(suiteId) => { setSuiteDetailDialogOpen(false); handleDeleteSuite(suiteId) }}
             onCreateChild={(parentSuiteId) => {
               setSuiteDetailDialogOpen(false)
               setEditingSuite(null)
@@ -760,35 +677,20 @@ export default function TestManagementPage() {
               if (suiteId) qp.set('testSuiteId', suiteId)
               router.push(`/test-management/cases/new?${qp.toString()}`)
             }}
-            onChildSuiteClick={(childSuiteId) => {
-              setDetailSuiteId(childSuiteId)
-            }}
+            onChildSuiteClick={(childSuiteId) => { setDetailSuiteId(childSuiteId) }}
           />
 
           <DeleteConfirmDialog
             isOpen={deleteDialogOpen}
-            onClose={() => {
-              setDeleteDialogOpen(false)
-              setDeleteItem(null)
-            }}
+            onClose={() => { setDeleteDialogOpen(false); setDeleteItem(null) }}
             onConfirm={async () => {
               if (!deleteItem) return
               setDeleting(true)
               try {
                 const res = await fetch(`/api/test-cases/${deleteItem.id}`, { method: 'DELETE' })
-                if (res.ok) {
-                  setDeleteDialogOpen(false)
-                  setDeleteItem(null)
-                  setTestCasesRefreshCounter(c => c + 1)
-                } else {
-                  const data = await res.json().catch(() => ({}))
-                  console.error('Failed to delete test case', data)
-                }
-              } catch (e) {
-                console.error('Error deleting test case:', e)
-              } finally {
-                setDeleting(false)
-              }
+                if (res.ok) { setDeleteDialogOpen(false); setDeleteItem(null); setTestCasesRefreshCounter(c => c + 1) }
+              } catch (e) { console.error('Error deleting test case:', e) }
+              finally { setDeleting(false) }
             }}
             title="Delete Test Case"
             itemName={deleteItem?.name || ''}
