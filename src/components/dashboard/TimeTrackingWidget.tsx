@@ -318,9 +318,15 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
           <CardContent className="space-y-3">
             {/* Large monospace clock */}
             <div className="text-center py-2">
-              <div className="text-[36px] font-apple-mono font-semibold text-[var(--apple-label)] tracking-wider leading-none">
-                {displayTime}
-              </div>
+              <span className="inline-flex items-center text-[36px] font-timer tabular-nums text-[var(--apple-label)] leading-none">
+                {displayTime.split('').map((char, i) =>
+                  /[0-9]/.test(char) ? (
+                    <span key={`${i}-${char}`} className="number-digit-flip">{char}</span>
+                  ) : (
+                    <span key={`s${i}`} className="mx-[0.18em] opacity-50 select-none">:</span>
+                  )
+                )}
+              </span>
             </div>
 
             {/* Project / Task / Memo */}

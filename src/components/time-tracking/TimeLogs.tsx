@@ -162,6 +162,7 @@ export function TimeLogs({
   const statusFilterSearchInputRef = useRef<HTMLInputElement | null>(null)
   const modalProjectSearchInputRef = useRef<HTMLInputElement | null>(null)
   const modalTaskSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const modalEmployeeSearchInputRef = useRef<HTMLInputElement | null>(null)
 
 
   // Filtered lists based on search queries
@@ -236,6 +237,8 @@ export function TimeLogs({
   const [tasks, setTasks] = useState<any[]>([])
   const [tasksLoading, setTasksLoading] = useState(false)
   const [selectedTaskForLog, setSelectedTaskForLog] = useState('')
+  const [selectedEmployeeForLog, setSelectedEmployeeForLog] = useState('')
+  const [modalEmployeeSearch, setModalEmployeeSearch] = useState('')
 
   const filteredModalProjects = useMemo(() => {
     if (!modalProjectSearch.trim()) return projects
@@ -258,6 +261,16 @@ export function TimeLogs({
     tasks.find(t => t._id === selectedTaskForLog),
     [tasks, selectedTaskForLog]
   )
+
+  const filteredModalEmployees = useMemo(() => {
+    if (!modalEmployeeSearch.trim()) return filterEmployees
+    const searchLower = modalEmployeeSearch.toLowerCase()
+    return filterEmployees.filter(emp => {
+      const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
+      const email = emp.email?.toLowerCase() || ''
+      return fullName.includes(searchLower) || email.includes(searchLower)
+    })
+  }, [filterEmployees, modalEmployeeSearch])
   const [manualLogData, setManualLogData] = useState({
     startDate: '',
     startTime: '',
@@ -516,6 +529,8 @@ export function TimeLogs({
   useEffect(() => {
     const fetchProjects = async () => {
       if (!resolvedUserId || !resolvedOrgId) return
+      // Admin/HR adding new entries use employee-scoped fetching instead
+      if (canViewEmployeeFilter && !isEditing) return
       try {
         const response = await fetch('/api/projects')
         const data = await response.json()
@@ -558,15 +573,46 @@ export function TimeLogs({
     }
   }, [showAddTimeLogModal, isEditing, resolvedUserId, resolvedOrgId, selectedEntry])
 
+  // Fetch employee-scoped projects when admin/HR selects a team member in add mode
+  useEffect(() => {
+    if (!canViewEmployeeFilter || !showAddTimeLogModal || isEditing) return
+    const fetchEmployeeScopedProjects = async () => {
+      setProjects([])
+      setSelectedProjectForLog('')
+      setSelectedTaskForLog('')
+      setTasks([])
+      setModalProjectSearch('')
+      setModalTaskSearch('')
+      if (!selectedEmployeeForLog || !resolvedOrgId) return
+      try {
+        const res = await fetch(`/api/time-tracking/hr/employee-projects?employeeId=${selectedEmployeeForLog}&organizationId=${resolvedOrgId}`)
+        const data = await res.json()
+        if (data.success && Array.isArray(data.projects)) {
+          setProjects(data.projects)
+        } else {
+          setProjects([])
+        }
+      } catch {
+        setProjects([])
+        showToast({ type: 'error', title: 'Failed to load employee projects' })
+      }
+    }
+    fetchEmployeeScopedProjects()
+  }, [selectedEmployeeForLog, canViewEmployeeFilter, showAddTimeLogModal, isEditing, resolvedOrgId])
+
   // Fetch tasks when project is selected
   useEffect(() => {
     if (selectedProjectForLog) {
-      loadTasksForProject(selectedProjectForLog)
+      if (canViewEmployeeFilter && selectedEmployeeForLog && !isEditing) {
+        loadEmployeeScopedTasks(selectedEmployeeForLog, selectedProjectForLog)
+      } else {
+        loadTasksForProject(selectedProjectForLog)
+      }
     } else {
       setTasks([])
       setSelectedTaskForLog('')
     }
-  }, [selectedProjectForLog, resolvedUserId, isEditing, selectedEntry])
+  }, [selectedProjectForLog, resolvedUserId, isEditing, selectedEntry, canViewEmployeeFilter, selectedEmployeeForLog])
 
   // Clear form when opening add time log modal
   useEffect(() => {
@@ -578,10 +624,14 @@ export function TimeLogs({
         endTime: '',
         description: ''
       })
+      setSelectedEmployeeForLog('')
+      setModalEmployeeSearch('')
       setSelectedProjectForLog('')
       setSelectedTaskForLog('')
       setTasks([])
+      setProjects([])
       setModalProjectSearch('')
+      setModalTaskSearch('')
       setError('')
       clearFieldErrors()
     }
@@ -740,6 +790,11 @@ export function TimeLogs({
   }, [manualLogData.startDate, manualLogData.startTime, manualLogData.endDate, manualLogData.endTime])
 
   const handleSubmitManualLog = async () => {
+    if (canViewEmployeeFilter && !selectedEmployeeForLog) {
+      setError('Please select a team member to log time for')
+      return
+    }
+
     if (!selectedProjectForLog || !resolvedUserId) {
       setError('Project selection required')
       return
@@ -788,7 +843,7 @@ export function TimeLogs({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: resolvedUserId,
+          userId: canViewEmployeeFilter ? selectedEmployeeForLog : resolvedUserId,
           organizationId: resolvedOrgId,
           projectId: selectedProjectForLog,
           taskId: selectedTaskForLog,
@@ -810,10 +865,14 @@ export function TimeLogs({
           endTime: '',
           description: ''
         })
+        setSelectedEmployeeForLog('')
+        setModalEmployeeSearch('')
         setSelectedProjectForLog('')
         setSelectedTaskForLog('')
         setModalProjectSearch('')
+        setModalTaskSearch('')
         setTasks([])
+        setProjects([])
         loadTimeEntries()
         onTimeEntryUpdate?.()
       } else {
@@ -1325,6 +1384,30 @@ export function TimeLogs({
 
   const handleMenuClose = () => {
     setAnchorEl(null)
+  }
+
+  const loadEmployeeScopedTasks = async (employeeId: string, projectId: string) => {
+    if (!employeeId || !projectId) {
+      setTasks([])
+      return
+    }
+    setTasksLoading(true)
+    try {
+      const res = await fetch(
+        `/api/time-tracking/hr/employee-tasks?employeeId=${employeeId}&projectId=${projectId}&organizationId=${resolvedOrgId}`
+      )
+      const data = await res.json()
+      if (data.success && Array.isArray(data.tasks)) {
+        setTasks(data.tasks)
+      } else {
+        setTasks([])
+      }
+    } catch {
+      setTasks([])
+      showToast({ type: 'error', title: 'Failed to load employee tasks' })
+    } finally {
+      setTasksLoading(false)
+    }
   }
 
   const loadTasksForProject = async (
@@ -2068,7 +2151,7 @@ export function TimeLogs({
       <div className="space-y-4">
 
       {/* ── Add Manual Time Log attractive section ─────────────────── */}
-      {showManualLogButtons && canAddManualTimeLog && (
+      {showManualLogButtons && canAddManualTimeLog && canViewEmployeeFilter && user?.role === 'human_resource' && (
         <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
           <div className="px-5 py-4 flex items-center gap-4">
             <div
@@ -2100,17 +2183,6 @@ export function TimeLogs({
             </button>
           </div>
         </div>
-      )}
-
-      {/* ── HR Manual Time Log button ──────────────────────────────── */}
-      {user?.role === 'human_resource' && !showManualLogButtons && (pathname === '/time-tracking/timer' || pathname === '/time-tracking/logs') && (
-        <button
-          onClick={() => setShowHRManualLogModal(true)}
-          className="inline-flex items-center gap-2 h-9 px-4 rounded-[var(--apple-radius-md)] text-[14px] font-medium border border-[var(--apple-system-blue)]/30 bg-[var(--apple-system-blue)]/5 text-[var(--apple-system-blue)] apple-transition hover:bg-[var(--apple-system-blue)]/10"
-        >
-          <UserPlus className="h-4 w-4" />
-          Add Manual Time Log
-        </button>
       )}
 
       {/* ── Filters ───────────────────────────────────────────────── */}
@@ -2877,6 +2949,78 @@ export function TimeLogs({
               </Alert>
             )}
 
+            {/* Team Member selector — Admin/HR only */}
+            {canViewEmployeeFilter && (
+              <div className="space-y-2">
+                <Label>Team Member *</Label>
+                <Select
+                  value={selectedEmployeeForLog}
+                  onValueChange={(value) => {
+                    setSelectedEmployeeForLog(value)
+                    setError('')
+                  }}
+                  onOpenChange={(open) => {
+                    if (open) focusSearchInput(modalEmployeeSearchInputRef.current)
+                    if (!open) setModalEmployeeSearch('')
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={filterEmployeesLoading ? 'Loading members...' : 'Select a team member'} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[250px]">
+                    <div className="sticky top-0 z-10 p-2 border-b bg-popover">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          ref={modalEmployeeSearchInputRef}
+                          placeholder="Search members..."
+                          value={modalEmployeeSearch}
+                          onChange={(e) => setModalEmployeeSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="h-8 pl-7 pr-7 text-xs"
+                        />
+                        {modalEmployeeSearch && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setModalEmployeeSearch('') }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {filterEmployeesLoading ? (
+                        <div className="flex items-center justify-center p-4">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-sm text-muted-foreground">Loading members...</span>
+                        </div>
+                      ) : filteredModalEmployees.length === 0 ? (
+                        <div className="px-2 py-4 text-center text-xs text-muted-foreground">No members found</div>
+                      ) : (
+                        filteredModalEmployees.map((emp) => (
+                          <SelectItem key={emp._id || emp.id} value={emp._id || emp.id} onMouseDown={(e) => e.preventDefault()}>
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium truncate">
+                                  {emp.firstName} {emp.lastName}
+                                </span>
+                                <span className="text-xs text-muted-foreground ml-2">{emp.email}</span>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="modal-project">Project *</Label>
@@ -2890,9 +3034,14 @@ export function TimeLogs({
                   onOpenChange={(open) => {
                     if (open) focusSearchInput(modalProjectSearchInputRef.current)
                   }}
+                  disabled={canViewEmployeeFilter && !selectedEmployeeForLog}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a project" />
+                    <SelectValue placeholder={
+                      canViewEmployeeFilter && !selectedEmployeeForLog
+                        ? 'Select a team member first'
+                        : 'Select a project'
+                    } />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
                     <div className="p-2 border-b">
@@ -3170,10 +3319,14 @@ export function TimeLogs({
                   endTime: '',
                   description: ''
                 })
+                setSelectedEmployeeForLog('')
+                setModalEmployeeSearch('')
                 setSelectedProjectForLog('')
                 setSelectedTaskForLog('')
                 setTasks([])
+                setProjects([])
                 setModalProjectSearch('')
+                setModalTaskSearch('')
                 setError('')
                 clearFieldErrors()
               }}
@@ -3185,6 +3338,7 @@ export function TimeLogs({
               onClick={handleSubmitManualLog}
               disabled={
                 submittingManualLog ||
+                (canViewEmployeeFilter && !selectedEmployeeForLog) ||
                 !selectedProjectForLog ||
                 !selectedTaskForLog ||
                 !manualLogData.startDate ||

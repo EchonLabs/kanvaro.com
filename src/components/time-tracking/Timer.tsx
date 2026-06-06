@@ -453,14 +453,12 @@ export function Timer({
 
           {/* Clock display */}
           <div className="flex flex-col items-center py-6">
-            <span className="inline-flex items-baseline text-[52px] font-bold font-apple-mono tabular-nums tracking-[-0.02em] text-[var(--apple-label)]">
+            <span className="inline-flex items-center text-[56px] font-timer tabular-nums text-[var(--apple-label)]">
               {displayTime.split('').map((char, i) =>
                 /[0-9]/.test(char) ? (
-                  <span key={`${i}-${char}`} className="number-digit-flip">
-                    {char}
-                  </span>
+                  <span key={`${i}-${char}`} className="number-digit-flip">{char}</span>
                 ) : (
-                  <span key={`s${i}`}>{char}</span>
+                  <span key={`s${i}`} className="mx-[0.18em] opacity-50 select-none">:</span>
                 )
               )}
             </span>

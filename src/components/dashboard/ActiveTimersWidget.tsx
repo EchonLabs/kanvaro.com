@@ -492,8 +492,14 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                      <div className="text-[15px] font-apple-mono font-semibold text-[var(--apple-label)]">
-                        {displayTime}
+                      <div className="inline-flex items-center text-[17px] font-timer tabular-nums text-[var(--apple-label)]">
+                        {displayTime.split('').map((char, i) =>
+                          /[0-9]/.test(char) ? (
+                            <span key={`${i}-${char}`} className="number-digit-flip">{char}</span>
+                          ) : (
+                            <span key={`s${i}`} className="mx-[0.15em] opacity-50 select-none">:</span>
+                          )
+                        )}
                       </div>
                       <Button
                         size="sm"

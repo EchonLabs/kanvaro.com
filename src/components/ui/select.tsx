@@ -161,7 +161,9 @@ const SelectItem = React.forwardRef<
         <CheckIcon className="h-4 w-4 text-[var(--apple-system-blue)]" />
       </SelectPrimitive.ItemIndicator>
     </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    <div className="flex-1 min-w-0 overflow-hidden">
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    </div>
   </SelectPrimitive.Item>
 ))
 SelectItem.displayName = SelectPrimitive.Item.displayName

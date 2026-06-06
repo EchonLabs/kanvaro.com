@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@400;500;600&family=Nunito+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@400;500;600&family=Ledger&family=Nunito+Sans:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -32,6 +32,11 @@
   }
   .font-apple-mono {
     font-family: 'JetBrains Mono', 'SF Mono', 'Menlo', ui-monospace, monospace;
+  }
+  .font-timer {
+    font-family: 'Ledger', Georgia, 'Times New Roman', serif;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
   }
 
   /* Apple HIG glass material — header, popovers */
@@ -198,6 +203,8 @@
 
 .number-digit-flip {
   display: inline-block;
+  width: 1ch;
+  text-align: center;
   will-change: transform, opacity, filter;
   animation: number-digit-flip var(--ndf-dur) var(--ndf-ease) both;
 }
