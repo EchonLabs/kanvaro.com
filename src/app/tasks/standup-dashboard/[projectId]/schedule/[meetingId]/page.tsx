@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { PageContent } from '@/components/ui/PageContent'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -23,14 +21,22 @@ import { UnifiedCommentsSection } from '@/components/standup-dashboard/UnifiedCo
 import { deleteStandupSchedule, updateStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
 import { useNotify } from '@/lib/notify'
 import { StandupTimelogList } from '@/components/standup-dashboard/StandupTimelogList'
-import { ArrowLeft, CalendarDays, Clock3, Loader2, Trash2, Edit3, MessageSquare, Users, X, Sparkles } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CalendarCheck, Clock3, Edit3, Loader2, MessageSquare, Sparkles, Trash2, Users } from 'lucide-react'
 import { formatToTitleCase } from '@/lib/utils'
 
-const statusLabels: Record<StandupMeetingStatus, string> = {
-  scheduled: 'Scheduled',
-  in_progress: 'In Progress',
-  completed: 'Completed',
-  missed: 'Missed'
+const HEADER_GRADIENT = 'linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%)'
+const HEADER_GLOW = 'rgba(0, 122, 255, 0.25)'
+
+const STATUS_CONFIG: Record<StandupMeetingStatus, { bg: string; text: string; dot: string; border: string; label: string }> = {
+  scheduled:   { bg: 'bg-blue-50 dark:bg-blue-950/30',       text: 'text-blue-600 dark:text-blue-400',       dot: 'bg-blue-500',   border: 'border-blue-200 dark:border-blue-800',   label: 'Scheduled' },
+  in_progress: { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'In Progress' },
+  completed:   { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',       dot: 'bg-gray-400',   border: 'border-gray-200 dark:border-gray-700',   label: 'Completed' },
+  missed:      { bg: 'bg-red-50 dark:bg-red-950/30',         text: 'text-red-600 dark:text-red-400',         dot: 'bg-red-500',    border: 'border-red-200 dark:border-red-800',     label: 'Missed' },
+}
+
+const OUTCOME_CONFIG = {
+  on_track:        { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-800', label: 'On Track' },
+  needs_attention: { bg: 'bg-amber-50 dark:bg-amber-950/30',     text: 'text-amber-600 dark:text-amber-400',     border: 'border-amber-200 dark:border-amber-800',     label: 'Needs Attention' },
 }
 
 export default function StandupScheduleDetailPage() {
@@ -45,13 +51,9 @@ export default function StandupScheduleDetailPage() {
 
   const [detail, setDetail] = useState<StandupScheduleDetail | null>(null)
   const [loading, setLoading] = useState(true)
-
-  // Edit details and delete states
   const [editOpen, setEditOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
-
-  // Inline comment on specific task states
   const [commentTaskState, setCommentTaskState] = useState<{ memberId: string; taskId: string; taskTitle: string } | null>(null)
   const [commentText, setCommentText] = useState('')
   const [addingComment, setAddingComment] = useState(false)
@@ -67,7 +69,6 @@ export default function StandupScheduleDetailPage() {
       setLoading(false)
       return
     }
-
     try {
       const data = await fetchStandupScheduleDetail(projectId, meetingId, user.organization, signal)
       setDetail(data)
@@ -92,6 +93,7 @@ export default function StandupScheduleDetailPage() {
   ]
 
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
+
   const handleViewSummary = () => {
     router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meetingId}/summary`)
   }
@@ -101,11 +103,10 @@ export default function StandupScheduleDetailPage() {
       notifyError({ title: 'Unable to delete standup' })
       return
     }
-
     setDeleting(true)
     try {
       await deleteStandupSchedule(projectId, meetingId)
-      notifySuccess({ title: 'Standup deleted', message: 'The standup schedule was permanently deleted from the database.' })
+      notifySuccess({ title: 'Standup deleted', message: 'The standup schedule was permanently deleted.' })
       router.push(`/tasks/standup-dashboard/${projectId}`)
     } catch {
       notifyError({ title: 'Unable to delete standup' })
@@ -122,7 +123,6 @@ export default function StandupScheduleDetailPage() {
     reason: string
   }) => {
     if (!user?.id || !detail) return
-
     try {
       const newComment = {
         author: user.id,
@@ -133,12 +133,7 @@ export default function StandupScheduleDetailPage() {
         reason: commentPayload.reason,
         createdAt: new Date().toISOString()
       }
-
-      await updateStandupSchedule(projectId, meetingId, {
-        comment: newComment
-      })
-
-      // Refresh data
+      await updateStandupSchedule(projectId, meetingId, { comment: newComment })
       await loadDetail()
       notifySuccess({ title: 'Comment posted', message: 'Comment successfully added to standup logs.' })
     } catch {
@@ -150,15 +145,9 @@ export default function StandupScheduleDetailPage() {
     if (!detail) return ''
     const completedTasks = detail.timelogs.filter((log) => log.taskStatus === 'completed' || log.taskStatus === 'done').length
     if (completedTasks === 0) return 'No logged work was completed for this meeting date yet.'
-    if (completedTasks >= detail.timelogs.length && detail.timelogs.length > 0) {
-      return 'All logged work for the meeting date was completed.'
-    }
+    if (completedTasks >= detail.timelogs.length && detail.timelogs.length > 0) return 'All logged work for the meeting date was completed.'
     return `${completedTasks} logged tasks were completed on the meeting date.`
   }, [detail])
-
-  const getOutcomeStatus = (status: string) => {
-    return status === 'on_track' ? 'On Track' : 'Needs Attention'
-  }
 
   const getMemberName = (id: string) => {
     const match = detail?.project.teamMembers.find((m) => m._id === id)
@@ -169,187 +158,207 @@ export default function StandupScheduleDetailPage() {
     return (
       <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
-          <Card>
-            <CardContent className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              Loading standup details...
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-center gap-2.5 py-20 text-[13px] text-[var(--apple-secondary-label)]">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Loading standup details…
+          </div>
         </PageContent>
       </MainLayout>
     )
   }
 
+  const statusCfg = STATUS_CONFIG[detail.meeting.status]
+
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
       <PageContent>
         <div className="space-y-6 sm:space-y-8">
-          {/* Main Title and Page Header layout */}
+
+          {/* Page header */}
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <Button variant="ghost" size="sm" className="w-fit px-0 text-muted-foreground" onClick={() => router.push(`/tasks/standup-dashboard/${projectId}`)}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
+            <div className="space-y-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-fit gap-1.5 px-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
+                onClick={() => router.push(`/tasks/standup-dashboard/${projectId}`)}
+              >
+                <ArrowLeft className="h-4 w-4" />
                 Back to project
               </Button>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{detail.meeting.title}</h1>
-                <Badge variant="outline" className="capitalize">{statusLabels[detail.meeting.status]}</Badge>
+
+              <div className="flex items-center gap-4">
+                <div
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--apple-radius-md)] shadow-lg"
+                  style={{ background: HEADER_GRADIENT, boxShadow: `0 8px 24px ${HEADER_GLOW}` }}
+                >
+                  <CalendarCheck className="h-7 w-7 text-white" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight">{detail.meeting.title}</h1>
+                    <div
+                      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
+                      style={{ animation: 'badge-border-pulse 3s ease-in-out infinite' }}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot}`} style={{ animation: 'status-pulse 2s ease-in-out infinite' }} />
+                      {statusCfg.label}
+                    </div>
+                  </div>
+                  <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
+                    {detail.project.name} · {formatDate(detail.meeting.date)}
+                  </p>
+                </div>
               </div>
-              <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">{detail.project.name} • {formatDate(detail.meeting.date)}</p>
-              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+
+              <div className="flex flex-wrap items-center gap-4 text-[13px] text-[var(--apple-secondary-label)]">
                 <span className="flex items-center gap-1.5"><Users className="h-4 w-4" />{detail.meeting.participants.length} participants</span>
                 <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{detail.meeting.time}</span>
                 <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4" />{detail.meeting.durationMinutes} mins</span>
               </div>
             </div>
 
-            {/* Clean top-right actions */}
+            {/* Action buttons */}
             <div className="flex flex-wrap gap-2 items-center">
-              {detail.meeting.status !== 'completed' && canManageStandup ? (
-                <Button variant="outline" onClick={async () => {
-                  if (!user?.organization) {
-                    notifyError({ title: 'Unable to complete standup' })
-                    return
-                  }
-                  try {
-                    await updateStandupSchedule(projectId, meetingId, { status: 'completed', actualDate: new Date().toISOString() })
-                    await loadDetail()
-                    notifySuccess({ title: 'Standup completed', message: 'Standup marked as completed.' })
-                  } catch {
-                    notifyError({ title: 'Unable to complete standup' })
-                  }
-                }}>Mark Complete</Button>
-              ) : null}
-              {canManageStandup ? (
-                <Button variant="outline" onClick={() => setEditOpen(true)}>
+              {detail.meeting.status !== 'completed' && canManageStandup && (
+                <Button
+                  variant="outline"
+                  className="apple-transition"
+                  onClick={async () => {
+                    if (!user?.organization) { notifyError({ title: 'Unable to complete standup' }); return }
+                    try {
+                      await updateStandupSchedule(projectId, meetingId, { status: 'completed', actualDate: new Date().toISOString() })
+                      await loadDetail()
+                      notifySuccess({ title: 'Standup completed', message: 'Standup marked as completed.' })
+                    } catch {
+                      notifyError({ title: 'Unable to complete standup' })
+                    }
+                  }}
+                >
+                  Mark Complete
+                </Button>
+              )}
+              {canManageStandup && (
+                <Button variant="outline" className="apple-transition" onClick={() => setEditOpen(true)}>
                   <Edit3 className="mr-2 h-4 w-4" />
                   Edit
                 </Button>
-              ) : null}
-              {canManageStandup ? (
-                <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)}>
+              )}
+              <Button
+                variant="outline"
+                className="apple-transition"
+                onClick={handleViewSummary}
+              >
+                <Sparkles className="mr-2 h-4 w-4 text-amber-500" />
+                View Summary
+              </Button>
+              {detail.meeting.status === 'completed' && (
+                <StandupSummaryDialog
+                  projectId={projectId}
+                  meetingId={meetingId}
+                  detail={detail}
+                  onGenerated={(summary) => setDetail((cur) => cur ? { ...cur, meeting: { ...cur.meeting, summary } } : cur)}
+                />
+              )}
+              {canManageStandup && (
+                <Button variant="destructive" className="apple-transition" onClick={() => setDeleteConfirmOpen(true)}>
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </Button>
-              ) : null}
-              <Button variant="outline" onClick={handleViewSummary}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                View Summary
-              </Button>
-              {detail.meeting.status === 'completed' ? (
-                <StandupSummaryDialog 
-                  projectId={projectId} 
-                  meetingId={meetingId} 
-                  detail={detail} 
-                  onGenerated={(summary) => setDetail((current) => current ? { ...current, meeting: { ...current.meeting, summary } } : current)} 
-                />
-              ) : null}
+              )}
             </div>
           </div>
 
-          {/* Member outcomes cards */}
+          {/* Member outcome cards */}
           <section className="space-y-4">
             <div>
-              <h2 className="text-lg font-semibold">Member Outcomes</h2>
-              <p className="text-sm text-muted-foreground">What happened for each team member on this day.</p>
+              <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1">Team</p>
+              <h2 className="text-[20px] font-bold tracking-tight">Member Outcomes</h2>
+              <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">What happened for each team member on this day.</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="view-transition-container grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {detail.memberSummaries.map((member) => {
-                const outcomeStatus = getOutcomeStatus(member.status)
-                
+                const outcomeKey = member.status === 'on_track' ? 'on_track' : 'needs_attention'
+                const outcomeCfg = OUTCOME_CONFIG[outcomeKey]
+
                 return (
-                  <Card key={member._id} className="shadow-xs border-border/80">
-                    <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
-                      <div>
-                        <CardTitle className="text-base font-semibold">{member.firstName} {member.lastName}</CardTitle>
-                        <CardDescription className="text-xs">{member.role}</CardDescription>
+                  <div
+                    key={member._id}
+                    className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.35)]"
+                  >
+                    {/* Card header */}
+                    <div className="flex items-center justify-between gap-3 border-b border-[var(--apple-separator)] px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-semibold truncate">{member.firstName} {member.lastName}</p>
+                        <p className="text-[11px] text-[var(--apple-secondary-label)]">{member.role}</p>
                       </div>
-                      <Badge 
-                        variant="outline" 
-                        className={`capitalize font-semibold text-xs px-2 py-0.5 ${
-                          outcomeStatus === 'On Track' 
-                            ? 'border-emerald-500/25 bg-emerald-500/5 text-emerald-600' 
-                            : 'border-amber-500/25 bg-amber-500/5 text-amber-600'
-                        }`}
-                      >
-                        {outcomeStatus}
-                      </Badge>
-                    </CardHeader>
-                    
-                    <CardContent className="space-y-3 pt-2">
-                      <div className="space-y-2">
-                        {member.assignedTasks.length > 0 ? (
-                          <div className="grid gap-2">
-                            {member.assignedTasks.map((task) => (
-                              <div 
-                                key={task.taskId} 
-                                className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-card hover:bg-muted/10 transition-colors text-sm"
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <span className="font-semibold text-foreground truncate text-xs sm:text-sm">
-                                    {task.taskTitle}
-                                  </span>
-                                  {task.status && (
-                                    <Badge variant="secondary" className="text-[9px] sm:text-[10px] capitalize h-fit py-0.5 px-1.5 shrink-0 bg-muted text-muted-foreground">
-                                      {formatToTitleCase(task.status)}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  onClick={() => setCommentTaskState({ 
-                                    memberId: member._id, 
-                                    taskId: task.taskId, 
-                                    taskTitle: task.taskTitle 
-                                  })}
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-primary shrink-0"
-                                >
-                                  <MessageSquare className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ))}
+                      <div className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold shrink-0 ${outcomeCfg.bg} ${outcomeCfg.text} ${outcomeCfg.border}`}>
+                        {outcomeCfg.label}
+                      </div>
+                    </div>
+
+                    {/* Assigned tasks */}
+                    <div className="p-3 space-y-2">
+                      {member.assignedTasks.length > 0 ? (
+                        member.assignedTasks.map((task) => (
+                          <div
+                            key={task.taskId}
+                            className="flex items-center justify-between gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-3 py-2 apple-transition hover:bg-[var(--apple-tertiary-fill)]"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <span className="text-[12px] font-semibold truncate">{task.taskTitle}</span>
+                              {task.status && (
+                                <span className="text-[10px] capitalize shrink-0 rounded-full bg-[var(--apple-tertiary-fill)] px-2 py-0.5 font-medium text-[var(--apple-secondary-label)]">
+                                  {formatToTitleCase(task.status)}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => setCommentTaskState({ memberId: member._id, taskId: task.taskId, taskTitle: task.taskTitle })}
+                              className="apple-transition h-7 w-7 shrink-0 flex items-center justify-center rounded-full text-[var(--apple-tertiary-label)] hover:bg-[var(--apple-tertiary-fill)] hover:text-[var(--apple-system-blue)]"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </button>
                           </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground italic py-2">
-                            No assignments captured for this member.
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+                        ))
+                      ) : (
+                        <p className="text-[12px] text-[var(--apple-tertiary-label)] italic py-2 text-center">
+                          No assignments captured for this member.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 )
               })}
             </div>
           </section>
 
-          {/* Sleek compact timelogs */}
+          {/* Timelogs */}
           <StandupTimelogList timelogs={detail.timelogs} members={detail.meeting.participants} standupDate={detail.meeting.date} />
 
-          {/* Standup date notes/summary info */}
-          <Card className="shadow-xs border-border/80">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base sm:text-lg">Day Summary</CardTitle>
-              <CardDescription>Overall status for this standup date.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm text-foreground">
-              <p>{overallSummary}</p>
-              <p className="text-muted-foreground">{detail.meeting.notes || 'No standup notes were recorded.'}</p>
-            </CardContent>
-          </Card>
+          {/* Day summary */}
+          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-5 space-y-3">
+            <div>
+              <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1">Overview</p>
+              <h2 className="text-[17px] font-semibold">Day Summary</h2>
+              <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">Overall status for this standup date.</p>
+            </div>
+            <p className="text-[13px]">{overallSummary}</p>
+            <p className="text-[13px] text-[var(--apple-secondary-label)]">{detail.meeting.notes || 'No standup notes were recorded.'}</p>
+          </div>
 
-          {/* Unified Discussion Stream */}
-          <UnifiedCommentsSection 
-            comments={detail.meeting.comments || []} 
-            members={detail.project.teamMembers} 
+          {/* Comments */}
+          <UnifiedCommentsSection
+            comments={detail.meeting.comments || []}
+            members={detail.project.teamMembers}
             projectTasks={detail.projectTasks}
             onAddComment={handleAddComment}
           />
         </div>
       </PageContent>
 
-      {/* Edit Standup Schedule Modal */}
+      {/* Edit modal */}
       {editOpen && (
         <EditStandupScheduleModal
           open={editOpen}
@@ -361,53 +370,57 @@ export default function StandupScheduleDetailPage() {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete confirmation */}
       <ConfirmationModal
         isOpen={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={handleDeleteSchedule}
         title="Delete Standup Schedule"
-        description="Are you absolutely sure you want to delete this standup schedule? This will permanently remove the record and its compiled summary reports from the database."
+        description="Are you absolutely sure you want to delete this standup schedule? This will permanently remove the record and its compiled summary reports."
         confirmText="Yes, Delete"
         cancelText="Cancel"
         variant="destructive"
         isLoading={deleting}
       />
 
-      {/* Directed Task Comment Modal popup */}
+      {/* Inline task comment dialog */}
       <Dialog open={commentTaskState !== null} onOpenChange={(open) => !open && setCommentTaskState(null)}>
         <DialogContent className="sm:max-w-md pointer-events-auto">
           <DialogHeader>
-            <div className="flex items-center justify-between pb-2 border-b">
+            <div className="flex items-center gap-3 pb-3 border-b border-[var(--apple-separator)]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--apple-radius-sm)]" style={{ background: HEADER_GRADIENT }}>
+                <MessageSquare className="h-4 w-4 text-white" />
+              </div>
               <div>
                 <DialogTitle>Comment on Task</DialogTitle>
-                <DialogDescription className="text-xs mt-0.5">
+                <DialogDescription className="text-[11px] mt-0.5">
                   Add a comment for "{commentTaskState?.taskTitle}" directed to {commentTaskState ? getMemberName(commentTaskState.memberId) : ''}.
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
-          
+
           <DialogBody className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="popup-comment-text" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+            <div className="space-y-1.5">
+              <Label htmlFor="popup-comment-text" className="apple-section-label text-[var(--apple-secondary-label)]">
                 Comment message
               </Label>
-              <Textarea 
+              <Textarea
                 id="popup-comment-text"
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Type your notes, status updates, or blockers here..."
+                placeholder="Type your notes, status updates, or blockers here…"
                 rows={4}
-                className="resize-none text-sm bg-background border-border"
+                className="resize-none text-[13px] rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] focus:bg-card"
               />
             </div>
           </DialogBody>
-          <DialogFooter className="border-t pt-4">
+
+          <DialogFooter className="border-t border-[var(--apple-separator)] pt-4">
             <Button variant="outline" onClick={() => setCommentTaskState(null)} disabled={addingComment}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={async () => {
                 if (!commentText.trim() || !commentTaskState) return
                 setAddingComment(true)
@@ -423,11 +436,14 @@ export default function StandupScheduleDetailPage() {
                 } finally {
                   setAddingComment(false)
                 }
-              }} 
+              }}
               disabled={addingComment || !commentText.trim()}
               className="min-w-28"
+              style={!addingComment && commentText.trim() ? { background: HEADER_GRADIENT } : undefined}
             >
-              {addingComment ? 'Saving...' : 'Add Comment'}
+              {addingComment ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>
+              ) : 'Add Comment'}
             </Button>
           </DialogFooter>
         </DialogContent>
