@@ -39,7 +39,7 @@ export default function CreateSprintPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
 
   const router = useRouter()
-  const { success: notifySuccess, error: notifyError } = useNotify()
+  const { error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
@@ -308,7 +308,6 @@ export default function CreateSprintPage() {
       const data = await response.json()
 
       if (data.success) {
-        notifySuccess({ title: 'Sprint created successfully' })
         router.push('/sprints?success=sprint-created')
       } else {
         setError(data.error || 'Failed to create sprint')

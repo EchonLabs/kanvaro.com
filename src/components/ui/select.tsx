@@ -29,7 +29,7 @@ const SelectTrigger = React.forwardRef<
       // Disabled
       "disabled:cursor-not-allowed disabled:opacity-50",
       // Smooth
-      "transition-all duration-150 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]",
+      "transition-all duration-150 ease-apple",
       "[&>span]:line-clamp-1",
       className
     )}

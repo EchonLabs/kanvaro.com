@@ -152,12 +152,15 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
   return (
     <>
       <Button
-        variant={existingSummary ? 'outline' : 'default'}
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 shrink-0 apple-transition"
-        style={!existingSummary ? { background: AMBER_GRADIENT, boxShadow: `0 2px 12px ${AMBER_GLOW}` } : undefined}
+        className="rounded-full px-4 h-9 text-[13.5px] font-medium text-white border-0 flex items-center gap-1.5 shrink-0 apple-transition"
+        style={
+          existingSummary
+            ? { background: 'var(--apple-tertiary-fill)', color: 'var(--apple-label)', boxShadow: 'none' }
+            : { background: AMBER_GRADIENT, boxShadow: `0 2px 12px ${AMBER_GLOW}` }
+        }
       >
-        <Sparkles className="h-4 w-4 text-amber-500" />
+        <Sparkles className="h-4 w-4" style={{ color: existingSummary ? 'var(--apple-system-orange)' : 'white' }} />
         {detail.meeting.summary || existingSummary ? 'Regenerate Summary' : 'Generate Summary'}
       </Button>
 
@@ -254,22 +257,32 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
           </DialogBody>
 
           <DialogFooter className="flex-shrink-0 border-t border-[var(--apple-separator)] pt-4">
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving} className="apple-transition">
+            <Button
+              variant="ghost"
+              onClick={() => setOpen(false)}
+              disabled={saving}
+              className="rounded-full px-5 h-9 text-[13.5px] font-medium border-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+            >
               Close
             </Button>
             <Button
               onClick={handleGenerate}
               disabled={saving}
-              className="apple-transition font-medium"
+              className="rounded-full px-5 h-9 text-[13.5px] font-medium text-white border-0 flex items-center gap-1.5 apple-transition"
               style={{ background: AMBER_GRADIENT, boxShadow: `0 2px 8px ${AMBER_GLOW}` }}
             >
               {saving ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{existingSummary ? 'Regenerating…' : 'Generating…'}</>
+                <><Loader2 className="h-4 w-4 animate-spin" />{existingSummary ? 'Regenerating…' : 'Generating…'}</>
               ) : (
-                <><Sparkles className="mr-2 h-4 w-4 shrink-0" />{existingSummary ? 'Regenerate Summary' : 'Generate Summary'}</>
+                <><Sparkles className="h-4 w-4 shrink-0" />{existingSummary ? 'Regenerate Summary' : 'Generate Summary'}</>
               )}
             </Button>
-            <Button variant="outline" onClick={handleDone} disabled={saving} className="apple-transition">
+            <Button
+              onClick={handleDone}
+              disabled={saving}
+              className="rounded-full px-5 h-9 text-[13.5px] font-medium text-white border-0 apple-transition"
+              style={{ background: 'var(--apple-system-blue)', boxShadow: '0 2px 10px rgba(0,122,255,0.28)' }}
+            >
               Done
             </Button>
           </DialogFooter>

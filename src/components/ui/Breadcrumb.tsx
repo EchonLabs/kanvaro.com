@@ -28,7 +28,7 @@ export function Breadcrumb({ items: propItems, className }: BreadcrumbProps) {
   return (
     <nav 
       className={cn(
-        "sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b",
+        "sticky top-0 z-30 apple-glass border-b border-[var(--apple-separator)]",
         className
       )}
       aria-label="Breadcrumb"

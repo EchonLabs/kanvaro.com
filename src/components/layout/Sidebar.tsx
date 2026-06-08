@@ -409,7 +409,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     <>
     <div
       className={cn(
-        'flex h-full flex-col apple-sidebar-material border-r border-[var(--apple-separator)] transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] overflow-hidden',
+        'flex h-full flex-col apple-sidebar-material border-r border-[var(--apple-separator)] transition-all duration-300 ease-apple overflow-hidden',
         collapsed ? 'w-16' : 'w-64'
       )}
     >
