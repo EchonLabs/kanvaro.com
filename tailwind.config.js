@@ -91,9 +91,9 @@ module.exports = {
         "apple-sidebar-collapsed": "64px",
       },
       fontFamily: {
-        apple: ["Inter", "-apple-system", "BlinkMacSystemFont", "SF Pro Display", "system-ui", "sans-serif"],
-        "apple-rounded": ["Nunito Sans", "SF Pro Rounded", "system-ui", "sans-serif"],
-        "apple-mono": ["JetBrains Mono", "SF Mono", "Menlo", "ui-monospace", "monospace"],
+        apple: ["Nunito Sans", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
+        "apple-rounded": ["Nunito Sans", "system-ui", "sans-serif"],
+        "apple-mono": ["Nunito Sans", "ui-monospace", "monospace"],
       },
       keyframes: {
         "accordion-down": {

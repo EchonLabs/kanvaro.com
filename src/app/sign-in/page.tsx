@@ -2,15 +2,12 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { useOrganization } from '@/hooks/useOrganization'
-import { Eye, EyeOff, Loader2, X } from 'lucide-react'
+import { Eye, EyeOff, Loader2, ArrowRight, X, CheckCircle2 } from 'lucide-react'
 import { getAppVersion } from '@/lib/version'
+
+const inputBase =
+  'w-full h-[46px] rounded-full border border-black/[0.09] dark:border-white/[0.10] bg-black/[0.04] dark:bg-white/[0.06] px-5 text-[15px] tracking-[-0.1px] text-[var(--apple-label)] placeholder:text-[var(--apple-tertiary-label)] outline-none focus:ring-2 focus:ring-[#3FADA5]/30 focus:border-[#3FADA5]/60 apple-transition disabled:opacity-50 disabled:cursor-not-allowed'
 
 function SignInForm() {
   const [email, setEmail] = useState('')
@@ -22,11 +19,11 @@ function SignInForm() {
   const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { organization, loading: orgLoading } = useOrganization()
+  const { organization } = useOrganization()
 
   useEffect(() => {
     if (searchParams.get('message') === 'setup-completed') {
-      setSuccessMessage('Setup completed successfully! Please log in with your admin credentials.')
+      setSuccessMessage('Setup completed! Please sign in with your admin credentials.')
     }
   }, [searchParams])
 
@@ -34,32 +31,22 @@ function SignInForm() {
     let isMounted = true
     const performGuards = async () => {
       try {
-        // Redirect authenticated users to dashboard
         const authResponse = await fetch('/api/auth/me')
         if (!isMounted) return
-        if (authResponse.ok) {
-          router.replace('/dashboard')
-          return
-        }
+        if (authResponse.ok) { router.replace('/dashboard'); return }
 
-        // Ensure setup is completed before allowing sign in
         const setupResponse = await fetch('/api/setup/status')
         if (!isMounted) return
         if (setupResponse.ok) {
           const setupData = await setupResponse.json()
-          if (!setupData.setupCompleted) {
-            router.replace('/setup')
-          }
+          if (!setupData.setupCompleted) router.replace('/setup')
         }
       } catch (err) {
         console.error('Pre-auth checks failed:', err)
       }
     }
-
     performGuards()
-    return () => {
-      isMounted = false
-    }
+    return () => { isMounted = false }
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,189 +57,191 @@ function SignInForm() {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
 
       const data = await response.json()
 
       if (response.ok && data.success) {
-        console.log('Login successful, preparing dashboard...')
         setIsLoading(false)
         setIsLoadingPermissions(true)
-        
         try {
-          // IMPORTANT: Use window.location.href for hard navigation instead of router.push().
-          // This forces the browser to send a new HTTP request with the HTTP-only cookies
-          // that were just set by the login API. Client-side navigation doesn't trigger
-          // the browser to send cookies, causing the middleware to reject the request.
-          // The 100ms delay ensures cookies are fully processed before navigation.
-          console.log('Performing hard redirect to dashboard')
-          setTimeout(() => {
-            window.location.href = '/dashboard'
-          }, 100)
+          // Hard navigation — forces browser to send the new HTTP-only cookies
+          setTimeout(() => { window.location.href = '/dashboard' }, 100)
         } catch (err) {
-          console.error('Error during redirect:', err)
-          setError('An error occurred during login. Please try again.')
+          console.error('Redirect error:', err)
+          setError('An error occurred. Please try again.')
           setIsLoadingPermissions(false)
         }
       } else {
         setError(data.error || 'Login failed. Please try again.')
         setIsLoading(false)
       }
-    } catch (error) {
-      console.error('Login failed:', error)
+    } catch {
       setError('Login failed. Please check your connection and try again.')
       setIsLoading(false)
       setIsLoadingPermissions(false)
     }
   }
 
+  const busy = isLoading || isLoadingPermissions
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-md mx-auto">
-          <div className="text-center mb-8">
-            <div className="h-16 w-16 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              {orgLoading ? (
-                <div className="h-8 w-8 rounded bg-primary/20 animate-pulse" />
-              ) : (
-                <OrganizationLogo 
-                  lightLogo={organization?.logo} 
-                  darkLogo={organization?.darkLogo}
-                  logoMode={organization?.logoMode}
-                  fallbackText={organization?.name?.charAt(0) || 'K'}
-                  size="lg"
-                  className="rounded"
-                />
-              )}
+    <div className="min-h-screen flex items-center justify-center px-4 py-10 relative overflow-hidden">
+      {/* ── Aurora background ── */}
+      <div className="fixed inset-0 -z-20 bg-[#F4F4F6] dark:bg-[#06060A]" />
+      <div
+        className="fixed inset-0 -z-10"
+        style={{
+          backgroundImage: `
+            radial-gradient(ellipse 70% 70% at 10% 10%, rgba(63,173,165,0.22) 0%, transparent 55%),
+            radial-gradient(ellipse 65% 65% at 90% 85%, rgba(36,78,155,0.22) 0%, transparent 55%),
+            radial-gradient(ellipse 45% 50% at 55% 25%, rgba(63,173,165,0.09) 0%, transparent 50%)
+          `,
+        }}
+      />
+      <div
+        className="fixed inset-0 -z-10 opacity-[0.35] dark:opacity-[0.18]"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' width='40' height='40'%3e%3ccircle cx='1' cy='1' r='1' fill='%23000'/%3e%3c/svg%3e")`,
+        }}
+      />
+
+      <div className="w-full max-w-[460px]">
+        {/* Logo */}
+        <div className="flex justify-center mb-9">
+          <img
+            src="/Kanvaro.svg"
+            alt="Kanvaro"
+            className="h-8 dark:brightness-0 dark:invert select-none"
+            draggable={false}
+          />
+        </div>
+
+        {/* Glass card */}
+        <div className="auth-glass-card relative rounded-[28px] border border-white/70 dark:border-white/[0.08] overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+
+          <div className="p-8 space-y-6">
+            <div className="text-center">
+              <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--apple-label)]">
+                Welcome back
+              </h1>
+              <p className="text-[14px] text-[var(--apple-secondary-label)] mt-1">
+                Sign in to {organization?.name || 'Kanvaro'}
+              </p>
             </div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Welcome to {organization?.name || 'Kanvaro'}
-            </h1>
-            <p className="text-muted-foreground">
-              Sign in to your account to continue
-            </p>
-          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center">Sign In</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {successMessage && (
-                  <Alert>
-                    <AlertDescription>{successMessage}</AlertDescription>
-                  </Alert>
-                )}
-                {error && (
-                  <Alert variant="destructive" className="relative">
-                    <AlertDescription className="pr-8">{error}</AlertDescription>
-                    <button
-                      type="button"
-                      onClick={() => setError('')}
-                      className="absolute top-2 right-2 p-1 rounded-md hover:bg-destructive/20 transition-colors"
-                      aria-label="Dismiss error"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </Alert>
-                )}
+            {successMessage && (
+              <div className="flex items-center gap-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/50 px-4 py-3 text-[13px] text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span className="flex-1">{successMessage}</span>
+              </div>
+            )}
+            {error && (
+              <div className="flex items-center gap-2.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/50 px-4 py-3 text-[13px] text-red-600 dark:text-red-400">
+                <span className="flex-1">{error}</span>
+                <button type="button" onClick={() => setError('')} className="shrink-0 apple-transition hover:opacity-60">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@kanvaro.com"
-                    required
-                    disabled={isLoading || isLoadingPermissions}
-                    className="w-full"
-                  />
-                </div>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div>
+                <label htmlFor="email" className="block text-[12px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)] mb-2 pl-1">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  disabled={busy}
+                  className={inputBase}
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password"
-                      required
-                      disabled={isLoading || isLoadingPermissions}
-                      className="w-full pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading || isLoadingPermissions}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isLoading || isLoadingPermissions}
-                >
-                  {isLoadingPermissions ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    'Sign In'
-                  )}
-                </Button>
-
-                <div className="text-center mt-4">
+              <div>
+                <div className="flex items-center justify-between mb-2 pl-1">
+                  <label htmlFor="password" className="text-[12px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">
+                    Password
+                  </label>
                   <button
                     type="button"
+                    tabIndex={-1}
                     onClick={() => router.push('/forgot-password')}
-                    className="text-sm text-primary hover:underline"
-                    disabled={isLoading || isLoadingPermissions}
+                    disabled={busy}
+                    className="text-[12px] font-medium text-[var(--apple-system-blue)] hover:opacity-70 apple-transition pr-1"
                   >
-                    Forgot your password?
+                    Forgot password?
                   </button>
                 </div>
-              </form>
-            </CardContent>
-          </Card>
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    disabled={busy}
+                    className={`${inputBase} pr-14`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={busy}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-secondary-label)] apple-transition"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
 
-          <div className="mt-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Need help? Check our{' '}
-              <a href="/docs/public" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                Documentation
-              </a>
-            </p>
+              <div className="pt-1">
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="w-full h-[52px] rounded-full text-white font-semibold text-[15px] tracking-[-0.1px] flex items-center justify-center gap-2 apple-transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                  style={{ background: 'linear-gradient(135deg, #3FADA5 0%, #244E9B 100%)' }}
+                >
+                  {busy ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {isLoadingPermissions ? 'Preparing your workspace…' : 'Signing in…'}
+                    </>
+                  ) : (
+                    <>
+                      Sign In
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
+        </div>
 
-          <div className="mt-6 text-center text-xs text-muted-foreground">
-            <span>Version </span>
-            <span className="font-mono">{getAppVersion()}</span>
-          </div>
+        <div className="mt-7 text-center space-y-2">
+          <p className="text-[12px] text-[var(--apple-tertiary-label)]">
+            Need help?{' '}
+            <a
+              href="/docs/public"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--apple-system-blue)] hover:opacity-70 apple-transition"
+            >
+              View documentation
+            </a>
+          </p>
+          <p className="text-[11px] text-[var(--apple-quaternary-label)] font-apple-mono">
+            v{getAppVersion()}
+          </p>
         </div>
       </div>
     </div>
@@ -261,16 +250,14 @@ function SignInForm() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="h-8 w-8 rounded bg-primary/20 animate-pulse mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading...</p>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#F4F4F6] dark:bg-[#06060A] flex items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-[#3FADA5]" />
         </div>
-      </div>
-    }>
+      }
+    >
       <SignInForm />
     </Suspense>
   )
 }
-

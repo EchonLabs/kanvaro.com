@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@400;500;600&family=Ledger&family=Nunito+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -25,16 +25,16 @@
 
   /* Apple HIG font utilities */
   .font-apple {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   }
   .font-apple-rounded {
-    font-family: 'Nunito Sans', 'SF Pro Rounded', system-ui, sans-serif;
+    font-family: 'Nunito Sans', system-ui, sans-serif;
   }
   .font-apple-mono {
-    font-family: 'JetBrains Mono', 'SF Mono', 'Menlo', ui-monospace, monospace;
+    font-family: 'Nunito Sans', ui-monospace, monospace;
   }
   .font-timer {
-    font-family: 'Ledger', Georgia, 'Times New Roman', serif;
+    font-family: 'Nunito Sans', system-ui, sans-serif;
     font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
@@ -47,6 +47,24 @@
   }
   .dark .apple-glass {
     background: rgba(22, 22, 24, 0.78);
+  }
+
+  /* Auth page glass card — premium frosted panel, light + dark */
+  .auth-glass-card {
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: saturate(180%) blur(28px);
+    -webkit-backdrop-filter: saturate(180%) blur(28px);
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.10),
+      0 2px 8px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+  .dark .auth-glass-card {
+    background: rgba(22, 22, 24, 0.82);
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.55),
+      0 2px 8px rgba(0, 0, 0, 0.30),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   /* Apple HIG sidebar material */
@@ -382,7 +400,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     letter-spacing: -0.01em;
