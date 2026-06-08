@@ -51,6 +51,12 @@ const quickActions: QuickAction[] = [
   }
 ]
 
+const SM_GRID_COLS: Record<number, string> = {
+  3: 'sm:grid-cols-3',
+  4: 'sm:grid-cols-4',
+  5: 'sm:grid-cols-5',
+}
+
 export function QuickActions() {
   const { hasAnyPermission, loading } = usePermissions()
 
@@ -60,26 +66,38 @@ export function QuickActions() {
 
   if (loading) {
     return (
-      /* Mobile: 3-col equal grid | sm+: flex-wrap fixed-size cards */
-      <div className="grid grid-cols-3 gap-3 sm:flex sm:flex-wrap">
+      /* Mobile: 3-col equal grid | sm+: full-width 5-col grid */
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
         {[0, 1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="h-[88px] sm:w-[100px] rounded-[var(--apple-radius-xl)] bg-[var(--apple-quaternary-fill)] animate-pulse"
+            className="h-[88px] rounded-[var(--apple-radius-xl)] bg-[var(--apple-quaternary-fill)] animate-pulse"
           />
         ))}
       </div>
     )
   }
 
+  const count = availableActions.length
+  const useFullWidth = count >= 3
+
+  /* Mobile: always 3-col grid. sm+: full-width grid (≥3 actions) or left-aligned flex (<3 actions) */
+  const containerClass = useFullWidth
+    ? `grid grid-cols-3 gap-3 ${SM_GRID_COLS[count] ?? 'sm:grid-cols-5'}`
+    : 'grid grid-cols-3 gap-3 sm:flex sm:flex-wrap sm:gap-3'
+
   return (
-    /* Mobile: 3-col equal-width grid | sm+: flex-wrap so cards sit at natural 100px width */
-    <div className="grid grid-cols-3 gap-3 sm:flex sm:flex-wrap">
+    <div className={containerClass}>
       {availableActions.map((action, index) => {
         const Icon = action.icon
         return (
-          <Link key={index} href={action.href} prefetch className="contents sm:block sm:flex-shrink-0">
-            <div className="flex flex-col items-center justify-center gap-2 h-[88px] sm:w-[100px] px-2 py-3 rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card hover:bg-[var(--apple-quaternary-fill)] apple-transition cursor-pointer active:scale-[0.97]">
+          <Link
+            key={index}
+            href={action.href}
+            prefetch
+            className={useFullWidth ? 'contents sm:block' : 'contents sm:block sm:flex-shrink-0'}
+          >
+            <div className={`flex flex-col items-center justify-center gap-2 h-[88px] px-2 py-3 rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card hover:bg-[var(--apple-quaternary-fill)] apple-transition cursor-pointer active:scale-[0.97]${useFullWidth ? '' : ' sm:w-[100px]'}`}>
               <div
                 className="h-9 w-9 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: action.color }}

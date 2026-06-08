@@ -174,7 +174,7 @@ export default function FinancialReportsPage() {
                 <div className="h-4 w-64 rounded-full bg-[var(--apple-tertiary-fill)]" />
               </div>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="h-24 rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)]" />
               ))}
@@ -335,7 +335,7 @@ export default function FinancialReportsPage() {
           )}
 
           {/* ── Stats Bar ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               label="Total Budget" icon={Wallet} accent={STAT_ACCENTS[0]}
               value={formatCurrency(reportData.overview.totalBudget)}

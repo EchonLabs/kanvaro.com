@@ -179,7 +179,7 @@ export default function TeamReportsPage() {
                 <div className="h-4 w-60 rounded-full bg-[var(--apple-tertiary-fill)]" />
               </div>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="h-24 rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)]" />
               ))}
@@ -338,7 +338,7 @@ export default function TeamReportsPage() {
           )}
 
           {/* ── Stats Bar ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               label="Team Size" icon={Users} accent={STAT_ACCENTS[0]}
               value={String(reportData.overview.totalMembers)}
