@@ -627,7 +627,7 @@ export default function StoriesPage() {
             <PermissionGate permission={Permission.STORY_CREATE}>
               <Button
                 onClick={() => router.push('/stories/create-story')}
-                className="rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
+                className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 New Story
@@ -647,7 +647,7 @@ export default function StoriesPage() {
                 placeholder="Search stories..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-background text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition"
+                className="pl-10 h-10 rounded-full border-[var(--apple-separator)] bg-background text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition"
               />
             </div>
             {/* Status */}
@@ -655,7 +655,7 @@ export default function StoriesPage() {
               <Select value={statusFilter} onValueChange={setStatusFilter} onOpenChange={(open) => {
                 if (open) focusSearchInput(statusSearchInputRef.current)
               }}>
-                <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
+                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -681,7 +681,7 @@ export default function StoriesPage() {
               <Select value={priorityFilter} onValueChange={setPriorityFilter} onOpenChange={(open) => {
                 if (open) focusSearchInput(prioritySearchInputRef.current)
               }}>
-                <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
+                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
                   <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
@@ -711,7 +711,7 @@ export default function StoriesPage() {
               <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
                 if (open) focusSearchInput(projectSearchInputRef.current)
               }}>
-                <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
+                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
                   <SelectValue placeholder="Project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -738,7 +738,7 @@ export default function StoriesPage() {
               <Select value={epicFilter} onValueChange={setEpicFilter} onOpenChange={(open) => {
                 if (open) focusSearchInput(epicSearchInputRef.current)
               }}>
-                <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
+                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
                   <SelectValue placeholder="Epic" />
                 </SelectTrigger>
                 <SelectContent>
@@ -765,7 +765,7 @@ export default function StoriesPage() {
               <Select value={sprintFilter} onValueChange={setSprintFilter} onOpenChange={(open) => {
                 if (open) focusSearchInput(sprintSearchInputRef.current)
               }}>
-                <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
+                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
                   <SelectValue placeholder="Sprint" />
                 </SelectTrigger>
                 <SelectContent>

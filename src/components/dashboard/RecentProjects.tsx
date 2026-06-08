@@ -109,7 +109,7 @@ function GradientProgress({
           {pct > 2 && <span aria-hidden className="progress-shimmer absolute inset-0" />}
         </div>
       </div>
-      <span className="text-xs font-apple-mono font-semibold text-[var(--apple-secondary-label)] w-8 text-right flex-shrink-0 tabular-nums">
+      <span className="text-xs font-apple-mono font-semibold text-[var(--apple-secondary-label)] w-10 text-right flex-shrink-0 tabular-nums">
         {pct}%
       </span>
     </div>
@@ -261,7 +261,7 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
                * status = fixed 104px (matches StatusBadge width)
                * hours  = fixed 72px (compact: "3h 47m" + icon)
                */}
-              <div className="hidden md:grid grid-cols-[auto_1fr_3fr_1fr_1fr] gap-3 items-center px-4 py-4">
+              <div className="hidden md:grid grid-cols-[auto_1fr_3.5fr_1fr_1fr] gap-3 items-center px-4 py-4">
                 {/* Avatar */}
                 <ProjectAvatar name={project.name} gradient={palette.gradient} />
 

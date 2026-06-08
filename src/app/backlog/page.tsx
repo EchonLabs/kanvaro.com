@@ -1556,7 +1556,7 @@ export default function BacklogPage() {
           title="Product Backlog"
           subtitle="Manage your product backlog and sprint planning"
           actions={
-            <>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:contents">
               <Button
                 variant="ghost"
                 size="sm"
@@ -1566,7 +1566,7 @@ export default function BacklogPage() {
                   fetchBacklogItems()
                 }}
                 disabled={searching}
-                className="rounded-[var(--apple-radius-md)] h-9 w-9 p-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
+                className="rounded-full h-9 w-9 p-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
                 title="Refresh backlog items"
               >
                 {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
@@ -1576,7 +1576,7 @@ export default function BacklogPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/epics/create-epic')}
-                  className="rounded-[var(--apple-radius-md)] h-9 border-[var(--apple-separator)] text-[13px]"
+                  className="rounded-full h-9 border-[var(--apple-separator)] text-[13px] flex-1 sm:flex-none"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1.5" />
                   New Epic
@@ -1587,7 +1587,7 @@ export default function BacklogPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/stories/create-story')}
-                  className="rounded-[var(--apple-radius-md)] h-9 border-[var(--apple-separator)] text-[13px]"
+                  className="rounded-full h-9 border-[var(--apple-separator)] text-[13px] flex-1 sm:flex-none"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1.5" />
                   New Story
@@ -1597,13 +1597,13 @@ export default function BacklogPage() {
                 <Button
                   size="sm"
                   onClick={() => router.push('/tasks/create-new-task')}
-                  className="rounded-[var(--apple-radius-md)] h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px]"
+                  className="rounded-full h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px] w-full sm:w-auto"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1.5" />
                   New Task
                 </Button>
               )}
-            </>
+            </div>
           }
         />
 
@@ -1619,7 +1619,7 @@ export default function BacklogPage() {
                     placeholder="Search backlog..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-9 h-10 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                    className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
                 />
                 {searchQuery && (
                     <button
@@ -1634,7 +1634,7 @@ export default function BacklogPage() {
             </div>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-1/4 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                <SelectTrigger className="w-1/4 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1648,7 +1648,7 @@ export default function BacklogPage() {
             </Select>
 
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-1/4 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                <SelectTrigger className="w-1/4 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1668,7 +1668,7 @@ export default function BacklogPage() {
                     placeholder="Search backlog..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-9 h-10 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                    className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
                 />
                 {searchQuery && (
                     <button
@@ -1683,7 +1683,7 @@ export default function BacklogPage() {
             </div>
             <div className="flex gap-2">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-1/2 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                    <SelectTrigger className="w-1/2 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1696,7 +1696,7 @@ export default function BacklogPage() {
                     </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-1/2 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                    <SelectTrigger className="w-1/2 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1715,7 +1715,7 @@ export default function BacklogPage() {
             <Select value={projectFilterValue} onValueChange={setProjectFilterValue} onOpenChange={(open) => {
               if (open) focusSearchInput(projectFilterInputRef.current)
             }}>
-              <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px]">
+              <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
                 <SelectValue placeholder="All Projects" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
@@ -1750,7 +1750,7 @@ export default function BacklogPage() {
 
             {/* 2. Types */}
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px]">
+                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1765,7 +1765,7 @@ export default function BacklogPage() {
             <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery('') }} onOpenChange={(open) => {
               if (open) focusSearchInput(assignedToFilterInputRef.current)
             }}>
-              <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px]">
+              <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
                 <SelectValue placeholder="All Assignees" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
@@ -1802,7 +1802,7 @@ export default function BacklogPage() {
             <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
               if (open) focusSearchInput(createdByFilterInputRef.current)
             }}>
-              <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px]">
+              <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
                 <SelectValue placeholder="All Creators" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
@@ -1843,7 +1843,7 @@ export default function BacklogPage() {
                       variant="outline"
                       size="sm"
                       className={cn(
-                        "h-9 flex-1 px-2 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px] justify-start",
+                        "h-9 flex-1 px-2 rounded-full border-[var(--apple-separator)] bg-background text-[13px] justify-start",
                         !createdDateRange.from && "text-[var(--apple-tertiary-label)]"
                       )}
                     >
@@ -1866,7 +1866,7 @@ export default function BacklogPage() {
                       variant="outline"
                       size="sm"
                       className={cn(
-                        "h-9 flex-1 px-2 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px] justify-start",
+                        "h-9 flex-1 px-2 rounded-full border-[var(--apple-separator)] bg-background text-[13px] justify-start",
                         !createdDateRange.to && "text-[var(--apple-tertiary-label)]"
                       )}
                     >
@@ -1889,7 +1889,7 @@ export default function BacklogPage() {
         <div className="flex flex-wrap items-center justify-end gap-2 mt-2">
             <span className="text-[12px] text-[var(--apple-secondary-label)]">Sort by:</span>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="h-8 w-32 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-transparent text-[12px]">
+              <SelectTrigger className="h-8 w-32 rounded-full border-[var(--apple-separator)] bg-transparent text-[12px]">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
@@ -1906,7 +1906,7 @@ export default function BacklogPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="h-8 w-8 p-0 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-transparent"
+                    className="h-8 w-8 p-0 rounded-full border-[var(--apple-separator)] bg-transparent"
                     aria-label={sortOrder === 'asc' ? 'Sort descending' : 'Sort ascending'}
                   >
                     {sortOrder === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
@@ -1994,7 +1994,7 @@ export default function BacklogPage() {
               onClick={handleSelectModeToggle}
               disabled={!canManageSprints}
               title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
-              className="rounded-[var(--apple-radius-md)] h-9 text-[13px] border-[var(--apple-separator)]"
+              className="rounded-full h-9 text-[13px] border-[var(--apple-separator)]"
             >
               <List className="h-3.5 w-3.5 mr-1.5" />
               {selectMode ? 'Cancel Selection' : 'Select Mode'}
@@ -2005,7 +2005,7 @@ export default function BacklogPage() {
                   variant="ghost"
                   size="sm"
                   onClick={allSelectableItemsSelected ? deselectAll : selectAll}
-                  className="rounded-[var(--apple-radius-md)] h-9 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
+                  className="rounded-full h-9 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
                 >
                   {allSelectableItemsSelected ? 'Deselect All' : 'Select All'}
                 </Button>
@@ -2014,7 +2014,7 @@ export default function BacklogPage() {
                     size="sm"
                     onClick={() => handleOpenSprintModal(selectedTaskIds, selectedStoryIds)}
                     disabled={(selectedTaskCount === 0 && selectedStoryCount === 0) || assigningSprint}
-                    className="rounded-[var(--apple-radius-md)] h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px]"
+                    className="rounded-full h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px]"
                   >
                     {assigningSprint ? (
                       <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -2064,7 +2064,7 @@ export default function BacklogPage() {
                     variant="outline"
                     size="sm"
                     onClick={resetFilters}
-                    className="rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] text-[13px]"
+                    className="rounded-full border-[var(--apple-separator)] text-[13px]"
                   >
                     <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
                     Reset Filters

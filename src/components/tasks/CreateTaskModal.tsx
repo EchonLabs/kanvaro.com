@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/Dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
 import { useAuthContext } from '@/contexts/AuthContext'
@@ -652,27 +652,18 @@ export default function CreateTaskModal({
     [attachments]
   )
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-      <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-background m-4 sm:m-6" onClick={(e) => e.stopPropagation()}>
-        <CardHeader className="flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Create New Task</CardTitle>
-              <CardDescription>Add a new task to this project</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto">
-          <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on" id="create-task-form">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[700px] flex flex-col max-h-[90vh] overflow-hidden rounded-[var(--apple-radius-xl)] border-[var(--apple-separator)] shadow-2xl bg-[var(--apple-bg-secondary)]">
+        <DialogHeader className="border-b border-[var(--apple-separator)] px-6 py-4 bg-[var(--apple-bg-primary)]">
+          <DialogTitle className="text-[17px] font-semibold text-[var(--apple-label)] tracking-tight">Create New Task</DialogTitle>
+          <DialogDescription className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Add a new task to your project</DialogDescription>
+        </DialogHeader>
+        <DialogBody className="flex-1 overflow-y-auto px-6 py-5">
+          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="on" id="create-task-form">
             {!projectId && (
               <div>
-                <label className="text-sm font-medium text-foreground">Project *</label>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Project *</label>
                 <Select
                   value={selectedProjectId}
                   onValueChange={(v) => {
@@ -697,7 +688,7 @@ export default function CreateTaskModal({
                   }}
                   onOpenChange={(open) => { if (open) setProjectQuery('') }}
                 >
-                  <SelectTrigger className="mt-1 w-full">
+                  <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder={loadingProjects ? 'Loading projects...' : 'Select project'} />
                   </SelectTrigger>
                   <SelectContent className="z-[10050] p-0 w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
@@ -738,12 +729,12 @@ export default function CreateTaskModal({
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
-                <label className="text-sm font-medium text-foreground">Task Title *</label>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Task Title *</label>
                 <Input
                   value={formData.title}
                   onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="Enter task title"
-                  className="mt-1"
+                  className="mt-1.5 h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                   required
                 />
                 <div className="mt-1 flex items-center justify-between gap-2">
@@ -757,7 +748,7 @@ export default function CreateTaskModal({
               </div>
 
               <div className="md:col-span-2">
-                <label className="text-sm font-medium text-foreground">Description</label>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Description</label>
                 <div className="mt-1 overflow-hidden rounded-md">
                   <RichTextEditor
                     value={formData.description}
@@ -773,7 +764,7 @@ export default function CreateTaskModal({
               </div>
 
               <div className="md:col-span-2 space-y-2">
-                <label className="text-sm font-medium text-foreground">Attachments</label>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Attachments</label>
                 <div className="flex items-center gap-2 flex-wrap mt-3">
                   <input
                     ref={attachmentInputRef}
@@ -787,6 +778,7 @@ export default function CreateTaskModal({
                     size="sm"
                     onClick={handleAttachmentButtonClick}
                     disabled={isUploadingAttachment || !currentUser}
+                    className="rounded-full h-9 px-4 text-[13px] border-[var(--apple-separator)]"
                   >
                     <Paperclip className="h-4 w-4 mr-2" />
                     {isUploadingAttachment ? 'Uploading...' : 'Add Attachment'}
@@ -810,9 +802,9 @@ export default function CreateTaskModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground">Priority</label>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Priority</label>
                 <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value as TaskFormData['priority'] })}>
-                  <SelectTrigger className="mt-1 w-full">
+                  <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
                   <SelectContent className="z-[10050]">
@@ -825,9 +817,9 @@ export default function CreateTaskModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground">Type</label>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Type</label>
                 <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value as TaskFormData['type'] })}>
-                  <SelectTrigger className="mt-1 w-full">
+                  <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent className="z-[10050]">
@@ -842,7 +834,7 @@ export default function CreateTaskModal({
               {hasProjectSelected && (
                 <>
                   <div>
-                    <label className="text-sm font-medium text-foreground">User Story</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">User Story</label>
                     <Select
                       value={formData.story}
                       onValueChange={(value) => {
@@ -855,7 +847,7 @@ export default function CreateTaskModal({
                       }}
                       onOpenChange={(open) => { if (open) setStoryQuery('') }}
                     >
-                      <SelectTrigger className="mt-1 w-full">
+                      <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder={loadingStories ? 'Loading stories...' : 'Select a story'} />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0 w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
@@ -898,14 +890,14 @@ export default function CreateTaskModal({
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Epic</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Epic</label>
                     <Select
                       value={formData.epic}
                       onValueChange={(value) => setFormData({ ...formData, epic: value })}
                       disabled={loadingEpics}
                       onOpenChange={(open) => { if (open) setEpicQuery('') }}
                     >
-                      <SelectTrigger className="mt-1 w-full">
+                      <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder={loadingEpics ? 'Loading epics...' : 'Select an epic'} />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0 w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
@@ -971,7 +963,7 @@ export default function CreateTaskModal({
 
               {hasProjectSelected && (
                 <div className="md:col-span-2">
-                  <label className="text-sm font-medium text-foreground">Assigned To *</label>
+                  <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Assigned To *</label>
                   <div className="space-y-2 mt-1">
                     <Select
                       value=""
@@ -983,7 +975,7 @@ export default function CreateTaskModal({
                       }}
                       onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select team members *'} />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0 w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
@@ -1091,7 +1083,7 @@ export default function CreateTaskModal({
                             return (
                               <span
                                 key={userId}
-                                className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
+                                className="inline-flex items-center gap-1 text-[12px] bg-[var(--apple-quaternary-fill)] border border-[var(--apple-separator)] px-2.5 py-1 rounded-full"
                               >
                                 <span>{user.firstName} {user.lastName}</span>
                                 <button
@@ -1159,32 +1151,32 @@ export default function CreateTaskModal({
               )}
 
               <div>
-                <label className="text-sm font-medium text-foreground">Estimated Hours</label>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Estimated Hours</label>
                 <Input
                   type="number"
                   step="0.5"
                   value={formData.estimatedHours}
                   onChange={(e) => setFormData({ ...formData, estimatedHours: e.target.value })}
                   placeholder="e.g., 8"
-                  className="mt-1"
+                  className="mt-1.5 h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                 />
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground">Due Date *</label>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Due Date *</label>
                 <Input
                   type="date"
                   value={formData.dueDate}
                   onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                   min={new Date().toISOString().split('T')[0]}
-                  className="mt-1"
+                  className="mt-1.5 h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                   required
                 />
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <label className="text-sm font-medium text-foreground">Billable</label>
+                  <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Billable</label>
                   <p className="text-xs text-muted-foreground">Defaults from project; you can override per task.</p>
                 </div>
                 <input
@@ -1195,18 +1187,18 @@ export default function CreateTaskModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground">Labels</label>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Labels</label>
                 <div className="space-y-2">
-                  <div className="flex space-x-2 mt-3">
+                  <div className="flex space-x-2 mt-2">
                     <Input
                       value={newLabel}
                       onChange={(e) => setNewLabel(e.target.value)}
                       placeholder="Enter label"
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLabel())}
                       maxLength={MAX_LABEL_LENGTH}
-                      className="mt-1"
+                      className="h-9 rounded-[var(--apple-radius-pill)] text-[14px]"
                     />
-                    <Button type="button" onClick={addLabel} size="sm" disabled={newLabel.trim() === ''} className="mt-1">
+                    <Button type="button" onClick={addLabel} size="sm" disabled={newLabel.trim() === ''} className="rounded-full h-9 px-4">
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
@@ -1215,7 +1207,7 @@ export default function CreateTaskModal({
                       {formData.labels.map((label, index) => (
                         <div
                           key={index}
-                          className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 rounded-md text-sm"
+                          className="inline-flex items-center gap-1.5 bg-[var(--apple-quaternary-fill)] border border-[var(--apple-separator)] px-3 py-1 rounded-full text-[13px]"
                         >
                           <span>{label}</span>
                           <button
@@ -1235,19 +1227,19 @@ export default function CreateTaskModal({
             </div>
 
             {/* Subtasks Section */}
-            <div className="space-y-4 mt-16">
-              <div className="flex items-center justify-between mt-4">
-                <h3 className="text-lg font-medium">Subtasks</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addSubtask}>
-                  <Plus className="h-4 w-4 mr-2" />
+            <div className="space-y-3 mt-4 pt-4 border-t border-[var(--apple-separator)]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[14px] font-semibold text-[var(--apple-label)]">Subtasks</h3>
+                <Button type="button" variant="outline" size="sm" onClick={addSubtask} className="rounded-full h-8 px-4 text-[13px] border-[var(--apple-separator)]">
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
                   Add Subtask
                 </Button>
               </div>
 
               {subtasks.map((subtask, index) => (
-                <div key={index} className="p-4 border rounded-lg space-y-3">
+                <div key={index} className="p-4 border border-[var(--apple-separator)] rounded-[var(--apple-radius-lg)] space-y-3 bg-[var(--apple-bg-primary)]">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Subtask {index + 1}</h4>
+                    <h4 className="text-[13px] font-semibold text-[var(--apple-label)]">Subtask {index + 1}</h4>
                     <Button
                       type="button"
                       variant="ghost"
@@ -1260,17 +1252,18 @@ export default function CreateTaskModal({
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Title *</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Title *</label>
                     <Input
                       value={subtask.title}
                       onChange={(e) => updateSubtask(index, 'title', e.target.value)}
                       placeholder="Subtask title"
+                      className="mt-1.5 h-9 rounded-[var(--apple-radius-pill)] text-[14px]"
                       required
                     />
                   </div>
 
                   {/* <div>
-                    <label className="text-sm font-medium text-foreground">Description</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Description</label>
                     <Textarea
                       value={subtask.description || ''}
                       onChange={(e) => updateSubtask(index, 'description', e.target.value)}
@@ -1291,35 +1284,33 @@ export default function CreateTaskModal({
             </div>
 
           </form>
-        </CardContent>
-        <div className="flex-shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-6 border-t">
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-0 sm:space-x-2 mt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" form="create-task-form" disabled={
-              loading ||
-              !(formData.title && formData.title.trim().length > 0) ||
-              !(projectId || (selectedProjectId && selectedProjectId.trim().length > 0)) ||
-              !(formData.dueDate && formData.dueDate.trim().length > 0) ||
-              assignedTo.length === 0 ||
-              subtasks.some(st => !(st.title && st.title.trim().length > 0))
-            }>
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Task
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </Card>
-    </div>
+        </DialogBody>
+        <DialogFooter className="border-t border-[var(--apple-separator)] bg-[var(--apple-bg-primary)] px-6 py-4 gap-2">
+          <Button type="button" variant="outline" onClick={onClose} className="rounded-full px-6 h-10 text-[14px] border-[var(--apple-separator)] font-medium">
+            Cancel
+          </Button>
+          <Button type="submit" form="create-task-form" className="rounded-full px-6 h-10 text-[14px] bg-[var(--apple-system-blue)] text-white hover:opacity-90 font-medium" disabled={
+            loading ||
+            !(formData.title && formData.title.trim().length > 0) ||
+            !(projectId || (selectedProjectId && selectedProjectId.trim().length > 0)) ||
+            !(formData.dueDate && formData.dueDate.trim().length > 0) ||
+            assignedTo.length === 0 ||
+            subtasks.some(st => !(st.title && st.title.trim().length > 0))
+          }>
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Task
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

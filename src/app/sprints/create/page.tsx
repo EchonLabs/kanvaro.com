@@ -404,38 +404,37 @@ export default function CreateSprintPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8 sm:space-y-10">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <Button variant="ghost" onClick={() => router.push('/sprints')} className="w-full sm:w-auto">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" onClick={() => router.push('/sprints')} className="rounded-full h-9 w-9 p-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]">
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center space-x-2">
-              <Zap className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600 flex-shrink-0" />
-              <span className="truncate">Create New Sprint</span>
+            <h1 className="text-[22px] font-semibold text-[var(--apple-label)] tracking-tight flex items-center gap-2">
+              <Zap className="h-5 w-5 text-blue-500 flex-shrink-0" />
+              Create New Sprint
             </h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">Create a new sprint for your project</p>
+            <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Create a new sprint for your project</p>
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Sprint Details</CardTitle>
-            <CardDescription>Fill in the details for your new sprint</CardDescription>
+        <Card className="rounded-[var(--apple-radius-xl)] border-[var(--apple-separator)] shadow-sm">
+          <CardHeader className="border-b border-[var(--apple-separator)] px-6 py-4">
+            <CardTitle className="text-[15px] font-semibold text-[var(--apple-label)]">Sprint Details</CardTitle>
+            <CardDescription className="text-[13px] text-[var(--apple-secondary-label)]">Fill in the details for your new sprint</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
+          <CardContent className="px-6 py-5">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-foreground">Project *</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Project *</label>
                     <Select
                       value={formData.project}
                       onValueChange={(value) => handleChange('project', value)}
                       onOpenChange={open => { if (open) setProjectQuery(""); }}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">
@@ -462,20 +461,20 @@ export default function CreateSprintPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Name *</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Name *</label>
                     <Input
                       value={formData.name}
                       onChange={(e) => handleChange('name', e.target.value)}
                       placeholder="Enter sprint name"
                       required
-                      className="w-full"
+                      className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                     />
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Start Date *</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Start Date *</label>
                     {selectedProject?.startDate && selectedProject?.endDate && (
-                      <div className="mb-2 p-2 bg-muted/50 rounded-md border border-muted">
+                      <div className="mb-2 mt-1.5 p-2.5 bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)]">
                         <p className="text-xs text-muted-foreground">
                           <span className="font-medium">Project Duration:</span>{' '}
                           {new Date(selectedProject.startDate).toLocaleDateString()} to{' '}
@@ -508,7 +507,7 @@ export default function CreateSprintPage() {
                           : undefined
                       }
                       required
-                      className={`w-full ${startDateError ? 'border-destructive' : ''}`}
+                      className={`mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] text-[14px] ${startDateError ? 'border-destructive' : ''}`}
                       disabled={!formData.project}
                     />
                     {!formData.project && (
@@ -526,7 +525,7 @@ export default function CreateSprintPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">End Date *</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">End Date *</label>
                     <Input
                       type="date"
                       value={formData.endDate}
@@ -552,7 +551,7 @@ export default function CreateSprintPage() {
                           : undefined
                       }
                       required
-                      className={`w-full ${endDateError ? 'border-destructive' : ''}`}
+                      className={`mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] text-[14px] ${endDateError ? 'border-destructive' : ''}`}
                       disabled={!formData.project || !formData.startDate}
                     />
                     {!formData.project && (
@@ -578,42 +577,41 @@ export default function CreateSprintPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-foreground">Capacity (hours)</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Capacity (hours)</label>
                     <Input
                       type="number"
                       value={formData.capacity}
                       onChange={(e) => handleChange('capacity', e.target.value)}
                       placeholder="Enter sprint capacity"
-                      className="w-full"
+                      className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                     />
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Sprint Goal</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Sprint Goal</label>
                     <Input
                       value={formData.goal}
                       onChange={(e) => handleChange('goal', e.target.value)}
                       placeholder="Enter sprint goal"
-                      className="w-full"
+                      className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="mt-8">
-                <label className="text-sm font-medium text-foreground">Description</label>
+              <div>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Description</label>
                 <Textarea
                   value={formData.description}
                   onChange={(e) => handleChange('description', e.target.value)}
                   placeholder="Enter sprint description"
                   rows={4}
-                  className="w-full"
+                  className="mt-1.5 w-full rounded-[var(--apple-radius-lg)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px] resize-none"
                 />
               </div>
 
-              {/* Add more space above Team Members */}
-              <div className="mt-12 space-y-3">
-                <label className="text-sm font-medium text-foreground">Team Members</label>
+              <div className="pt-4 border-t border-[var(--apple-separator)] space-y-3">
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Team Members</label>
                 {!formData.project ? (
                   <p className="text-xs sm:text-sm text-muted-foreground italic mt-6">
                     Please select a project to see available team members
@@ -636,7 +634,7 @@ export default function CreateSprintPage() {
                       }}
                       disabled={membersLoading || activeUsers.length === 0}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue
                           placeholder={
                             membersLoading
@@ -801,11 +799,11 @@ export default function CreateSprintPage() {
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 pt-6 mt-8 border-t border-muted">
-                <Button type="button" variant="outline" onClick={() => router.push('/sprints')} className="w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-5 mt-2 border-t border-[var(--apple-separator)]">
+                <Button type="button" variant="outline" onClick={() => router.push('/sprints')} className="rounded-full px-6 h-10 text-[14px] border-[var(--apple-separator)] font-medium w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading || !isFormValid()} className="w-full sm:w-auto">
+                <Button type="submit" disabled={loading || !isFormValid()} className="rounded-full px-6 h-10 text-[14px] bg-[var(--apple-system-blue)] text-white hover:opacity-90 font-medium w-full sm:w-auto">
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -858,7 +858,7 @@ const [searchQuery, setSearchQuery] = useState('')
               }}
               disabled={!canCreateSprint}
               title={!canCreateSprint ? 'You need sprint:create permission to create a sprint.' : undefined}
-              className="w-full sm:w-auto rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] text-white hover:opacity-90 apple-transition"
+              className="w-full sm:w-auto rounded-full bg-[var(--apple-system-blue)] text-white hover:opacity-90 apple-transition"
             >
               <Plus className="h-4 w-4 mr-2" />
               New Sprint
@@ -877,12 +877,12 @@ const [searchQuery, setSearchQuery] = useState('')
                 placeholder="Search sprints..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition"
+                className="pl-10 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition"
               />
             </div>
             {/* Status */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-9 w-full sm:w-40 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px]">
+              <SelectTrigger className="h-9 w-full sm:w-40 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -897,7 +897,7 @@ const [searchQuery, setSearchQuery] = useState('')
             <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
               if (open) focusSearchInput(projectSearchInputRef.current)
             }}>
-              <SelectTrigger className="h-9 w-full sm:w-44 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px]">
+              <SelectTrigger className="h-9 w-full sm:w-44 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px]">
                 <SelectValue placeholder="Project" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
@@ -959,7 +959,7 @@ const [searchQuery, setSearchQuery] = useState('')
                 variant="ghost"
                 size="sm"
                 onClick={resetFilters}
-                className="h-7 text-[12px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] rounded-[var(--apple-radius-sm)]"
+                className="h-7 text-[12px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] rounded-full"
                 aria-label="Reset all filters"
               >
                 <RotateCcw className="h-3 w-3 mr-1" />

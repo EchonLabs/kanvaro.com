@@ -473,7 +473,7 @@ export default function EpicsPage() {
                     ? "You need epic:create permission to create an epic."
                     : undefined
                 }
-                className="h-9 px-4 rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] text-white hover:opacity-90 apple-transition text-[14px] font-medium"
+                className="h-9 px-5 rounded-full bg-[var(--apple-system-blue)] text-white hover:opacity-90 apple-transition text-[14px] font-medium"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 New Epic
@@ -492,7 +492,7 @@ export default function EpicsPage() {
                     placeholder="Search epics..."
                     value={localSearch}
                     onChange={(e) => setLocalSearch(e.target.value)}
-                    className="w-full pl-10 pr-9 h-10 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                    className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
                 />
                 {localSearch && (
                     <button
@@ -507,7 +507,7 @@ export default function EpicsPage() {
             </div>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-1/4 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                <SelectTrigger className="w-1/4 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -521,7 +521,7 @@ export default function EpicsPage() {
             </Select>
 
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-1/4 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                <SelectTrigger className="w-1/4 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
@@ -542,7 +542,7 @@ export default function EpicsPage() {
                     placeholder="Search epics..."
                     value={localSearch}
                     onChange={(e) => setLocalSearch(e.target.value)}
-                    className="w-full pl-10 pr-9 h-10 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                    className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
                 />
                 {localSearch && (
                     <button
@@ -557,7 +557,7 @@ export default function EpicsPage() {
             </div>
             <div className="flex gap-2">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-1/2 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                    <SelectTrigger className="w-1/2 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -570,7 +570,7 @@ export default function EpicsPage() {
                     </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-1/2 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                    <SelectTrigger className="w-1/2 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
@@ -593,7 +593,7 @@ export default function EpicsPage() {
                 if (open) focusSearchInput(projectFilterInputRef.current);
               }}
             >
-              <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px]">
+              <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
                 <SelectValue placeholder="All Projects" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">

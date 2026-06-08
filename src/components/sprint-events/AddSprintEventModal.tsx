@@ -797,10 +797,10 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] flex flex-col max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle>Create Sprint Event</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-[700px] flex flex-col max-h-[90vh] overflow-hidden rounded-[var(--apple-radius-xl)] border-[var(--apple-separator)] shadow-2xl bg-[var(--apple-bg-secondary)]">
+        <DialogHeader className="border-b border-[var(--apple-separator)] px-6 py-4 bg-[var(--apple-bg-primary)]">
+          <DialogTitle className="text-[17px] font-semibold text-[var(--apple-label)] tracking-tight">Create Sprint Event</DialogTitle>
+          <DialogDescription className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
             Schedule a new agile event or ceremony
           </DialogDescription>
         </DialogHeader>
@@ -809,16 +809,16 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
           <form onSubmit={handleSubmit} className="space-y-6" id="create-sprint-event-form">
             {/* (1) Basic Details */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Basic Details</h3>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Basic Details</h3>
               {!projectId && (
-                <div className="space-y-2">
-                  <Label htmlFor="projectId">Project *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="projectId">Project *</Label>
                   <Select
                     value={formData.projectId}
                     onValueChange={(value) => handleInputChange('projectId', value)}
                     onOpenChange={(open) => { if (open) setProjectQuery('') }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                       <SelectValue placeholder="Select project" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -846,15 +846,15 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sprintId">Sprint *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="sprintId">Sprint *</Label>
                   <Select
                     value={formData.sprintId}
                     onValueChange={(value) => handleInputChange('sprintId', value)}
                     disabled={!formData.projectId && !projectId}
                     onOpenChange={(open) => { if (open) setSprintQuery('') }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                       <SelectValue placeholder="Select sprint" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -882,14 +882,14 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="eventType">Event Type *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="eventType">Event Type *</Label>
                   <Select
                     value={formData.eventType}
                     onValueChange={(value) => handleInputChange('eventType', value)}
                     onOpenChange={(open) => { if (open) setEventTypeQuery('') }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                       <SelectValue placeholder="Select event type" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -913,27 +913,28 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="title">Event Name *</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="title">Event Name *</Label>
                 <Input
                   id="title"
                   value={formData.title}
                   onChange={(e) => handleInputChange('title', e.target.value)}
                   placeholder="Enter event name"
+                  className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                   required
                 />
               </div>
             </div>
 
             {/* (3) Schedule */}
-            <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold mt-4">Schedule</h3>
+            <div className="space-y-4 pt-4 border-t border-[var(--apple-separator)]">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Schedule</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="scheduledDate">Date *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="scheduledDate">Date *</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <Button variant="outline" className="w-full justify-start text-left font-normal rounded-[var(--apple-radius-pill)] h-10 border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {selectedDate ? format(selectedDate, 'PPP') : 'Pick a date'}
                       </Button>
@@ -979,25 +980,26 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                     </Alert>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="status">Status</Label>
                   <Input
                     id="status"
                     value="Scheduled"
                     disabled
-                    className="bg-muted"
+                    className="h-10 rounded-[var(--apple-radius-pill)] bg-[var(--apple-tertiary-fill)] text-[14px] opacity-60"
                   />
                   <input type="hidden" value={formData.status} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startTime">Start Time</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="startTime">Start Time</Label>
                   <Input
                     id="startTime"
                     type="time"
                     value={formData.startTime}
                     onChange={(e) => handleInputChange('startTime', e.target.value)}
+                    className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                   />
                   {startTimeError && (
                     <Alert variant="destructive" className="mt-2">
@@ -1006,13 +1008,14 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                     </Alert>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endTime">End Time</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="endTime">End Time</Label>
                   <Input
                     id="endTime"
                     type="time"
                     value={formData.endTime}
                     onChange={(e) => handleInputChange('endTime', e.target.value)}
+                    className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                   />
                   {endTimeError && (
                     <Alert variant="destructive" className="mt-2">
@@ -1022,27 +1025,27 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   )}
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="duration">Duration</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="duration">Duration</Label>
                 <Input
                   id="duration"
                   value={getDurationDisplay()}
                   disabled
-                  className="bg-muted"
+                  className="h-10 rounded-[var(--apple-radius-pill)] bg-[var(--apple-tertiary-fill)] text-[14px] opacity-60"
                   placeholder="Enter start and end time to calculate"
                 />
               </div>
             </div>
 
             {/* (3.5) Recurrence Settings */}
-            <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Repeat className="h-4 w-4" />
+            <div className="space-y-4 pt-4 border-t border-[var(--apple-separator)]">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)] flex items-center gap-1.5">
+                <Repeat className="h-3.5 w-3.5" />
                 Recurrence
               </h3>
-              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                <div className="space-y-2">
-                  <Label htmlFor="recurrenceType">Repeat</Label>
+              <div className="space-y-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]">
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="recurrenceType">Repeat</Label>
                   <Select
                     value={formData.recurrence.type}
                     onValueChange={(value) => {
@@ -1054,7 +1057,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                       }
                     }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-background text-[14px]">
                       <SelectValue placeholder={formData.eventType === 'daily_standup' ? 'One-time' : 'Does not repeat'} />
                     </SelectTrigger>
                     <SelectContent>
@@ -1201,11 +1204,11 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             
 
               return (
-                <div className="space-y-4 mt-8">
+                <div className="space-y-3 pt-4 border-t border-[var(--apple-separator)]">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold mt-4">Attendees</h3>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Attendees</h3>
                     {formData.attendees.length > 0 && (
-                      <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                      <span className="text-[12px] text-[var(--apple-secondary-label)] bg-[var(--apple-quaternary-fill)] px-2.5 py-0.5 rounded-full border border-[var(--apple-separator)]">
                         {formData.attendees.length} selected
                       </span>
                     )}
@@ -1218,11 +1221,11 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                       setAttendeeQuery(e.target.value)
                     }}
                     placeholder="Search attendees..."
-                    className="w-full"
+                    className="w-full h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                   />
 
                   {/* Scrollable attendees list */}
-                  <div className="max-h-48 overflow-y-auto border rounded-md">
+                  <div className="max-h-48 overflow-y-auto border border-[var(--apple-separator)] rounded-[var(--apple-radius-lg)]">
                     <div className="p-3">
                       {filteredUsers && filteredUsers.length > 0 ? (
                         <div className="space-y-3">
@@ -1261,21 +1264,21 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             })()}
 
             {/* (5) Description / Notes */}
-            <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold mt-4">Description / Notes</h3>
+            <div className="space-y-3 pt-4 border-t border-[var(--apple-separator)]">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Description / Notes</h3>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Meeting agenda, talking points, key decisions..."
-                rows={6}
-                className="resize-none"
+                rows={5}
+                className="resize-none rounded-[var(--apple-radius-lg)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]"
               />
             </div>
 
             {/* (6) Attachments */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold mt-4">Attachments (Optional)</h3>
+            <div className="space-y-3 pt-4 border-t border-[var(--apple-separator)]">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Attachments (Optional)</h3>
               <FileUploader onUpload={handleFileUpload} />
 
               {attachments.length > 0 && (
@@ -1293,17 +1296,18 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLink())}
+                  className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                 />
-                <Button type="button" variant="outline" onClick={addLink}>
+                <Button type="button" variant="outline" onClick={addLink} className="rounded-full h-10 px-5 text-[14px] border-[var(--apple-separator)]">
                   Add Link
                 </Button>
               </div>
             </div>
 
             {/* (7) Notification Settings */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold mt-4">Notification & Reminder Settings</h3>
-              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+            <div className="space-y-3 pt-4 border-t border-[var(--apple-separator)]">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Notification & Reminders</h3>
+              <div className="space-y-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]">
                 <label className="flex items-center space-x-2">
                   <Checkbox
                     checked={formData.notificationSettings.enabled}
@@ -1370,36 +1374,39 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             </div>
 
             {/* Location and Meeting Link */}
-            <div className="grid grid-cols-2 gap-4 mt-8">
-              <div className="space-y-2 mt-4">
-                <Label htmlFor="location">Location</Label>
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--apple-separator)]">
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="location">Location</Label>
                 <Input
                   id="location"
                   value={formData.location}
                   onChange={(e) => handleInputChange('location', e.target.value)}
                   placeholder="Meeting room, office, etc."
+                  className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                 />
               </div>
-              <div className="space-y-2 mt-4">
-                <Label htmlFor="meetingLink">Meeting Link</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="meetingLink">Meeting Link</Label>
                 <Input
                   id="meetingLink"
                   value={formData.meetingLink}
                   onChange={(e) => handleInputChange('meetingLink', e.target.value)}
                   placeholder="Zoom, Teams, Google Meet link"
+                  className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                 />
               </div>
             </div>
           </form>
         </DialogBody>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
+        <DialogFooter className="border-t border-[var(--apple-separator)] bg-[var(--apple-bg-primary)] px-6 py-4 gap-2">
+          <Button type="button" variant="outline" onClick={onClose} className="rounded-full px-6 h-10 text-[14px] border-[var(--apple-separator)] font-medium">
             Cancel
           </Button>
           <Button
             type="submit"
             form="create-sprint-event-form"
             disabled={loading || !isFormValid()}
+            className="rounded-full px-6 h-10 text-[14px] bg-[var(--apple-system-blue)] text-white hover:opacity-90 font-medium"
           >
             {loading ? (
               <>
@@ -1407,7 +1414,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                 Creating...
               </>
             ) : (
-              'Save'
+              'Create Event'
             )}
           </Button>
         </DialogFooter>

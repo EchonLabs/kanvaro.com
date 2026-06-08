@@ -431,7 +431,7 @@ export default function SprintEventsPage() {
           <p className="text-[15px] text-[var(--apple-secondary-label)]">Please log in to access sprint events.</p>
           <Button
             onClick={() => router.push('/login')}
-            className="rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
+            className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
           >
             Go to Login
           </Button>
@@ -460,7 +460,7 @@ export default function SprintEventsPage() {
             <PermissionGate permission={Permission.SPRINT_EVENT_VIEW_ALL}>
               <Button
                 onClick={() => setShowAddModal(true)}
-                className="rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
+                className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Event
@@ -479,7 +479,7 @@ export default function SprintEventsPage() {
                     placeholder="Search events..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-9 h-10 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                    className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
                 />
                 {searchTerm && (
                     <button
@@ -494,7 +494,7 @@ export default function SprintEventsPage() {
             </div>
 
             <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-1/4 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                <SelectTrigger className="w-1/4 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder="Event Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -509,7 +509,7 @@ export default function SprintEventsPage() {
             </Select>
 
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-1/4 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                <SelectTrigger className="w-1/4 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -530,7 +530,7 @@ export default function SprintEventsPage() {
                     placeholder="Search events..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-9 h-10 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                    className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
                 />
                 {searchTerm && (
                     <button
@@ -545,7 +545,7 @@ export default function SprintEventsPage() {
             </div>
             <div className="flex gap-2">
                 <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger className="w-1/2 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                    <SelectTrigger className="w-1/2 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder="Event Type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -559,7 +559,7 @@ export default function SprintEventsPage() {
                     </SelectContent>
                 </Select>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-1/2 h-10 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                    <SelectTrigger className="w-1/2 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -586,7 +586,7 @@ export default function SprintEventsPage() {
                     }
                   }}
                 >
-                  <SelectTrigger className="h-9 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-background text-[13px]">
+                  <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
                     <SelectValue placeholder="All Projects" />
                   </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
@@ -692,7 +692,7 @@ export default function SprintEventsPage() {
               <PermissionGate permission={Permission.SPRINT_EVENT_VIEW_ALL}>
                 <Button
                   onClick={() => setShowAddModal(true)}
-                  className="rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
+                  className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Event
