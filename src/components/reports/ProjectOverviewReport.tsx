@@ -1,358 +1,278 @@
-'use client'
+﻿'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
-import { Button } from '@/components/ui/Button'
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line
+  BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import {
-  FolderOpen,
-  CheckCircle,
-  Clock,
-  DollarSign,
-  TrendingUp,
-  Users,
-  Calendar,
-  Target
-} from 'lucide-react'
+import { CheckCircle2, Clock, Users, ArrowRight } from 'lucide-react'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import Link from 'next/link'
 
 interface Project {
-  _id: string
-  name: string
-  status: string
-  startDate: string
-  endDate?: string
-  description?: string
-  budget?: {
-    total: number
-    spent: number
-    remaining: number
-  }
-  team?: any[]
+  _id: string; name: string; status: string; startDate: string; endDate?: string
+  description?: string; budget?: { total: number; spent: number; remaining: number }; team?: any[]
   stats: {
-    tasks: {
-      total: number
-      completed: number
-      completionRate: number
-    }
-    sprints: {
-      total: number
-      active: number
-    }
-    timeTracking: {
-      totalHours: number
-      entries: number
-    }
-    budget: {
-      total: number
-      spent: number
-      remaining: number
-      utilizationRate: number
-    }
+    tasks: { total: number; completed: number; completionRate: number }
+    sprints: { total: number; active: number }
+    timeTracking: { totalHours: number; entries: number }
+    budget: { total: number; spent: number; remaining: number; utilizationRate: number }
   }
 }
 
 interface ProjectOverviewReportProps {
   projects: Project[]
-  summary: {
-    totalProjects: number
-    activeProjects: number
-    completedProjects: number
-    totalBudget: number
-    totalSpent: number
-    averageCompletionRate: number
-  }
-  trends: {
-    projectVelocity: number
-    budgetUtilization: number
-    teamUtilization: number
-  }
+  summary: { totalProjects: number; activeProjects: number; completedProjects: number; totalBudget: number; totalSpent: number; averageCompletionRate: number }
+  trends: { projectVelocity: number; budgetUtilization: number; teamUtilization: number }
   filters: any
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']
+const STATUS_PALETTE: Record<string, { color: string; bg: string; label: string }> = {
+  active:    { color: '#34C759', bg: 'rgba(52,199,89,0.12)', label: 'Active' },
+  completed: { color: '#007AFF', bg: 'rgba(0,122,255,0.12)', label: 'Completed' },
+  'on-hold': { color: '#FF9500', bg: 'rgba(255,149,0,0.12)', label: 'On Hold' },
+  cancelled: { color: '#FF453A', bg: 'rgba(255,69,58,0.12)', label: 'Cancelled' },
+  planning:  { color: '#BF5AF2', bg: 'rgba(191,90,242,0.12)', label: 'Planning' },
+  draft:     { color: '#FF9500', bg: 'rgba(255,149,0,0.12)', label: 'Draft' },
+}
+const getStatus = (s: string) => STATUS_PALETTE[s] || { color: '#8E8E93', bg: 'rgba(142,142,147,0.12)', label: s }
 
-import { useOrganization } from '@/hooks/useOrganization'
+const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px] min-w-[140px]">
+      {label && <p className="font-semibold text-[var(--apple-label)] mb-2">{label}</p>}
+      {payload.map((item: any, i: number) => (
+        <div key={i} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+            <span className="text-[var(--apple-secondary-label)]">{item.name}</span>
+          </div>
+          <span className="font-semibold font-apple-mono text-[var(--apple-label)]">
+            {formatValue ? formatValue(item.value) : item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
-// ... existing imports
+const PieTooltip = ({ active, payload }: any) => {
+  if (!active || !payload?.length) return null
+  const item = payload[0]
+  return (
+    <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px]">
+      <div className="flex items-center gap-1.5 mb-1">
+        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.payload.fill }} />
+        <span className="font-semibold text-[var(--apple-label)]">{item.name}</span>
+      </div>
+      <p className="font-semibold font-apple-mono text-[var(--apple-label)]">{item.value} projects</p>
+      <p className="text-[var(--apple-tertiary-label)]">{(item.payload.percent * 100).toFixed(1)}%</p>
+    </div>
+  )
+}
+
+function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+      <div className="mb-4">
+        <p className="text-[17px] font-semibold tracking-tight">{title}</p>
+        {subtitle && <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
 
 export function ProjectOverviewReport({ projects, summary, trends, filters }: ProjectOverviewReportProps) {
-  const { organization } = useOrganization()
-  const currency = organization?.currency || 'USD'
+  const { formatCurrency } = useOrgCurrency()
 
-  const formatCurrency = (amount: number) => {
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency
-      }).format(amount)
-    } catch (e) {
-      return `${currency} ${amount.toLocaleString()}`
-    }
-  }
-
-  // Prepare data for charts
   const statusData = [
-    { name: 'Active', value: summary.activeProjects, color: '#00C49F' },
-    { name: 'Completed', value: summary.completedProjects, color: '#0088FE' },
-    { name: 'On Hold', value: projects.filter(p => p.status === 'on-hold').length, color: '#FFBB28' },
-    { name: 'Cancelled', value: projects.filter(p => p.status === 'cancelled').length, color: '#FF8042' }
-  ]
+    { name: 'Active', value: summary.activeProjects, fill: '#34C759' },
+    { name: 'Completed', value: summary.completedProjects, fill: '#007AFF' },
+    { name: 'On Hold', value: projects.filter(p => p.status === 'on-hold').length, fill: '#FF9500' },
+    { name: 'Cancelled', value: projects.filter(p => p.status === 'cancelled').length, fill: '#FF453A' },
+  ].filter(d => d.value > 0)
 
-  const budgetData = projects.map(project => ({
-    name: project.name.length > 15 ? project.name.substring(0, 15) + '...' : project.name,
-    budget: project.stats.budget.total,
-    spent: project.stats.budget.spent,
-    remaining: project.stats.budget.remaining
+  const budgetData = projects.map(p => ({
+    name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name,
+    Budget: p.stats.budget.total,
+    Spent: p.stats.budget.spent,
   }))
 
-  const completionData = projects.map(project => ({
-    name: project.name.length > 15 ? project.name.substring(0, 15) + '...' : project.name,
-    completion: project.stats.tasks.completionRate,
-    tasks: project.stats.tasks.total
+  const completionData = projects.map(p => ({
+    name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name,
+    'Completion %': p.stats.tasks.completionRate,
   }))
 
-  const timeTrackingData = projects.map(project => ({
-    name: project.name.length > 15 ? project.name.substring(0, 15) + '...' : project.name,
-    hours: project.stats.timeTracking.totalHours,
-    entries: project.stats.timeTracking.entries
+  const hoursData = projects.map(p => ({
+    name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name,
+    Hours: p.stats.timeTracking.totalHours,
   }))
 
   return (
-    <div className="space-y-8">
-      {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Project Status</CardTitle>
-            <FolderOpen className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">{summary.totalProjects}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {summary.activeProjects} active, {summary.completedProjects} completed
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1">
-              <Badge variant="default" className="text-xs">
-                {summary.activeProjects} Active
-              </Badge>
-              <Badge variant="secondary" className="text-xs">
-                {summary.completedProjects} Done
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Budget Utilization</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {trends.budgetUtilization.toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 break-words">
-              {formatCurrency(summary.totalSpent)} of {formatCurrency(summary.totalBudget)}
-            </p>
-            <Progress value={trends.budgetUtilization} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Average Completion</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {summary.averageCompletionRate.toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Across all projects
-            </p>
-            <Progress value={summary.averageCompletionRate} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Project Velocity</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {trends.projectVelocity.toFixed(1)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Projects completed per month
-            </p>
-          </CardContent>
-        </Card>
+      {/* ── Stats Strip ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Active Projects', value: String(summary.activeProjects), sub: `${summary.completedProjects} completed`, color: '#34C759' },
+          { label: 'Budget Used', value: `${trends.budgetUtilization.toFixed(1)}%`, sub: `${formatCurrency(summary.totalSpent)} of ${formatCurrency(summary.totalBudget)}`, color: '#007AFF' },
+          { label: 'Avg Completion', value: `${summary.averageCompletionRate.toFixed(1)}%`, sub: 'Across all projects', color: '#FF9500' },
+          { label: 'Velocity', value: `${trends.projectVelocity.toFixed(1)}`, sub: 'Projects per month', color: '#BF5AF2' },
+        ].map(s => (
+          <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
+            <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
+            <p className="text-[20px] font-bold font-apple-mono tracking-tight" style={{ color: s.color }}>{s.value}</p>
+            <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5 truncate">{s.sub}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Charts Grid */}
+      {/* ── Charts ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Project Status Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Project Status Distribution</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Breakdown of projects by status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
 
-        {/* Budget Utilization */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Budget Utilization by Project</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Budget vs spent across projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={budgetData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} className="sm:text-xs" />
-                <YAxis tick={{ fontSize: 10 }} className="sm:text-xs" />
-                <Tooltip />
-                <Bar dataKey="budget" fill="#8884d8" name="Total Budget" />
-                <Bar dataKey="spent" fill="#82ca9d" name="Spent" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Donut — status distribution */}
+        <ChartCard title="Project Status Distribution" subtitle="Breakdown of projects by status">
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie
+                data={statusData} cx="50%" cy="50%"
+                innerRadius={55} outerRadius={90}
+                paddingAngle={3} dataKey="value"
+                strokeWidth={0} animationBegin={0} animationDuration={800}
+              >
+                {statusData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+              </Pie>
+              <Tooltip content={<PieTooltip />} />
+              <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        {/* Completion Rates */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Task Completion Rates</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Completion percentage by project</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={completionData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} className="sm:text-xs" />
-                <YAxis tick={{ fontSize: 10 }} className="sm:text-xs" />
-                <Tooltip formatter={(value) => [`${value}%`, 'Completion Rate']} />
-                <Bar dataKey="completion" fill="#00C49F" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Bar — budget by project */}
+        <ChartCard title="Budget Utilization by Project" subtitle="Budget vs spent across projects">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={budgetData} barCategoryGap="30%" barGap={4} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="pov-budget" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.9} /><stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.7} />
+                </linearGradient>
+                <linearGradient id="pov-spent" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FF9500" stopOpacity={0.9} /><stop offset="100%" stopColor="#FFD60A" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
+              <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <Bar dataKey="Budget" fill="url(#pov-budget)" radius={[5,5,0,0]} maxBarSize={28} />
+              <Bar dataKey="Spent" fill="url(#pov-spent)" radius={[5,5,0,0]} maxBarSize={28} />
+              <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        {/* Time Tracking */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Time Tracking by Project</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Hours logged per project</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={timeTrackingData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} className="sm:text-xs" />
-                <YAxis tick={{ fontSize: 10 }} className="sm:text-xs" />
-                <Tooltip formatter={(value) => [`${value}h`, 'Hours']} />
-                <Bar dataKey="hours" fill="#FFBB28" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Bar — completion rate */}
+        <ChartCard title="Task Completion Rates" subtitle="Completion percentage by project">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={completionData} barCategoryGap="40%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="pov-comp" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#34C759" stopOpacity={0.9} /><stop offset="100%" stopColor="#30D158" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0,100]} />
+              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <Bar dataKey="Completion %" fill="url(#pov-comp)" radius={[5,5,0,0]} maxBarSize={40} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        {/* Bar — hours logged */}
+        <ChartCard title="Time Tracking by Project" subtitle="Hours logged per project">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={hoursData} barCategoryGap="40%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="pov-hours" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#BF5AF2" stopOpacity={0.9} /><stop offset="100%" stopColor="#FF375F" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}h`} />
+              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}h`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <Bar dataKey="Hours" fill="url(#pov-hours)" radius={[5,5,0,0]} maxBarSize={40} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
 
-      {/* Projects List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base sm:text-lg">Project Details</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Detailed view of all projects</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {projects.map((project) => (
-              <div key={project._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
-                <div className="flex-1 min-w-0 w-full sm:w-auto">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-                    <h3 className="font-semibold text-sm sm:text-base truncate">{project.name}</h3>
-                    <Badge variant={project.status === 'active' ? 'default' : 'secondary'} className="flex-shrink-0">
-                      {project.status}
-                    </Badge>
+      {/* ── Projects List ── */}
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+        <div className="px-5 pt-5 pb-4 border-b border-[var(--apple-separator)]">
+          <p className="text-[17px] font-semibold">Project Details</p>
+          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Detailed view of all projects</p>
+        </div>
+        <div className="divide-y divide-[var(--apple-separator)]">
+          {projects.map((project) => {
+            const st = getStatus(project.status)
+            const compPct = project.stats.tasks.completionRate
+            const budPct = Math.min(100, project.stats.budget.utilizationRate)
+            return (
+              <div key={project._id} className="px-5 py-4 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <p className="text-[15px] font-semibold truncate">{project.name}</p>
+                      <span
+                        className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold flex-shrink-0"
+                        style={{ backgroundColor: st.bg, color: st.color }}
+                      >
+                        {st.label}
+                      </span>
+                    </div>
+                    {project.description && (
+                      <p className="text-[13px] text-[var(--apple-secondary-label)] mt-1 line-clamp-1">{project.description}</p>
+                    )}
+                    <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+                      <div>
+                        <div className="flex items-center justify-between text-[12px] mb-1">
+                          <div className="flex items-center gap-1 text-[var(--apple-secondary-label)]">
+                            <CheckCircle2 className="h-3 w-3" /><span>Tasks</span>
+                          </div>
+                          <span className="font-semibold font-apple-mono" style={{ color: '#34C759' }}>{compPct.toFixed(0)}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${compPct}%`, backgroundColor: '#34C759' }} />
+                        </div>
+                        <p className="text-[11px] text-[var(--apple-tertiary-label)] mt-0.5">{project.stats.tasks.completed}/{project.stats.tasks.total}</p>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between text-[12px] mb-1">
+                          <span className="text-[var(--apple-secondary-label)]">Budget</span>
+                          <span className="font-semibold font-apple-mono" style={{ color: budPct > 85 ? '#FF453A' : budPct > 65 ? '#FF9F0A' : '#007AFF' }}>{budPct.toFixed(0)}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${budPct}%`, backgroundColor: budPct > 85 ? '#FF453A' : budPct > 65 ? '#FF9F0A' : '#007AFF' }} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  {project.description && (
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
-                      {project.description}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
-                    <div className="flex items-center space-x-1">
-                      <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                      <span>{project.stats.tasks.completed}/{project.stats.tasks.total} tasks</span>
+                  <div className="flex items-center gap-4 text-[13px] flex-shrink-0">
+                    <div className="text-center hidden sm:block">
+                      <p className="font-semibold font-apple-mono">{project.stats.timeTracking.totalHours.toFixed(0)}h</p>
+                      <p className="text-[11px] text-[var(--apple-tertiary-label)]"><Clock className="inline h-3 w-3 mr-0.5" />logged</p>
                     </div>
-                    <div className="flex items-center space-x-1">
-                      <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                      <span>{project.stats.timeTracking.totalHours.toFixed(1)}h logged</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Users className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                      <span>{project.team?.length || 0} members</span>
+                    <div className="text-center hidden sm:block">
+                      <p className="font-semibold font-apple-mono">{project.team?.length || 0}</p>
+                      <p className="text-[11px] text-[var(--apple-tertiary-label)]"><Users className="inline h-3 w-3 mr-0.5" />members</p>
                     </div>
                   </div>
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
-                  <div className="flex items-center sm:items-end sm:flex-col sm:text-right gap-2 sm:gap-0">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {project.stats.tasks.completionRate.toFixed(1)}%
-                    </div>
-                    <div className="text-xs text-muted-foreground">Complete</div>
-                  </div>
-                  <div className="flex items-center sm:items-end sm:flex-col sm:text-right gap-2 sm:gap-0">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {project.stats.budget.utilizationRate.toFixed(1)}%
-                    </div>
-                    <div className="text-xs text-muted-foreground">Budget Used</div>
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full sm:w-auto flex-shrink-0">
-                    View Details
-                  </Button>
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

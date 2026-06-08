@@ -4,14 +4,12 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { PageWrapper } from '@/components/layout/PageWrapper'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { GanttChart } from '@/components/reports/GanttChart'
 import { GanttData, GanttTask } from '@/lib/gantt'
-import { Calendar, Filter, Download } from 'lucide-react'
+import { Calendar, Download, SlidersHorizontal, GitBranch } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function GanttReportPage() {
@@ -19,11 +17,7 @@ export default function GanttReportPage() {
   const [ganttData, setGanttData] = useState<GanttData | null>(null)
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
-    project: '',
-    sprint: '',
-    assignee: '',
-    startDate: '',
-    endDate: ''
+    project: '', sprint: '', assignee: '', startDate: '', endDate: ''
   })
   const ALL_PROJECTS = '__ALL_PROJECTS__'
   const ALL_SPRINTS = '__ALL_SPRINTS__'
@@ -36,66 +30,42 @@ export default function GanttReportPage() {
   const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('')
   const router = useRouter()
 
-  // Helper function to focus filter search inputs
-  const focusSearchInput = (el: HTMLInputElement | null) => {
-    if (!el || el.disabled) return
-
-    const doFocus = () => {
-      el.focus({ preventScroll: true })
-      try {
-        el.select?.()
-      } catch {
-        // ignore
-      }
-    }
-
-    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-      window.requestAnimationFrame(doFocus)
-    } else {
-      setTimeout(doFocus, 0)
-    }
-  }
-
-  // Filter search input refs
   const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
   const sprintSearchInputRef = useRef<HTMLInputElement | null>(null)
   const assigneeSearchInputRef = useRef<HTMLInputElement | null>(null)
 
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+    const doFocus = () => { el.focus({ preventScroll: true }); try { el.select?.() } catch {} }
+    typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame(doFocus)
+      : setTimeout(doFocus, 0)
+  }
+
   useEffect(() => {
-    // Set breadcrumb
     setItems([
       { label: 'Reports', href: '/reports' },
       { label: 'Project Reports', href: '/reports/project-reports' },
-      { label: 'Gantt Report' }
+      { label: 'Gantt Chart' },
     ])
   }, [setItems])
 
-  useEffect(() => {
-    loadFilterOptions()
-  }, [])
-
-  useEffect(() => {
-    loadGanttData()
-  }, [filters])
+  useEffect(() => { loadFilterOptions() }, [])
+  useEffect(() => { loadGanttData() }, [filters])
 
   const loadGanttData = async () => {
     try {
       setLoading(true)
-      const params = new URLSearchParams()
-
-      if (filters.project) params.append('projectId', filters.project)
-      if (filters.sprint) params.append('sprintId', filters.sprint)
-      if (filters.assignee) params.append('assigneeId', filters.assignee)
-      if (filters.startDate) params.append('startDate', filters.startDate)
-      if (filters.endDate) params.append('endDate', filters.endDate)
-
-      const response = await fetch(`/api/reports/gantt?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setGanttData(data)
-      }
-    } catch (error) {
-      console.error('Failed to load Gantt data:', error)
+      const p = new URLSearchParams()
+      if (filters.project) p.append('projectId', filters.project)
+      if (filters.sprint) p.append('sprintId', filters.sprint)
+      if (filters.assignee) p.append('assigneeId', filters.assignee)
+      if (filters.startDate) p.append('startDate', filters.startDate)
+      if (filters.endDate) p.append('endDate', filters.endDate)
+      const res = await fetch(`/api/reports/gantt?${p}`)
+      if (res.ok) setGanttData(await res.json())
+    } catch (e) {
+      console.error('Failed to load Gantt data:', e)
     } finally {
       setLoading(false)
     }
@@ -103,325 +73,263 @@ export default function GanttReportPage() {
 
   const loadFilterOptions = async () => {
     try {
-      // Load projects
-      const projectsResponse = await fetch('/api/projects')
-      if (projectsResponse.ok) {
-        const projectsData = await projectsResponse.json()
-        const projectsArray = Array.isArray(projectsData)
-          ? projectsData
-          : (projectsData?.data && Array.isArray(projectsData.data) ? projectsData.data : [])
-        setProjects(projectsArray)
+      const [pr, ar] = await Promise.all([
+        fetch('/api/projects'),
+        fetch('/api/members?limit=10000&page=1'),
+      ])
+      if (pr.ok) {
+        const d = await pr.json()
+        setProjects(Array.isArray(d) ? d : (d?.data && Array.isArray(d.data) ? d.data : []))
       }
-
-      // Load assignees
-      const assigneesResponse = await fetch('/api/members?limit=10000&page=1')
-      if (assigneesResponse.ok) {
-        const assigneesData = await assigneesResponse.json()
-        const assigneesArray = Array.isArray(assigneesData)
-          ? assigneesData
-          : (assigneesData?.data && Array.isArray(assigneesData.data) ? assigneesData.data : [])
-        setAssignees(assigneesArray)
+      if (ar.ok) {
+        const d = await ar.json()
+        setAssignees(Array.isArray(d) ? d : (d?.data && Array.isArray(d.data) ? d.data : []))
       }
-    } catch (error) {
-      console.error('Failed to load filter options:', error)
-    }
+    } catch (e) { console.error('Failed to load filter options:', e) }
   }
 
   const filteredProjects = useMemo(() => {
-    const query = projectSearchQuery.trim().toLowerCase()
-    if (!query) return projects
-    return projects.filter((project) => project.name.toLowerCase().includes(query))
+    const q = projectSearchQuery.trim().toLowerCase()
+    return q ? projects.filter(p => p.name.toLowerCase().includes(q)) : projects
   }, [projects, projectSearchQuery])
 
   const filteredSprints = useMemo(() => {
-    const query = sprintSearchQuery.trim().toLowerCase()
-    if (!query) return sprints
-    return sprints.filter((sprint) => sprint.name.toLowerCase().includes(query))
+    const q = sprintSearchQuery.trim().toLowerCase()
+    return q ? sprints.filter(s => s.name.toLowerCase().includes(q)) : sprints
   }, [sprints, sprintSearchQuery])
 
   const filteredAssignees = useMemo(() => {
-    const query = assigneeSearchQuery.trim().toLowerCase()
-    if (!query) return assignees
-    return assignees.filter((assignee) => assignee.name.toLowerCase().includes(query))
+    const q = assigneeSearchQuery.trim().toLowerCase()
+    return q ? assignees.filter(a => a.name.toLowerCase().includes(q)) : assignees
   }, [assignees, assigneeSearchQuery])
 
-  const handleTaskClick = (task: GanttTask) => {
-    // Navigate to task detail page
-    router.push(`/tasks/${task.id}`)
-  }
+  const handleTaskClick = (task: GanttTask) => router.push(`/tasks/${task.id}`)
 
   const handleExport = () => {
-    const params = new URLSearchParams()
-    if (filters.project) params.append('projectId', filters.project)
-    if (filters.sprint) params.append('sprintId', filters.sprint)
-    if (filters.assignee) params.append('assigneeId', filters.assignee)
-    if (filters.startDate) params.append('startDate', filters.startDate)
-    if (filters.endDate) params.append('endDate', filters.endDate)
-    params.append('format', 'csv')
-    // Trigger browser download
-    window.location.href = `/api/reports/gantt/export?${params.toString()}`
+    const p = new URLSearchParams()
+    if (filters.project) p.append('projectId', filters.project)
+    if (filters.sprint) p.append('sprintId', filters.sprint)
+    if (filters.assignee) p.append('assigneeId', filters.assignee)
+    if (filters.startDate) p.append('startDate', filters.startDate)
+    if (filters.endDate) p.append('endDate', filters.endDate)
+    p.append('format', 'csv')
+    window.location.href = `/api/reports/gantt/export?${p}`
   }
 
   const handleFilterChange = async (key: string, value: string) => {
     if (key === 'project') {
-      // Reset sprint filter when project changes
-      setFilters(prev => ({
-        ...prev,
-        project: value,
-        sprint: ''
-      }))
-      setProjectSearchQuery('')
-      setSprintSearchQuery('')
-
-      // Reload sprints for the new project
+      setFilters(prev => ({ ...prev, project: value, sprint: '' }))
+      setProjectSearchQuery(''); setSprintSearchQuery('')
       if (value) {
         try {
-          const sprintsResponse = await fetch(`/api/sprints?project=${value}`)
-          if (sprintsResponse.ok) {
-            const sprintsData = await sprintsResponse.json()
-            const sprintsArray = Array.isArray(sprintsData)
-              ? sprintsData
-              : (sprintsData?.data && Array.isArray(sprintsData.data) ? sprintsData.data : [])
-            setSprints(sprintsArray)
+          const r = await fetch(`/api/sprints?project=${value}`)
+          if (r.ok) {
+            const d = await r.json()
+            setSprints(Array.isArray(d) ? d : (d?.data && Array.isArray(d.data) ? d.data : []))
           }
-        } catch (error) {
-          console.error('Failed to load sprints:', error)
-        }
-      } else {
-        setSprints([])
-      }
+        } catch (e) { console.error('Failed to load sprints:', e) }
+      } else { setSprints([]) }
     } else if (key === 'sprint') {
-      setFilters(prev => ({
-        ...prev,
-        [key]: value
-      }))
-      setSprintSearchQuery('')
+      setFilters(prev => ({ ...prev, sprint: value })); setSprintSearchQuery('')
     } else if (key === 'assignee') {
-      setFilters(prev => ({
-        ...prev,
-        [key]: value
-      }))
-      setAssigneeSearchQuery('')
+      setFilters(prev => ({ ...prev, assignee: value })); setAssigneeSearchQuery('')
     } else {
-      setFilters(prev => ({
-        ...prev,
-        [key]: value
-      }))
+      setFilters(prev => ({ ...prev, [key]: value }))
     }
-  }
-
-  if (loading) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading Gantt chart...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
   }
 
   return (
     <MainLayout>
       <PageWrapper>
-        <div className="space-y-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Gantt Chart</h1>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">
-                Visualize project timelines and dependencies
-              </p>
+        <div className="space-y-6">
+
+          {/* ── Header ── */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-11 w-11 items-center justify-center rounded-[var(--apple-radius-md)] shadow-sm flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', boxShadow: '0 4px 14px rgba(255,149,0,0.30)' }}
+              >
+                <GitBranch className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight">Gantt Chart</h1>
+                <p className="text-[13px] text-[var(--apple-secondary-label)]">Visualize project timelines and task dependencies</p>
+              </div>
             </div>
-            <Button onClick={handleExport} className="flex items-center gap-2 w-full sm:w-auto">
-              <Download className="h-4 w-4" />
-              Export
+            <Button
+              onClick={handleExport}
+              className="rounded-full h-8 px-4 text-[13px] apple-transition flex items-center gap-1.5"
+              style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' }}
+            >
+              <Download className="h-3.5 w-3.5" />Export CSV
             </Button>
           </div>
 
-          {/* Filters */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <Filter className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                Filters
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="project" className="text-xs sm:text-sm">Project</Label>
-                  <Select
-                    value={filters.project || ALL_PROJECTS}
-                    onValueChange={(value) => handleFilterChange('project', value === ALL_PROJECTS ? '' : value)}
-                    onOpenChange={(open) => {
-                      if (open) focusSearchInput(projectSearchInputRef.current)
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All projects" />
-                    </SelectTrigger>
-                    <SelectContent className="p-0">
-                      <div className="p-2">
-                        <Input
-                          ref={projectSearchInputRef}
-                          value={projectSearchQuery}
-                          onChange={(e) => setProjectSearchQuery(e.target.value)}
-                          placeholder="Search projects"
-                          className="mb-2"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
-                          {filteredProjects.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                          ) : (
-                            filteredProjects.map((project) => (
-                              <SelectItem key={project._id} value={project._id}>
-                                {project.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                </div>
+          {/* ── Filter Card ── */}
+          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <SlidersHorizontal className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+              <p className="text-[13px] font-semibold text-[var(--apple-secondary-label)] uppercase tracking-[0.06em]">Filters</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
 
-                <div className="space-y-2">
-                  <Label htmlFor="sprint" className="text-xs sm:text-sm">Sprint</Label>
-                  <Select
-                    value={filters.sprint || ALL_SPRINTS}
-                    onValueChange={(value) => handleFilterChange('sprint', value === ALL_SPRINTS ? '' : value)}
-                    disabled={!filters.project}
-                    onOpenChange={(open) => {
-                      if (open) focusSearchInput(sprintSearchInputRef.current)
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All sprints" />
-                    </SelectTrigger>
-                    <SelectContent className="p-0">
-                      <div className="p-2">
-                        <Input
-                          ref={sprintSearchInputRef}
-                          value={sprintSearchQuery}
-                          onChange={(e) => setSprintSearchQuery(e.target.value)}
-                          placeholder="Search sprints"
-                          className="mb-2"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value={ALL_SPRINTS}>All sprints</SelectItem>
-                          {filteredSprints.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching sprints</div>
-                          ) : (
-                            filteredSprints.map((sprint) => (
-                              <SelectItem key={sprint._id} value={sprint._id}>
-                                {sprint.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                </div>
+              {/* Project */}
+              <Select
+                value={filters.project || ALL_PROJECTS}
+                onValueChange={v => handleFilterChange('project', v === ALL_PROJECTS ? '' : v)}
+                onOpenChange={open => open && focusSearchInput(projectSearchInputRef.current)}
+              >
+                <SelectTrigger className="h-9 rounded-full text-[13px] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]">
+                  <SelectValue placeholder="All projects" />
+                </SelectTrigger>
+                <SelectContent className="p-0 rounded-[var(--apple-radius-md)]">
+                  <div className="p-2">
+                    <Input
+                      ref={projectSearchInputRef}
+                      value={projectSearchQuery}
+                      onChange={e => setProjectSearchQuery(e.target.value)}
+                      placeholder="Search projects…"
+                      className="mb-2 h-8 text-[13px] rounded-full"
+                      onKeyDown={e => e.stopPropagation()}
+                      onMouseDown={e => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value={ALL_PROJECTS} className="text-[13px]">All projects</SelectItem>
+                      {filteredProjects.length === 0
+                        ? <div className="px-2 py-1 text-[12px] text-[var(--apple-tertiary-label)]">No matching projects</div>
+                        : filteredProjects.map(p => (
+                          <SelectItem key={p._id} value={p._id} className="text-[13px]">{p.name}</SelectItem>
+                        ))
+                      }
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
 
-                <div className="space-y-2">
-                  <Label htmlFor="assignee" className="text-xs sm:text-sm">Assignee</Label>
-                  <Select
-                    value={filters.assignee || ALL_ASSIGNEES}
-                    onValueChange={(value) => handleFilterChange('assignee', value === ALL_ASSIGNEES ? '' : value)}
-                    onOpenChange={(open) => {
-                      if (open) focusSearchInput(assigneeSearchInputRef.current)
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All assignees" />
-                    </SelectTrigger>
-                    <SelectContent className="p-0">
-                      <div className="p-2">
-                        <Input
-                          ref={assigneeSearchInputRef}
-                          value={assigneeSearchQuery}
-                          onChange={(e) => setAssigneeSearchQuery(e.target.value)}
-                          placeholder="Search assignees"
-                          className="mb-2"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value={ALL_ASSIGNEES}>All assignees</SelectItem>
-                          {filteredAssignees.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
-                          ) : (
-                            filteredAssignees.map((assignee) => (
-                              <SelectItem key={assignee._id} value={assignee._id}>
-                                {assignee.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                </div>
+              {/* Sprint */}
+              <Select
+                value={filters.sprint || ALL_SPRINTS}
+                onValueChange={v => handleFilterChange('sprint', v === ALL_SPRINTS ? '' : v)}
+                disabled={!filters.project}
+                onOpenChange={open => open && focusSearchInput(sprintSearchInputRef.current)}
+              >
+                <SelectTrigger className="h-9 rounded-full text-[13px] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]">
+                  <SelectValue placeholder="All sprints" />
+                </SelectTrigger>
+                <SelectContent className="p-0 rounded-[var(--apple-radius-md)]">
+                  <div className="p-2">
+                    <Input
+                      ref={sprintSearchInputRef}
+                      value={sprintSearchQuery}
+                      onChange={e => setSprintSearchQuery(e.target.value)}
+                      placeholder="Search sprints…"
+                      className="mb-2 h-8 text-[13px] rounded-full"
+                      onKeyDown={e => e.stopPropagation()}
+                      onMouseDown={e => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value={ALL_SPRINTS} className="text-[13px]">All sprints</SelectItem>
+                      {filteredSprints.length === 0
+                        ? <div className="px-2 py-1 text-[12px] text-[var(--apple-tertiary-label)]">No matching sprints</div>
+                        : filteredSprints.map(s => (
+                          <SelectItem key={s._id} value={s._id} className="text-[13px]">{s.name}</SelectItem>
+                        ))
+                      }
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
 
-                <div className="space-y-2">
-                  <Label htmlFor="startDate" className="text-xs sm:text-sm">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={filters.startDate}
-                    onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                    className="w-full"
-                  />
-                </div>
+              {/* Assignee */}
+              <Select
+                value={filters.assignee || ALL_ASSIGNEES}
+                onValueChange={v => handleFilterChange('assignee', v === ALL_ASSIGNEES ? '' : v)}
+                onOpenChange={open => open && focusSearchInput(assigneeSearchInputRef.current)}
+              >
+                <SelectTrigger className="h-9 rounded-full text-[13px] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]">
+                  <SelectValue placeholder="All assignees" />
+                </SelectTrigger>
+                <SelectContent className="p-0 rounded-[var(--apple-radius-md)]">
+                  <div className="p-2">
+                    <Input
+                      ref={assigneeSearchInputRef}
+                      value={assigneeSearchQuery}
+                      onChange={e => setAssigneeSearchQuery(e.target.value)}
+                      placeholder="Search assignees…"
+                      className="mb-2 h-8 text-[13px] rounded-full"
+                      onKeyDown={e => e.stopPropagation()}
+                      onMouseDown={e => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value={ALL_ASSIGNEES} className="text-[13px]">All assignees</SelectItem>
+                      {filteredAssignees.length === 0
+                        ? <div className="px-2 py-1 text-[12px] text-[var(--apple-tertiary-label)]">No matching assignees</div>
+                        : filteredAssignees.map(a => (
+                          <SelectItem key={a._id} value={a._id} className="text-[13px]">{a.name}</SelectItem>
+                        ))
+                      }
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
 
-                <div className="space-y-2">
-                  <Label htmlFor="endDate" className="text-xs sm:text-sm">End Date</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={filters.endDate}
-                    onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                    className="w-full"
-                  />
-                </div>
+              {/* Date inputs */}
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--apple-tertiary-label)] pointer-events-none" />
+                <Input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={e => handleFilterChange('startDate', e.target.value)}
+                  className="pl-9 h-9 rounded-full text-[13px] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]"
+                />
               </div>
-            </CardContent>
-          </Card>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--apple-tertiary-label)] pointer-events-none" />
+                <Input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={e => handleFilterChange('endDate', e.target.value)}
+                  className="pl-9 h-9 rounded-full text-[13px] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]"
+                />
+              </div>
+            </div>
+          </div>
 
-          {/* Gantt Chart */}
-          {ganttData && ganttData.tasks.length > 0 ? (
-            <div className="overflow-x-auto">
-              <GanttChart
-                tasks={ganttData.tasks}
-                startDate={ganttData.startDate}
-                endDate={ganttData.endDate}
-                onTaskClick={handleTaskClick}
-              />
+          {/* ── Gantt Chart ── */}
+          {loading ? (
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-12 flex flex-col items-center gap-4 animate-pulse">
+              <div className="h-10 w-10 rounded-full bg-[var(--apple-tertiary-fill)]" />
+              <div className="h-4 w-40 rounded-full bg-[var(--apple-tertiary-fill)]" />
+              <div className="w-full h-48 rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] mt-2" />
+            </div>
+          ) : ganttData && ganttData.tasks.length > 0 ? (
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
+              <div className="overflow-x-auto">
+                <GanttChart
+                  tasks={ganttData.tasks}
+                  startDate={ganttData.startDate}
+                  endDate={ganttData.endDate}
+                  onTaskClick={handleTaskClick}
+                />
+              </div>
             </div>
           ) : (
-            <Card>
-              <CardContent className="flex items-center justify-center h-64">
-                <div className="text-center px-4">
-                  <Calendar className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-base sm:text-lg font-semibold mb-2">No tasks found</h3>
-                  <p className="text-sm sm:text-base text-muted-foreground">
-                    Try adjusting your filters or create some tasks to see the Gantt chart.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-16 flex flex-col items-center gap-4">
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-[var(--apple-radius-lg)]"
+                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' }}
+              >
+                <GitBranch className="h-6 w-6 text-white" />
+              </div>
+              <p className="text-[17px] font-semibold">No tasks found</p>
+              <p className="text-[13px] text-[var(--apple-secondary-label)] text-center max-w-sm">
+                Try adjusting your filters or create tasks to see the Gantt chart.
+              </p>
+            </div>
           )}
         </div>
       </PageWrapper>
     </MainLayout>
   )
 }
-
