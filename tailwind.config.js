@@ -109,6 +109,12 @@ module.exports = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+      transitionDuration: {
+        250: "250ms",
+      },
+      transitionTimingFunction: {
+        apple: "cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

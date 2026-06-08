@@ -41,12 +41,14 @@
 
   /* Apple HIG glass material — header, popovers */
   .apple-glass {
-    background: rgba(255, 255, 255, 0.78);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: saturate(180%) blur(8px);
+    -webkit-backdrop-filter: saturate(180%) blur(8px);
   }
   .dark .apple-glass {
-    background: rgba(22, 22, 24, 0.78);
+    background: rgba(22, 22, 24, 0.58);
+    backdrop-filter: saturate(180%) blur(8px);
+    -webkit-backdrop-filter: saturate(180%) blur(8px);
   }
 
   /* Auth page glass card — premium frosted panel, light + dark */
@@ -69,12 +71,14 @@
 
   /* Apple HIG sidebar material */
   .apple-sidebar-material {
-    background: rgba(246, 246, 248, 0.94);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background: rgba(246, 246, 248, 0.58);
+    backdrop-filter: saturate(180%) blur(8px);
+    -webkit-backdrop-filter: saturate(180%) blur(8px);
   }
   .dark .apple-sidebar-material {
-    background: rgba(16, 16, 18, 0.94);
+    background: rgba(16, 16, 18, 0.62);
+    backdrop-filter: saturate(180%) blur(8px);
+    -webkit-backdrop-filter: saturate(180%) blur(8px);
   }
 
   /* Apple HIG section header label */
