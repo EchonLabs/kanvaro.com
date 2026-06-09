@@ -535,11 +535,11 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="overflow-x-auto overflow-y-hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-2 [scrollbar-width:thin] [scrollbar-color:var(--apple-separator)_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[var(--apple-separator)] [&::-webkit-scrollbar-thumb]:rounded-full">
           <div
-            className="grid gap-4 sm:gap-6 min-w-max sm:min-w-0"
+            className="grid gap-3 sm:gap-4 min-w-max sm:min-w-0"
             style={{
-              gridTemplateColumns: `repeat(${getColumns().length}, minmax(320px, 1fr))`,
+              gridTemplateColumns: `repeat(${getColumns().length}, minmax(280px, 1fr))`,
             }}
           >
             {getColumns().map((column) => {

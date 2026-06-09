@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -20,84 +22,379 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-  
+
+  /* Apple HIG font utilities */
+  .font-apple {
+    font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+  .font-apple-rounded {
+    font-family: 'Nunito Sans', system-ui, sans-serif;
+  }
+  .font-apple-mono {
+    font-family: 'Nunito Sans', ui-monospace, monospace;
+  }
+  .font-timer {
+    font-family: 'Nunito Sans', system-ui, sans-serif;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Apple HIG glass material — header, popovers */
+  .apple-glass {
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: saturate(180%) blur(8px);
+    -webkit-backdrop-filter: saturate(180%) blur(8px);
+  }
+  .dark .apple-glass {
+    background: rgba(22, 22, 24, 0.58);
+    backdrop-filter: saturate(180%) blur(8px);
+    -webkit-backdrop-filter: saturate(180%) blur(8px);
+  }
+
+  /* Auth page glass card — premium frosted panel, light + dark */
+  .auth-glass-card {
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: saturate(180%) blur(28px);
+    -webkit-backdrop-filter: saturate(180%) blur(28px);
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.10),
+      0 2px 8px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+  .dark .auth-glass-card {
+    background: rgba(22, 22, 24, 0.82);
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.55),
+      0 2px 8px rgba(0, 0, 0, 0.30),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  /* Apple HIG sidebar material */
+  .apple-sidebar-material {
+    background: rgba(246, 246, 248, 0.58);
+    backdrop-filter: saturate(180%) blur(8px);
+    -webkit-backdrop-filter: saturate(180%) blur(8px);
+  }
+  .dark .apple-sidebar-material {
+    background: rgba(16, 16, 18, 0.62);
+    backdrop-filter: saturate(180%) blur(8px);
+    -webkit-backdrop-filter: saturate(180%) blur(8px);
+  }
+
+  /* Apple HIG section header label */
+  .apple-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--apple-tertiary-label);
+  }
+
+  /* Apple HIG spring-like easing transition */
+  .apple-transition {
+    transition: all 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  /* Card resize / view-switch container — use with key={viewMode} to retrigger */
+  .view-transition-container {
+    animation: view-fade-scale 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  }
+
+  /* Individual card stagger inside a view-transition-container */
+  .view-transition-container > * {
+    animation: card-enter 0.20s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  }
+  .view-transition-container > *:nth-child(1)  { animation-delay:   0ms; }
+  .view-transition-container > *:nth-child(2)  { animation-delay:  25ms; }
+  .view-transition-container > *:nth-child(3)  { animation-delay:  50ms; }
+  .view-transition-container > *:nth-child(4)  { animation-delay:  75ms; }
+  .view-transition-container > *:nth-child(5)  { animation-delay: 100ms; }
+  .view-transition-container > *:nth-child(6)  { animation-delay: 125ms; }
+  .view-transition-container > *:nth-child(7)  { animation-delay: 150ms; }
+  .view-transition-container > *:nth-child(8)  { animation-delay: 175ms; }
+  .view-transition-container > *:nth-child(9)  { animation-delay: 200ms; }
+  .view-transition-container > *:nth-child(n+10) { animation-delay: 200ms; }
+
+  /* Progress bar shimmer sweep — light passes left-to-right then pauses */
+  .progress-shimmer {
+    animation: shimmer-sweep 2s ease-in-out infinite;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.42) 50%,
+      transparent 100%
+    );
+  }
+}
+
+/* View-switch container fade+scale */
+@keyframes view-fade-scale {
+  from { opacity: 0; transform: scale(0.975) translateY(3px); }
+  to   { opacity: 1; transform: scale(1)     translateY(0);   }
+}
+
+/* Per-card stagger enter inside view-transition-container */
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* Shimmer keyframe — defined outside @layer so Tailwind arbitrary can reference it */
+@keyframes shimmer-sweep {
+  0%          { transform: translateX(-100%); }
+  55%, 100%   { transform: translateX(250%);  }
+}
+
+/* Status dot pulse — scale+opacity for the inner dot */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1);    }
+  50%      { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* Status badge border pulse — glowing ring around the badge using currentColor */
+@keyframes badge-border-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px currentColor;       opacity: 0.85;    }
+  50%       { box-shadow: 0 0 0 0px currentColor;       opacity: 1; }
+}
+
+/* Transitions.dev — Number pop-in */
+:root {
+  --digit-dur: 500ms;
+  --digit-distance: 8px;
+  --digit-stagger: 70ms;
+  --digit-blur: 2px;
+  --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --digit-dir-x: 0;
+  --digit-dir-y: 1;
+}
+
+@keyframes t-digit-pop-in {
+  0%   {
+    transform: translate(
+      calc(var(--digit-distance) * var(--digit-dir-x)),
+      calc(var(--digit-distance) * var(--digit-dir-y))
+    );
+    opacity: 0;
+    filter: blur(var(--digit-blur));
+  }
+  100% { transform: translate(0, 0); opacity: 1; filter: blur(0); }
+}
+
+.t-digit-group {
+  display: inline-flex;
+  align-items: baseline;
+}
+.t-digit {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+}
+.t-digit-group.is-animating .t-digit {
+  animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
+}
+.t-digit-group.is-animating .t-digit[data-stagger="1"] {
+  animation-delay: var(--digit-stagger);
+}
+.t-digit-group.is-animating .t-digit[data-stagger="2"] {
+  animation-delay: calc(var(--digit-stagger) * 2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-digit-group .t-digit { animation: none !important; }
+}
+
+/* Number Digit Flip — re-fires every time a digit value changes (live timer) */
+:root {
+  --ndf-dur: 180ms;
+  --ndf-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ndf-distance: 50%;
+  --ndf-blur: 3px;
+}
+
+@keyframes number-digit-flip {
+  0% {
+    transform: translateY(var(--ndf-distance));
+    opacity: 0;
+    filter: blur(var(--ndf-blur));
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.number-digit-flip {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  will-change: transform, opacity, filter;
+  animation: number-digit-flip var(--ndf-dur) var(--ndf-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .number-digit-flip { animation: none !important; }
 }
 
 @layer base {
   * {
     box-sizing: border-box;
   }
-  
+
   html,
   body {
     overflow-x: hidden;
     width: 100%;
     position: relative;
   }
-  
+
   /* Prevent horizontal scrolling on all containers */
   body > * {
     max-width: 100%;
     overflow-x: hidden;
   }
-  
+
   /* Ensure images and media don't overflow */
   img, video, iframe, embed, object {
     max-width: 100% !important;
     height: auto;
   }
-  
+
   /* Prevent text overflow */
   p, span, div, h1, h2, h3, h4, h5, h6 {
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
-  
+
   :root {
-    /* Light theme - High contrast, accessible colors */
-    --background: 0 0% 100%; /* Pure white */
-    --foreground: 0 0% 0%; /* Pure black */
-    --card: 0 0% 100%; /* Pure white */
-    --card-foreground: 0 0% 0%; /* Pure black */
-    --popover: 0 0% 100%; /* Pure white */
-    --popover-foreground: 0 0% 0%; /* Pure black */
-    --primary: 0 0% 0%; /* Pure black for primary actions */
-    --primary-foreground: 0 0% 100%; /* Pure white text on primary */
-    --secondary: 0 0% 96%; /* Very light gray */
-    --secondary-foreground: 0 0% 0%; /* Pure black */
-    --muted: 0 0% 96%; /* Very light gray */
-    --muted-foreground: 0 0% 45%; /* Dark gray for muted text */
-    --accent: 0 0% 96%; /* Very light gray */
-    --accent-foreground: 0 0% 0%; /* Pure black */
-    --destructive: 0 84% 60%; /* High contrast red for destructive actions */
-    --destructive-foreground: 0 0% 100%; /* White text on destructive */
-    --border: 0 0% 90%; /* Light gray borders */
-    --input: 0 0% 96%; /* Light gray input backgrounds */
-    --ring: 0 0% 0%; /* Black focus rings */
-    --radius: 0.5rem;
+    /* ============================================================
+       shadcn/ui tokens — updated to Apple HIG light mode values
+       ============================================================ */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 211 100% 50%;          /* Apple Blue #007AFF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;          /* #F2F2F7 Apple secondary bg */
+    --secondary-foreground: 0 0% 0%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 3% 36%;   /* Darker muted text for light mode readability */
+    --accent: 240 5% 96%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 3 100% 59%;        /* #FF3B30 Apple red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 90%;
+    --input: 240 5% 96%;
+    --ring: 211 100% 50%;             /* Apple Blue focus ring */
+    --radius: 0.875rem;               /* 14px — Apple HIG md radius */
+
+    /* ============================================================
+       Apple HIG semantic color tokens
+       ============================================================ */
+    --apple-system-blue: #007AFF;
+    --apple-system-green: #34C759;
+    --apple-system-orange: #FF9500;
+    --apple-system-red: #FF3B30;
+    --apple-system-yellow: #FFCC00;
+    --apple-system-purple: #AF52DE;
+    --apple-system-gray: #8E8E93;
+    --apple-system-cyan: #32ADE6;
+    --apple-system-teal: #30B0C7;
+
+    /* Background hierarchy */
+    --apple-system-background: #FFFFFF;
+    --apple-secondary-system-background: #F2F2F7;
+    --apple-tertiary-system-background: #FFFFFF;
+    --apple-system-grouped-background: #F2F2F7;
+    --apple-secondary-system-grouped-background: #FFFFFF;
+    --apple-tertiary-system-grouped-background: #F2F2F7;
+
+    /* Label hierarchy — slightly stronger in light mode for web readability */
+    --apple-label: #000000;
+    --apple-secondary-label: rgba(60, 60, 67, 0.80);
+    --apple-tertiary-label: rgba(60, 60, 67, 0.52);
+    --apple-quaternary-label: rgba(60, 60, 67, 0.26);
+
+    /* Fill hierarchy */
+    --apple-fill: rgba(120, 120, 128, 0.20);
+    --apple-secondary-fill: rgba(120, 120, 128, 0.16);
+    --apple-tertiary-fill: rgba(118, 118, 128, 0.12);
+    --apple-quaternary-fill: rgba(116, 116, 128, 0.08);
+
+    /* Separators */
+    --apple-separator: rgba(60, 60, 67, 0.22);
+    --apple-opaque-separator: #C6C6C8;
+
+    /* Radius tokens */
+    --apple-radius-sm: 10px;
+    --apple-radius-md: 14px;
+    --apple-radius-lg: 16px;
+    --apple-radius-xl: 20px;
+    --apple-radius-pill: 999px;
   }
 
   .dark {
-    /* Dark theme - High contrast, accessible colors */
-    --background: 0 0% 8%; /* Very dark gray */
-    --foreground: 0 0% 100%; /* Pure white */
-    --card: 0 0% 8%; /* Very dark gray */
-    --card-foreground: 0 0% 100%; /* Pure white */
-    --popover: 0 0% 8%; /* Very dark gray */
-    --popover-foreground: 0 0% 100%; /* Pure white */
-    --primary: 0 0% 100%; /* Pure white for primary actions */
-    --primary-foreground: 0 0% 0%; /* Black text on primary */
-    --secondary: 0 0% 15%; /* Dark gray */
-    --secondary-foreground: 0 0% 100%; /* Pure white */
-    --muted: 0 0% 15%; /* Dark gray */
-    --muted-foreground: 0 0% 70%; /* Light gray for muted text */
-    --accent: 0 0% 15%; /* Dark gray */
-    --accent-foreground: 0 0% 100%; /* Pure white */
-    --destructive: 0 84% 60%; /* High contrast red for destructive actions */
-    --destructive-foreground: 0 0% 100%; /* White text on destructive */
-    --border: 0 0% 20%; /* Dark gray borders */
-    --input: 0 0% 15%; /* Dark gray input backgrounds */
-    --ring: 0 0% 100%; /* White focus rings */
+    /* ============================================================
+       shadcn/ui tokens — Apple HIG true dark mode values
+       ============================================================ */
+    --background: 0 0% 0%;            /* #000000 TRUE black */
+    --foreground: 0 0% 100%;
+    --card: 0 0% 11%;                 /* #1C1C1E Apple secondary bg */
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 17%;              /* #2C2C2E Apple tertiary bg */
+    --popover-foreground: 0 0% 100%;
+    --primary: 211 100% 53%;          /* #0A84FF Apple Blue dark */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 11%;            /* #1C1C1E */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 11%;
+    --muted-foreground: 0 0% 60%;     /* Approx rgba(235,235,245,.60) */
+    --accent: 0 0% 17%;               /* #2C2C2E */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 3 100% 61%;        /* #FF453A Apple red dark */
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 2% 26%;             /* Approx rgba(84,84,88,.55) */
+    --input: 0 0% 11%;
+    --ring: 211 100% 53%;
+
+    /* ============================================================
+       Apple HIG dark semantic color tokens
+       ============================================================ */
+    --apple-system-blue: #0A84FF;
+    --apple-system-green: #30D158;
+    --apple-system-orange: #FF9F0A;
+    --apple-system-red: #FF453A;
+    --apple-system-yellow: #FFD60A;
+    --apple-system-purple: #BF5AF2;
+    --apple-system-gray: #8E8E93;
+    --apple-system-cyan: #64D2FF;
+    --apple-system-teal: #40C8E0;
+
+    /* Background hierarchy — dark */
+    --apple-system-background: #000000;
+    --apple-secondary-system-background: #1C1C1E;
+    --apple-tertiary-system-background: #2C2C2E;
+    --apple-system-grouped-background: #000000;
+    --apple-secondary-system-grouped-background: #1C1C1E;
+    --apple-tertiary-system-grouped-background: #2C2C2E;
+
+    /* Label hierarchy — dark */
+    --apple-label: #FFFFFF;
+    --apple-secondary-label: rgba(235, 235, 245, 0.60);
+    --apple-tertiary-label: rgba(235, 235, 245, 0.30);
+    --apple-quaternary-label: rgba(235, 235, 245, 0.18);
+
+    /* Fill hierarchy — dark */
+    --apple-fill: rgba(120, 120, 128, 0.36);
+    --apple-secondary-fill: rgba(120, 120, 128, 0.32);
+    --apple-tertiary-fill: rgba(118, 118, 128, 0.24);
+    --apple-quaternary-fill: rgba(118, 118, 128, 0.18);
+
+    /* Separators — dark */
+    --apple-separator: rgba(84, 84, 88, 0.55);
+    --apple-opaque-separator: #38383A;
   }
 }
 
@@ -107,30 +404,34 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
   }
-  
+
   /* Remove margin-top from layout content */
   main {
     margin-top: 0 !important;
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — Apple HIG style */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground));
-  border-radius: 3px;
+  background: var(--apple-fill);
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary));
+  background: var(--apple-secondary-fill);
 }
 
 /* Loading animation */
@@ -144,7 +445,7 @@
   animation: spin 1s linear infinite;
 }
 
-/* Setup wizard specific styles - Modern accessible design */
+/* Setup wizard specific styles */
 .setup-wizard {
   background: hsl(var(--background));
   min-height: 100vh;
@@ -156,12 +457,12 @@
     flex-wrap: wrap;
     gap: 1rem;
   }
-  
+
   .progress-steps li {
     flex: 1 1 calc(50% - 0.5rem);
     min-width: 150px;
   }
-  
+
   .progress-steps .connector-line {
     display: none;
   }
@@ -173,13 +474,13 @@
     align-items: flex-start;
     gap: 1rem;
   }
-  
+
   .progress-steps li {
     flex-direction: row;
     width: 100%;
     max-width: none;
   }
-  
+
   .progress-steps .connector-line {
     display: none;
   }
@@ -223,7 +524,7 @@
 
 /* Keep links blue */
 .rich-text-editor a {
-  color: rgb(59, 130, 246) !important;
+  color: var(--apple-system-blue) !important;
   background-color: transparent !important;
 }
 
@@ -237,7 +538,7 @@
   background-color: transparent !important;
 }
 
-/* Task description display - Override prose styles for proper theme colors */
+/* Task description display */
 .task-description {
   color: hsl(var(--foreground)) !important;
 }
@@ -266,19 +567,19 @@
 }
 
 .task-description a {
-  color: rgb(59, 130, 246) !important;
+  color: var(--apple-system-blue) !important;
   background-color: transparent !important;
 }
 
 .task-description img {
   max-width: 100% !important;
   height: auto !important;
-  border-radius: 0.5rem;
+  border-radius: var(--apple-radius-sm);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   background-color: transparent !important;
 }
 
-/* Task description formatting (Tailwind preflight removes default margins/list styles) */
+/* Task description formatting */
 .task-description p {
   margin: 0.5rem 0;
 }

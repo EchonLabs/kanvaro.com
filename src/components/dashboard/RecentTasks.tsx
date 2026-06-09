@@ -1,14 +1,13 @@
 'use client'
 
-import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { formatToTitleCase } from '@/lib/utils'
-import { Calendar, User, ArrowRight, CheckCircle } from 'lucide-react'
+import { Calendar, User, ArrowRight, CheckSquare } from 'lucide-react'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils'
 
 interface RecentTasksProps {
   tasks?: any[]
@@ -16,73 +15,67 @@ interface RecentTasksProps {
   onTaskUpdate?: () => void
 }
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'todo':
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    case 'in_progress':
-      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-    case 'review':
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
-    case 'testing':
-      return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
-    case 'done':
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
-    case 'cancelled':
-      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-    default:
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-  }
+/* Apple HIG semantic status styles */
+const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
+  todo:        { bg: 'bg-[var(--apple-system-gray)]/12',    text: 'text-[var(--apple-system-gray)]' },
+  in_progress: { bg: 'bg-[var(--apple-system-blue)]/12',   text: 'text-[var(--apple-system-blue)]' },
+  review:      { bg: 'bg-[var(--apple-system-yellow)]/15', text: 'text-[var(--apple-system-yellow)]' },
+  testing:     { bg: 'bg-[var(--apple-system-purple)]/12', text: 'text-[var(--apple-system-purple)]' },
+  done:        { bg: 'bg-[var(--apple-system-green)]/12',  text: 'text-[var(--apple-system-green)]' },
+  cancelled:   { bg: 'bg-[var(--apple-system-red)]/12',    text: 'text-[var(--apple-system-red)]' },
 }
 
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case 'critical':
-      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-    case 'high':
-      return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
-    case 'medium':
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
-    case 'low':
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
-    default:
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-  }
+const PRIORITY_STYLES: Record<string, { bg: string; text: string }> = {
+  critical: { bg: 'bg-[var(--apple-system-red)]/12',    text: 'text-[var(--apple-system-red)]' },
+  high:     { bg: 'bg-[var(--apple-system-orange)]/12', text: 'text-[var(--apple-system-orange)]' },
+  medium:   { bg: 'bg-[var(--apple-system-yellow)]/15', text: 'text-[var(--apple-system-yellow)]' },
+  low:      { bg: 'bg-[var(--apple-system-green)]/12',  text: 'text-[var(--apple-system-green)]' },
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const style = STATUS_STYLES[status] || STATUS_STYLES.todo
+  return (
+    <span className={cn(
+      'inline-flex items-center px-2 py-0.5 rounded-[var(--apple-radius-pill)] text-xs font-medium whitespace-nowrap',
+      style.bg, style.text
+    )}>
+      {formatToTitleCase(status)}
+    </span>
+  )
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  const style = PRIORITY_STYLES[priority] || PRIORITY_STYLES.medium
+  return (
+    <span className={cn(
+      'inline-flex items-center px-2 py-0.5 rounded-[var(--apple-radius-pill)] text-xs font-medium whitespace-nowrap',
+      style.bg, style.text
+    )}>
+      {formatToTitleCase(priority)}
+    </span>
+  )
 }
 
 export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps) {
   const router = useRouter()
-  const { showToast } = useToast()
   const { formatDate } = useDateTime()
-  // Selection controls removed per request; tasks are view-only here.
 
   if (isLoading) {
     return (
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Recent Tasks</CardTitle>
-            <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-28 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+            <div className="h-4 w-16 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="space-y-1">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center space-x-3 p-3 border rounded-lg">
-                <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                    <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                    <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                    <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                    <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                  </div>
-                </div>
-                <div className="h-8 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+                <div className="h-4 w-40 bg-[var(--apple-tertiary-fill)] rounded animate-pulse flex-1" />
+                <div className="h-5 w-16 bg-[var(--apple-tertiary-fill)] rounded-full animate-pulse" />
+                <div className="h-5 w-14 bg-[var(--apple-tertiary-fill)] rounded-full animate-pulse" />
               </div>
             ))}
           </div>
@@ -97,24 +90,16 @@ export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Recent Tasks</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/tasks')}
-            >
-              View All
-              <ArrowRight className="h-4 w-4 ml-1" />
+            <Button variant="ghost" size="sm" onClick={() => router.push('/tasks')}>
+              View All <ArrowRight className="h-3.5 w-3.5 ml-1" />
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">No tasks found</p>
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => router.push('/tasks/create-new-task')}
-            >
+          <div className="text-center py-10">
+            <CheckSquare className="h-8 w-8 text-[var(--apple-tertiary-label)] mx-auto mb-3" />
+            <p className="text-sm text-[var(--apple-secondary-label)] mb-4">No tasks found</p>
+            <Button variant="default" size="sm" onClick={() => router.push('/tasks/create-new-task')}>
               Create Your First Task
             </Button>
           </div>
@@ -125,85 +110,64 @@ export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps
 
   return (
     <Card className="overflow-x-hidden">
-      <CardHeader className="p-4 sm:p-6">
-        <div className="flex flex-col space-y-1.5">
-          <div className="flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-base sm:text-lg truncate">Recent Tasks</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                router.push('/tasks')
-              }}
-              className="flex-shrink-0"
-            >
-              View All
-              <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
-            </Button>
-          </div>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Recent Tasks</CardTitle>
+          <button
+            onClick={() => router.push('/tasks')}
+            className="text-[15px] text-[var(--apple-system-blue)] hover:opacity-80 apple-transition flex items-center gap-1"
+          >
+            View all <ArrowRight className="h-3.5 w-3.5" />
+          </button>
         </div>
       </CardHeader>
-      <CardContent className="p-4 sm:p-6 pt-0">
-        <div className="space-y-2 sm:space-y-3">
+      <CardContent className="pt-0">
+        <div className="space-y-0 -mx-1 px-1">
           {tasks.map((task) => (
             <div
               key={task._id}
-              className="flex items-start sm:items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors overflow-x-hidden"
+              className="flex items-start sm:items-center gap-3 px-3 py-2.5 rounded-[var(--apple-radius-md)] hover:bg-[var(--apple-quaternary-fill)] apple-transition cursor-pointer overflow-x-hidden"
+              onClick={() => router.push(`/tasks/${task._id}`)}
             >
               <div className="flex-1 min-w-0">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1 min-w-0">
+                {/* Task title + badges row */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 min-w-0">
                   <h4
-                    className={`text-xs sm:text-sm font-medium truncate ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}
+                    className={cn(
+                      'text-[15px] font-medium truncate min-w-0',
+                      task.status === 'done'
+                        ? 'line-through text-[var(--apple-tertiary-label)]'
+                        : 'text-[var(--apple-label)]'
+                    )}
                     title={task.title}
                   >
                     {task.title}
                   </h4>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Badge className={`${getStatusColor(task.status)} text-xs whitespace-nowrap`}>
-                      {formatToTitleCase(task.status)}
-                    </Badge>
-                    <Badge className={`${getPriorityColor(task.priority)} text-xs whitespace-nowrap`}>
-                      {formatToTitleCase(task.priority)}
-                    </Badge>
+                  <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
+                    <StatusBadge status={task.status} />
+                    <PriorityBadge priority={task.priority} />
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-600 dark:text-gray-400">
-                  <span
-                    className="font-medium truncate"
-                    title={task.project?.name}
-                  >
+                {/* Meta row */}
+                <div className="flex flex-wrap items-center gap-2 mt-1 text-[13px] text-[var(--apple-secondary-label)]">
+                  <span className="font-medium truncate" title={task.project?.name}>
                     {task.project?.name || 'No Project'}
                   </span>
                   {task.assignedTo && (
-                    <div className="flex items-center whitespace-nowrap">
-                      <User className="h-3 w-3 mr-1 flex-shrink-0" />
-                      <span className="truncate">{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
+                    <div className="flex items-center gap-1 whitespace-nowrap">
+                      <User className="h-3 w-3 flex-shrink-0" />
+                      <span>{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
                     </div>
                   )}
                   {task.dueDate && (
-                    <div className="flex items-center whitespace-nowrap">
-                      <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
-                      <span className="truncate">{formatDate(task.dueDate)}</span>
+                    <div className="flex items-center gap-1 whitespace-nowrap">
+                      <Calendar className="h-3 w-3 flex-shrink-0" />
+                      <span>{formatDate(task.dueDate)}</span>
                     </div>
                   )}
                 </div>
               </div>
-
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="flex-shrink-0 hidden sm:inline-flex"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  router.push(`/tasks/${task._id}`)
-                }}
-              >
-                View
-              </Button>
             </div>
           ))}
         </div>

@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { OrganizationSettings } from '@/components/settings/OrganizationSettings'
 import { EmailSettings } from '@/components/settings/EmailSettings'
 import { DatabaseSettings } from '@/components/settings/DatabaseSettings'
@@ -16,20 +14,28 @@ import {
   Database,
   Settings as SettingsIcon,
   BookOpen,
-  Loader2
+  Loader2,
+  ShieldOff,
 } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { cn } from '@/lib/utils'
+
+const TABS = [
+  { id: 'organization', label: 'Organization', icon: Building2 },
+  { id: 'email',        label: 'Email',         icon: Mail      },
+  { id: 'database',    label: 'Database',       icon: Database  },
+]
+
+const DOC_TAB = { id: 'documentation', label: 'Documentation', icon: BookOpen }
 
 export default function SettingsPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
-
   const [activeTab, setActiveTab] = useState('organization')
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   const { hasPermission, loading: permissionsLoading } = usePermissions()
 
-  // Auth initialization
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       setIsLoading(false)
@@ -40,10 +46,13 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin mx-auto mb-3 sm:mb-4 text-primary" />
-          <p className="text-xs sm:text-sm text-muted-foreground">Loading settings...</p>
+          <div className="w-12 h-12 rounded-[var(--apple-radius-md)] flex items-center justify-center mx-auto mb-4"
+            style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 16px rgba(0,122,255,0.35)' }}>
+            <Loader2 className="h-6 w-6 text-white animate-spin" />
+          </div>
+          <p className="text-[13px] text-[var(--apple-secondary-label)]">Loading settings…</p>
         </div>
       </div>
     )
@@ -51,10 +60,8 @@ export default function SettingsPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="text-center">
-          <p className="text-xs sm:text-sm text-muted-foreground">No user data available</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-[13px] text-[var(--apple-secondary-label)]">No user data available</p>
       </div>
     )
   }
@@ -66,80 +73,78 @@ export default function SettingsPage() {
     return (
       <MainLayout>
         <div className="min-h-[50vh] flex items-center justify-center px-4">
-          <div className="text-center max-w-md space-y-3">
-            <p className="text-lg font-semibold text-foreground">Access restricted</p>
-            <p className="text-sm text-muted-foreground">
-              You do not have permission to view application settings. Please contact your administrator if you believe this is a mistake.
-            </p>
+          <div className="text-center max-w-sm space-y-4">
+            <div className="w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center mx-auto"
+              style={{ background: 'linear-gradient(135deg,#FF3B30 0%,#FF9500 100%)', boxShadow: '0 4px 16px rgba(255,59,48,0.30)' }}>
+              <ShieldOff className="h-7 w-7 text-white" strokeWidth={1.8} />
+            </div>
+            <div>
+              <p className="text-[17px] font-semibold text-[var(--apple-label)]">Access Restricted</p>
+              <p className="text-[13px] text-[var(--apple-secondary-label)] mt-1">
+                You don't have permission to view application settings. Contact your administrator if this is a mistake.
+              </p>
+            </div>
           </div>
         </div>
       </MainLayout>
     )
   }
 
+  const visibleTabs = canManageDocumentation ? [...TABS, DOC_TAB] : TABS
+
   return (
     <MainLayout>
-      <div className="space-y-8 px-4 sm:px-6">
-        {/* Settings Header */}
-        <div className="border-b border-border pb-4 sm:pb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-              <SettingsIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight truncate">
-                Application Settings
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
-                Configure your organization settings, email system, and database management.
-              </p>
-            </div>
+      <div className="space-y-6 px-4 sm:px-6">
+
+        {/* ── Page Header ── */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div
+            className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center shadow-lg"
+            style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 16px rgba(0,122,255,0.35)' }}
+          >
+            <SettingsIcon className="h-7 w-7 text-white" strokeWidth={1.8} />
+          </div>
+          <div>
+            <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
+              Settings
+            </h1>
+            <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+              Manage your organization, email, database, and documentation
+            </p>
           </div>
         </div>
 
-        {/* Settings Content */}
-        <div className="space-y-6 sm:space-y-8">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 sm:space-y-8">
-            <TabsList className={`grid w-full gap-1 overflow-x-auto mb-4 ${canManageDocumentation ? 'grid-cols-4' : 'grid-cols-3'}`}>
-              <TabsTrigger value="organization" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-                <Building2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">Organization</span>
-              </TabsTrigger>
-              <TabsTrigger value="email" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-                <Mail className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">Email</span>
-              </TabsTrigger>
-              <TabsTrigger value="database" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-                <Database className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">Database</span>
-              </TabsTrigger>
-              {canManageDocumentation && (
-                <TabsTrigger value="documentation" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-                  <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="truncate">Documentation</span>
-                </TabsTrigger>
-              )}
-            </TabsList>
-
-            <TabsContent value="organization" className="space-y-4 sm:space-y-6">
-              <OrganizationSettings />
-            </TabsContent>
-
-            <TabsContent value="email" className="space-y-4 sm:space-y-6">
-              <EmailSettings />
-            </TabsContent>
-
-            <TabsContent value="database" className="space-y-4 sm:space-y-6">
-              <DatabaseSettings />
-            </TabsContent>
-
-            {canManageDocumentation && (
-              <TabsContent value="documentation" className="space-y-4 sm:space-y-6">
-                <DocumentationSettings />
-              </TabsContent>
-            )}
-          </Tabs>
+        {/* ── Pill Segmented Tabs ── */}
+        <div className="flex w-full items-center gap-0.5 p-0.5 rounded-full bg-[var(--apple-tertiary-fill)]">
+            {visibleTabs.map((tab) => {
+              const Icon = tab.icon
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-1.5 h-9 px-2 sm:px-3 rounded-full text-[13px] font-medium apple-transition select-none min-w-0',
+                    isActive
+                      ? 'bg-card text-[var(--apple-label)] shadow-sm'
+                      : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]'
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline truncate">{tab.label}</span>
+                </button>
+              )
+            })}
         </div>
+
+        {/* ── Tab Content ── */}
+        <div key={activeTab} className="view-transition-container">
+          {activeTab === 'organization' && <OrganizationSettings />}
+          {activeTab === 'email'        && <EmailSettings />}
+          {activeTab === 'database'     && <DatabaseSettings />}
+          {activeTab === 'documentation' && canManageDocumentation && <DocumentationSettings />}
+        </div>
+
       </div>
     </MainLayout>
   )

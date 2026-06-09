@@ -2,14 +2,39 @@
 
 import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
-import { useOrganization } from '@/hooks/useOrganization'
-import { ArrowLeft, Mail, Loader2, X, Shield, CheckCircle2, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Mail, Loader2, X, ShieldCheck, CheckCircle2, RefreshCw, ArrowRight } from 'lucide-react'
+
+const inputBase =
+  'w-full h-[46px] rounded-full border border-black/[0.09] dark:border-white/[0.10] bg-black/[0.04] dark:bg-white/[0.06] px-5 text-[15px] tracking-[-0.1px] text-[var(--apple-label)] placeholder:text-[var(--apple-tertiary-label)] outline-none focus:ring-2 focus:ring-[#3FADA5]/30 focus:border-[#3FADA5]/60 apple-transition disabled:opacity-50 disabled:cursor-not-allowed'
+
+const BG = (
+  <>
+    <div className="fixed inset-0 -z-20 bg-[#F4F4F6] dark:bg-[#06060A]" />
+    <div
+      className="fixed inset-0 -z-10"
+      style={{
+        backgroundImage: `
+          radial-gradient(ellipse 70% 70% at 10% 10%, rgba(63,173,165,0.22) 0%, transparent 55%),
+          radial-gradient(ellipse 65% 65% at 90% 85%, rgba(36,78,155,0.22) 0%, transparent 55%),
+          radial-gradient(ellipse 45% 50% at 55% 25%, rgba(63,173,165,0.09) 0%, transparent 50%)
+        `,
+      }}
+    />
+    <div
+      className="fixed inset-0 -z-10 opacity-[0.35] dark:opacity-[0.18]"
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' width='40' height='40'%3e%3ccircle cx='1' cy='1' r='1' fill='%23000'/%3e%3c/svg%3e")`,
+      }}
+    />
+  </>
+)
+
+const GlassCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <div className={`auth-glass-card relative rounded-[28px] border border-white/70 dark:border-white/[0.08] overflow-hidden ${className}`}>
+    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+    {children}
+  </div>
+)
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -20,56 +45,39 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [resendCountdown, setResendCountdown] = useState(0)
   const router = useRouter()
-  const { organization } = useOrganization()
-  
-  // Refs for OTP inputs
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  // Countdown timer for resend
   useEffect(() => {
     if (resendCountdown > 0) {
-      const timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000)
-      return () => clearTimeout(timer)
+      const t = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000)
+      return () => clearTimeout(t)
     }
   }, [resendCountdown])
 
-  // Auto-focus first OTP input when step changes to OTP
   useEffect(() => {
-    if (step === 'otp' && inputRefs.current[0]) {
-      setTimeout(() => inputRefs.current[0]?.focus(), 100)
-    }
+    if (step === 'otp') setTimeout(() => inputRefs.current[0]?.focus(), 120)
   }, [step])
 
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
-
     try {
-      const response = await fetch('/api/auth/forgot-password', {
+      const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       })
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
-        // Move to OTP step
+      const data = await res.json()
+      if (res.ok && data.success) {
         setStep('otp')
-        setResendCountdown(60) // 60 seconds before resend
-        // In demo mode, show the OTP
-        if (data.demoOtp) {
-          alert(`Demo OTP: ${data.demoOtp}\n\nIn production, this would be sent to your email.`)
-        }
+        setResendCountdown(60)
+        if (data.demoOtp) alert(`Demo OTP: ${data.demoOtp}\n\nIn production this would be sent by email.`)
       } else {
-        setError(data.error || 'Failed to send password reset email')
+        setError(data.error || 'Failed to send reset code')
       }
-    } catch (error) {
-      console.error('Password reset request failed:', error)
-      setError('Failed to send password reset email. Please try again.')
+    } catch {
+      setError('Failed to send reset code. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -77,40 +85,28 @@ export default function ForgotPasswordPage() {
 
   const handleVerifyOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
-    
     const otp = otpDigits.join('')
     if (otp.length !== 6) return
-
     setIsVerifying(true)
     setError('')
-
     try {
-      const response = await fetch('/api/auth/verify-otp', {
+      const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp }),
       })
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
-        // Store reset token and redirect to new password page
+      const data = await res.json()
+      if (res.ok && data.success) {
         localStorage.setItem('resetToken', data.resetToken)
         localStorage.setItem('resetEmail', email)
         router.push('/reset-password')
       } else {
-        // Show specific error from API
         setError(data.error || 'Invalid verification code')
-        // Clear OTP on error
         setOtpDigits(['', '', '', '', '', ''])
         inputRefs.current[0]?.focus()
       }
-    } catch (error) {
-      console.error('OTP verification failed:', error)
-      setError('Unable to connect to server. Please check your connection and try again.')
-      // Clear OTP on error
+    } catch {
+      setError('Unable to connect to server. Please try again.')
       setOtpDigits(['', '', '', '', '', ''])
       inputRefs.current[0]?.focus()
     } finally {
@@ -118,373 +114,283 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  const handleResendCode = async () => {
+  const handleResend = async () => {
     if (resendCountdown > 0) return
-    
     setIsLoading(true)
     setError('')
     setOtpDigits(['', '', '', '', '', ''])
-
     try {
-      const response = await fetch('/api/auth/forgot-password', {
+      const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       })
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
+      const data = await res.json()
+      if (res.ok && data.success) {
         setResendCountdown(60)
-        // In demo mode, show the OTP
-        if (data.demoOtp) {
-          alert(`Demo OTP: ${data.demoOtp}\n\nIn production, this would be sent to your email.`)
-        }
+        if (data.demoOtp) alert(`Demo OTP: ${data.demoOtp}`)
       } else {
         setError(data.error || 'Failed to resend code')
       }
-    } catch (error) {
+    } catch {
       setError('Failed to resend code. Please try again.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Handle individual digit input
   const handleOtpChange = (index: number, value: string) => {
-    // Only allow digits
     const digit = value.replace(/\D/g, '').slice(-1)
-    
-    const newDigits = [...otpDigits]
-    newDigits[index] = digit
-    setOtpDigits(newDigits)
-
-    // Auto-advance to next input
-    if (digit && index < 5) {
-      inputRefs.current[index + 1]?.focus()
-    }
-
-    // Auto-submit when all digits are filled
-    if (digit && index === 5 && newDigits.every(d => d !== '')) {
-      setTimeout(() => {
-        const otp = newDigits.join('')
-        if (otp.length === 6) {
-          handleVerifyOtp()
-        }
-      }, 100)
+    const next = [...otpDigits]
+    next[index] = digit
+    setOtpDigits(next)
+    if (digit && index < 5) inputRefs.current[index + 1]?.focus()
+    if (digit && index === 5 && next.every(d => d !== '')) {
+      setTimeout(() => { if (next.join('').length === 6) handleVerifyOtp() }, 100)
     }
   }
 
-  // Handle keyboard navigation
   const handleKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Backspace') {
       if (!otpDigits[index] && index > 0) {
-        // Move to previous input if current is empty
         inputRefs.current[index - 1]?.focus()
-        const newDigits = [...otpDigits]
-        newDigits[index - 1] = ''
-        setOtpDigits(newDigits)
+        const next = [...otpDigits]; next[index - 1] = ''; setOtpDigits(next)
       } else {
-        // Clear current input
-        const newDigits = [...otpDigits]
-        newDigits[index] = ''
-        setOtpDigits(newDigits)
+        const next = [...otpDigits]; next[index] = ''; setOtpDigits(next)
       }
-    } else if (e.key === 'ArrowLeft' && index > 0) {
-      inputRefs.current[index - 1]?.focus()
-    } else if (e.key === 'ArrowRight' && index < 5) {
-      inputRefs.current[index + 1]?.focus()
-    }
+    } else if (e.key === 'ArrowLeft' && index > 0) inputRefs.current[index - 1]?.focus()
+    else if (e.key === 'ArrowRight' && index < 5) inputRefs.current[index + 1]?.focus()
   }
 
-  // Handle paste
   const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault()
-    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    
-    if (pastedData) {
-      const newDigits = [...otpDigits]
-      for (let i = 0; i < 6; i++) {
-        newDigits[i] = pastedData[i] || ''
-      }
-      setOtpDigits(newDigits)
-      
-      // Focus last filled input or last input
-      const lastFilledIndex = Math.min(pastedData.length - 1, 5)
-      inputRefs.current[lastFilledIndex]?.focus()
-
-      // Auto-submit if all digits pasted
-      if (pastedData.length === 6) {
-        setTimeout(() => handleVerifyOtp(), 100)
-      }
-    }
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+    const next = [...otpDigits]
+    for (let i = 0; i < 6; i++) next[i] = pasted[i] || ''
+    setOtpDigits(next)
+    inputRefs.current[Math.min(pasted.length - 1, 5)]?.focus()
+    if (pasted.length === 6) setTimeout(() => handleVerifyOtp(), 100)
   }
 
   const isOtpComplete = otpDigits.every(d => d !== '')
 
-  // OTP Entry Step
+  /* ─── OTP Step ─── */
   if (step === 'otp') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-md mx-auto">
-            {/* Header Section */}
-            <div className="text-center mb-8">
-              <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Shield className="h-10 w-10 text-primary" />
-              </div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">
-                Verification Code
-              </h1>
-              <p className="text-muted-foreground">
-                Enter the 6-digit code sent to
-              </p>
-              <p className="font-medium text-foreground mt-1">{email}</p>
+      <div className="min-h-screen flex items-center justify-center px-4 py-10 relative overflow-hidden">
+        {BG}
+        <div className="w-full max-w-[460px]">
+          {/* Logo */}
+          <div className="flex justify-center mb-9">
+            <img src="/Kanvaro.svg" alt="Kanvaro" className="h-8 dark:brightness-0 dark:invert select-none" draggable={false} />
+          </div>
+
+          {/* Icon badge */}
+          <div className="flex justify-center mb-6">
+            <div
+              className="h-[72px] w-[72px] rounded-[22px] flex items-center justify-center shadow-[0_8px_32px_rgba(63,173,165,0.28)]"
+              style={{ background: 'linear-gradient(135deg, rgba(63,173,165,0.18) 0%, rgba(36,78,155,0.18) 100%)', border: '1px solid rgba(63,173,165,0.20)' }}
+            >
+              <ShieldCheck className="h-9 w-9" style={{ color: '#3FADA5' }} />
             </div>
+          </div>
 
-            <Card className="border-0 shadow-xl">
-              <CardContent className="pt-6">
-                <form onSubmit={handleVerifyOtp} className="space-y-6">
-                  {error && (
-                    <Alert variant="destructive" className="relative animate-in slide-in-from-top-2">
-                      <AlertDescription className="pr-8">{error}</AlertDescription>
-                      <button
-                        type="button"
-                        onClick={() => setError('')}
-                        className="absolute top-2 right-2 p-1 rounded-md hover:bg-destructive/20 transition-colors"
-                        aria-label="Dismiss error"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </Alert>
-                  )}
+          {/* Heading */}
+          <div className="text-center mb-7">
+            <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--apple-label)]">Check your email</h1>
+            <p className="text-[14px] text-[var(--apple-secondary-label)] mt-1.5">
+              We sent a 6-digit code to
+            </p>
+            <p className="text-[15px] font-semibold text-[var(--apple-label)] mt-0.5">{email}</p>
+          </div>
 
-                  {/* OTP Input Grid */}
-                  <div className="space-y-4">
-                    <Label className="text-center block text-sm font-medium">
-                      Enter verification code
-                    </Label>
-                    <div className="flex justify-center gap-2 sm:gap-3">
-                      {otpDigits.map((digit, index) => (
-                        <input
-                          key={index}
-                          ref={(el) => { inputRefs.current[index] = el }}
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={1}
-                          value={digit}
-                          onChange={(e) => handleOtpChange(index, e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(index, e)}
-                          onPaste={handlePaste}
-                          onFocus={(e) => e.target.select()}
-                          disabled={isVerifying}
-                          className={`
-                            w-12 h-14 sm:w-14 sm:h-16 
-                            text-center text-2xl sm:text-3xl font-bold
-                            rounded-xl border-2 
-                            bg-background
-                            transition-all duration-200
-                            focus:outline-none focus:ring-2 focus:ring-primary/50
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                            ${digit 
-                              ? 'border-primary bg-primary/5 text-primary' 
-                              : 'border-muted-foreground/20 hover:border-muted-foreground/40'
-                            }
-                            ${error ? 'border-destructive/50 shake' : ''}
-                          `}
-                          aria-label={`Digit ${index + 1}`}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Tip: You can paste the full code
-                    </p>
-                  </div>
-
-                  {/* Verify Button */}
-                  <Button
-                    type="submit"
-                    className="w-full h-12 text-base font-semibold"
-                    disabled={isVerifying || !isOtpComplete}
-                  >
-                    {isVerifying ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Verifying...
-                      </>
-                    ) : isOtpComplete ? (
-                      <>
-                        <CheckCircle2 className="mr-2 h-5 w-5" />
-                        Verify & Continue
-                      </>
-                    ) : (
-                      'Enter all 6 digits'
-                    )}
-                  </Button>
-                </form>
-
-                {/* Resend Section */}
-                <div className="mt-8 pt-6 border-t border-border">
-                  <div className="text-center space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Didn't receive the code?
-                    </p>
-                    {resendCountdown > 0 ? (
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Resend available in <span className="text-primary font-bold">{resendCountdown}s</span>
-                      </p>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleResendCode}
-                        disabled={isLoading}
-                        className="gap-2"
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4" />
-                        )}
-                        Resend Code
-                      </Button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStep('email')
-                        setOtpDigits(['', '', '', '', '', ''])
-                        setError('')
-                      }}
-                      className="block mx-auto text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Use a different email
-                    </button>
-                  </div>
+          <GlassCard>
+            <form onSubmit={handleVerifyOtp} className="p-8 space-y-6">
+              {error && (
+                <div className="flex items-center gap-2.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/50 px-4 py-3 text-[13px] text-red-600 dark:text-red-400">
+                  <span className="flex-1">{error}</span>
+                  <button type="button" onClick={() => setError('')} className="shrink-0 apple-transition hover:opacity-60">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-              </CardContent>
-            </Card>
+              )}
 
-            <div className="mt-8 text-center">
+              {/* OTP inputs */}
+              <div className="space-y-3">
+                <p className="text-[12px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)] text-center">
+                  Verification code
+                </p>
+                <div className="flex justify-center gap-2.5">
+                  {otpDigits.map((digit, i) => (
+                    <input
+                      key={i}
+                      ref={(el) => { inputRefs.current[i] = el }}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleOtpChange(i, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(i, e)}
+                      onPaste={handlePaste}
+                      onFocus={(e) => e.target.select()}
+                      disabled={isVerifying}
+                      className={[
+                        'w-11 h-[50px] text-center text-[20px] font-bold rounded-2xl',
+                        'border-2 apple-transition outline-none',
+                        'disabled:opacity-50 disabled:cursor-not-allowed',
+                        digit
+                          ? 'border-[#3FADA5] bg-[rgba(63,173,165,0.06)] text-[var(--apple-label)]'
+                          : 'border-black/[0.09] dark:border-white/[0.10] bg-black/[0.04] dark:bg-white/[0.06] text-[var(--apple-label)]',
+                        'focus:ring-2 focus:ring-[#3FADA5]/30',
+                        error ? 'border-red-400/70' : '',
+                      ].join(' ')}
+                      aria-label={`Digit ${i + 1}`}
+                    />
+                  ))}
+                </div>
+                <p className="text-[11px] text-[var(--apple-tertiary-label)] text-center">You can paste the full code</p>
+              </div>
+
+              {/* Verify pill button */}
               <button
-                onClick={() => router.push('/login')}
-                className="text-sm text-muted-foreground hover:text-foreground flex items-center space-x-1 mx-auto transition-colors"
+                type="submit"
+                disabled={isVerifying || !isOtpComplete}
+                className="w-full h-[52px] rounded-full text-white font-semibold text-[15px] tracking-[-0.1px] flex items-center justify-center gap-2 apple-transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                style={{ background: 'linear-gradient(135deg, #3FADA5 0%, #244E9B 100%)' }}
               >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Sign In</span>
+                {isVerifying ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Verifying…</>
+                ) : isOtpComplete ? (
+                  <><CheckCircle2 className="h-4 w-4" /> Verify & Continue</>
+                ) : (
+                  'Enter all 6 digits'
+                )}
+              </button>
+            </form>
+          </GlassCard>
+
+          {/* Resend + links */}
+          <div className="mt-6 text-center space-y-3">
+            <p className="text-[13px] text-[var(--apple-secondary-label)]">Didn't receive the code?</p>
+            {resendCountdown > 0 ? (
+              <p className="text-[13px] text-[var(--apple-tertiary-label)]">
+                Resend in <span className="font-semibold" style={{ color: '#3FADA5' }}>{resendCountdown}s</span>
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={isLoading}
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--apple-system-blue)] hover:opacity-70 apple-transition disabled:opacity-40"
+              >
+                {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                Resend code
+              </button>
+            )}
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => { setStep('email'); setOtpDigits(['', '', '', '', '', '']); setError('') }}
+                className="block w-full text-[12px] text-[var(--apple-tertiary-label)] hover:text-[var(--apple-secondary-label)] apple-transition"
+              >
+                Use a different email
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/login')}
+                className="inline-flex items-center gap-1.5 text-[12px] text-[var(--apple-tertiary-label)] hover:text-[var(--apple-secondary-label)] apple-transition"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                Back to Sign In
               </button>
             </div>
           </div>
         </div>
-
-        {/* Add shake animation */}
-        <style jsx>{`
-          @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-            20%, 40%, 60%, 80% { transform: translateX(4px); }
-          }
-          .shake {
-            animation: shake 0.5s ease-in-out;
-          }
-        `}</style>
       </div>
     )
   }
 
+  /* ─── Email Step ─── */
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-md mx-auto">
-          {/* Header Section */}
-          <div className="text-center mb-8">
-            <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <OrganizationLogo 
-                lightLogo={organization?.logo} 
-                darkLogo={organization?.darkLogo}
-                logoMode={organization?.logoMode}
-                fallbackText={organization?.name?.charAt(0) || 'K'}
-                size="lg"
-                className="rounded"
+    <div className="min-h-screen flex items-center justify-center px-4 py-10 relative overflow-hidden">
+      {BG}
+      <div className="w-full max-w-[420px]">
+        {/* Logo */}
+        <div className="flex justify-center mb-9">
+          <img src="/Kanvaro.svg" alt="Kanvaro" className="h-8 dark:brightness-0 dark:invert select-none" draggable={false} />
+        </div>
+
+        {/* Icon badge */}
+        <div className="flex justify-center mb-6">
+          <div
+            className="h-[72px] w-[72px] rounded-[22px] flex items-center justify-center shadow-[0_8px_32px_rgba(63,173,165,0.22)]"
+            style={{ background: 'linear-gradient(135deg, rgba(63,173,165,0.18) 0%, rgba(36,78,155,0.18) 100%)', border: '1px solid rgba(63,173,165,0.20)' }}
+          >
+            <Mail className="h-9 w-9" style={{ color: '#3FADA5' }} />
+          </div>
+        </div>
+
+        {/* Heading */}
+        <div className="text-center mb-7">
+          <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--apple-label)]">Reset your password</h1>
+          <p className="text-[14px] text-[var(--apple-secondary-label)] mt-1.5 max-w-[300px] mx-auto">
+            Enter your email and we'll send you a verification code
+          </p>
+        </div>
+
+        <GlassCard>
+          <form onSubmit={handleSendCode} className="p-8 space-y-5">
+            {error && (
+              <div className="flex items-center gap-2.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/50 px-4 py-3 text-[13px] text-red-600 dark:text-red-400">
+                <span className="flex-1">{error}</span>
+                <button type="button" onClick={() => setError('')} className="shrink-0 apple-transition hover:opacity-60">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="email" className="block text-[12px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)] mb-2 pl-1">
+                Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                disabled={isLoading}
+                className={inputBase}
               />
             </div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Forgot Password?
-            </h1>
-            <p className="text-muted-foreground">
-              No worries! Enter your email and we'll send you a reset code
-            </p>
-          </div>
 
-          <Card className="border-0 shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-center flex items-center justify-center space-x-2">
-                <Mail className="h-5 w-5" />
-                <span>Reset Password</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSendCode} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive" className="relative animate-in slide-in-from-top-2">
-                    <AlertDescription className="pr-8">{error}</AlertDescription>
-                    <button
-                      type="button"
-                      onClick={() => setError('')}
-                      className="absolute top-2 right-2 p-1 rounded-md hover:bg-destructive/20 transition-colors"
-                      aria-label="Dismiss error"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email address"
-                    required
-                    disabled={isLoading}
-                    className="w-full h-12"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full h-12 text-base font-semibold"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Sending Code...
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="mr-2 h-5 w-5" />
-                      Send Verification Code
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <div className="mt-8 text-center">
+            {/* Send Code — gradient pill */}
             <button
-              onClick={() => router.push('/login')}
-              className="text-sm text-muted-foreground hover:text-foreground flex items-center space-x-1 mx-auto transition-colors"
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-[52px] rounded-full text-white font-semibold text-[15px] tracking-[-0.1px] flex items-center justify-center gap-2 apple-transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+              style={{ background: 'linear-gradient(135deg, #3FADA5 0%, #244E9B 100%)' }}
             >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back to Sign In</span>
+              {isLoading ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Sending code…</>
+              ) : (
+                <>Send verification code <ArrowRight className="h-4 w-4" /></>
+              )}
             </button>
-          </div>
+          </form>
+        </GlassCard>
+
+        <div className="mt-7 text-center">
+          <button
+            type="button"
+            onClick={() => router.push('/login')}
+            className="inline-flex items-center gap-1.5 text-[13px] text-[var(--apple-tertiary-label)] hover:text-[var(--apple-secondary-label)] apple-transition"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Sign In
+          </button>
         </div>
       </div>
     </div>

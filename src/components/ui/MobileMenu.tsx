@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { startTransition } from 'react'
 import Link from 'next/link'
-import { X, Menu, ChevronRight } from 'lucide-react'
+import { X, Menu, ChevronRight, Sun, Moon, Monitor } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
@@ -93,7 +94,7 @@ const navigationItems = [
       },
       {
         id: 'tasks-backlog',
-        label: 'backlog',
+        label: 'Backlog',
         icon: List,
         path: '/backlog',
         permission: Permission.BACKLOG_READ
@@ -299,10 +300,14 @@ interface MobileMenuProps {
 
 export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([])
+  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const { organization, loading } = useOrganization()
   const { hasPermission } = usePermissions()
+  const { theme, setTheme } = useTheme()
+
+  useEffect(() => { setMounted(true) }, [])
 
   const toggleExpanded = (itemId: string) => {
     setExpandedItems(prev => 
@@ -340,43 +345,49 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
   return (
     <>
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+      <div
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
         onClick={onClose}
       />
-      
-      {/* Mobile Menu */}
-      <div className="fixed inset-y-0 left-0 w-80 bg-background border-r z-50 lg:hidden overflow-y-auto">
+
+      {/* Mobile Drawer */}
+      <div className="fixed inset-y-0 left-0 w-72 apple-sidebar-material border-r border-[var(--apple-separator)] z-50 lg:hidden overflow-y-auto">
         {/* Header */}
-        <div className="flex h-16 items-center justify-between px-4 border-b">
-          <div className="flex items-center space-x-3">
+        <div className="flex h-14 items-center justify-between px-3 border-b border-[var(--apple-separator)]">
+          <div className="flex items-center min-w-0 flex-1">
             {loading ? (
-              <div className="h-8 w-8 rounded bg-primary/10 animate-pulse" />
-            ) : (
-              <OrganizationLogo 
-                lightLogo={organization?.logo} 
+              <div className="h-7 w-28 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] animate-pulse" />
+            ) : organization?.logo || organization?.darkLogo ? (
+              <OrganizationLogo
+                lightLogo={organization?.logo}
                 darkLogo={organization?.darkLogo}
                 logoMode={organization?.logoMode}
                 fallbackText={organization?.name?.charAt(0) || 'K'}
                 size="sm"
-                className="rounded"
+                className="rounded-[var(--apple-radius-sm)]"
+              />
+            ) : (
+              <img
+                src="/Kanvaro.svg"
+                alt="Kanvaro"
+                className="h-8 w-auto object-contain dark:brightness-0 dark:invert"
               />
             )}
           </div>
-          
+
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="h-8 w-8"
+            className="h-7 w-7 rounded-full hover:bg-[var(--apple-quaternary-fill)]"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5 text-[var(--apple-secondary-label)]" />
           </Button>
         </div>
 
         {/* Navigation Items */}
-        <div className="px-2 py-4">
-          <nav className="space-y-1">
+        <div className="px-2 py-3">
+          <nav className="space-y-0.5">
             {navigationItems
               .filter((item) => hasPermission(item.permission))
               .map((item) => ({
@@ -396,15 +407,43 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
           </nav>
         </div>
 
+        {/* Appearance — theme toggle */}
+        {mounted && (
+          <div className="border-t border-[var(--apple-separator)] px-2 py-3">
+            <p className="apple-section-label px-1 mb-2">Appearance</p>
+            <div className="flex items-center bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-pill)] p-0.5 gap-0.5">
+              {([
+                { value: 'light',  Icon: Sun,     label: 'Light' },
+                { value: 'dark',   Icon: Moon,    label: 'Dark' },
+                { value: 'system', Icon: Monitor, label: 'System' },
+              ] as const).map(({ value, Icon, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setTheme(value)}
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[var(--apple-radius-pill)] text-[13px] font-medium apple-transition',
+                    theme === value
+                      ? 'bg-card shadow-sm text-[var(--apple-label)]'
+                      : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]',
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Sign Out */}
-        <div className="border-t p-2 mt-auto">
+        <div className="border-t border-[var(--apple-separator)] p-2">
           <Button
             variant="ghost"
-            className="w-full justify-start text-muted-foreground hover:text-foreground px-3"
+            className="w-full justify-start h-8 rounded-[12px] text-[var(--apple-system-red)] hover:bg-[var(--apple-system-red)]/10 hover:text-[var(--apple-system-red)] px-3"
             onClick={handleLogout}
           >
             <LogOut className="h-4 w-4 mr-2" />
-            Logout
+            <span className="text-sm">Sign out</span>
           </Button>
         </div>
       </div>
@@ -428,19 +467,24 @@ function MobileNavigationItem({ item, pathname, expandedItems, onToggleExpanded,
 
   return (
     <PermissionGate permission={item.permission}>
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {hasChildren ? (
           <Button
-            variant={isActive ? 'secondary' : 'ghost'}
-            className="w-full justify-start px-3"
+            variant="ghost"
+            className={cn(
+              'w-full justify-start h-9 px-3 rounded-[12px] apple-transition text-sm',
+              isActive
+                ? 'bg-[var(--apple-system-blue)]/12 text-[var(--apple-system-blue)] font-medium'
+                : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
+            )}
             onClick={() => onToggleExpanded(item.id)}
           >
-            <Icon className="h-4 w-4 mr-2" />
+            <Icon className={cn('h-4 w-4 mr-2 flex-shrink-0', isActive ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-secondary-label)]')} />
             <span className="flex-1 text-left">{item.label}</span>
             {hasChildren && (
               <ChevronRight
                 className={cn(
-                  'h-4 w-4 transition-transform',
+                  'h-3.5 w-3.5 transition-transform text-[var(--apple-tertiary-label)]',
                   isExpanded && 'rotate-90'
                 )}
               />
@@ -448,12 +492,17 @@ function MobileNavigationItem({ item, pathname, expandedItems, onToggleExpanded,
           </Button>
         ) : (
           <Button
-            variant={isActive ? 'secondary' : 'ghost'}
-            className="w-full justify-start px-3"
+            variant="ghost"
+            className={cn(
+              'w-full justify-start h-9 px-3 rounded-[12px] apple-transition text-sm',
+              isActive
+                ? 'bg-[var(--apple-system-blue)]/12 text-[var(--apple-system-blue)] font-medium'
+                : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
+            )}
             asChild
           >
             <Link href={item.path} prefetch onMouseEnter={() => router.prefetch(item.path)}>
-              <Icon className="h-4 w-4 mr-2" />
+              <Icon className={cn('h-4 w-4 mr-2 flex-shrink-0', isActive ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-secondary-label)]')} />
               <span className="flex-1 text-left">{item.label}</span>
             </Link>
           </Button>
@@ -461,16 +510,21 @@ function MobileNavigationItem({ item, pathname, expandedItems, onToggleExpanded,
 
         {/* Sub-navigation */}
         {hasChildren && isExpanded && (
-          <div className="ml-4 space-y-1">
+          <div className="ml-3 space-y-0.5 border-l border-[var(--apple-separator)] pl-2">
             {item.children.map((child: any) => (
               <PermissionGate key={child.id} permission={child.permission}>
                 <Button
-                  variant={pathname === child.path ? 'secondary' : 'ghost'}
-                  className="w-full justify-start text-sm"
+                  variant="ghost"
+                  className={cn(
+                    'w-full justify-start text-sm h-8 px-2 rounded-[10px] apple-transition',
+                    pathname === child.path
+                      ? 'bg-[var(--apple-system-blue)]/12 text-[var(--apple-system-blue)] font-medium'
+                      : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
+                  )}
                   asChild
                 >
                   <Link href={child.path} prefetch onMouseEnter={() => router.prefetch(child.path)}>
-                    <child.icon className="mr-2 h-4 w-4" />
+                    <child.icon className={cn('mr-2 h-3.5 w-3.5', pathname === child.path ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-tertiary-label)]')} />
                     {child.label}
                   </Link>
                 </Button>

@@ -1,422 +1,227 @@
-'use client'
+﻿'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
-import { Button } from '@/components/ui/Button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar'
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line
+  BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import {
-  Users,
-  Clock,
-  DollarSign,
-  TrendingUp,
-  Target,
-  AlertTriangle
-} from 'lucide-react'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { Users, Clock, DollarSign } from 'lucide-react'
 
 interface Project {
-  _id: string
-  name: string
-  status: string
-  startDate: string
-  endDate?: string
-  description?: string
-  budget?: {
-    total: number
-    spent: number
-    remaining: number
-  }
-  team?: any[]
+  _id: string; name: string; status: string; startDate: string; endDate?: string
+  description?: string; team?: any[]
   stats: {
-    tasks: {
-      total: number
-      completed: number
-      completionRate: number
-    }
-    sprints: {
-      total: number
-      active: number
-    }
-    timeTracking: {
-      totalHours: number
-      entries: number
-    }
-    budget: {
-      total: number
-      spent: number
-      remaining: number
-      utilizationRate: number
-    }
+    tasks: { total: number; completed: number; completionRate: number }
+    sprints: { total: number; active: number }
+    timeTracking: { totalHours: number; entries: number }
+    budget: { total: number; spent: number; remaining: number; utilizationRate: number }
   }
 }
 
-interface ProjectResourceReportProps {
-  projects: Project[]
-  filters: any
+interface ProjectResourceReportProps { projects: Project[]; filters: any }
+
+const APPLE_COLORS = ['#007AFF','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7','#FF375F','#FFD60A']
+
+const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px] min-w-[140px]">
+      {label && <p className="font-semibold text-[var(--apple-label)] mb-2">{label}</p>}
+      {payload.map((item: any, i: number) => (
+        <div key={i} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+            <span className="text-[var(--apple-secondary-label)]">{item.name}</span>
+          </div>
+          <span className="font-semibold font-apple-mono text-[var(--apple-label)]">
+            {formatValue ? formatValue(item.value) : item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
+const PieTooltip = ({ active, payload, formatValue }: any) => {
+  if (!active || !payload?.length) return null
+  const item = payload[0]
+  return (
+    <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px]">
+      <div className="flex items-center gap-1.5 mb-1">
+        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.payload.fill }} />
+        <span className="font-semibold text-[var(--apple-label)]">{item.name}</span>
+      </div>
+      <p className="font-semibold font-apple-mono">{formatValue ? formatValue(item.value) : item.value}</p>
+    </div>
+  )
+}
 
-import { useOrganization } from '@/hooks/useOrganization'
-
-// ... existing imports
+function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+      <div className="mb-4">
+        <p className="text-[17px] font-semibold tracking-tight">{title}</p>
+        {subtitle && <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
 
 export function ProjectResourceReport({ projects, filters }: ProjectResourceReportProps) {
-  const { organization } = useOrganization()
-  const currency = organization?.currency || 'USD'
+  const { formatCurrency } = useOrgCurrency()
 
-  const formatCurrency = (amount: number) => {
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency
-      }).format(amount)
-    } catch (e) {
-      return `${currency} ${amount.toLocaleString()}`
-    }
-  }
+  const totalTeamSize = projects.reduce((s, p) => s + (p.team?.length || 0), 0)
+  const totalHours = projects.reduce((s, p) => s + p.stats.timeTracking.totalHours, 0)
+  const totalBudget = projects.reduce((s, p) => s + p.stats.budget.total, 0)
+  const totalSpent = projects.reduce((s, p) => s + p.stats.budget.spent, 0)
 
-  // Aggregates
-  const totalTeamMembers = projects.reduce((sum, p) => sum + (p.team?.length || 0), 0)
-  const totalHoursLogged = projects.reduce((sum, p) => sum + (p.stats?.timeTracking?.totalHours || 0), 0)
-  const totalBudget = projects.reduce((sum, p) => sum + (p.stats?.budget?.total || 0), 0)
-  const totalSpent = projects.reduce((sum, p) => sum + (p.stats?.budget?.spent || 0), 0)
-
-  // Team size distribution buckets
-  const teamBuckets: Record<string, number> = { '0-5': 0, '6-10': 0, '11-20': 0, '21+': 0 }
-  projects.forEach(p => {
-    const size = p.team?.length || 0
-    if (size <= 5) teamBuckets['0-5'] += 1
-    else if (size <= 10) teamBuckets['6-10'] += 1
-    else if (size <= 20) teamBuckets['11-20'] += 1
-    else teamBuckets['21+'] += 1
-  })
-  const totalProjects = projects.length || 1
-  const teamSizeData = Object.entries(teamBuckets).map(([size, count]) => ({
-    size,
-    count,
-    percentage: totalProjects > 0 ? (count / totalProjects) * 100 : 0
+  const teamData = projects.map((p, i) => ({
+    name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name,
+    Members: p.team?.length || 0,
+    fill: APPLE_COLORS[i % APPLE_COLORS.length],
   }))
 
-  // Resource allocation data
-  const resourceData = projects.map(p => ({
-    name: p.name,
-    teamSize: p.team?.length || 0,
-    hoursLogged: Number(p.stats?.timeTracking?.totalHours || 0)
+  const hoursData = projects.map((p, i) => ({
+    name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name,
+    Hours: p.stats.timeTracking.totalHours,
   }))
 
-  // Budget chart data
-  const budgetData = projects.map(p => ({
-    name: p.name,
-    budget: Number(p.stats?.budget?.total || 0),
-    spent: Number(p.stats?.budget?.spent || 0)
+  const budgetPieData = projects.map((p, i) => ({
+    name: p.name.length > 16 ? p.name.slice(0, 16) + '…' : p.name,
+    value: p.stats.budget.total,
+    fill: APPLE_COLORS[i % APPLE_COLORS.length],
+    percent: 0,
   }))
-
-  // Time tracking efficiency data
-  const timeData = projects.map(p => {
-    const hours = Number(p.stats?.timeTracking?.totalHours || 0)
-    const entries = Number(p.stats?.timeTracking?.entries || 0)
-    const avgSession = entries > 0 ? hours / entries : 0
-    return {
-      name: p.name,
-      hours,
-      avgSession
-    }
-  })
 
   return (
-    <div className="space-y-8">
-      {/* Resource Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Team Members</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">{totalTeamMembers}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Across all projects
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Hours Logged</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {totalHoursLogged.toFixed(0)}h
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Time investment
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Budget</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {formatCurrency(totalBudget)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 break-words">
-              Allocated budget
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Budget Utilization</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : 0}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 break-words">
-              {formatCurrency(totalSpent)} spent
-            </p>
-            <Progress
-              value={totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0}
-              className="mt-2"
-            />
-          </CardContent>
-        </Card>
+      {/* ── Stats Strip ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Team Size', value: String(totalTeamSize), sub: 'Across all projects', color: '#007AFF', icon: Users },
+          { label: 'Total Hours', value: `${totalHours.toFixed(0)}h`, sub: 'Time logged', color: '#BF5AF2', icon: Clock },
+          { label: 'Total Budget', value: formatCurrency(totalBudget), sub: 'Combined allocation', color: '#34C759', icon: DollarSign },
+          { label: 'Total Spent', value: formatCurrency(totalSpent), sub: `${totalBudget > 0 ? ((totalSpent/totalBudget)*100).toFixed(1) : 0}% utilized`, color: '#FF9500', icon: DollarSign },
+        ].map(s => (
+          <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
+            <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
+            <p className="text-[20px] font-bold font-apple-mono tracking-tight" style={{ color: s.color }}>{s.value}</p>
+            <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{s.sub}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Charts Grid */}
+      {/* ── Charts ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Team Size Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Team Size Distribution</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Distribution of team sizes across projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={teamSizeData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ size, count, percentage }) => `${size}: ${count} (${percentage.toFixed(0)}%)`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="count"
-                >
-                  {teamSizeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [`${value} projects`, 'Count']} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
 
-        {/* Resource Allocation by Project */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Resource Allocation</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Team size and hours logged by project</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={resourceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar yAxisId="left" dataKey="teamSize" fill="#8884d8" name="Team Size" />
-                <Bar yAxisId="right" dataKey="hoursLogged" fill="#82ca9d" name="Hours Logged" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Donut — budget distribution */}
+        <ChartCard title="Budget Distribution" subtitle="Budget allocation across projects">
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie
+                data={budgetPieData} cx="50%" cy="50%"
+                innerRadius={55} outerRadius={90}
+                paddingAngle={3} dataKey="value"
+                strokeWidth={0} animationBegin={0} animationDuration={800}
+              >
+                {budgetPieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+              </Pie>
+              <Tooltip content={<PieTooltip formatValue={formatCurrency} />} />
+              <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        {/* Budget vs Spent */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Budget vs Spent by Project</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Budget allocation vs actual spending</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={budgetData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${formatCurrency(Number(value))}`, 'Amount']} />
-                <Bar dataKey="budget" fill="#8884d8" name="Budget" />
-                <Bar dataKey="spent" fill="#82ca9d" name="Spent" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Bar — hours by project */}
+        <ChartCard title="Hours Logged by Project" subtitle="Time investment across projects">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={hoursData} barCategoryGap="40%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="res-hours" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#BF5AF2" stopOpacity={0.9} /><stop offset="100%" stopColor="#FF375F" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={40} tickFormatter={v => `${v}h`} />
+              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}h`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <Bar dataKey="Hours" fill="url(#res-hours)" radius={[5,5,0,0]} maxBarSize={44} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        {/* Time Tracking Efficiency */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Time Tracking Efficiency</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Hours logged vs time entries by project</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={timeData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="hours"
-                  stroke="#8884d8"
-                  strokeWidth={2}
-                  name="Hours Logged"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="avgSession"
-                  stroke="#82ca9d"
-                  strokeWidth={2}
-                  name="Avg Session Length"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+        {/* Bar — team size */}
+        <ChartCard title="Team Size by Project" subtitle="Number of team members per project">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={teamData} barCategoryGap="40%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="res-team" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.9} /><stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={24} allowDecimals={false} />
+              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v} members`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <Bar dataKey="Members" fill="url(#res-team)" radius={[5,5,0,0]} maxBarSize={44} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-      {/* Project Resource Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base sm:text-lg">Project Resource Details</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Detailed resource allocation for each project</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-5">
-            {projects.map((project) => (
-              <div key={project._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
-                <div className="flex-1 min-w-0 w-full sm:w-auto">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
-                    <h3 className="font-semibold text-sm sm:text-base truncate">{project.name}</h3>
-                    <Badge variant={project.status === 'active' ? 'default' : 'secondary'} className="flex-shrink-0">
-                      {project.status}
-                    </Badge>
-                    {project.stats.budget.utilizationRate > 80 && (
-                      <Badge variant="destructive" className="flex items-center space-x-1 flex-shrink-0">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span className="text-xs sm:text-sm">Over Budget</span>
-                      </Badge>
-                    )}
+        {/* Resource efficiency */}
+        <ChartCard title="Resource Efficiency" subtitle="Hours per team member per project">
+          <div className="space-y-3 mt-1">
+            {projects.map((p, i) => {
+              const members = p.team?.length || 0
+              const hpm = members > 0 ? p.stats.timeTracking.totalHours / members : p.stats.timeTracking.totalHours
+              const maxHpm = Math.max(...projects.map(pr => {
+                const m = pr.team?.length || 0
+                return m > 0 ? pr.stats.timeTracking.totalHours / m : pr.stats.timeTracking.totalHours
+              }))
+              const pct = maxHpm > 0 ? (hpm / maxHpm) * 100 : 0
+              return (
+                <div key={p._id} className="space-y-1">
+                  <div className="flex items-center justify-between text-[13px]">
+                    <p className="font-medium truncate w-36">{p.name}</p>
+                    <span className="font-semibold font-apple-mono text-[var(--apple-secondary-label)]">{hpm.toFixed(1)}h/member</span>
                   </div>
-
-                  {/* Resource Metrics */}
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-5">
-                    <div>
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-xs sm:text-sm font-medium">Team</span>
-                      </div>
-                      <div className="text-base sm:text-lg font-bold">
-                        {project.team?.length || 0} members
-                      </div>
-                      {project.team && project.team.length > 0 && (
-                        <div className="flex -space-x-2 mt-2">
-                          {project.team.slice(0, 3).map((member, index) => (
-                            <Avatar key={index} className="h-5 w-5 sm:h-6 sm:w-6 border-2 border-background">
-                              <AvatarImage src={member.avatar} />
-                              <AvatarFallback className="text-xs">
-                                {member.firstName?.charAt(0)}{member.lastName?.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                          ))}
-                          {project.team.length > 3 && (
-                            <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
-                              +{project.team.length - 3}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-xs sm:text-sm font-medium">Time</span>
-                      </div>
-                      <div className="text-base sm:text-lg font-bold">
-                        {project.stats.timeTracking.totalHours.toFixed(1)}h
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {project.stats.timeTracking.entries} entries
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center space-x-2 mb-2">
-                        <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-xs sm:text-sm font-medium">Budget</span>
-                      </div>
-                      <div className="text-base sm:text-lg font-bold break-words">
-                        {formatCurrency(project.stats.budget.spent)}
-                      </div>
-                      <div className="text-xs text-muted-foreground break-words">
-                        of {formatCurrency(project.stats.budget.total)}
-                      </div>
-                      <Progress
-                        value={project.stats.budget.utilizationRate}
-                        className="mt-1 h-1"
-                      />
-                    </div>
+                  <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: APPLE_COLORS[i % APPLE_COLORS.length] }} />
                   </div>
                 </div>
+              )
+            })}
+          </div>
+        </ChartCard>
+      </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-5 w-full sm:w-auto sm:ml-6">
-                  <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {project.stats.sprints.active}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Active Sprints</div>
-                  </div>
-                  <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {project.stats.tasks.completionRate.toFixed(1)}%
-                    </div>
-                    <div className="text-xs text-muted-foreground">Complete</div>
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full sm:w-auto flex-shrink-0">
-                    View Details
-                  </Button>
+      {/* ── Per-project resource summary ── */}
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+        <div className="px-5 pt-5 pb-4 border-b border-[var(--apple-separator)]">
+          <p className="text-[17px] font-semibold">Resource Summary</p>
+          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Team, time, and budget per project</p>
+        </div>
+        <div className="divide-y divide-[var(--apple-separator)]">
+          {projects.map((p, i) => (
+            <div key={p._id} className="px-5 py-4 flex items-center gap-4 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--apple-radius-sm)] flex-shrink-0" style={{ backgroundColor: `${APPLE_COLORS[i % APPLE_COLORS.length]}22` }}>
+                <Users className="h-4 w-4" style={{ color: APPLE_COLORS[i % APPLE_COLORS.length] }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[15px] font-semibold truncate">{p.name}</p>
+                <div className="flex items-center gap-3 mt-0.5 text-[12px] text-[var(--apple-tertiary-label)]">
+                  <span className="flex items-center gap-0.5"><Users className="h-3 w-3" />{p.team?.length || 0} members</span>
+                  <span className="flex items-center gap-0.5"><Clock className="h-3 w-3" />{p.stats.timeTracking.totalHours.toFixed(0)}h</span>
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="text-right flex-shrink-0">
+                <p className="text-[15px] font-bold font-apple-mono">{formatCurrency(p.stats.budget.total)}</p>
+                <p className="text-[12px] text-[var(--apple-tertiary-label)]">{p.stats.budget.utilizationRate.toFixed(0)}% used</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

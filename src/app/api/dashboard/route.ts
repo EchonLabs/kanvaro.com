@@ -158,19 +158,42 @@ export async function GET(request: NextRequest) {
       { userId }
     )
 
-    // Calculate project progress
+    // Batch-aggregate total time tracked (minutes) per project — one query for all recent projects
+    const recentProjectIds = recentProjects.map(p => p._id)
+    const projectHoursAgg = await TimeEntry.aggregate([
+      {
+        $match: {
+          organization: organizationId,
+          project: { $in: recentProjectIds },
+          status: 'completed'
+        }
+      },
+      {
+        $group: {
+          _id: '$project',
+          totalDuration: { $sum: '$duration' }
+        }
+      }
+    ])
+    const projectHoursMap = new Map(
+      projectHoursAgg.map((r: any) => [r._id.toString(), r.totalDuration as number])
+    )
+
+    // Calculate project progress + attach hoursTracked
     const projectsWithProgress = await Promise.all(
       recentProjects.map(async (project) => {
         const projectTasks = await Task.find({ project: project._id })
         const totalTasks = projectTasks.length
         const completedTasks = projectTasks.filter(task => task.status === 'done').length
         const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+        const hoursTracked = projectHoursMap.get(project._id.toString()) ?? 0
 
         return {
           ...project.toObject(),
           progress,
           tasksCompleted: completedTasks,
-          totalTasks
+          totalTasks,
+          hoursTracked   // total minutes tracked against this project
         }
       })
     )

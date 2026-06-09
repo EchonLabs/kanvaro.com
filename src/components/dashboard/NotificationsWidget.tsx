@@ -1,13 +1,12 @@
 'use client'
 
-import { useState } from 'react'
 import { Bell, Check, X, Loader2, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
 import { useNotifications } from '@/hooks/useNotifications'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
+import { cn } from '@/lib/utils'
 
 export function NotificationsWidget() {
   const router = useRouter()
@@ -15,88 +14,65 @@ export function NotificationsWidget() {
     limit: 10,
     unreadOnly: false,
     autoRefresh: true,
-    refreshInterval: 60000 // Refresh every 60 seconds (SSE handles real-time)
+    refreshInterval: 60000
   })
 
   const handleNotificationClick = (notification: any) => {
-    // Mark as read
     if (!notification.isRead) {
       markAsRead((notification._id as any).toString())
     }
-
-    // Navigate to URL if available
     if (notification.data?.url) {
       router.push(notification.data.url)
     }
   }
 
-  const handleMarkAllAsRead = async () => {
-    await markAllAsRead()
-  }
-
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case 'time_tracking':
-        return '⏱️'
-      case 'task':
-        return '✓'
-      case 'project':
-        return '📁'
-      case 'team':
-        return '👥'
-      default:
-        return '🔔'
-    }
-  }
-
-  const getNotificationColor = (priority?: string) => {
-    switch (priority) {
-      case 'high':
-      case 'critical':
-        return 'text-red-600 dark:text-red-400'
-      case 'medium':
-        return 'text-yellow-600 dark:text-yellow-400'
-      default:
-        return 'text-blue-600 dark:text-blue-400'
+      case 'time_tracking': return '⏱️'
+      case 'task':          return '✓'
+      case 'project':       return '📁'
+      case 'team':          return '👥'
+      default:              return '🔔'
     }
   }
 
   return (
     <Card className="overflow-x-hidden">
-      <CardHeader className="p-4 sm:p-6">
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base sm:text-lg truncate flex items-center gap-2">
-            <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-            Notifications
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+            <CardTitle>Notifications</CardTitle>
             {unreadCount > 0 && (
-              <Badge variant="destructive" className="ml-2">
-                {unreadCount}
-              </Badge>
+              <span className="h-5 w-5 rounded-full bg-[var(--apple-system-red)] text-white text-[10px] font-semibold flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
             )}
-          </CardTitle>
+          </div>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleMarkAllAsRead}
-              className="h-8 text-xs"
+              onClick={markAllAsRead}
+              className="h-7 px-2 text-[13px] text-[var(--apple-system-blue)]"
             >
-              Mark All as Read
+              <Check className="h-3 w-3 mr-1" />
+              Mark All Read
             </Button>
           )}
         </div>
       </CardHeader>
-      <CardContent className="p-4 sm:p-6 pt-0">
+      <CardContent>
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--apple-secondary-label)]" />
           </div>
         ) : notifications.length === 0 ? (
-          <div className="text-center py-8 text-sm text-muted-foreground">
+          <div className="text-center py-8 text-[15px] text-[var(--apple-secondary-label)]">
             No notifications
           </div>
         ) : (
-          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+          <div className="space-y-0.5 max-h-[360px] overflow-y-auto -mx-1 px-1">
             {notifications.map((notification) => {
               const notificationId = (notification._id as any).toString()
               const isUnread = !notification.isRead
@@ -105,67 +81,62 @@ export function NotificationsWidget() {
               return (
                 <div
                   key={notificationId}
-                  className={`group border rounded-lg p-3 cursor-pointer hover:bg-muted/50 transition-colors ${
-                    isUnread ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800' : ''
-                  }`}
+                  className={cn(
+                    'group flex items-start gap-3 rounded-[var(--apple-radius-md)] px-3 py-2.5 cursor-pointer apple-transition hover:bg-[var(--apple-quaternary-fill)]',
+                    isUnread && 'bg-[var(--apple-system-blue)]/8 border-l-2 border-[var(--apple-system-blue)]/50'
+                  )}
                   onClick={() => handleNotificationClick(notification)}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <span className="text-lg">{getNotificationIcon(notification.type || '')}</span>
+                  <span className="text-base flex-shrink-0 mt-0.5">{getNotificationIcon(notification.type || '')}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-0.5">
+                      <h4 className={cn(
+                        'text-sm text-[var(--apple-label)] break-words',
+                        isUnread ? 'font-semibold' : 'font-medium'
+                      )}>
+                        {notification.title}
+                      </h4>
+                      {isUnread && (
+                        <div className="h-2 w-2 rounded-full bg-[var(--apple-system-blue)] flex-shrink-0 mt-1" />
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <h4 className={`text-sm font-medium ${isUnread ? 'font-semibold' : ''} ${getNotificationColor(notification.data?.priority)}`}>
-                          {notification.title}
-                        </h4>
-                        {isUnread && (
-                          <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400 flex-shrink-0 mt-1.5" />
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                        {notification.message}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(createdAt, { addSuffix: true })}
-                        </span>
-                        {notification.data?.url && (
-                          <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                        )}
-                      </div>
+                    <p className="text-[13px] text-[var(--apple-secondary-label)] line-clamp-2 mb-1">
+                      {notification.message}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[var(--apple-tertiary-label)]">
+                        {formatDistanceToNow(createdAt, { addSuffix: true })}
+                      </span>
+                      {notification.data?.url && (
+                        <ExternalLink className="h-3 w-3 text-[var(--apple-tertiary-label)]" />
+                      )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        deleteNotification(notificationId)
-                      }}
-                      className="h-6 w-6 p-0 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      deleteNotification(notificationId)
+                    }}
+                    className="h-6 w-6 flex items-center justify-center rounded-full flex-shrink-0 opacity-0 group-hover:opacity-100 apple-transition hover:bg-[var(--apple-secondary-fill)]"
+                  >
+                    <X className="h-3 w-3 text-[var(--apple-secondary-label)]" />
+                  </button>
                 </div>
               )
             })}
           </div>
         )}
         {notifications.length > 0 && (
-          <div className="mt-4 pt-4 border-t">
-            <Button
-              variant="outline"
-              size="sm"
+          <div className="mt-3 pt-3 border-t border-[var(--apple-separator)]">
+            <button
               onClick={() => router.push('/notifications')}
-              className="w-full text-xs"
+              className="w-full text-sm text-[var(--apple-system-blue)] hover:opacity-80 apple-transition text-center"
             >
-              View All Notifications
-            </Button>
+              View all notifications →
+            </button>
           </div>
         )}
       </CardContent>
     </Card>
   )
 }
-

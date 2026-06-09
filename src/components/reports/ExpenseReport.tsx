@@ -1,330 +1,234 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
+  BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import { 
-  DollarSign, 
-  TrendingUp, 
-  AlertCircle,
-  Download,
-  Filter
-} from 'lucide-react'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { Receipt } from 'lucide-react'
 
 interface ExpenseReportProps {
   topExpenses: {
-    description: string
-    amount: number
-    category: string
-    project: string
-    date: string
+    description: string; amount: number; category: string; project: string; date: string
   }[]
   budgetBreakdown: {
-    category: string
-    budgeted: number
-    spent: number
-    remaining: number
-    utilizationRate: number
+    category: string; budgeted: number; spent: number; remaining: number; utilizationRate: number
   }[]
   filters: any
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
+const APPLE_COLORS = ['#007AFF','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7','#FF375F','#FFD60A']
+
+const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px] min-w-[140px]">
+      {label && <p className="font-semibold text-[var(--apple-label)] mb-2">{label}</p>}
+      {payload.map((item: any, i: number) => (
+        <div key={i} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+            <span className="text-[var(--apple-secondary-label)]">{item.name}</span>
+          </div>
+          <span className="font-semibold font-apple-mono text-[var(--apple-label)]">
+            {formatValue ? formatValue(item.value) : item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const PieTooltip = ({ active, payload, formatValue }: any) => {
+  if (!active || !payload?.length) return null
+  const item = payload[0]
+  return (
+    <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px]">
+      <div className="flex items-center gap-1.5 mb-1">
+        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.payload.fill }} />
+        <span className="font-semibold text-[var(--apple-label)]">{item.name}</span>
+      </div>
+      <p className="font-semibold font-apple-mono text-[var(--apple-label)]">{formatValue ? formatValue(item.value) : item.value}</p>
+      <p className="text-[var(--apple-tertiary-label)]">{(item.payload.percent * 100).toFixed(1)}%</p>
+    </div>
+  )
+}
+
+function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+      <div className="mb-4">
+        <p className="text-[17px] font-semibold tracking-tight">{title}</p>
+        {subtitle && <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
 
 export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: ExpenseReportProps) {
   const { formatCurrency } = useOrgCurrency()
   const { formatDate } = useDateTime()
 
-  // Calculate expense metrics
-  const totalExpenses = topExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-  const averageExpense = topExpenses.length > 0 ? totalExpenses / topExpenses.length : 0
+  const totalExpenses = topExpenses.reduce((s, e) => s + e.amount, 0)
+  const avgExpense = topExpenses.length > 0 ? totalExpenses / topExpenses.length : 0
   const highestExpense = topExpenses.length > 0 ? Math.max(...topExpenses.map(e => e.amount)) : 0
 
-  // Prepare data for charts
-  const categoryExpenses = budgetBreakdown.map(item => ({
-    category: item.category,
-    spent: item.spent,
-    budgeted: item.budgeted,
-    utilization: item.utilizationRate
-  }))
-
-  const expenseData = topExpenses.map(expense => ({
-    description: expense.description.length > 20 
-      ? expense.description.substring(0, 20) + '...' 
-      : expense.description,
-    amount: expense.amount,
-    category: expense.category,
-    project: expense.project
-  }))
-
-  const categoryPieData = budgetBreakdown.map((item, index) => ({
+  const pieData = budgetBreakdown.map((item, i) => ({
     name: item.category,
     value: item.spent,
-    color: COLORS[index % COLORS.length]
+    fill: APPLE_COLORS[i % APPLE_COLORS.length],
+    percent: 0,
+  }))
+
+  const barData = budgetBreakdown.map((item, i) => ({
+    name: item.category.length > 10 ? item.category.slice(0, 10) + '…' : item.category,
+    Budgeted: item.budgeted,
+    Spent: item.spent,
+  }))
+
+  const topExpenseBar = topExpenses.slice(0, 10).map(e => ({
+    name: e.description.length > 16 ? e.description.slice(0, 16) + '…' : e.description,
+    Amount: e.amount,
   }))
 
   return (
-    <div className="space-y-8">
-      {/* Expense Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Expenses</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold break-words">
-              {formatCurrency(totalExpenses)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Across all categories
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Average Expense</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold break-words">
-              {formatCurrency(averageExpense)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Per transaction
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Highest Expense</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold break-words">
-              {formatCurrency(highestExpense)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Single transaction
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Transactions</CardTitle>
-            <Badge variant="outline" className="flex-shrink-0 ml-2">{topExpenses.length}</Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {topExpenses.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Expense entries
-            </p>
-          </CardContent>
-        </Card>
+      {/* ── Stats Strip ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Expenses', value: formatCurrency(totalExpenses), sub: 'Across all categories', color: '#FF453A' },
+          { label: 'Average Expense', value: formatCurrency(avgExpense), sub: 'Per transaction', color: '#FF9500' },
+          { label: 'Highest Expense', value: formatCurrency(highestExpense), sub: 'Single transaction', color: '#BF5AF2' },
+          { label: 'Total Transactions', value: String(topExpenses.length), sub: 'Expense entries', color: '#007AFF' },
+        ].map(s => (
+          <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
+            <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
+            <p className="text-[20px] font-bold font-apple-mono tracking-tight" style={{ color: s.color }}>{s.value}</p>
+            <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{s.sub}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-        {/* Expenses by Category */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Expenses by Category</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Distribution of expenses across categories</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={categoryPieData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value, percent }) => `${name}: $${value.toLocaleString()} (${(percent * 100).toFixed(0)}%)`}
-                  outerRadius={60}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {categoryPieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* ── Charts ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Category Spending vs Budget */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Category Spending vs Budget</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Actual spending compared to budgeted amounts</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={categoryExpenses}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
-                <Bar dataKey="budgeted" fill="#8884d8" name="Budgeted" />
-                <Bar dataKey="spent" fill="#82ca9d" name="Spent" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Donut — expenses by category */}
+        <ChartCard title="Expenses by Category" subtitle="Distribution of spending across categories">
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie
+                data={pieData} cx="50%" cy="50%"
+                innerRadius={55} outerRadius={90}
+                paddingAngle={3} dataKey="value"
+                strokeWidth={0} animationBegin={0} animationDuration={800}
+              >
+                {pieData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Pie>
+              <Tooltip content={<PieTooltip formatValue={formatCurrency} />} />
+              <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        {/* Top Expenses */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Top Expenses</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Highest value expense transactions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={expenseData.slice(0, 10)}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="description" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
-                <Bar dataKey="amount" fill="#FF8042" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Bar — spending vs budget */}
+        <ChartCard title="Category Spending vs Budget" subtitle="Actual spending compared to budgeted amounts">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={barData} barCategoryGap="30%" barGap={4} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="exp-budgeted" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.9} /><stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.7} />
+                </linearGradient>
+                <linearGradient id="exp-spent" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FF453A" stopOpacity={0.9} /><stop offset="100%" stopColor="#FF9F0A" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
+              <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <Bar dataKey="Budgeted" fill="url(#exp-budgeted)" radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Spent" fill="url(#exp-spent)" radius={[6,6,0,0]} maxBarSize={32} />
+              <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        {/* Category Utilization */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Category Budget Utilization</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Percentage of budget used by category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={categoryExpenses}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value}%`, 'Utilization']} />
-                <Bar dataKey="utilization" fill="#FFBB28" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Bar — top expenses */}
+        <ChartCard title="Top Expense Transactions" subtitle="Highest value individual expenses">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={topExpenseBar} barCategoryGap="35%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="exp-top" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FF9500" stopOpacity={0.9} /><stop offset="100%" stopColor="#FFD60A" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} angle={-30} textAnchor="end" height={48} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
+              <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <Bar dataKey="Amount" fill="url(#exp-top)" radius={[6,6,0,0]} maxBarSize={32} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        {/* Utilization heatmap-style bars */}
+        <ChartCard title="Budget Utilization" subtitle="Percentage of budget used per category">
+          <div className="space-y-3 mt-1">
+            {budgetBreakdown.map((cat, i) => {
+              const pct = Math.min(100, cat.utilizationRate)
+              const color = pct > 85 ? '#FF453A' : pct > 65 ? '#FF9F0A' : '#34C759'
+              return (
+                <div key={cat.category} className="space-y-1">
+                  <div className="flex items-center justify-between text-[13px]">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: APPLE_COLORS[i % APPLE_COLORS.length] }} />
+                      <span className="font-medium">{cat.category}</span>
+                    </div>
+                    <span className="font-semibold font-apple-mono" style={{ color }}>{pct.toFixed(0)}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </ChartCard>
       </div>
 
-      {/* Top Expenses List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base sm:text-lg">Top Expense Transactions</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Detailed list of highest value expenses</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-5">
-            {topExpenses.map((expense, index) => (
-              <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
-                <div className="flex-1 min-w-0 w-full sm:w-auto">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline" className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0">
-                        {index + 1}
-                      </Badge>
-                      <h3 className="font-semibold text-sm sm:text-base truncate">{expense.description}</h3>
-                    </div>
-                    <Badge variant="secondary" className="flex-shrink-0">{expense.category}</Badge>
-                  </div>
-                  <div className="mt-2 text-xs sm:text-sm text-muted-foreground">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-4">
-                      <span className="break-words">Project: {expense.project}</span>
-                      <span className="flex-shrink-0">Date: {formatDate(expense.date)}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
-                  <div className="text-left sm:text-right w-full sm:w-auto">
-                    <div className="text-base sm:text-lg font-bold break-words">
-                      {formatCurrency(expense.amount)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Transaction Amount
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full sm:w-auto flex-shrink-0">
-                    <Download className="h-4 w-4 mr-2" />
-                    Receipt
-                  </Button>
+      {/* ── Transaction List ── */}
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+        <div className="px-5 pt-5 pb-4 border-b border-[var(--apple-separator)]">
+          <p className="text-[17px] font-semibold">Top Expense Transactions</p>
+          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Detailed list of highest value expenses</p>
+        </div>
+        <div className="divide-y divide-[var(--apple-separator)]">
+          {topExpenses.map((expense, i) => (
+            <div key={i} className="px-5 py-4 flex items-center gap-4 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--apple-radius-sm)] flex-shrink-0 bg-[var(--apple-tertiary-fill)]">
+                <Receipt className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[15px] font-semibold truncate">{expense.description}</p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]">
+                    {expense.category}
+                  </span>
+                  <span className="text-[12px] text-[var(--apple-tertiary-label)]">{expense.project}</span>
+                  <span className="text-[12px] text-[var(--apple-tertiary-label)]">·</span>
+                  <span className="text-[12px] text-[var(--apple-tertiary-label)]">{formatDate(expense.date)}</span>
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Category Analysis */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base sm:text-lg">Expense Category Analysis</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Detailed breakdown of expenses by category</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-5">
-            {budgetBreakdown.map((category, index) => (
-              <div key={category.category} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
-                <div className="flex-1 min-w-0 w-full sm:w-auto">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
-                    <div className="flex items-center space-x-2">
-                      <div 
-                        className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0" 
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                      />
-                      <h3 className="font-semibold text-sm sm:text-base truncate">{category.category}</h3>
-                    </div>
-                    <Badge variant={category.utilizationRate > 80 ? 'destructive' : 
-                                   category.utilizationRate > 60 ? 'default' : 'secondary'} className="flex-shrink-0">
-                      {category.utilizationRate.toFixed(1)}% used
-                    </Badge>
-                  </div>
-                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 text-xs sm:text-sm">
-                    <div>
-                      <div className="text-muted-foreground">Budgeted</div>
-                      <div className="font-medium break-words">{formatCurrency(category.budgeted)}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">Spent</div>
-                      <div className="font-medium break-words">{formatCurrency(category.spent)}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">Remaining</div>
-                      <div className={`font-medium break-words ${category.remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {formatCurrency(category.remaining)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <p className="text-[17px] font-bold font-apple-mono text-[var(--apple-label)] flex-shrink-0">
+                {formatCurrency(expense.amount)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

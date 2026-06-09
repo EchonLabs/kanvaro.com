@@ -9,37 +9,32 @@ import { useNotify } from '@/lib/notify'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthContext } from '@/contexts/AuthContext'
 import {
   Plus,
   Search,
-  Filter,
-  MoreHorizontal,
   Calendar,
   Clock,
-  CheckCircle,
-  Pause,
-  XCircle,
-  Play,
-  Loader2,
-  User,
   Target,
-  Zap,
-  BarChart3,
-  List,
-  Kanban,
-  Users,
-  TrendingUp,
-  Calendar as CalendarIcon,
-  Star,
-  Layers,
   ChevronLeft,
   ChevronRight,
-  RotateCcw
+  RotateCcw,
+  Loader2,
+  User,
+  CheckCircle2,
+  Circle,
+  Zap,
+  Star,
+  Users,
+  Flag,
+  CalendarDays,
+  PlayCircle,
+  Filter,
 } from 'lucide-react'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CalendarEvent {
   _id: string
@@ -69,9 +64,229 @@ interface CalendarEvent {
   updatedAt: string
 }
 
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+
+const TYPE_CONFIG: Record<string, { color: string; bg: string; label: string; Icon: React.ElementType }> = {
+  task:      { color: '#007AFF', bg: 'rgba(0,122,255,0.12)',   label: 'Task',      Icon: Target },
+  sprint:    { color: '#34C759', bg: 'rgba(52,199,89,0.12)',   label: 'Sprint',    Icon: Zap },
+  milestone: { color: '#AF52DE', bg: 'rgba(175,82,222,0.12)', label: 'Milestone', Icon: Star },
+  meeting:   { color: '#FF9500', bg: 'rgba(255,149,0,0.12)',   label: 'Meeting',   Icon: Users },
+  deadline:  { color: '#FF3B30', bg: 'rgba(255,59,48,0.12)',   label: 'Deadline',  Icon: Flag },
+}
+
+const PRIORITY_BADGE: Record<string, string> = {
+  low:      'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  medium:   'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400',
+  high:     'bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400',
+  critical: 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400',
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  scheduled:   'bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400',
+  in_progress: 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400',
+  completed:   'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400',
+  cancelled:   'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400',
+}
+
+// ─── Subcomponents ────────────────────────────────────────────────────────────
+
+function StatCard({
+  label,
+  value,
+  Icon,
+  gradient,
+  glow,
+}: {
+  label: string
+  value: number
+  Icon: React.ElementType
+  gradient: string
+  glow: string
+}) {
+  return (
+    <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4 flex items-center gap-3">
+      <div
+        className="flex-shrink-0 w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center shadow-sm"
+        style={{ background: gradient, boxShadow: `0 4px 12px ${glow}` }}
+      >
+        <Icon className="w-5 h-5 text-white" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[22px] font-bold tracking-tight font-apple-mono tabular-nums leading-none">{value}</p>
+        <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">{label}</p>
+      </div>
+    </div>
+  )
+}
+
+function EventPill({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
+  const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG.task
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      className="w-full text-left text-[11px] font-medium px-1.5 py-0.5 rounded-[5px] truncate apple-transition hover:opacity-80 leading-5"
+      style={{ background: cfg.bg, color: cfg.color, borderLeft: `2.5px solid ${cfg.color}` }}
+      title={event.title}
+    >
+      {event.title}
+    </button>
+  )
+}
+
+function EventCard({ event, onClick, detailed = false }: { event: CalendarEvent; onClick: () => void; detailed?: boolean }) {
+  const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG.task
+  const { Icon } = cfg
+  return (
+    <div
+      className="group rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5 apple-transition cursor-pointer overflow-hidden"
+      onClick={onClick}
+      style={{ borderLeft: `3px solid ${cfg.color}` }}
+    >
+      <div className="p-3.5">
+        <div className="flex items-start gap-2.5">
+          <div
+            className="flex-shrink-0 w-7 h-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center mt-0.5"
+            style={{ background: cfg.bg }}
+          >
+            <Icon className="w-3.5 h-3.5" style={{ color: cfg.color }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-foreground truncate">{event.title}</p>
+            {detailed && event.description && (
+              <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5 line-clamp-2">{event.description}</p>
+            )}
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+                style={{ background: cfg.bg, color: cfg.color }}
+              >
+                {cfg.label}
+              </span>
+              <span className={`inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium ${PRIORITY_BADGE[event.priority] ?? ''}`}>
+                {formatToTitleCase(event.priority)}
+              </span>
+              {event.status && (
+                <span className={`inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium ${STATUS_BADGE[event.status] ?? ''}`}>
+                  {formatToTitleCase(event.status)}
+                </span>
+              )}
+            </div>
+            {detailed && (
+              <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-[var(--apple-tertiary-label)]">
+                {event.startDate && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {new Date(event.startDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+                {event.project && (
+                  <span className="flex items-center gap-1 truncate">
+                    <Target className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{event.project.name}</span>
+                  </span>
+                )}
+                {event.assignedTo && (
+                  <span className="flex items-center gap-1 truncate">
+                    <User className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{event.assignedTo.firstName} {event.assignedTo.lastName}</span>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DayEventCard({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
+  const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG.task
+  const { Icon } = cfg
+  return (
+    <div
+      className="group rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5 apple-transition cursor-pointer overflow-hidden"
+      onClick={onClick}
+    >
+      <div className="flex items-stretch">
+        <div className="w-1 flex-shrink-0 rounded-l-[var(--apple-radius-lg)]" style={{ background: cfg.color }} />
+        <div className="flex-1 p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <div
+              className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center mt-0.5"
+              style={{ background: cfg.bg }}
+            >
+              <Icon className="w-4 h-4" style={{ color: cfg.color }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-[15px] font-semibold text-foreground">{event.title}</h4>
+              {event.description && (
+                <p className="text-[13px] text-[var(--apple-secondary-label)] mt-1 line-clamp-3">{event.description}</p>
+              )}
+              <div className="flex flex-wrap gap-1.5 mt-2.5">
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                  style={{ background: cfg.bg, color: cfg.color }}
+                >
+                  <Icon className="w-3 h-3" />
+                  {cfg.label}
+                </span>
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${PRIORITY_BADGE[event.priority] ?? ''}`}>
+                  {formatToTitleCase(event.priority)}
+                </span>
+                {event.status && (
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_BADGE[event.status] ?? ''}`}>
+                    {formatToTitleCase(event.status)}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 mt-3 pt-3 border-t border-[var(--apple-separator)] text-[12px] text-[var(--apple-secondary-label)]">
+                {event.startDate && (
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    {new Date(event.startDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+                {event.project && (
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <Target className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{event.project.name}</span>
+                  </span>
+                )}
+                {event.assignedTo && (
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <User className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{event.assignedTo.firstName} {event.assignedTo.lastName}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EmptyCalendar({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div
+        className="w-16 h-16 rounded-[var(--apple-radius-xl)] flex items-center justify-center mb-4"
+        style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 8px 24px rgba(0,122,255,0.25)' }}
+      >
+        <CalendarDays className="w-8 h-8 text-white" />
+      </div>
+      <p className="text-[15px] font-semibold text-foreground mb-1">No Events Found</p>
+      <p className="text-[13px] text-[var(--apple-secondary-label)] max-w-xs">{message}</p>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function CalendarPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
-
   const router = useRouter()
   const { formatDate } = useDateTime()
   const [loading, setLoading] = useState(true)
@@ -81,14 +296,10 @@ export default function CalendarPage() {
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month')
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [showFilters, setShowFilters] = useState(false)
 
-  // Check if any filters are active
-  const hasActiveFilters = searchQuery !== '' ||
-    typeFilter !== 'all' ||
-    statusFilter !== 'all' ||
-    priorityFilter !== 'all'
+  const hasActiveFilters = searchQuery !== '' || typeFilter !== 'all' || statusFilter !== 'all' || priorityFilter !== 'all'
 
-  // Reset all filters
   const resetFilters = () => {
     setSearchQuery('')
     setTypeFilter('all')
@@ -96,7 +307,6 @@ export default function CalendarPage() {
     setPriorityFilter('all')
   }
 
-  // Use the task state management hook for calendar events
   const {
     tasks: events,
     setTasks: setEvents,
@@ -104,22 +314,15 @@ export default function CalendarPage() {
     error: taskError,
     handleTaskUpdate,
     handleTaskCreate,
-    handleTaskDelete
+    handleTaskDelete,
   } = useTaskState([])
 
-  // Use the notification hook
   const { error: notifyError } = useNotify()
 
-  // Use the task synchronization hook
-  const {
-    isConnected,
-    startPolling,
-    stopPolling,
-    updateTaskOptimistically
-  } = useTaskSync({
+  const { isConnected, startPolling, stopPolling } = useTaskSync({
     onTaskUpdate: handleTaskUpdate,
     onTaskCreate: handleTaskCreate,
-    onTaskDelete: handleTaskDelete
+    onTaskDelete: handleTaskDelete,
   })
 
   const fetchEvents = useCallback(async () => {
@@ -127,22 +330,18 @@ export default function CalendarPage() {
       setLoading(true)
       const response = await fetch('/api/calendar')
       const data = await response.json()
-
       if (data.success) {
         setEvents(data.data)
-        // Optional: Add success notification for initial load if desired
-        // notifySuccess({ title: 'Calendar Loaded', message: 'Calendar events loaded successfully' })
       } else {
         notifyError({ title: 'Failed to Load Calendar', message: data.error || 'Failed to fetch calendar events' })
       }
-    } catch (err) {
+    } catch {
       notifyError({ title: 'Failed to Load Calendar', message: 'Failed to fetch calendar events' })
     } finally {
       setLoading(false)
     }
   }, [notifyError])
 
-  // Initialize: fetch events when authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
       fetchEvents()
@@ -151,70 +350,29 @@ export default function CalendarPage() {
       stopPolling()
       router.push('/login')
     }
-
-    return () => {
-      stopPolling()
-    }
+    return () => { stopPolling() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated]) // Only run when auth state changes
+  }, [authLoading, isAuthenticated])
 
-  // Handle task errors from the task state hook
   useEffect(() => {
-    if (taskError) {
-      notifyError({ title: 'Task Synchronization Error', message: taskError })
-    }
+    if (taskError) notifyError({ title: 'Task Synchronization Error', message: taskError })
   }, [taskError, notifyError])
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'task': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'sprint': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'milestone': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      case 'meeting': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'deadline': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'in_progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-    }
-  }
-
   const filteredEvents = events.filter(event => {
-    const matchesSearch = !searchQuery ||
-      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.project?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesType = typeFilter === 'all' || event.type === typeFilter
-    const matchesStatus = statusFilter === 'all' || event.status === statusFilter
-    const matchesPriority = priorityFilter === 'all' || event.priority === priorityFilter
-
-    return matchesSearch && matchesType && matchesStatus && matchesPriority
+    const q = searchQuery.toLowerCase()
+    const matchesSearch = !q ||
+      event.title.toLowerCase().includes(q) ||
+      event.description?.toLowerCase().includes(q) ||
+      event.project?.name?.toLowerCase().includes(q)
+    return matchesSearch &&
+      (typeFilter === 'all' || event.type === typeFilter) &&
+      (statusFilter === 'all' || event.status === statusFilter) &&
+      (priorityFilter === 'all' || event.priority === priorityFilter)
   })
 
   const getEventsForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0]
-    return filteredEvents.filter(event => {
-      const eventDate = new Date(event.startDate).toISOString().split('T')[0]
-      return eventDate === dateStr
-    })
+    return filteredEvents.filter(e => new Date(e.startDate).toISOString().split('T')[0] === dateStr)
   }
 
   const getDaysInMonth = (date: Date) => {
@@ -222,508 +380,550 @@ export default function CalendarPage() {
     const month = date.getMonth()
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
-    const daysInMonth = lastDay.getDate()
-    const startingDayOfWeek = firstDay.getDay()
-
-    const days = []
-
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null)
-    }
-
-    // Add days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(new Date(year, month, day))
-    }
-
+    const days: (Date | null)[] = []
+    for (let i = 0; i < firstDay.getDay(); i++) days.push(null)
+    for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, month, d))
     return days
   }
 
   const getDaysInWeek = (date: Date) => {
-    const days = []
-    const dayOfWeek = date.getDay()
-    const startOfWeek = new Date(date)
-    startOfWeek.setDate(date.getDate() - dayOfWeek)
-
+    const days: Date[] = []
+    const start = new Date(date)
+    start.setDate(date.getDate() - date.getDay())
     for (let i = 0; i < 7; i++) {
-      const day = new Date(startOfWeek)
-      day.setDate(startOfWeek.getDate() + i)
-      days.push(day)
+      const d = new Date(start)
+      d.setDate(start.getDate() + i)
+      days.push(d)
     }
-
     return days
   }
 
-  const getDay = (date: Date) => {
-    return [new Date(date)]
-  }
-
-  const navigate = (direction: 'prev' | 'next') => {
+  const navigate = (dir: 'prev' | 'next') => {
     setCurrentDate(prev => {
-      const newDate = new Date(prev)
-      if (viewMode === 'month') {
-        if (direction === 'prev') {
-          newDate.setMonth(newDate.getMonth() - 1)
-        } else {
-          newDate.setMonth(newDate.getMonth() + 1)
-        }
-      } else if (viewMode === 'week') {
-        if (direction === 'prev') {
-          newDate.setDate(newDate.getDate() - 7)
-        } else {
-          newDate.setDate(newDate.getDate() + 7)
-        }
-      } else if (viewMode === 'day') {
-        if (direction === 'prev') {
-          newDate.setDate(newDate.getDate() - 1)
-        } else {
-          newDate.setDate(newDate.getDate() + 1)
-        }
-      }
-      return newDate
+      const d = new Date(prev)
+      const delta = dir === 'prev' ? -1 : 1
+      if (viewMode === 'month') d.setMonth(d.getMonth() + delta)
+      else if (viewMode === 'week') d.setDate(d.getDate() + delta * 7)
+      else d.setDate(d.getDate() + delta)
+      return d
     })
   }
 
   const getViewTitle = () => {
-    if (viewMode === 'month') {
-      return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    } else if (viewMode === 'week') {
-      const weekStart = getDaysInWeek(currentDate)[0]
-      const weekEnd = getDaysInWeek(currentDate)[6]
-      return `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-    } else {
-      return currentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    if (viewMode === 'month') return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    if (viewMode === 'week') {
+      const days = getDaysInWeek(currentDate)
+      return `${days[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${days[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
     }
+    return currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   }
 
-  const goToToday = () => {
-    setCurrentDate(new Date())
-  }
+  const isToday = (date: Date) => date.toDateString() === new Date().toDateString()
 
   const handleEventClick = (event: CalendarEvent) => {
-    // Route based on event type
-    // Note: Events come from the task API, so they're all tasks with different type classifications
-    // However, we route sprints to their dedicated page if it exists
-    switch (event.type) {
-      case 'sprint':
-        // Sprints may have their own detail page
-        router.push(`/sprints/${event._id}`)
-        break
-      case 'task':
-      case 'deadline':
-      case 'milestone':
-      case 'meeting':
-      default:
-        // All other event types route to task detail page
-        router.push(`/tasks/${event._id}`)
-        break
-    }
+    if (event.type === 'sprint') router.push(`/sprints/${event._id}`)
+    else router.push(`/tasks/${event._id}`)
   }
+
+  // Stats
+  const totalEvents = filteredEvents.length
+  const scheduledCount = filteredEvents.filter(e => e.status === 'scheduled').length
+  const inProgressCount = filteredEvents.filter(e => e.status === 'in_progress').length
+  const completedCount = filteredEvents.filter(e => e.status === 'completed').length
+
+  // ─── Loading ─────────────────────────────────────────────────────────────────
 
   if (loading || taskLoading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading calendar...</p>
+        <div className="space-y-8">
+          {/* Header skeleton */}
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)] animate-pulse flex-shrink-0" />
+            <div className="space-y-2 flex-1">
+              <div className="h-7 w-36 bg-[var(--apple-tertiary-fill)] animate-pulse rounded-lg" />
+              <div className="h-4 w-56 bg-[var(--apple-tertiary-fill)] animate-pulse rounded-lg" />
+            </div>
+          </div>
+          {/* Stats skeleton */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                <div className="space-y-1.5">
+                  <div className="h-5 w-10 bg-[var(--apple-tertiary-fill)] animate-pulse rounded" />
+                  <div className="h-3 w-20 bg-[var(--apple-tertiary-fill)] animate-pulse rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Calendar skeleton */}
+          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] p-6">
+            <div className="flex items-center justify-center py-24">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-[var(--apple-system-blue)]" />
+                <p className="text-[13px] text-[var(--apple-secondary-label)]">Loading calendar…</p>
+              </div>
+            </div>
           </div>
         </div>
       </MainLayout>
     )
   }
 
+  // ─── Main render ─────────────────────────────────────────────────────────────
+
   return (
     <MainLayout>
-      <div className="space-y-8 sm:space-y-10 lg:space-y-10">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Calendar</h1>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{isConnected ? 'Real-time sync active' : 'Real-time sync inactive'}</p>
-                </TooltipContent>
-              </Tooltip>
+      <TooltipProvider>
+        <div className="space-y-6 pb-8">
+
+          {/* ── Page Header ─────────────────────────────────────────────────── */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div
+                className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-lg)] flex items-center justify-center shadow-lg"
+                style={{
+                  background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
+                  boxShadow: '0 8px 24px rgba(0,122,255,0.30)',
+                }}
+              >
+                <Calendar className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight">Calendar</h1>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? 'bg-[var(--apple-system-green)]' : 'bg-[var(--apple-system-red)]'}`}
+                        style={isConnected ? { animation: 'status-pulse 2s ease-in-out infinite' } : undefined}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {isConnected ? 'Real-time sync active' : 'Real-time sync inactive'}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Timeline and schedule management</p>
+              </div>
             </div>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">Timeline and schedule management</p>
-          </div>
-          <div className="flex items-center space-x-2 w-full sm:w-auto">
             <Button
-              variant="outline"
               onClick={() => router.push('/tasks/create-new-task')}
-              className="w-full sm:w-auto text-sm sm:text-base"
+              className="w-full sm:w-auto h-10 px-4 text-[13px] font-medium rounded-[var(--apple-radius-sm)] bg-[var(--apple-system-blue)] hover:bg-[var(--apple-system-blue)]/90 text-white border-0 flex-shrink-0"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              <span className="sm:inline">New Task</span>
-              <span className="sm:hidden">New</span>
+              <Plus className="w-4 h-4 mr-1.5" />
+              New Task
             </Button>
           </div>
-        </div>
-        {/* Search and Filters */}
-        <div className="space-y-3">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            <Input
-              placeholder="Search events..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-full text-sm sm:text-base"
+
+          {/* ── Stats Bar ───────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              label="Total Events"
+              value={totalEvents}
+              Icon={CalendarDays}
+              gradient="linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)"
+              glow="rgba(0,122,255,0.25)"
+            />
+            <StatCard
+              label="Scheduled"
+              value={scheduledCount}
+              Icon={Circle}
+              gradient="linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)"
+              glow="rgba(48,176,199,0.25)"
+            />
+            <StatCard
+              label="In Progress"
+              value={inProgressCount}
+              Icon={PlayCircle}
+              gradient="linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)"
+              glow="rgba(255,149,0,0.25)"
+            />
+            <StatCard
+              label="Completed"
+              value={completedCount}
+              Icon={CheckCircle2}
+              gradient="linear-gradient(135deg,#34C759 0%,#30D158 100%)"
+              glow="rgba(52,199,89,0.25)"
             />
           </div>
-          {/* Filter options - compact grid layout */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full text-sm">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="task">Tasks</SelectItem>
-                <SelectItem value="sprint">Sprints</SelectItem>
-                <SelectItem value="milestone">Milestones</SelectItem>
-                <SelectItem value="meeting">Meetings</SelectItem>
-                <SelectItem value="deadline">Deadlines</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full text-sm">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full text-sm">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Event count and reset filters */}
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} found
-            </p>
-            {hasActiveFilters && (
-              <TooltipProvider>
+
+          {/* ── Filter Toolbar ──────────────────────────────────────────────── */}
+          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-3 sm:p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--apple-tertiary-label)] pointer-events-none" />
+                <Input
+                  placeholder="Search events, projects…"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9 text-[13px] rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] focus:bg-background"
+                />
+              </div>
+              {/* Filter toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowFilters(v => !v)}
+                    className={`flex-shrink-0 h-9 w-9 rounded-[var(--apple-radius-sm)] border flex items-center justify-center apple-transition ${showFilters || hasActiveFilters ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)]' : 'border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)] hover:text-foreground'}`}
+                  >
+                    <Filter className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Filters</TooltipContent>
+              </Tooltip>
+              {/* Reset */}
+              {hasActiveFilters && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={resetFilters}
-                      className="text-xs"
-                      aria-label="Reset all filters"
+                      className="flex-shrink-0 h-9 w-9 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)] hover:text-foreground flex items-center justify-center apple-transition"
                     >
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      Reset Filters
-                    </Button>
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
                   </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Reset filters</p>
-                  </TooltipContent>
+                  <TooltipContent>Reset filters</TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-        </div>
+              )}
+            </div>
 
-        {/* Calendar View */}
-        <div>
-          <div className="space-y-6 sm:space-y-8">
-            {/* Calendar Navigation */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-              <div className="flex items-center justify-between w-full sm:w-auto gap-2 sm:gap-4">
-                <Button variant="outline" size="sm" onClick={() => navigate('prev')} className="flex-shrink-0">
-                  <ChevronLeft className="h-4 w-4" />
-                  <span className="sr-only">Previous</span>
-                </Button>
-                <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-foreground text-center flex-1 sm:flex-none">
-                  {getViewTitle()}
-                </h2>
-                <Button variant="outline" size="sm" onClick={() => navigate('next')} className="flex-shrink-0">
-                  <ChevronRight className="h-4 w-4" />
-                  <span className="sr-only">Next</span>
-                </Button>
-              </div>
-              <div className="flex items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
-                <Button variant="outline" size="sm" onClick={goToToday} className="text-xs sm:text-sm">
-                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-                  Today
-                </Button>
-                <Select value={viewMode} onValueChange={(value) => setViewMode(value as 'month' | 'week' | 'day')}>
-                  <SelectTrigger className="w-full sm:w-[120px] text-xs sm:text-sm">
-                    <SelectValue />
+            {/* Expanded filter row */}
+            {showFilters && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="h-9 text-[13px] rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]">
+                    <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="month">Month</SelectItem>
-                    <SelectItem value="week">Week</SelectItem>
-                    <SelectItem value="day">Day</SelectItem>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="task">Tasks</SelectItem>
+                    <SelectItem value="sprint">Sprints</SelectItem>
+                    <SelectItem value="milestone">Milestones</SelectItem>
+                    <SelectItem value="meeting">Meetings</SelectItem>
+                    <SelectItem value="deadline">Deadlines</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-9 text-[13px] rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="scheduled">Scheduled</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger className="h-9 text-[13px] rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]">
+                    <SelectValue placeholder="All Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+            )}
+
+            {/* Count row */}
+            <div className="flex items-center justify-between pt-0.5">
+              <p className="text-[12px] text-[var(--apple-secondary-label)]">
+                {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} {hasActiveFilters ? 'match filters' : 'total'}
+              </p>
+            </div>
+          </div>
+
+          {/* ── Calendar Panel ──────────────────────────────────────────────── */}
+          <div className="rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+
+            {/* Calendar header / nav */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]/50">
+              {/* Date nav */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => navigate('prev')}
+                  className="w-8 h-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-foreground apple-transition"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-[15px] font-semibold text-foreground px-2 min-w-[200px] text-center">
+                  {getViewTitle()}
+                </span>
+                <button
+                  onClick={() => navigate('next')}
+                  className="w-8 h-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-foreground apple-transition"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Right controls */}
+              <div className="flex items-center gap-2">
+                {/* Today button */}
+                <button
+                  onClick={() => setCurrentDate(new Date())}
+                  className="h-8 px-3 text-[12px] font-medium rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background text-foreground hover:bg-[var(--apple-quaternary-fill)] apple-transition"
+                >
+                  Today
+                </button>
+
+                {/* Segmented view mode control */}
+                <div className="flex items-center p-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] border border-[var(--apple-separator)]">
+                  {(['month', 'week', 'day'] as const).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => setViewMode(mode)}
+                      className={`px-3 h-7 text-[12px] font-medium rounded-[6px] apple-transition ${
+                        viewMode === mode
+                          ? 'bg-white dark:bg-zinc-700 text-foreground shadow-sm'
+                          : 'text-[var(--apple-secondary-label)] hover:text-foreground'
+                      }`}
+                    >
+                      {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* Calendar Grid - Month View */}
+            {/* ── Month View ──────────────────────────────────────────────── */}
             {viewMode === 'month' && (
-              <div className="overflow-x-auto -mx-4 sm:mx-0">
-                <div className="grid grid-cols-7 gap-1 min-w-[600px] sm:min-w-0">
-                  {/* Day headers */}
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} className="p-1.5 sm:p-2 text-center text-xs sm:text-sm font-medium text-muted-foreground">
-                      <span className="hidden sm:inline">{day}</span>
-                      <span className="sm:hidden">{day.substring(0, 1)}</span>
-                    </div>
-                  ))}
-
-                  {/* Calendar days */}
-                  {getDaysInMonth(currentDate).map((date, index) => {
-                    if (!date) {
-                      return <div key={index} className="p-1.5 sm:p-2 min-h-[60px] sm:min-h-[100px]"></div>
-                    }
-
-                    const dayEvents = getEventsForDate(date)
-                    const isToday = date.toDateString() === new Date().toDateString()
-
-                    return (
-                      <div
-                        key={index}
-                        className={`p-1.5 sm:p-2 min-h-[60px] sm:min-h-[100px] border border-muted rounded-lg ${isToday ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
-                          }`}
-                      >
-                        <div className="flex items-center justify-between mb-1 sm:mb-2">
-                          <span className={`text-xs sm:text-sm font-medium ${isToday ? 'text-primary' : 'text-foreground'
-                            }`}>
-                            {date.getDate()}
-                          </span>
-                          {dayEvents.length > 0 && (
-                            <Badge variant="outline" className="text-[10px] sm:text-xs h-4 sm:h-5 px-1 sm:px-1.5">
-                              {dayEvents.length}
-                            </Badge>
-                          )}
-                        </div>
-
-                        <div className="space-y-0.5 sm:space-y-1">
-                          {dayEvents.slice(0, 2).map(event => (
-                            <div
-                              key={event._id}
-                              className="text-[10px] sm:text-xs p-0.5 sm:p-1 rounded cursor-pointer hover:bg-muted transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleEventClick(event)
-                              }}
-                              title={event.title}
-                            >
-                              <div className="flex items-center space-x-0.5 sm:space-x-1 min-w-0">
-                                <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${event.type === 'task' ? 'bg-blue-500' :
-                                  event.type === 'sprint' ? 'bg-green-500' :
-                                    event.type === 'milestone' ? 'bg-purple-500' :
-                                      event.type === 'meeting' ? 'bg-orange-500' :
-                                        'bg-red-500'
-                                  }`} />
-                                <span className="truncate min-w-0">{event.title}</span>
-                              </div>
-                            </div>
-                          ))}
-                          {dayEvents.length > 2 && (
-                            <div className="text-[10px] sm:text-xs text-muted-foreground px-0.5 sm:px-1">
-                              +{dayEvents.length - 2} more
-                            </div>
-                          )}
-                        </div>
+              <>
+                {/* Desktop month grid */}
+                <div className="hidden lg:block p-4">
+                  {/* Day-of-week headers */}
+                  <div className="grid grid-cols-7 mb-1">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                      <div key={d} className="py-2 text-center text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">
+                        {d}
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Calendar Grid - Week View */}
-            {viewMode === 'week' && (
-              <div className="overflow-x-auto -mx-4 sm:mx-0">
-                <div className="grid grid-cols-7 gap-1 min-w-[700px] sm:min-w-0">
-                  {/* Day headers */}
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} className="p-2 text-center text-xs sm:text-sm font-medium text-muted-foreground">
-                      <span className="hidden sm:inline">{day}</span>
-                      <span className="sm:hidden">{day.substring(0, 1)}</span>
-                    </div>
-                  ))}
-
-                  {/* Week days */}
-                  {getDaysInWeek(currentDate).map((date, index) => {
-                    const dayEvents = getEventsForDate(date)
-                    const isToday = date.toDateString() === new Date().toDateString()
-
-                    return (
-                      <div
-                        key={index}
-                        className={`p-2 sm:p-3 min-h-[300px] sm:min-h-[400px] border border-muted rounded-lg ${isToday ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
-                          }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`text-xs sm:text-sm font-medium ${isToday ? 'text-primary' : 'text-foreground'
-                            }`}>
-                            <span className="hidden sm:inline">{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                            <span className="sm:hidden">{date.getDate()}</span>
-                          </span>
-                          {dayEvents.length > 0 && (
-                            <Badge variant="outline" className="text-[10px] sm:text-xs">
-                              {dayEvents.length}
-                            </Badge>
-                          )}
-                        </div>
-
-                        <div className="space-y-2 sm:space-y-3">
-                          {dayEvents.map(event => (
-                            <div
-                              key={event._id}
-                              className="text-[10px] sm:text-xs p-1.5 sm:p-2 rounded cursor-pointer hover:bg-muted border-l-2 transition-colors"
-                              style={{
-                                borderLeftColor: event.type === 'task' ? '#3b82f6' :
-                                  event.type === 'sprint' ? '#10b981' :
-                                    event.type === 'milestone' ? '#8b5cf6' :
-                                      event.type === 'meeting' ? '#f97316' :
-                                        '#ef4444'
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleEventClick(event)
-                              }}
-                              title={event.title}
-                            >
-                              <div className="flex items-center space-x-1 mb-0.5 sm:mb-1 min-w-0">
-                                <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${event.type === 'task' ? 'bg-blue-500' :
-                                  event.type === 'sprint' ? 'bg-green-500' :
-                                    event.type === 'milestone' ? 'bg-purple-500' :
-                                      event.type === 'meeting' ? 'bg-orange-500' :
-                                        'bg-red-500'
-                                  }`} />
-                                <span className="font-medium truncate min-w-0">{event.title}</span>
-                              </div>
-                              {event.description && (
-                                <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2">{event.description}</p>
-                              )}
-                              {event.project && (
-                                <p
-                                  className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 truncate"
-                                  title={event.project.name}
-                                >
-                                  {event.project.name}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Calendar Grid - Day View */}
-            {viewMode === 'day' && (
-              <div className="space-y-4">
-                <div className="border border-muted rounded-lg p-3 sm:p-4 lg:p-6 min-h-[400px] sm:min-h-[500px]">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 mb-4">
-                    <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-foreground">
-                      <span className="hidden sm:inline">
-                        {currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                      </span>
-                      <span className="sm:hidden">
-                        {currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                    </h3>
-                    {getEventsForDate(currentDate).length > 0 && (
-                      <Badge variant="outline" className="text-xs sm:text-sm">
-                        {getEventsForDate(currentDate).length} event{getEventsForDate(currentDate).length !== 1 ? 's' : ''}
-                      </Badge>
-                    )}
+                    ))}
                   </div>
-
-                  <div className="space-y-3 sm:space-y-4">
-                    {getEventsForDate(currentDate).length > 0 ? (
-                      getEventsForDate(currentDate).map(event => (
+                  {/* Day cells */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {getDaysInMonth(currentDate).map((date, idx) => {
+                      if (!date) return <div key={idx} className="min-h-[110px]" />
+                      const dayEvents = getEventsForDate(date)
+                      const today = isToday(date)
+                      return (
                         <div
-                          key={event._id}
-                          className="p-3 sm:p-4 rounded-lg border border-muted cursor-pointer hover:bg-muted transition-colors"
-                          onClick={() => handleEventClick(event)}
+                          key={idx}
+                          className={`min-h-[110px] rounded-[var(--apple-radius-md)] p-2 border apple-transition ${
+                            today
+                              ? 'border-[var(--apple-system-blue)]/40 bg-[var(--apple-system-blue)]/5'
+                              : 'border-[var(--apple-separator)] hover:bg-[var(--apple-quaternary-fill)]'
+                          }`}
                         >
-                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 mb-2">
-                            <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
-                              <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0 ${event.type === 'task' ? 'bg-blue-500' :
-                                event.type === 'sprint' ? 'bg-green-500' :
-                                  event.type === 'milestone' ? 'bg-purple-500' :
-                                    event.type === 'meeting' ? 'bg-orange-500' :
-                                      'bg-red-500'
-                                }`} />
-                              <h4 className="font-medium text-sm sm:text-base text-foreground truncate min-w-0">{event.title}</h4>
-                              <Badge className={`${getTypeColor(event.type)} text-xs`}>
-                                {formatToTitleCase(event.type)}
-                              </Badge>
-                            </div>
-                            <Badge className={`${getPriorityColor(event.priority)} text-xs flex-shrink-0`}>
-                              {formatToTitleCase(event.priority)}
-                            </Badge>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span
+                              className={`text-[13px] font-semibold leading-none flex-shrink-0 ${
+                                today
+                                  ? 'w-6 h-6 rounded-full bg-[var(--apple-system-blue)] text-white flex items-center justify-center text-[12px]'
+                                  : 'text-[var(--apple-label)]'
+                              }`}
+                            >
+                              {date.getDate()}
+                            </span>
+                            {dayEvents.length > 0 && (
+                              <span className="text-[10px] font-medium text-[var(--apple-secondary-label)] tabular-nums">
+                                {dayEvents.length}
+                              </span>
+                            )}
                           </div>
-                          {event.description && (
-                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2">{event.description}</p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-muted-foreground">
-                            {event.project && (
-                              <div className="flex items-center space-x-1.5 min-w-0">
-                                <Target className="h-3 w-3 flex-shrink-0" />
-                                <span className="truncate min-w-0" title={event.project.name}>
-                                  {event.project.name}
-                                </span>
-                              </div>
-                            )}
-                            {event.startDate && (
-                              <div className="flex items-center space-x-1.5 whitespace-nowrap">
-                                <Clock className="h-3 w-3 flex-shrink-0" />
-                                <span>{new Date(event.startDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                              </div>
-                            )}
-                            {event.assignedTo && (
-                              <div className="flex items-center space-x-1.5 min-w-0">
-                                <User className="h-3 w-3 flex-shrink-0" />
-                                <span className="truncate">{event.assignedTo.firstName} {event.assignedTo.lastName}</span>
-                              </div>
+                          <div className="space-y-0.5">
+                            {dayEvents.slice(0, 3).map(ev => (
+                              <EventPill key={ev._id} event={ev} onClick={() => handleEventClick(ev)} />
+                            ))}
+                            {dayEvents.length > 3 && (
+                              <p className="text-[10px] text-[var(--apple-secondary-label)] px-1">
+                                +{dayEvents.length - 3} more
+                              </p>
                             )}
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 sm:py-12 text-muted-foreground">
-                        <Calendar className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50" />
-                        <p className="text-sm sm:text-base">No events scheduled for this day</p>
-                      </div>
-                    )}
+                      )
+                    })}
                   </div>
                 </div>
+
+                {/* Mobile agenda view */}
+                <div className="lg:hidden p-4">
+                  {filteredEvents.length === 0 ? (
+                    <EmptyCalendar message="No events match your current filters. Try adjusting the search or filter options." />
+                  ) : (() => {
+                    const grouped: Record<string, CalendarEvent[]> = {}
+                    filteredEvents.forEach(ev => {
+                      const key = new Date(ev.startDate).toLocaleDateString('en-US')
+                      if (!grouped[key]) grouped[key] = []
+                      grouped[key].push(ev)
+                    })
+                    return (
+                      <div className="space-y-4">
+                        {Object.entries(grouped)
+                          .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+                          .map(([dateStr, evs]) => {
+                            const d = new Date(dateStr)
+                            const today = isToday(d)
+                            return (
+                              <div key={dateStr}>
+                                <div className={`flex items-center gap-2 mb-2 px-1`}>
+                                  <div
+                                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0 ${today ? 'bg-[var(--apple-system-blue)] text-white' : 'bg-[var(--apple-tertiary-fill)] text-foreground'}`}
+                                  >
+                                    {d.getDate()}
+                                  </div>
+                                  <div>
+                                    <p className={`text-[12px] font-semibold ${today ? 'text-[var(--apple-system-blue)]' : 'text-foreground'}`}>
+                                      {d.toLocaleDateString('en-US', { weekday: 'long' })}
+                                    </p>
+                                    <p className="text-[11px] text-[var(--apple-secondary-label)]">
+                                      {d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="space-y-2 pl-9">
+                                  {evs.map(ev => (
+                                    <EventCard key={ev._id} event={ev} onClick={() => handleEventClick(ev)} detailed />
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          })}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </>
+            )}
+
+            {/* ── Week View ───────────────────────────────────────────────── */}
+            {viewMode === 'week' && (
+              <>
+                {/* Desktop week grid */}
+                <div className="hidden lg:block p-4">
+                  <div className="grid grid-cols-7 gap-2">
+                    {getDaysInWeek(currentDate).map((date, idx) => {
+                      const dayEvents = getEventsForDate(date)
+                      const today = isToday(date)
+                      return (
+                        <div key={idx} className="flex flex-col">
+                          {/* Day header */}
+                          <div className={`text-center pb-2 mb-2 border-b ${today ? 'border-[var(--apple-system-blue)]/30' : 'border-[var(--apple-separator)]'}`}>
+                            <p className={`text-[11px] font-semibold tracking-[0.06em] uppercase ${today ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-secondary-label)]'}`}>
+                              {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                            </p>
+                            <div
+                              className={`mx-auto mt-1 w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold ${
+                                today ? 'bg-[var(--apple-system-blue)] text-white' : 'text-foreground'
+                              }`}
+                            >
+                              {date.getDate()}
+                            </div>
+                          </div>
+                          {/* Events */}
+                          <div className="space-y-1.5 min-h-[300px]">
+                            {dayEvents.length === 0 ? (
+                              <div className="h-full flex items-center justify-center">
+                                <p className="text-[11px] text-[var(--apple-tertiary-label)]">—</p>
+                              </div>
+                            ) : (
+                              dayEvents.map(ev => (
+                                <EventCard key={ev._id} event={ev} onClick={() => handleEventClick(ev)} />
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Mobile week list */}
+                <div className="lg:hidden p-4">
+                  {(() => {
+                    const weekDays = getDaysInWeek(currentDate)
+                    const hasAny = weekDays.some(d => getEventsForDate(d).length > 0)
+                    if (!hasAny) {
+                      return <EmptyCalendar message="No events scheduled for this week. Navigate to a different week or adjust your filters." />
+                    }
+                    return (
+                      <div className="space-y-5">
+                        {weekDays.map(date => {
+                          const dayEvents = getEventsForDate(date)
+                          const today = isToday(date)
+                          return (
+                            <div key={date.toISOString()}>
+                              <div className="flex items-center gap-2 mb-2">
+                                <div
+                                  className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0 ${today ? 'bg-[var(--apple-system-blue)] text-white' : 'bg-[var(--apple-tertiary-fill)] text-foreground'}`}
+                                >
+                                  {date.getDate()}
+                                </div>
+                                <p className={`text-[13px] font-semibold ${today ? 'text-[var(--apple-system-blue)]' : 'text-foreground'}`}>
+                                  {date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                                </p>
+                              </div>
+                              {dayEvents.length === 0 ? (
+                                <p className="text-[12px] text-[var(--apple-tertiary-label)] pl-9 mb-1">No events</p>
+                              ) : (
+                                <div className="space-y-2 pl-9">
+                                  {dayEvents.map(ev => (
+                                    <EventCard key={ev._id} event={ev} onClick={() => handleEventClick(ev)} detailed />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </>
+            )}
+
+            {/* ── Day View ────────────────────────────────────────────────── */}
+            {viewMode === 'day' && (
+              <div className="p-4 sm:p-5">
+                {(() => {
+                  const dayEvents = getEventsForDate(currentDate)
+                  if (dayEvents.length === 0) {
+                    return <EmptyCalendar message="Nothing scheduled for today. Try navigating to a different day or clearing your filters." />
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {dayEvents.map(ev => (
+                        <DayEventCard key={ev._id} event={ev} onClick={() => handleEventClick(ev)} />
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
             )}
+
           </div>
+
+          {/* ── Legend ──────────────────────────────────────────────────────── */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
+            <p className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Event Types</p>
+            {Object.entries(TYPE_CONFIG).map(([key, cfg]) => (
+              <div key={key} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
+                <span className="text-[12px] text-[var(--apple-secondary-label)]">{cfg.label}</span>
+              </div>
+            ))}
+          </div>
+
         </div>
-      </div>
+      </TooltipProvider>
     </MainLayout>
   )
 }
