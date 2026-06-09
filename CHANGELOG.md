@@ -1,3 +1,28 @@
+# [1.39.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.2...v1.39.0) (2026-06-09)
+
+
+### Bug Fixes
+
+* adjust order of elements in dashboard layout for better responsiveness ([771dacb](https://github.com/EchonLabs/kanvaro.com/commit/771dacb3860d6202dc5088000b080a57cd75cfe9))
+* improve responsiveness and layout across project and calendar pages ([1b7a517](https://github.com/EchonLabs/kanvaro.com/commit/1b7a517213cee5f486ec67da3771fbda36564fd4))
+* refine glassmorphism effects and transition timing Adjusted the opacity and blur intensity of Apple-inspired glass materials to improve visual depth and transparency. Additionally, introduce a custom cubic-bezier timing function and transition duration to align with premium motion standards. ([b0c897b](https://github.com/EchonLabs/kanvaro.com/commit/b0c897bdba1fd469d96f3852272753ab60d22810))
+* **reports:** improve responsiveness and add date filtering to Gantt charts Update `QuickActions` component to use a dynamic grid system that adapts to the number of available actions. ([f97b15f](https://github.com/EchonLabs/kanvaro.com/commit/f97b15fe6966bc8fdf5e89ae7bfbd59968c5b27e))
+
+
+### Features
+
+* **dashboard:** redesigned the UI to fit Apple theme enhanced data aggregation and refine typography scales ([401154f](https://github.com/EchonLabs/kanvaro.com/commit/401154f42dd6978a9cfffcd6ad9ce7f1bb0f17d6))
+* **ui/dashboard:** implement Apple HIG design system tokens ([7839f56](https://github.com/EchonLabs/kanvaro.com/commit/7839f5626f9aab3f12d7940560b5c2215375be0c))
+* **ui:** apply Apple HIG semantic styling and component refinements to dashboard core UI Components ([f1adb0b](https://github.com/EchonLabs/kanvaro.com/commit/f1adb0b680cd1eab0758e6c4ccaf64fd74705580))
+* **ui:** Implement a more sophisticated visual presentation for time tracking components and extend the manual logging functionality for administrative users. ([ae9b1f8](https://github.com/EchonLabs/kanvaro.com/commit/ae9b1f88f7ab99248a8ab3c19198173945c4709e))
+* **ui:** implemented new revamped designs for all pages realted to the Time Tracking Module and added new animation styles ([c8c5440](https://github.com/EchonLabs/kanvaro.com/commit/c8c54403e59353cc832fccdee8550df3eb92c8d2))
+* **ui:** implemented revamped UI to all Team Module pages ([b188b04](https://github.com/EchonLabs/kanvaro.com/commit/b188b044bd185fa9c2eda1c01ab2543ade7e829f))
+* **ui:** redesign all report pages, components and the calender page with Apple-inspired design system ([76c536b](https://github.com/EchonLabs/kanvaro.com/commit/76c536bf4eda0f3d865cc0bb30a8c2705af311b4))
+* **ui:** redesign standup dashboard with Apple-inspired design system ([bd97109](https://github.com/EchonLabs/kanvaro.com/commit/bd97109628b0dae55c58acf0114c07229b5ef317))
+* **ui:** redesign UI and improve component structure in Test Management Module pages ([26ffcef](https://github.com/EchonLabs/kanvaro.com/commit/26ffcef4541dc7d9bf481e0b53325a81bdd9e633))
+* **ui:** refactor task management pages with shared components and Apple-inspired design ([9c1f424](https://github.com/EchonLabs/kanvaro.com/commit/9c1f424a286cbeb4cea22c09e5dd91236d1762d2))
+* **ui:** Update Kanban and Projects pages with new design tokens, improved typography, and refined component structures  Implement a theme switcher (Light, Dark, System) in the MobileMenu using `next-themes`. ([be4d213](https://github.com/EchonLabs/kanvaro.com/commit/be4d213f883a4e0594831da3235f0406b7f0419f))
+
 ## [1.38.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.1...v1.38.2) (2026-06-02)
 
 ## [1.38.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.0...v1.38.1) (2026-06-02)
