@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Clock, Square, User, FolderOpen, Loader2, RefreshCw, Search, AlertTriangle } from 'lucide-react'
+import { Clock, Square, User, FolderOpen, Loader2, RefreshCw, Search } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { useToast } from '@/components/ui/Toast'
@@ -523,32 +523,27 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
         )}
       </CardContent>
 
-      {/* Stop Timer Confirmation Dialog — logic unchanged */}
-      <Dialog open={!!stopConfirmTimerId} onOpenChange={(open) => !open && setStopConfirmTimerId(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-[var(--apple-system-red)]" />
-              Stop Timer
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to stop this timer?
-              {timerToStop && (
-                <span className="block mt-2 text-[var(--apple-label)] font-medium">
-                  {timerToStop.user.firstName} {timerToStop.user.lastName} — {timerToStop.project.name}
-                  {timerToStop.task && ` • ${timerToStop.task.title}`}
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setStopConfirmTimerId(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => stopConfirmTimerId && handleStopTimer(stopConfirmTimerId)}>
-              <Square className="h-4 w-4 mr-2" />Stop Timer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Stop Timer Confirmation Dialog */}
+      <ConfirmationModal
+        isOpen={!!stopConfirmTimerId}
+        onClose={() => setStopConfirmTimerId(null)}
+        onConfirm={() => stopConfirmTimerId && handleStopTimer(stopConfirmTimerId)}
+        title="Stop Timer"
+        description={
+          <>
+            Are you sure you want to stop this timer?
+            {timerToStop && (
+              <span className="block mt-2 font-medium text-[var(--apple-label)]">
+                {timerToStop.user.firstName} {timerToStop.user.lastName} — {timerToStop.project.name}
+                {timerToStop.task && ` • ${timerToStop.task.title}`}
+              </span>
+            )}
+          </>
+        }
+        confirmText="Stop Timer"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </Card>
   )
 }
