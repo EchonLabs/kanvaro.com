@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         requireCategory: orgTimeTracking.requireCategory ?? false,
         allowFutureTime: orgTimeTracking.allowFutureTime ?? false,
         allowPastTime: orgTimeTracking.allowPastTime ?? true,
-        pastTimeLimitDays: orgTimeTracking.pastTimeLimitDays ?? 30,
+        pastTimeLimitDays: orgTimeTracking.pastTimeLimitDays ?? 1,
         disableTimeLogEditing: orgTimeTracking.disableTimeLogEditing ?? false,
         timeLogEditMode: orgTimeTracking.timeLogEditMode,
         timeLogEditDays: orgTimeTracking.timeLogEditDays ?? 30,
@@ -92,6 +92,12 @@ export async function GET(request: NextRequest) {
         }
       })
 
+      await settings.save()
+    }
+
+    // Migrate pastTimeLimitDays from old default (30) to new default (1)
+    if (settings.pastTimeLimitDays === 30) {
+      settings.pastTimeLimitDays = 1
       await settings.save()
     }
 
