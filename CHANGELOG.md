@@ -1,3 +1,12 @@
+## [1.39.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.39.0...v1.39.1) (2026-06-10)
+
+
+### Bug Fixes
+
+* harden session timeout logic and stabilize token refresh Enforce a minimum session timeout of 4 hours in SessionTimeoutWrapper ([cd59682](https://github.com/EchonLabs/kanvaro.com/commit/cd59682939a51daa3008b530ddcb12ad75c7f8dc))
+* implement dynamic past time log limits Update the time tracking system to use a configurable past time limit ([f700305](https://github.com/EchonLabs/kanvaro.com/commit/f70030524ad094713d9cf80f9d5fff6a371e4bbe))
+* restrict manual time logs to today and yesterday ([0afbee3](https://github.com/EchonLabs/kanvaro.com/commit/0afbee32126e86ef8fe9e31dc65c46a5870628fb))
+
 # [1.39.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.2...v1.39.0) (2026-06-09)
 
 
