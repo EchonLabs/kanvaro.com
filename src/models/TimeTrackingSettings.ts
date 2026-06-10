@@ -109,7 +109,7 @@ const TimeTrackingSettingsSchema = new Schema<ITimeTrackingSettings>({
   },
   pastTimeLimitDays: {
     type: Number,
-    default: 30,
+    default: 1,
     min: 1,
     max: 365
   },

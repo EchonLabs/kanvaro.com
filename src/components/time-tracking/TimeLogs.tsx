@@ -2151,7 +2151,7 @@ export function TimeLogs({
       <div className="space-y-4">
 
       {/* ── Add Manual Time Log attractive section ─────────────────── */}
-      {showManualLogButtons && canAddManualTimeLog && canViewEmployeeFilter && user?.role === 'human_resource' && (
+      {showManualLogButtons && canAddManualTimeLog && canViewEmployeeFilter && user?.role === 'human_resource' && (timeTrackingSettings?.allowPastTime ?? true) && (
         <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
           <div className="px-5 py-4 flex items-center gap-4">
             <div
@@ -2165,16 +2165,7 @@ export function TimeLogs({
               <p className="text-[13px] text-[var(--apple-secondary-label)]">Log time for past work or specific intervals</p>
             </div>
             <button
-              onClick={() => {
-                setManualLogData({ startDate: '', startTime: '', endDate: '', endTime: '', description: '' })
-                setSelectedProjectForLog('')
-                setSelectedTaskForLog('')
-                setTasks([])
-                setModalProjectSearch('')
-                setError('')
-                clearFieldErrors()
-                setShowAddTimeLogModal(true)
-              }}
+              onClick={() => setShowHRManualLogModal(true)}
               className="inline-flex items-center gap-1.5 h-9 px-4 rounded-[var(--apple-radius-md)] text-[14px] font-semibold text-white apple-transition flex-shrink-0"
               style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 2px 8px rgba(52,199,89,0.25)' }}
             >
