@@ -2165,16 +2165,7 @@ export function TimeLogs({
               <p className="text-[13px] text-[var(--apple-secondary-label)]">Log time for past work or specific intervals</p>
             </div>
             <button
-              onClick={() => {
-                setManualLogData({ startDate: '', startTime: '', endDate: '', endTime: '', description: '' })
-                setSelectedProjectForLog('')
-                setSelectedTaskForLog('')
-                setTasks([])
-                setModalProjectSearch('')
-                setError('')
-                clearFieldErrors()
-                setShowAddTimeLogModal(true)
-              }}
+              onClick={() => setShowHRManualLogModal(true)}
               className="inline-flex items-center gap-1.5 h-9 px-4 rounded-[var(--apple-radius-md)] text-[14px] font-semibold text-white apple-transition flex-shrink-0"
               style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 2px 8px rgba(52,199,89,0.25)' }}
             >
