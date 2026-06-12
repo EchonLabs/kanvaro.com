@@ -20,7 +20,7 @@ interface Project {
 
 interface ProjectResourceReportProps { projects: Project[]; filters: any }
 
-const APPLE_COLORS = ['#007AFF','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7','#FF375F','#FFD60A']
+const APPLE_COLORS = ['var(--apple-chart-color)','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7','#FF375F','#FFD60A']
 
 const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
   if (!active || !payload?.length) return null
@@ -100,8 +100,8 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
       {/* ── Stats Strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Team Size', value: String(totalTeamSize), sub: 'Across all projects', color: '#007AFF', icon: Users },
-          { label: 'Total Hours', value: `${totalHours.toFixed(0)}h`, sub: 'Time logged', color: '#BF5AF2', icon: Clock },
+          { label: 'Total Team Size', value: String(totalTeamSize), sub: 'Across all projects', color: 'var(--apple-chart-color)', icon: Users },
+          { label: 'Total Hours', value: `${totalHours.toFixed(0)}h`, sub: 'Time logged', color: 'var(--apple-chart-color)', icon: Clock },
           { label: 'Total Budget', value: formatCurrency(totalBudget), sub: 'Combined allocation', color: '#34C759', icon: DollarSign },
           { label: 'Total Spent', value: formatCurrency(totalSpent), sub: `${totalBudget > 0 ? ((totalSpent/totalBudget)*100).toFixed(1) : 0}% utilized`, color: '#FF9500', icon: DollarSign },
         ].map(s => (
@@ -138,15 +138,10 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
         <ChartCard title="Hours Logged by Project" subtitle="Time investment across projects">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={hoursData} barCategoryGap="40%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="res-hours" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#BF5AF2" stopOpacity={0.9} /><stop offset="100%" stopColor="#FF375F" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={40} tickFormatter={v => `${v}h`} />
               <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}h`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Hours" fill="url(#res-hours)" radius={[5,5,0,0]} maxBarSize={44} />
+              <Bar dataKey="Hours" fill="var(--apple-chart-color)" radius={[5,5,0,0]} maxBarSize={44} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -155,15 +150,10 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
         <ChartCard title="Team Size by Project" subtitle="Number of team members per project">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={teamData} barCategoryGap="40%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="res-team" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.9} /><stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={24} allowDecimals={false} />
               <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v} members`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Members" fill="url(#res-team)" radius={[5,5,0,0]} maxBarSize={44} />
+              <Bar dataKey="Members" fill="var(--apple-chart-color)" radius={[5,5,0,0]} maxBarSize={44} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

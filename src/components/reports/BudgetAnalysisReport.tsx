@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
@@ -16,7 +16,7 @@ interface BudgetAnalysisReportProps {
   filters: any
 }
 
-const APPLE_COLORS = ['#007AFF','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7']
+const APPLE_COLORS = ['var(--apple-chart-color)','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7']
 
 const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
   if (!active || !payload?.length) return null
@@ -60,7 +60,7 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
     ? budgetBreakdown.reduce((s, i) => s + i.utilizationRate, 0) / budgetBreakdown.length
     : 0
 
-  const barData = budgetBreakdown.map((item, i) => ({
+  const barData = budgetBreakdown.map((item) => ({
     name: item.category.length > 10 ? item.category.slice(0, 10) + '…' : item.category,
     Budgeted: item.budgeted,
     Spent: item.spent,
@@ -84,10 +84,10 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
       {/* ── Stats Strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Budgeted', value: formatCurrency(totalBudgeted), sub: 'Across all categories', color: '#007AFF' },
-          { label: 'Total Spent', value: formatCurrency(totalSpent), sub: `${totalBudgeted > 0 ? ((totalSpent/totalBudgeted)*100).toFixed(1) : 0}% of budget`, color: '#FF453A' },
-          { label: 'Remaining Budget', value: formatCurrency(totalRemaining), sub: 'Available to spend', color: '#34C759' },
-          { label: 'Avg Utilization', value: `${avgUtilization.toFixed(1)}%`, sub: 'Across categories', color: '#BF5AF2' },
+          { label: 'Total Budgeted',  value: formatCurrency(totalBudgeted),  sub: 'Across all categories',                                                          color: 'var(--apple-chart-color)' },
+          { label: 'Total Spent',     value: formatCurrency(totalSpent),      sub: `${totalBudgeted > 0 ? ((totalSpent/totalBudgeted)*100).toFixed(1) : 0}% of budget`, color: '#FF453A' },
+          { label: 'Remaining',       value: formatCurrency(totalRemaining),  sub: 'Available to spend',                                                             color: '#34C759' },
+          { label: 'Avg Utilization', value: `${avgUtilization.toFixed(1)}%`, sub: 'Across categories',                                                             color: 'var(--apple-chart-color)' },
         ].map(s => (
           <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
             <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
@@ -104,19 +104,11 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
         <ChartCard title="Budget vs Spent" subtitle="Planned allocation against actual spending by category">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={barData} barCategoryGap="30%" barGap={4} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="ba-budgeted" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.9} /><stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.7} />
-                </linearGradient>
-                <linearGradient id="ba-spent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FF9500" stopOpacity={0.9} /><stop offset="100%" stopColor="#FFD60A" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
               <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Budgeted" fill="url(#ba-budgeted)" radius={[6,6,0,0]} maxBarSize={32} />
-              <Bar dataKey="Spent" fill="url(#ba-spent)" radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Budgeted" fill="var(--apple-chart-color)"              radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Spent"    fill="var(--apple-chart-color)" fillOpacity={0.45} radius={[6,6,0,0]} maxBarSize={32} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </BarChart>
           </ResponsiveContainer>
@@ -126,15 +118,10 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
         <ChartCard title="Utilization by Category" subtitle="Percentage of budget used per category">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={utilizationData} barCategoryGap="35%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="ba-util" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#BF5AF2" stopOpacity={0.9} /><stop offset="100%" stopColor="#FF375F" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0,100]} />
               <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Utilization" fill="url(#ba-util)" radius={[6,6,0,0]} maxBarSize={40} />
+              <Bar dataKey="Utilization" fill="var(--apple-chart-color)" radius={[6,6,0,0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -145,23 +132,20 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
             <AreaChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="ba-area-budget" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.22} /><stop offset="100%" stopColor="#007AFF" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="ba-area-spent" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#FF453A" stopOpacity={0.18} /><stop offset="100%" stopColor="#FF453A" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
               <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
-              <Area type="monotone" dataKey="Budget" stroke="#007AFF" strokeWidth={2} fill="url(#ba-area-budget)" dot={false} activeDot={{ r: 4 }} />
-              <Area type="monotone" dataKey="Spent" stroke="#FF453A" strokeWidth={2} fill="url(#ba-area-spent)" dot={false} activeDot={{ r: 4 }} />
+              <Area type="monotone" dataKey="Budget" stroke="var(--apple-chart-color)" strokeWidth={2} fill="var(--apple-chart-color)" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
+              <Area type="monotone" dataKey="Spent"  stroke="#FF453A"                  strokeWidth={2} fill="url(#ba-area-budget)"        dot={false} activeDot={{ r: 4 }} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Line: variance */}
+        {/* Line: variance — green = under budget (positive) */}
         <ChartCard title="Budget Variance Analysis" subtitle="Monthly budget vs actual variance">
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>

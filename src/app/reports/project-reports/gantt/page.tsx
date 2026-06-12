@@ -20,10 +20,10 @@ import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 
 const STAT_ACCENTS = [
-  { gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.22)' },
-  { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.22)' },
-  { gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.22)' },
-  { gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)', glow: 'rgba(255,69,58,0.22)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: '#FF453A', glow: 'rgba(255,69,58,0.22)' },
 ]
 
 function MiniStatCard({
@@ -244,12 +244,7 @@ export default function GanttReportPage() {
           {/* ── Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-[var(--apple-radius-md)] flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', boxShadow: '0 4px 14px rgba(255,149,0,0.30)' }}
-              >
-                <GitBranch className="h-5 w-5 text-white" />
-              </div>
+              <GitBranch className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
               <div>
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight">Gantt Chart</h1>
                 <p className="text-[13px] text-[var(--apple-secondary-label)]">Visualize project timelines and task dependencies</p>
@@ -268,7 +263,7 @@ export default function GanttReportPage() {
                 Filters
                 {hasActiveFilters && (
                   <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-4 rounded-full text-[10px] font-bold text-white px-1"
-                    style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' }}>
+                    style={{ background: 'var(--apple-card-gradient)' }}>
                     {activeFilterCount}
                   </span>
                 )}
@@ -288,7 +283,7 @@ export default function GanttReportPage() {
                 size="sm"
                 onClick={handleExport}
                 className="rounded-full h-8 px-4 text-[13px] apple-transition"
-                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' }}
+                style={{ background: 'var(--apple-card-gradient)' }}
               >
                 <Download className="h-3.5 w-3.5 mr-1.5" />Export CSV
               </Button>
@@ -511,7 +506,7 @@ export default function GanttReportPage() {
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-16 flex flex-col items-center gap-4">
               <div
                 className="flex h-16 w-16 items-center justify-center rounded-[var(--apple-radius-lg)]"
-                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', boxShadow: '0 4px 20px rgba(255,149,0,0.28)' }}
+                style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 20px var(--apple-chart-glow)' }}
               >
                 <GitBranch className="h-7 w-7 text-white" />
               </div>

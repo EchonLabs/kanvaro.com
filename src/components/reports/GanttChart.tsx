@@ -19,13 +19,13 @@ interface GanttChartProps {
 const SPRINT_STYLES: Record<string, { gradient: string; glow: string; label: string; chip: string }> = {
   completed: { gradient: 'linear-gradient(90deg,#8E8E93 0%,#AEAEB2 100%)', glow: 'rgba(142,142,147,0.20)', label: 'Past',    chip: 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]' },
   active:    { gradient: 'linear-gradient(90deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.30)',  label: 'Active',  chip: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' },
-  planned:   { gradient: 'linear-gradient(90deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.28)', label: 'Planned', chip: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400' },
+  planned:   { gradient: 'var(--apple-chart-color)',                        glow: 'var(--apple-chart-glow)', label: 'Planned', chip: 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-chart-color)]' },
 }
 
 // Task bar status styles
 const TASK_STYLES: Record<string, { gradient: string; glow: string }> = {
   done:        { gradient: 'linear-gradient(90deg,#34C759,#30D158)', glow: 'rgba(52,199,89,0.35)'  },
-  in_progress: { gradient: 'linear-gradient(90deg,#007AFF,#5AC8FA)', glow: 'rgba(0,122,255,0.35)'  },
+  in_progress: { gradient: 'var(--apple-chart-color)',               glow: 'var(--apple-chart-glow)' },
   review:      { gradient: 'linear-gradient(90deg,#FF9500,#FFD60A)', glow: 'rgba(255,149,0,0.35)'  },
   testing:     { gradient: 'linear-gradient(90deg,#BF5AF2,#FF375F)', glow: 'rgba(191,90,242,0.35)' },
   cancelled:   { gradient: 'linear-gradient(90deg,#FF453A,#FF6961)', glow: 'rgba(255,69,58,0.30)'  },
@@ -193,7 +193,7 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                       className={cn(
                         'flex items-center gap-2 px-3 border-b border-[var(--apple-separator)] cursor-pointer apple-transition select-none group',
                         isSelected
-                          ? 'bg-[rgba(0,122,255,0.08)] dark:bg-[rgba(0,122,255,0.14)]'
+                          ? 'bg-[var(--apple-tertiary-fill)]'
                           : 'hover:bg-[var(--apple-tertiary-fill)]'
                       )}
                       style={{ height: SPRINT_ROW_H }}
@@ -206,7 +206,7 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                         <div className="flex items-center gap-1.5">
                           <p className={cn(
                             'text-[12px] font-semibold leading-tight truncate',
-                            isSelected ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-label)]'
+                            isSelected ? 'text-[var(--apple-chart-color)]' : 'text-[var(--apple-label)]'
                           )}>
                             {sprint.title}
                           </p>
@@ -247,7 +247,7 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                       className={cn(
                         'flex items-center gap-2 px-3 border-b border-[var(--apple-separator)] cursor-pointer apple-transition select-none',
                         isSelected
-                          ? 'bg-[rgba(0,122,255,0.08)] dark:bg-[rgba(0,122,255,0.14)]'
+                          ? 'bg-[var(--apple-tertiary-fill)]'
                           : 'hover:bg-[var(--apple-tertiary-fill)]'
                       )}
                       style={{ height: ROW_HEIGHT }}
@@ -259,7 +259,7 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                       <div className="min-w-0 flex-1">
                         <p className={cn(
                           'text-[12px] font-medium leading-tight truncate',
-                          isSelected ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-label)]'
+                          isSelected ? 'text-[var(--apple-chart-color)]' : 'text-[var(--apple-label)]'
                         )}>
                           {task.title}
                         </p>
@@ -310,14 +310,14 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                       className={cn(
                         'flex-shrink-0 border-r border-[var(--apple-separator)] flex items-center justify-center',
                         isWeekend && 'bg-[var(--apple-tertiary-fill)]',
-                        isToday   && 'bg-[rgba(0,122,255,0.10)]'
+                        isToday   && 'bg-[var(--apple-chart-color)] bg-opacity-10'
                       )}
                       style={{ width: dayWidth }}
                     >
                       {dayWidth >= 22 && (
                         <span className={cn(
                           'text-[9px] font-apple-mono tabular-nums',
-                          isToday ? 'text-[var(--apple-system-blue)] font-bold' : 'text-[var(--apple-tertiary-label)]'
+                          isToday ? 'text-[var(--apple-chart-color)] font-bold' : 'text-[var(--apple-tertiary-label)]'
                         )}>
                           {date.getDate()}
                         </span>
@@ -348,8 +348,8 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                   className="absolute top-0 bottom-0 z-10 pointer-events-none"
                   style={{ left: todayOffset * dayWidth }}
                 >
-                  <div className="w-px h-full bg-[var(--apple-system-blue)] opacity-50" />
-                  <div className="absolute -top-0.5 -left-[3px] h-1.5 w-1.5 rounded-full bg-[var(--apple-system-blue)]" />
+                  <div className="w-px h-full opacity-50" style={{ backgroundColor: 'var(--apple-chart-color)' }} />
+                  <div className="absolute -top-0.5 -left-[3px] h-1.5 w-1.5 rounded-full" style={{ backgroundColor: 'var(--apple-chart-color)' }} />
                 </div>
               )}
 
@@ -409,7 +409,7 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                       className={cn(
                         'relative h-full w-full rounded-[6px] overflow-hidden apple-transition group-hover:brightness-105',
                         isPast && 'opacity-70',
-                        isSelected && 'ring-2 ring-[var(--apple-system-blue)] ring-offset-1'
+                        isSelected && 'ring-2 ring-[var(--apple-chart-color)] ring-offset-1'
                       )}
                       style={{
                         background: sprintStyle.gradient,
@@ -456,13 +456,13 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                     <div
                       className={cn(
                         'relative h-full w-full rounded-[6px] overflow-hidden apple-transition hover:brightness-105',
-                        isSelected && 'ring-2 ring-[var(--apple-system-blue)] ring-offset-1',
+                        isSelected && 'ring-2 ring-[var(--apple-chart-color)] ring-offset-1',
                         isOverdue && !isSelected && 'ring-2 ring-red-400 ring-offset-1'
                       )}
                       style={{
                         background: style.gradient,
                         boxShadow: isSelected
-                          ? `0 0 0 2px var(--apple-system-blue), 0 4px 16px ${style.glow}`
+                          ? `0 0 0 2px var(--apple-chart-color), 0 4px 16px ${style.glow}`
                           : `0 2px 10px ${style.glow}`,
                       }}
                     >

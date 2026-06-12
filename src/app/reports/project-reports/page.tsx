@@ -66,10 +66,10 @@ interface FilterState {
 }
 
 const STAT_ACCENTS = [
-  { gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.22)' },
-  { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.22)' },
-  { gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.22)' },
-  { gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.22)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
 ]
 
 function StatCard({
@@ -78,7 +78,7 @@ function StatCard({
   label: string; value: string; sub: string; icon: React.ElementType; accent: typeof STAT_ACCENTS[0]
 }) {
   return (
-    <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5 flex items-center gap-4 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5">
+    <div className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5 flex items-center gap-4 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5">
       <div
         className="flex h-11 w-11 items-center justify-center rounded-[var(--apple-radius-sm)] flex-shrink-0"
         style={{ background: accent.gradient, boxShadow: `0 4px 14px ${accent.glow}` }}
@@ -190,7 +190,7 @@ export default function ProjectReportsPage() {
       <MainLayout>
         <PageWrapper>
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-[var(--apple-radius-lg)]" style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}>
+            <div className="flex h-16 w-16 items-center justify-center rounded-[var(--apple-radius-lg)]" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 20px var(--apple-chart-glow)' }}>
               <FolderKanban className="h-7 w-7 text-white" />
             </div>
             <p className="text-[17px] font-semibold">No project data available</p>
@@ -213,12 +213,7 @@ export default function ProjectReportsPage() {
           {/* ── Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-[var(--apple-radius-md)] shadow-sm flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 14px rgba(0,122,255,0.30)' }}
-              >
-                <BarChart3 className="h-5 w-5 text-white" />
-              </div>
+              <BarChart3 className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
               <div>
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight">Project Reports</h1>
                 <p className="text-[13px] text-[var(--apple-secondary-label)]">Comprehensive analytics and insights for all projects</p>
@@ -238,7 +233,7 @@ export default function ProjectReportsPage() {
               <Button
                 size="sm" onClick={() => exportReport('csv')}
                 className="rounded-full h-8 px-4 text-[13px] apple-transition"
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+                style={{ background: 'var(--apple-card-gradient)' }}
               >
                 <Download className="h-3.5 w-3.5 mr-1.5" />Export
               </Button>
@@ -357,7 +352,7 @@ export default function ProjectReportsPage() {
               ] as [string, string, React.ElementType][]).map(([v, l, Icon]) => (
                 <TabsTrigger
                   key={v} value={v}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-1.5 text-[13px] font-medium apple-transition data-[state=active]:bg-white dark:data-[state=active]:bg-[rgba(255,255,255,0.12)] data-[state=active]:shadow-sm data-[state=active]:text-[var(--apple-label)] text-[var(--apple-secondary-label)]"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-1.5 text-[13px] font-medium apple-transition data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-[var(--apple-chart-color)] text-[var(--apple-secondary-label)]"
                 >
                   <Icon className="h-4 w-4 flex-shrink-0" />
                   <span className="hidden sm:inline">{l}</span>
