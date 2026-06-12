@@ -36,9 +36,9 @@ interface ActiveTimer {
 }
 
 const TIME_PALETTE = [
-  { gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.25)', bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-600 dark:text-blue-400' },
-  { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.25)', bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400' },
-  { gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.25)', bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-600 dark:text-purple-400' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-600 dark:text-blue-400' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-600 dark:text-purple-400' },
 ]
 
 export default function TimeTrackingPage() {
@@ -165,8 +165,8 @@ export default function TimeTrackingPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
-              className="h-11 w-11 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 shadow-[0_2px_8px_rgba(0,122,255,0.30)]"
-              style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+              className="h-11 w-11 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}
             >
               <Clock className="h-5 w-5 text-white" />
             </div>
@@ -182,7 +182,7 @@ export default function TimeTrackingPage() {
           <Button
             onClick={() => router.push('/time-tracking/timer')}
             className="h-9 px-4 rounded-[var(--apple-radius-md)] text-[15px] font-medium flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+            style={{ background: 'var(--apple-card-gradient)' }}
           >
             <Play className="h-4 w-4 mr-2" />
             Start Timer
@@ -201,10 +201,10 @@ export default function TimeTrackingPage() {
             return (
               <div
                 key={stat.label}
-                className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4 apple-transition hover:shadow-[0_4px_14px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_4px_14px_rgba(0,0,0,0.35)]"
+                className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4 apple-transition hover:shadow-[0_4px_14px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_4px_14px_rgba(0,0,0,0.35)]"
               >
-                <div className={cn('inline-flex h-8 w-8 items-center justify-center rounded-[var(--apple-radius-sm)] mb-3', stat.bg)}>
-                  <Icon className={cn('h-4 w-4', stat.color)} />
+                <div className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--apple-radius-sm)] mb-3" style={{ background: 'var(--apple-card-gradient)' }}>
+                  <Icon className="h-4 w-4 text-white" />
                 </div>
                 <p className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">
                   {stat.label}
@@ -229,7 +229,7 @@ export default function TimeTrackingPage() {
               <button
                 key={action.label}
                 onClick={() => router.push(action.path)}
-                className="text-left rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5 group"
+                className="card-fade-in text-left rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5 group"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div
@@ -279,8 +279,8 @@ export default function TimeTrackingPage() {
                   {/* Clock display */}
                   <div className="flex flex-col items-center py-4">
                     <div
-                      className="h-24 w-24 rounded-full flex items-center justify-center mb-4 shadow-[0_4px_20px_rgba(0,122,255,0.25)]"
-                      style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+                      className="h-24 w-24 rounded-full flex items-center justify-center mb-4"
+                      style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 20px var(--apple-chart-glow)' }}
                     >
                       <Clock className="h-10 w-10 text-white" />
                     </div>

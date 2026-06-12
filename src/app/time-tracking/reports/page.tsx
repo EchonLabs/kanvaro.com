@@ -68,7 +68,7 @@ export default function TimeReportsPage() {
               <button
                 onClick={() => router.push('/dashboard')}
                 className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-[var(--apple-radius-md)] text-[14px] font-semibold text-white apple-transition"
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 2px 8px rgba(0,122,255,0.25)' }}
+                style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}
               >
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
@@ -88,8 +88,8 @@ export default function TimeReportsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
-              className="h-11 w-11 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 shadow-[0_2px_8px_rgba(191,90,242,0.30)]"
-              style={{ background: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)' }}
+              className="h-11 w-11 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}
             >
               <BarChart3 className="h-5 w-5 text-white" />
             </div>

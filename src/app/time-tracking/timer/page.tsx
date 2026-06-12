@@ -956,8 +956,8 @@ export default function TimerPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
-              className="h-11 w-11 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 shadow-[0_2px_8px_rgba(0,122,255,0.30)]"
-              style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+              className="h-11 w-11 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}
             >
               <Clock className="h-5 w-5 text-white" />
             </div>
@@ -1014,7 +1014,7 @@ export default function TimerPage() {
             <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center gap-2.5">
               <div
                 className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+                style={{ background: 'var(--apple-card-gradient)' }}
               >
                 <FolderOpen className="h-3.5 w-3.5 text-white" />
               </div>
@@ -1286,7 +1286,7 @@ export default function TimerPage() {
                   style={{
                     background: dailyHoursLogged >= timeTrackingSettings.maxDailyHours
                       ? 'linear-gradient(135deg,#FF3B30 0%,#FF453A 100%)'
-                      : 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)'
+                      : 'var(--apple-card-gradient)'
                   }}
                 >
                   <Clock className="h-3.5 w-3.5 text-white" />
@@ -1309,10 +1309,10 @@ export default function TimerPage() {
                     width: `${dailyPct}%`,
                     background: dailyHoursLogged >= timeTrackingSettings.maxDailyHours
                       ? 'linear-gradient(135deg,#FF3B30 0%,#FF453A 100%)'
-                      : 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
+                      : 'var(--apple-card-gradient)',
                     boxShadow: dailyHoursLogged >= timeTrackingSettings.maxDailyHours
                       ? '0 2px 8px rgba(255,59,48,0.20)'
-                      : '0 2px 8px rgba(0,122,255,0.20)'
+                      : '0 2px 8px var(--apple-chart-glow)'
                   }}
                 >
                   <span className="progress-shimmer absolute inset-0" />

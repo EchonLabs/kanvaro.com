@@ -273,14 +273,14 @@ function MemberGridCard({
   const palette = getMemberPalette(member._id)
   return (
     <div className={cn(
-      'group rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
+      'card-fade-in group rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
       'shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden flex flex-col',
       'apple-transition',
       'hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)]',
       'hover:-translate-y-0.5',
     )}>
       {/* Gradient accent bar */}
-      <div className="h-[3px] w-full flex-shrink-0" style={{ background: palette.gradient }} />
+      <div className="h-[3px] w-full flex-shrink-0" style={{ background: 'var(--apple-card-gradient)' }} />
 
       <div className="p-5 flex flex-col items-center text-center gap-3 flex-1">
         {/* Avatar with status ring */}
@@ -360,14 +360,14 @@ function InviteGridCard({
 }) {
   return (
     <div className={cn(
-      'rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden flex flex-col',
+      'card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden flex flex-col',
       'shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none apple-transition',
       'hover:shadow-[0_8px_28px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.35)]',
     )}>
-      <div className="h-[3px] w-full flex-shrink-0 bg-gradient-to-r from-amber-400 to-yellow-300" />
+      <div className="h-[3px] w-full flex-shrink-0" style={{ background: 'var(--apple-card-gradient)' }} />
       <div className="p-5 flex flex-col items-center text-center gap-3 flex-1">
-        <div className="h-16 w-16 rounded-full bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-200 dark:border-amber-800 flex items-center justify-center mt-1">
-          <Mail className="h-7 w-7 text-amber-500" />
+        <div className="h-16 w-16 rounded-full flex items-center justify-center mt-1" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
+          <Mail className="h-7 w-7 text-white" />
         </div>
         <div className="w-full space-y-0.5">
           <h3 className="text-[14px] font-semibold text-[var(--apple-label)] truncate" title={invitation.email}>
@@ -378,7 +378,7 @@ function InviteGridCard({
           </p>
         </div>
         <RoleBadge role={invitation.role} customRole={invitation.customRole} />
-        <div className="flex items-center gap-1.5 text-[12px] text-amber-600 dark:text-amber-400">
+        <div className="flex items-center gap-1.5 text-[12px] text-[var(--apple-secondary-label)]">
           <Clock className="h-3.5 w-3.5 flex-shrink-0" />
           <span>Expires {formatDate(invitation.expiresAt)}</span>
         </div>
@@ -435,8 +435,8 @@ function InviteListRow({
       'apple-transition hover:bg-[var(--apple-quaternary-fill)]',
       INVITE_LIST_COLS,
     )}>
-      <div className="h-9 w-9 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-center flex-shrink-0">
-        <Mail className="h-4 w-4 text-amber-500" />
+      <div className="h-9 w-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 6px var(--apple-chart-glow)' }}>
+        <Mail className="h-4 w-4 text-white" />
       </div>
       <div className="min-w-0">
         <p className="text-[15px] font-semibold text-[var(--apple-label)] truncate">{invitation.email}</p>
@@ -447,7 +447,7 @@ function InviteListRow({
       <div className="flex-shrink-0">
         <RoleBadge role={invitation.role} customRole={invitation.customRole} />
       </div>
-      <div className="flex items-center gap-1.5 text-[13px] text-amber-600 dark:text-amber-400 flex-shrink-0 whitespace-nowrap">
+      <div className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)] flex-shrink-0 whitespace-nowrap">
         <Clock className="h-3.5 w-3.5 flex-shrink-0" />
         {formatDate(invitation.expiresAt)}
       </div>

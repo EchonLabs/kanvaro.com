@@ -357,13 +357,13 @@
     --apple-radius-xl: 20px;
     --apple-radius-pill: 999px;
 
-    /* Premium cobalt-azure gradient — charts, card accents, button bg, progress bars, avatars */
-    --apple-chart-from: #1048D1;
+    /* Premium cobalt-azure — charts, card accents, button bg, progress bars, avatars */
+    --apple-chart-from: #3D8EFF;
     --apple-chart-to: #3D8EFF;
-    --apple-chart-gradient: linear-gradient(135deg, #1048D1 0%, #3D8EFF 100%);
+    --apple-chart-gradient: #3D8EFF;
     --apple-chart-glow: rgba(61, 142, 255, 0.32);
     --apple-chart-color: #3D8EFF;
-    --apple-card-gradient: linear-gradient(135deg, #1048D1 0%, #3D8EFF 100%);
+    --apple-card-gradient: #3D8EFF;
   }
 
   .dark {
@@ -617,34 +617,34 @@
    ───────────────────────────────────────────────────────────────────────────── */
 
 [data-theme="orange"] {
-  --apple-chart-from:     #BF4D00;
+  --apple-chart-from:     #FF7A00;
   --apple-chart-to:       #FF7A00;
-  --apple-chart-gradient: linear-gradient(135deg, #BF4D00 0%, #FF7A00 100%);
+  --apple-chart-gradient: #FF7A00;
   --apple-chart-glow:     rgba(255, 122, 0, 0.32);
   --apple-chart-color:    #FF7A00;
-  --apple-card-gradient:  linear-gradient(135deg, #BF4D00 0%, #FF7A00 100%);
+  --apple-card-gradient:  #FF7A00;
   --primary: 29 100% 50%;
   --ring:    29 100% 50%;
 }
 
 [data-theme="purple"] {
-  --apple-chart-from:     #5B1E9C;
+  --apple-chart-from:     #9B5FE8;
   --apple-chart-to:       #9B5FE8;
-  --apple-chart-gradient: linear-gradient(135deg, #5B1E9C 0%, #9B5FE8 100%);
+  --apple-chart-gradient: #9B5FE8;
   --apple-chart-glow:     rgba(155, 95, 232, 0.32);
   --apple-chart-color:    #9B5FE8;
-  --apple-card-gradient:  linear-gradient(135deg, #5B1E9C 0%, #9B5FE8 100%);
+  --apple-card-gradient:  #9B5FE8;
   --primary: 270 72% 63%;
   --ring:    270 72% 63%;
 }
 
 [data-theme="red"] {
-  --apple-chart-from:     #A80E1A;
+  --apple-chart-from:     #FF2D30;
   --apple-chart-to:       #FF2D30;
-  --apple-chart-gradient: linear-gradient(135deg, #A80E1A 0%, #FF2D30 100%);
+  --apple-chart-gradient: #FF2D30;
   --apple-chart-glow:     rgba(255, 45, 48, 0.32);
   --apple-chart-color:    #FF2D30;
-  --apple-card-gradient:  linear-gradient(135deg, #A80E1A 0%, #FF2D30 100%);
+  --apple-card-gradient:  #FF2D30;
   --primary: 357 100% 59%;
   --ring:    357 100% 59%;
 }
