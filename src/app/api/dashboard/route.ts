@@ -498,18 +498,17 @@ async function getTeamActivity(
     projectQuery['teamMembers.memberId'] = userId
   }
 
-  // Get recent activities from tasks, projects, and time entries
-  const [taskActivities, projectActivities, timeActivities] = await Promise.all([
+  // Get recent activities from tasks, projects, time entries, and the current user
+  const [taskActivities, projectActivities, timeActivities, currentUser] = await Promise.all([
     Task.find(taskQuery)
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
+      .populate('assignedTo.user', 'firstName lastName email avatar')
+      .populate('createdBy', 'firstName lastName email avatar')
       .populate('project', 'name')
       .sort({ updatedAt: -1 })
       .limit(5),
 
     Project.find(projectQuery)
-      .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email avatar')
       .sort({ updatedAt: -1 })
       .limit(3),
 
@@ -520,7 +519,9 @@ async function getTeamActivity(
       .populate('project', 'name')
       .populate('task', 'title')
       .sort({ startTime: -1 })
-      .limit(3)
+      .limit(3),
+
+    User.findById(userId).select('firstName lastName email avatar')
   ])
 
   // Format activities
@@ -528,13 +529,14 @@ async function getTeamActivity(
 
   // Add task activities
   taskActivities.forEach(task => {
+    const assignedUser = (task.assignedTo as any)?.[0]?.user || null
     activities.push({
       id: `task-${task._id}`,
       type: 'task',
       action: task.status === 'done' ? 'completed' : 'updated',
       target: task.title,
       project: task.project?.name || 'Unknown Project',
-      user: task.assignedTo || task.createdBy,
+      user: assignedUser || task.createdBy,
       timestamp: task.updatedAt,
       status: task.status
     })
@@ -562,7 +564,7 @@ async function getTeamActivity(
       action: 'logged',
       target: `${entry.duration} minutes`,
       project: entry.project?.name || 'Unknown Project',
-      user: { _id: userId },
+      user: currentUser,
       timestamp: entry.startTime,
       duration: entry.duration
     })

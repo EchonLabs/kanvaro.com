@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
       .select('name startDate endDate createdBy teamMembers client status priority settings')
       .populate('createdBy', 'firstName lastName email')
       .populate('client', 'firstName lastName email')
-      .populate('teamMembers.memberId', 'firstName lastName email _id')
+      .populate('teamMembers.memberId', 'firstName lastName email avatar _id')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
