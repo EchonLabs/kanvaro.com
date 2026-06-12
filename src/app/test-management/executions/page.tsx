@@ -184,7 +184,7 @@ export default function TestExecutionsPage() {
             <div className="flex items-center gap-4">
               <div
                 className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center shadow-lg"
-                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', boxShadow: '0 4px 16px rgba(255,149,0,0.35)' }}
+                style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 16px var(--apple-chart-glow)' }}
               >
                 <Activity className="h-7 w-7 text-white" strokeWidth={1.8} />
               </div>
@@ -199,7 +199,7 @@ export default function TestExecutionsPage() {
               onClick={() => { if (!selectedProject) return; router.push(`/test-management/executions/new?projectId=${encodeURIComponent(selectedProject)}`) }}
               disabled={!selectedProject}
               className="w-full sm:w-auto h-9 gap-1.5 rounded-[var(--apple-radius-sm)] apple-transition"
-              style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' }}
+              style={{ background: 'var(--apple-card-gradient)' }}
             >
               <Play className="h-4 w-4" />
               <span className="text-[13px]">Execute Test</span>
@@ -256,7 +256,7 @@ export default function TestExecutionsPage() {
                 const count = statusCounts[key] ?? 0
                 const Icon = cfg.icon
                 return (
-                  <div key={key} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] px-4 py-3 flex items-center gap-3">
+                  <div key={key} className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] px-4 py-3 flex items-center gap-3">
                     <Icon className={cn('h-4 w-4', cfg.iconColor)} />
                     <div>
                       <p className="text-[20px] font-bold font-apple-mono tabular-nums text-[var(--apple-label)] leading-none">{count}</p>

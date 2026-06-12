@@ -134,7 +134,7 @@ export default function TestCasesPage() {
             <div className="flex items-center gap-4">
               <div
                 className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center shadow-lg"
-                style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 4px 16px rgba(52,199,89,0.35)' }}
+                style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 16px var(--apple-chart-glow)' }}
               >
                 <FileText className="h-7 w-7 text-white" strokeWidth={1.8} />
               </div>
@@ -149,7 +149,7 @@ export default function TestCasesPage() {
               onClick={handleCreateTestCase}
               disabled={!selectedProject}
               className="w-full sm:w-auto h-9 gap-1.5 rounded-[var(--apple-radius-sm)] apple-transition"
-              style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)' }}
+              style={{ background: 'var(--apple-card-gradient)' }}
             >
               <Plus className="h-4 w-4" />
               <span className="text-[13px]">Create Test Case</span>
@@ -201,7 +201,7 @@ export default function TestCasesPage() {
           {!selectedProject ? (
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-12 text-center">
               <div className="mx-auto w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center mb-4"
-                style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 4px 16px rgba(52,199,89,0.25)' }}>
+                style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 16px var(--apple-chart-glow)' }}>
                 <FileText className="h-7 w-7 text-white" strokeWidth={1.8} />
               </div>
               <h3 className="text-[17px] font-semibold text-[var(--apple-label)] mb-2">Select a Project</h3>

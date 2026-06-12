@@ -23,7 +23,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     <div>
       <h1 className="text-[28px] sm:text-[30px] font-bold leading-tight tracking-tight text-[var(--apple-label)]">
         Welcome back,{' '}
-        <span className="text-[var(--apple-system-blue)]">{user?.firstName || 'User'}!</span>
+        <span style={{ color: 'var(--apple-chart-color)' }}>{user?.firstName || 'User'}!</span>
       </h1>
       <div className="flex items-center gap-2 mt-0.5 text-[15px] text-[var(--apple-secondary-label)]">
         <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
