@@ -484,8 +484,8 @@ export default function CalendarPage() {
               <div
                 className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-lg)] flex items-center justify-center shadow-lg"
                 style={{
-                  background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
-                  boxShadow: '0 8px 24px rgba(0,122,255,0.30)',
+                  background: 'var(--apple-card-gradient)',
+                  boxShadow: '0 8px 24px var(--apple-chart-glow)',
                 }}
               >
                 <Calendar className="w-7 h-7 text-white" />
@@ -519,34 +519,18 @@ export default function CalendarPage() {
 
           {/* ── Stats Bar ───────────────────────────────────────────────────── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard
-              label="Total Events"
-              value={totalEvents}
-              Icon={CalendarDays}
-              gradient="linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)"
-              glow="rgba(0,122,255,0.25)"
-            />
-            <StatCard
-              label="Scheduled"
-              value={scheduledCount}
-              Icon={Circle}
-              gradient="linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)"
-              glow="rgba(48,176,199,0.25)"
-            />
-            <StatCard
-              label="In Progress"
-              value={inProgressCount}
-              Icon={PlayCircle}
-              gradient="linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)"
-              glow="rgba(255,149,0,0.25)"
-            />
-            <StatCard
-              label="Completed"
-              value={completedCount}
-              Icon={CheckCircle2}
-              gradient="linear-gradient(135deg,#34C759 0%,#30D158 100%)"
-              glow="rgba(52,199,89,0.25)"
-            />
+            <div className="card-fade-in card-fade-in-delay-1">
+              <StatCard label="Total Events" value={totalEvents} Icon={CalendarDays} gradient="var(--apple-card-gradient)" glow="var(--apple-chart-glow)" />
+            </div>
+            <div className="card-fade-in card-fade-in-delay-2">
+              <StatCard label="Scheduled" value={scheduledCount} Icon={Circle} gradient="linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)" glow="rgba(48,176,199,0.25)" />
+            </div>
+            <div className="card-fade-in card-fade-in-delay-3">
+              <StatCard label="In Progress" value={inProgressCount} Icon={PlayCircle} gradient="linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)" glow="rgba(255,149,0,0.25)" />
+            </div>
+            <div className="card-fade-in card-fade-in-delay-4">
+              <StatCard label="Completed" value={completedCount} Icon={CheckCircle2} gradient="linear-gradient(135deg,#34C759 0%,#30D158 100%)" glow="rgba(52,199,89,0.25)" />
+            </div>
           </div>
 
           {/* ── Filter Toolbar ──────────────────────────────────────────────── */}

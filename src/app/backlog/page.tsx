@@ -2087,15 +2087,10 @@ export default function BacklogPage() {
 
             // Type icon
             const typeIconNode = isEpic
-              ? <Layers className="h-4 w-4 text-[var(--apple-system-purple)]" />
+              ? <Layers className="h-4 w-4 text-white" />
               : isStory
-                ? <BookOpen className="h-4 w-4 text-sky-500" />
-                : <ListTodo className="h-4 w-4 text-[var(--apple-secondary-label)]" />
-            const typeBgClass = isEpic
-              ? 'bg-purple-50 dark:bg-purple-950/30'
-              : isStory
-                ? 'bg-sky-50 dark:bg-sky-950/30'
-                : 'bg-[var(--apple-quaternary-fill)]'
+                ? <BookOpen className="h-4 w-4 text-white" />
+                : <ListTodo className="h-4 w-4 text-white" />
 
             // Epic label for stories
             const epicLabel = (() => {
@@ -2112,7 +2107,7 @@ export default function BacklogPage() {
               <div
                 key={item._id}
                 className={cn(
-                  'group flex items-start gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card mb-2',
+                  'card-fade-in group flex items-start gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card mb-2',
                   'apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px',
                   selectMode ? 'cursor-default' : 'cursor-pointer',
                   showCheckbox && isSelected && 'border-[var(--apple-system-blue)]/60 bg-[var(--apple-system-blue)]/5',
@@ -2159,10 +2154,10 @@ export default function BacklogPage() {
                 )}
 
                 {/* Type icon */}
-                <div className={cn(
-                  'flex-shrink-0 h-9 w-9 rounded-full flex items-center justify-center mt-0.5',
-                  typeBgClass
-                )}>
+                <div
+                  className="flex-shrink-0 h-9 w-9 rounded-[var(--apple-radius-md)] flex items-center justify-center mt-0.5"
+                  style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 6px var(--apple-chart-glow)' }}
+                >
                   {typeIconNode}
                 </div>
 

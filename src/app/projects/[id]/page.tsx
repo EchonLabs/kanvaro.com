@@ -879,76 +879,84 @@ export default function ProjectDetailPage() {
           </div>
 
           {/* Project Stats */}
-          <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                    <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Progress</p>
-                    <p className="text-2xl font-bold text-foreground">{project.progress?.completionPercentage || 0}%</p>
-                  </div>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-6">
+            {/* Progress */}
+            <div className="card-fade-in card-fade-in-delay-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2.5 rounded-[var(--apple-radius-md)] flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
+                  <Target className="h-5 w-5 text-white" />
                 </div>
-                <div className="mt-4">
-                  <Progress value={project.progress?.completionPercentage || 0} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {project.progress?.tasksCompleted || 0} of {project.progress?.totalTasks || 0} tasks completed
+                <div className="min-w-0">
+                  <p className="text-[13px] text-[var(--apple-secondary-label)]">Progress</p>
+                  <p className="text-[26px] font-bold font-apple-mono tabular-nums leading-tight" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    {project.progress?.completionPercentage || 0}%
                   </p>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                    <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Team Members</p>
-                    <p className="text-2xl font-bold text-foreground">{project.teamMembers.length}</p>
-                  </div>
+              </div>
+              <div className="h-[5px] w-full rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                <div
+                  className="h-full rounded-full progress-bar-animated relative overflow-hidden"
+                  style={{
+                    width: `${project.progress?.completionPercentage || 0}%`,
+                    background: 'var(--apple-chart-gradient)',
+                    boxShadow: (project.progress?.completionPercentage || 0) > 2 ? '0 0 6px var(--apple-chart-glow)' : 'none',
+                  }}
+                >
+                  {(project.progress?.completionPercentage || 0) > 2 && <span className="progress-shimmer absolute inset-0" />}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
+                {project.progress?.tasksCompleted || 0} of {project.progress?.totalTasks || 0} tasks
+              </p>
+            </div>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                    <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Duration</p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {project.startDate && project.endDate
-                        ? Math.ceil((new Date(project.endDate).getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24))
-                        : 'N/A'
-                      }
-                    </p>
-                    <p className="text-xs text-muted-foreground">days</p>
-                  </div>
+            {/* Team Members */}
+            <div className="card-fade-in card-fade-in-delay-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-[var(--apple-radius-md)] flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
+                  <Users className="h-5 w-5 text-white" />
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <p className="text-[13px] text-[var(--apple-secondary-label)]">Team Members</p>
+                  <p className="text-[26px] font-bold font-apple-mono tabular-nums leading-tight" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    {project.teamMembers.length}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                    <DollarSign className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Budget</p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {project.budget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total) : 'N/A'}
-                    </p>
-                  </div>
+            {/* Duration */}
+            <div className="card-fade-in card-fade-in-delay-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-[var(--apple-radius-md)] flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
+                  <Clock className="h-5 w-5 text-white" />
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <p className="text-[13px] text-[var(--apple-secondary-label)]">Duration</p>
+                  <p className="text-[26px] font-bold font-apple-mono tabular-nums leading-tight" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    {project.startDate && project.endDate
+                      ? Math.ceil((new Date(project.endDate).getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24))
+                      : '—'}
+                  </p>
+                  <p className="text-[12px] text-[var(--apple-secondary-label)]">days</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Budget */}
+            <div className="card-fade-in card-fade-in-delay-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-[var(--apple-radius-md)] flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
+                  <DollarSign className="h-5 w-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] text-[var(--apple-secondary-label)]">Budget</p>
+                  <p className="text-[22px] font-bold font-apple-mono tabular-nums leading-tight truncate" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    {project.budget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total) : '—'}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={(value) => {
@@ -2120,45 +2128,57 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Project Progress</CardTitle>
-                      <Target className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{project?.stats?.tasks?.completionRate || 0}%</div>
-                      <p className="text-xs text-muted-foreground">
-                        {project?.stats?.tasks?.completed || 0} of {project?.stats?.tasks?.total || 0} tasks completed
-                      </p>
-                    </CardContent>
-                  </Card>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="card-fade-in card-fade-in-delay-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2.5 rounded-[var(--apple-radius-md)]" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
+                        <Target className="h-4 w-4 text-white" />
+                      </div>
+                      <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Project Progress</p>
+                    </div>
+                    <p className="text-[28px] font-bold font-apple-mono tabular-nums" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                      {project?.stats?.tasks?.completionRate || 0}%
+                    </p>
+                    <div className="mt-2 h-[5px] w-full rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                      <div className="h-full rounded-full progress-bar-animated" style={{ width: `${project?.stats?.tasks?.completionRate || 0}%`, background: 'var(--apple-chart-gradient)' }} />
+                    </div>
+                    <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
+                      {project?.stats?.tasks?.completed || 0} of {project?.stats?.tasks?.total || 0} tasks
+                    </p>
+                  </div>
 
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Budget Utilization</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{project?.stats?.budget?.utilizationRate || 0}%</div>
-                      <p className="text-xs text-muted-foreground">
-                        {project?.stats?.budget?.spent || 0} of {project?.stats?.budget?.total || 0} spent
-                      </p>
-                    </CardContent>
-                  </Card>
+                  <div className="card-fade-in card-fade-in-delay-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2.5 rounded-[var(--apple-radius-md)]" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
+                        <DollarSign className="h-4 w-4 text-white" />
+                      </div>
+                      <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Budget Utilization</p>
+                    </div>
+                    <p className="text-[28px] font-bold font-apple-mono tabular-nums" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                      {project?.stats?.budget?.utilizationRate || 0}%
+                    </p>
+                    <div className="mt-2 h-[5px] w-full rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                      <div className="h-full rounded-full progress-bar-animated" style={{ width: `${project?.stats?.budget?.utilizationRate || 0}%`, background: 'var(--apple-chart-gradient)' }} />
+                    </div>
+                    <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
+                      Budget spent vs total
+                    </p>
+                  </div>
 
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Time Tracking</CardTitle>
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{project?.stats?.timeTracking?.totalHours || 0}h</div>
-                      <p className="text-xs text-muted-foreground">
-                        {project?.stats?.timeTracking?.entries || 0} time entries
-                      </p>
-                    </CardContent>
-                  </Card>
+                  <div className="card-fade-in card-fade-in-delay-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2.5 rounded-[var(--apple-radius-md)]" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
+                        <Clock className="h-4 w-4 text-white" />
+                      </div>
+                      <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Time Tracking</p>
+                    </div>
+                    <p className="text-[28px] font-bold font-apple-mono tabular-nums" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                      {project?.stats?.timeTracking?.totalHours || 0}h
+                    </p>
+                    <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
+                      {project?.stats?.timeTracking?.entries || 0} time entries
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid gap-8 lg:grid-cols-2">
