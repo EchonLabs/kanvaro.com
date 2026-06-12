@@ -850,6 +850,7 @@ const [searchQuery, setSearchQuery] = useState('')
         <PageHeader
           title="Sprints"
           subtitle="Manage your agile sprints and iterations"
+          icon={Zap}
           actions={
             <Button
               onClick={() => {

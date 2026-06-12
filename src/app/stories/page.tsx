@@ -623,6 +623,7 @@ export default function StoriesPage() {
         <PageHeader
           title="User Stories"
           subtitle="Manage your user stories and requirements"
+          icon={BookOpen}
           actions={
             <PermissionGate permission={Permission.STORY_CREATE}>
               <Button

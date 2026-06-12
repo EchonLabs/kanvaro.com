@@ -46,7 +46,9 @@ import {
   Image,
   Trash2,
   ExternalLink,
-  Download
+  Download,
+  FolderOpen,
+  FolderPlus
 } from 'lucide-react'
 
 interface ProjectFormData {
@@ -981,21 +983,25 @@ export default function CreateProjectPage() {
         { label: isEditMode ? 'Edit Project' : 'Create Project' }
       ]}>
       <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm" onClick={() => router.back()}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {isEditMode
+                ? <FolderOpen className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+                : <FolderPlus className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+              }
               <div>
-                <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
                   {isEditMode ? 'Edit Project' : 'Create New Project'}
                 </h1>
-                <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
                   {isEditMode ? 'Update project details and configuration' : 'Set up a new project with detailed configuration'}
                 </p>
               </div>
             </div>
+            <Button variant="outline" size="sm" onClick={() => router.back()} className="flex-shrink-0 w-full sm:w-auto">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
           </div>
 
         {/* Progress Bar */}

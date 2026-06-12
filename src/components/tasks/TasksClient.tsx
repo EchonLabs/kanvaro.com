@@ -38,7 +38,8 @@ import {
     X,
     RotateCcw,
     Upload,
-    ListTodo
+    ListTodo,
+    CheckSquare
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -1013,6 +1014,7 @@ export default function TasksClient({
             <PageHeader
                 title="My Tasks"
                 subtitle="Manage and track your assigned tasks"
+                icon={CheckSquare}
                 actions={
                     canCreateTask ? (
                         <Button

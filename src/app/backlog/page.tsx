@@ -1555,6 +1555,7 @@ export default function BacklogPage() {
         <PageHeader
           title="Product Backlog"
           subtitle="Manage your product backlog and sprint planning"
+          icon={List}
           actions={
             <div className="flex flex-wrap items-center gap-2 w-full sm:contents">
               <Button

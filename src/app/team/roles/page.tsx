@@ -321,13 +321,16 @@ export default function RolesPage() {
 
           {/* ─── Page Header ───────────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-[28px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
-                Roles &amp; Permissions
-              </h1>
-              <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
-                {roles.length} role{roles.length !== 1 ? 's' : ''} · {customRoles.length} custom
-              </p>
+            <div className="flex items-center gap-3">
+              <Shield className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+              <div>
+                <h1 className="text-[28px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
+                  Roles &amp; Permissions
+                </h1>
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                  {roles.length} role{roles.length !== 1 ? 's' : ''} · {customRoles.length} custom
+                </p>
+              </div>
             </div>
             <Button
               onClick={() => setShowCreateModal(true)}

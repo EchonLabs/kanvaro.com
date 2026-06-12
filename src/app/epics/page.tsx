@@ -460,6 +460,7 @@ export default function EpicsPage() {
         <PageHeader
           title="Epics"
           subtitle="Manage your product epics and large features"
+          icon={Layers}
           actions={
             <PermissionGate permission={Permission.EPIC_CREATE}>
               <Button

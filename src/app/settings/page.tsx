@@ -97,13 +97,8 @@ export default function SettingsPage() {
       <div className="space-y-6 px-4 sm:px-6">
 
         {/* ── Page Header ── */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div
-            className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center shadow-lg"
-            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 16px var(--apple-chart-glow)' }}
-          >
-            <SettingsIcon className="h-7 w-7 text-white" strokeWidth={1.8} />
-          </div>
+        <div className="flex items-center gap-3">
+          <SettingsIcon className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
           <div>
             <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
               Settings

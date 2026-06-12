@@ -3268,7 +3268,7 @@ export function TimeLogs({
                     Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                    Total: {Math.round(calculatedDuration.totalMinutes / 60 * 10) / 10}h
                     {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
                       <span className="ml-1">
                         (Max: {timeTrackingSettings.maxSessionHours}h)
@@ -3644,7 +3644,7 @@ export function TimeLogs({
                     Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                    Total: {Math.round(calculatedDuration.totalMinutes / 60 * 10) / 10}h
                     {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
                       <span className="ml-1">
                         (Max: {timeTrackingSettings.maxSessionHours}h)

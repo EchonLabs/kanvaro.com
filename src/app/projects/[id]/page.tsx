@@ -41,7 +41,8 @@ import {
   File,
   Image as ImageIcon,
   ExternalLink,
-  Upload
+  Upload,
+  FolderOpen
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import BulkTaskUploadDialog from '@/components/tasks/BulkTaskUploadDialog'
@@ -825,8 +826,9 @@ export default function ProjectDetailPage() {
               </Button>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+                  <FolderOpen className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
                   <h1
-                    className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground leading-tight tracking-tight line-clamp-2 max-w-full break-words"
+                    className="text-xl sm:text-2xl lg:text-3xl font-bold text-[var(--apple-label)] leading-tight tracking-tight line-clamp-2 max-w-full break-words"
                     title={project.name}
                   >
                     {project.name}

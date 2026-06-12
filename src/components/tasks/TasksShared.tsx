@@ -196,19 +196,25 @@ interface PageHeaderProps {
   actions?: React.ReactNode
   meta?: React.ReactNode
   className?: string
+  icon?: React.ElementType
 }
 
-export function PageHeader({ title, subtitle, actions, meta, className }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions, meta, className, icon: Icon }: PageHeaderProps) {
   return (
     <div className={cn('flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4', className)}>
-      <div className="flex-1 min-w-0">
-        <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)] leading-tight">
-          {title}
-        </h1>
-        {subtitle && (
-          <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">{subtitle}</p>
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {Icon && (
+          <Icon className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
         )}
-        {meta && <div className="mt-1.5">{meta}</div>}
+        <div className="min-w-0">
+          <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)] leading-tight">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">{subtitle}</p>
+          )}
+          {meta && <div className="mt-1.5">{meta}</div>}
+        </div>
       </div>
       {actions && (
         <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">

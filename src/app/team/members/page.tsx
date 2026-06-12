@@ -795,15 +795,18 @@ export default function MembersPage() {
 
           {/* ─── Page Header ───────────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-[28px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
-                Team Members
-              </h1>
-              <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
-                {membersPagination.total > 0
-                  ? `${membersPagination.total} member${membersPagination.total !== 1 ? 's' : ''}`
-                  : 'Manage your team members and invitations'}
-              </p>
+            <div className="flex items-center gap-3">
+              <Users className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+              <div>
+                <h1 className="text-[28px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
+                  Team Members
+                </h1>
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                  {membersPagination.total > 0
+                    ? `${membersPagination.total} member${membersPagination.total !== 1 ? 's' : ''}`
+                    : 'Manage your team members and invitations'}
+                </p>
+              </div>
             </div>
             {canInviteMembers && (
               <Button

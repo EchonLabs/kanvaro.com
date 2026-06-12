@@ -456,6 +456,7 @@ export default function SprintEventsPage() {
         <PageHeader
           title="Sprint Events"
           subtitle="Plan and track your sprint ceremonies"
+          icon={Calendar}
           actions={
             <PermissionGate permission={Permission.SPRINT_EVENT_VIEW_ALL}>
               <Button

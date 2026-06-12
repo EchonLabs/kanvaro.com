@@ -117,15 +117,10 @@ export default function StandupDashboardPage() {
 
           {/* Page header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--apple-radius-md)] shadow-lg"
-                style={{ background: HEADER_GRADIENT, boxShadow: `0 8px 24px ${HEADER_GLOW}` }}
-              >
-                <CalendarCheck className="h-7 w-7 text-white" />
-              </div>
+            <div className="flex items-center gap-3">
+              <Activity className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
               <div>
-                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight">Standup Dashboard</h1>
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Standup Dashboard</h1>
                 <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
                   Monitor daily project progress, review blockers, and keep standup follow-ups organized.
                 </p>

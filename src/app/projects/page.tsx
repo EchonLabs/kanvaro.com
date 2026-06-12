@@ -828,22 +828,25 @@ export default function ProjectsPage() {
 
           {/* ─── Page Header ─────────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
-                Projects
-              </h1>
-              <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
-                {searching ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--apple-system-blue)] animate-pulse" />
-                    Searching...
-                  </span>
-                ) : totalCount > 0 ? (
-                  `${totalCount} project${totalCount !== 1 ? 's' : ''}`
-                ) : (
-                  'Manage and track your projects'
-                )}
-              </p>
+            <div className="flex items-center gap-3">
+              <FolderOpen className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+              <div>
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
+                  Projects
+                </h1>
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                  {searching ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--apple-system-blue)] animate-pulse" />
+                      Searching...
+                    </span>
+                  ) : totalCount > 0 ? (
+                    `${totalCount} project${totalCount !== 1 ? 's' : ''}`
+                  ) : (
+                    'Manage and track your projects'
+                  )}
+                </p>
+              </div>
             </div>
             <PermissionGate permission={Permission.PROJECT_CREATE}>
               <Button

@@ -480,19 +480,11 @@ export default function CalendarPage() {
 
           {/* ── Page Header ─────────────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div
-                className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-lg)] flex items-center justify-center shadow-lg"
-                style={{
-                  background: 'var(--apple-card-gradient)',
-                  boxShadow: '0 8px 24px var(--apple-chart-glow)',
-                }}
-              >
-                <Calendar className="w-7 h-7 text-white" />
-              </div>
+            <div className="flex items-center gap-3">
+              <Calendar className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight">Calendar</h1>
+                  <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Calendar</h1>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span
