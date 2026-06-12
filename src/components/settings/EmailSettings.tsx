@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -50,6 +50,7 @@ export function EmailSettings() {
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const savedConfig = useRef<typeof formData | null>(null)
 
   useEffect(() => {
     const loadEmailConfig = async () => {
@@ -57,7 +58,7 @@ export function EmailSettings() {
         const response = await fetch('/api/settings/email')
         if (response.ok) {
           const config = await response.json()
-          setFormData({
+          const loaded = {
             provider: config.provider || 'smtp',
             smtp: {
               host: config.smtp?.host || '', port: config.smtp?.port || 587,
@@ -70,7 +71,9 @@ export function EmailSettings() {
               tenantId: config.azure?.tenantId || '', fromEmail: config.azure?.fromEmail || '',
               fromName: config.azure?.fromName || '',
             },
-          })
+          }
+          setFormData(loaded)
+          savedConfig.current = loaded
         }
       } catch (error) {
         console.error('Failed to load email configuration:', error)
@@ -78,6 +81,8 @@ export function EmailSettings() {
     }
     loadEmailConfig()
   }, [])
+
+  const hasChanges = !savedConfig.current || JSON.stringify(formData) !== JSON.stringify(savedConfig.current)
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -133,6 +138,7 @@ export function EmailSettings() {
         body: JSON.stringify(formData),
       })
       if (!response.ok) throw new Error('Failed to update email settings')
+      savedConfig.current = { ...formData }
       notifySuccess({ title: 'Email Settings Updated', message: 'Email configuration has been updated successfully' })
     } catch (error) {
       notifyError({ title: 'Update Failed', message: error instanceof Error ? error.message : 'Failed to update email settings' })
@@ -341,9 +347,9 @@ export function EmailSettings() {
 
             <Button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !hasChanges}
               className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
-              style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+              style={{ background: hasChanges ? 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' : undefined }}
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               {saving ? 'Saving…' : 'Save Configuration'}

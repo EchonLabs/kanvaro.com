@@ -71,24 +71,7 @@ export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
   return (
     <DateTimeProvider>
       <BreadcrumbProvider>
-        {/* Aurora background — identical layers to the signin page */}
-        <div className="fixed inset-0 -z-20 bg-[#F4F4F6] dark:bg-[#06060A]" />
-        <div
-          className="fixed inset-0 -z-10"
-          style={{
-            backgroundImage: `
-              radial-gradient(ellipse 70% 70% at 10% 10%, rgba(63,173,165,0.22) 0%, transparent 55%),
-              radial-gradient(ellipse 65% 65% at 90% 85%, rgba(36,78,155,0.22) 0%, transparent 55%),
-              radial-gradient(ellipse 45% 50% at 55% 25%, rgba(63,173,165,0.09) 0%, transparent 50%)
-            `,
-          }}
-        />
-        <div
-          className="fixed inset-0 -z-10 opacity-[0.35] dark:opacity-[0.18]"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' width='40' height='40'%3e%3ccircle cx='1' cy='1' r='1' fill='%23000'/%3e%3c/svg%3e")`,
-          }}
-        />
+        <div className="fixed inset-0 -z-10 bg-white dark:bg-black" />
         <div className="flex h-screen overflow-x-hidden">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block flex-shrink-0">
