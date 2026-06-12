@@ -740,7 +740,7 @@ export default function EpicsPage() {
                 <div
                   key={epic._id}
                   className={cn(
-                    "group rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card overflow-hidden",
+                    "card-fade-in group rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card overflow-hidden",
                     "shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none",
                     "hover:shadow-[0_10px_40px_rgba(0,0,0,0.13)] dark:hover:shadow-[0_10px_40px_rgba(0,0,0,0.42)]",
                     "hover:-translate-y-1 apple-transition",
@@ -749,14 +749,14 @@ export default function EpicsPage() {
                   onClick={() => viewAllowed && router.push(`/epics/${epic._id}`)}
                 >
                   {/* Gradient header bar */}
-                  <div className={cn("h-1.5 w-full bg-gradient-to-r", gradient.g)} />
+                  <div className="h-1.5 w-full" style={{ background: 'var(--apple-card-gradient)' }} />
 
                   <div className="p-5 space-y-4">
                     {/* Title row */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className={cn("h-8 w-8 rounded-[var(--apple-radius-sm)] bg-gradient-to-br flex items-center justify-center flex-shrink-0", gradient.g)}>
+                          <div className="h-8 w-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
                             <Layers className="h-4 w-4 text-white" />
                           </div>
                           <h3
@@ -891,15 +891,15 @@ export default function EpicsPage() {
                 <div
                   key={epic._id}
                   className={cn(
-                    "group flex items-start gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card",
+                    "card-fade-in group flex items-start gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card",
                     "apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px",
                     viewAllowed ? "cursor-pointer" : "opacity-60 cursor-not-allowed"
                   )}
                   onClick={() => viewAllowed && router.push(`/epics/${epic._id}`)}
                 >
                   {/* Icon */}
-                  <div className="h-10 w-10 rounded-[var(--apple-radius-md)] bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center flex-shrink-0">
-                    <Layers className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  <div className="h-10 w-10 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
+                    <Layers className="h-5 w-5 text-white" />
                   </div>
 
                   {/* Content */}

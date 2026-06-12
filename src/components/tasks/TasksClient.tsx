@@ -1710,7 +1710,7 @@ export default function TasksClient({
                                                 <div
                                                     key={task._id}
                                                     className={cn(
-                                                        'group flex flex-col sm:flex-row sm:items-start gap-3 px-3 sm:px-4 py-3 sm:py-3.5 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
+                                                        'card-fade-in group flex flex-col sm:flex-row sm:items-start gap-3 px-3 sm:px-4 py-3 sm:py-3.5 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
                                                         'hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)]',
                                                         'hover:-translate-y-px apple-transition cursor-pointer'
                                                     )}
@@ -2031,7 +2031,7 @@ export default function TasksClient({
                                             return (
                                                 <div
                                                     key={task._id}
-                                                    className={cn(cardShell, cardHover, 'p-4 space-y-3')}
+                                                    className={cn('card-fade-in', cardShell, cardHover, 'p-4 space-y-3')}
                                                     onClick={(e) => {
                                                         const target = e.target as HTMLElement
                                                         if (

@@ -833,12 +833,12 @@ export default function StoriesPage() {
                   {filteredStories.map((story) => (
                     <div
                       key={story._id}
-                      className="group flex items-start gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card mb-2.5 apple-transition hover:shadow-[0_6px_20px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_6px_20px_rgba(0,0,0,0.35)] hover:-translate-y-px cursor-pointer"
+                      className="card-fade-in group flex items-start gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card mb-2.5 apple-transition hover:shadow-[0_6px_20px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_6px_20px_rgba(0,0,0,0.35)] hover:-translate-y-px cursor-pointer"
                       onClick={() => story.project && router.push(`/stories/${story._id}`)}
                     >
                       {/* Left icon area */}
-                      <div className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-md)] bg-sky-50 dark:bg-sky-950/30 flex items-center justify-center mt-0.5">
-                        <BookOpen className="h-4 w-4 text-sky-500 dark:text-sky-400" />
+                      <div className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-md)] flex items-center justify-center mt-0.5" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 6px var(--apple-chart-glow)' }}>
+                        <BookOpen className="h-4 w-4 text-white" />
                       </div>
 
                       {/* Main content */}

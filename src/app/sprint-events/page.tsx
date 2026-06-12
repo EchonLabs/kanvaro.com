@@ -711,7 +711,7 @@ export default function SprintEventsPage() {
                     <div
                       key={event._id}
                       className={cn(
-                        'group rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card overflow-hidden',
+                        'card-fade-in group rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card overflow-hidden',
                         'shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none',
                         'hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)]',
                         'hover:-translate-y-0.5 apple-transition cursor-pointer'
@@ -721,7 +721,7 @@ export default function SprintEventsPage() {
                       <div className="p-5 space-y-4">
                         {/* Header: icon + title + status + menu */}
                         <div className="flex items-start gap-3">
-                          <div className={cn('h-10 w-10 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0', style.bg, style.color)}>
+                          <div className="h-10 w-10 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
                             {style.icon}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -831,10 +831,10 @@ export default function SprintEventsPage() {
                   return (
                     <div
                       key={event._id}
-                      className="group flex items-center gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px cursor-pointer"
+                      className="card-fade-in group flex items-center gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px cursor-pointer"
                       onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                     >
-                      <div className={cn('h-9 w-9 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0', style.bg, style.color)}>
+                      <div className="h-9 w-9 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 6px var(--apple-chart-glow)' }}>
                         {style.icon}
                       </div>
                       <div className="flex-1 min-w-0">
