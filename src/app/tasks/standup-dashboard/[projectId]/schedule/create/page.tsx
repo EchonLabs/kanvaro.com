@@ -22,8 +22,8 @@ import { useNotify } from '@/lib/notify'
 import { createStandupParticipantList, createStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
 import { formatToTitleCase, truncateText } from '@/lib/utils'
 
-const HEADER_GRADIENT = 'linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%)'
-const HEADER_GLOW = 'rgba(0, 122, 255, 0.25)'
+const HEADER_GRADIENT = 'var(--apple-card-gradient)'
+const HEADER_GLOW = 'var(--apple-chart-glow)'
 
 type MemberTaskRow = { id: string; taskId: string; notes: string }
 

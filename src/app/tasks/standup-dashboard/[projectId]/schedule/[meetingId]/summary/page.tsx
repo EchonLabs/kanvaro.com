@@ -15,8 +15,8 @@ import { formatLoggedHours } from '@/components/standup-dashboard/standup-timelo
 import { ArrowLeft, CalendarDays, Clock3, Loader2, Sparkles, Users, CalendarCheck, AlertTriangle } from 'lucide-react'
 import { formatToTitleCase } from '@/lib/utils'
 
-const HEADER_GRADIENT = 'linear-gradient(135deg, #FF9500 0%, #FFD60A 100%)'
-const HEADER_GLOW = 'rgba(255, 149, 0, 0.25)'
+const HEADER_GRADIENT = 'var(--apple-card-gradient)'
+const HEADER_GLOW = 'var(--apple-chart-glow)'
 
 const STATUS_LABEL: Record<string, string> = {
   scheduled: 'Scheduled', in_progress: 'In Progress', completed: 'Completed', missed: 'Missed'

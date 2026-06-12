@@ -17,8 +17,8 @@ import { fetchStandupProjectSummaries } from '@/components/standup-dashboard/sta
 import { StandupProjectCard } from '@/components/standup-dashboard/StandupProjectCard'
 import { formatToTitleCase } from '@/lib/utils'
 
-const HEADER_GRADIENT = 'linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%)'
-const HEADER_GLOW = 'rgba(0, 122, 255, 0.25)'
+const HEADER_GRADIENT = 'var(--apple-card-gradient)'
+const HEADER_GLOW = 'var(--apple-chart-glow)'
 
 export default function StandupDashboardPage() {
   const router = useRouter()
@@ -136,7 +136,7 @@ export default function StandupDashboardPage() {
           {/* Stats bar */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: 'Total Projects', value: projects.length, icon: LayoutGrid, color: '#007AFF' },
+              { label: 'Total Projects', value: projects.length, icon: LayoutGrid, color: 'var(--apple-chart-to)' },
               { label: 'Active',          value: activeCount,    icon: Activity,     color: '#34C759' },
               { label: 'Total Meetings',  value: totalMeetings,  icon: CalendarCheck,color: '#AF52DE' },
               { label: 'Upcoming',        value: upcomingCount,  icon: Users,        color: '#FF9500' },

@@ -11,7 +11,7 @@ interface StandupTimelineProps {
 }
 
 const TONE_MAP: Record<StandupTimelineItem['type'], { gradient: string; glow: string; badge: string; text: string }> = {
-  update:     { gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.2)',   badge: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800',   text: 'Update' },
+  update:     { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)',   badge: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800',   text: 'Update' },
   assignment: { gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.2)',  badge: 'bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800', text: 'Assignment' },
   blocker:    { gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)', glow: 'rgba(255,69,58,0.2)',   badge: 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800',       text: 'Blocker' },
   progress:   { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.2)',   badge: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800', text: 'Progress' },

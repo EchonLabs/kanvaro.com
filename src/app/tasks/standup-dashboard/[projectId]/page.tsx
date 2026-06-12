@@ -22,8 +22,8 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { getStandupDateKey } from '@/components/standup-dashboard/standup-date-utils'
 import type { StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 
-const HEADER_GRADIENT = 'linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%)'
-const HEADER_GLOW = 'rgba(0, 122, 255, 0.25)'
+const HEADER_GRADIENT = 'var(--apple-card-gradient)'
+const HEADER_GLOW = 'var(--apple-chart-glow)'
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; border: string; label: string }> = {
   active:    { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'Active' },
@@ -232,7 +232,7 @@ export default function StandupProjectPage() {
           {/* Stats bar */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: 'Team Members',  value: project.teamMembers.length, icon: Users,        color: '#007AFF' },
+              { label: 'Team Members',  value: project.teamMembers.length, icon: Users,        color: 'var(--apple-chart-to)' },
               { label: 'Total Meetings',value: totalMeetings,              icon: CalendarCheck, color: '#AF52DE' },
               { label: 'Upcoming',      value: upcomingMeetings.length,    icon: CalendarDays,  color: '#FF9500' },
               { label: 'Completed',     value: completedMeetings,          icon: Activity,      color: '#34C759' },
@@ -254,7 +254,7 @@ export default function StandupProjectPage() {
                 <p className="text-[15px] font-semibold">Project Progress</p>
                 <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">Standup coverage and team momentum for the current sprint window.</p>
               </div>
-              <span className="text-[22px] font-bold font-apple-mono tabular-nums" style={{ color: '#007AFF' }}>
+              <span className="text-[22px] font-bold font-apple-mono tabular-nums" style={{ color: 'var(--apple-chart-to)' }}>
                 {project.progressPercent}%
               </span>
             </div>

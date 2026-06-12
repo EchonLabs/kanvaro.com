@@ -167,6 +167,19 @@
   animation: progress-grow 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
+/* Card fade-in — subtle entrance for content cards */
+@keyframes card-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-fade-in {
+  animation: card-fade-in 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+.card-fade-in-delay-1 { animation-delay:  40ms; }
+.card-fade-in-delay-2 { animation-delay:  80ms; }
+.card-fade-in-delay-3 { animation-delay: 120ms; }
+.card-fade-in-delay-4 { animation-delay: 160ms; }
+
 /* Transitions.dev — Number pop-in */
 :root {
   --digit-dur: 500ms;

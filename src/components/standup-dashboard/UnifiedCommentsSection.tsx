@@ -68,7 +68,7 @@ export function UnifiedCommentsSection({
       <div className="flex items-center gap-3 border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-5 py-4">
         <div
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--apple-radius-sm)]"
-          style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 12px rgba(0,122,255,0.2)' }}
+          style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 12px var(--apple-chart-glow)' }}
         >
           <MessageSquare className="h-4 w-4 text-white" />
         </div>
@@ -140,7 +140,7 @@ export function UnifiedCommentsSection({
               size="sm"
               disabled={submitting || !commentText.trim()}
               className="h-8 text-[12px] gap-1.5 apple-transition"
-              style={!submitting && commentText.trim() ? { background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' } : undefined}
+              style={!submitting && commentText.trim() ? { background: 'var(--apple-card-gradient)' } : undefined}
             >
               {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               {submitting ? 'Posting…' : 'Add Comment'}

@@ -24,8 +24,8 @@ import { StandupTimelogList } from '@/components/standup-dashboard/StandupTimelo
 import { ArrowLeft, CalendarDays, CalendarCheck, Clock3, Edit3, Loader2, MessageSquare, Sparkles, Trash2, Users } from 'lucide-react'
 import { formatToTitleCase } from '@/lib/utils'
 
-const HEADER_GRADIENT = 'linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%)'
-const HEADER_GLOW = 'rgba(0, 122, 255, 0.25)'
+const HEADER_GRADIENT = 'var(--apple-card-gradient)'
+const HEADER_GLOW = 'var(--apple-chart-glow)'
 
 const STATUS_CONFIG: Record<StandupMeetingStatus, { bg: string; text: string; dot: string; border: string; label: string }> = {
   scheduled:   { bg: 'bg-blue-50 dark:bg-blue-950/30',       text: 'text-blue-600 dark:text-blue-400',       dot: 'bg-blue-500',   border: 'border-blue-200 dark:border-blue-800',   label: 'Scheduled' },
