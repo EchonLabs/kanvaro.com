@@ -29,12 +29,12 @@ const STATUS_CONFIG: Record<string, {
 // ─── Project Palette ───────────────────────────────────────────────────────────
 
 const PROJECT_PALETTE = [
-  { gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.30)',   text: '#007AFF' },
-  { gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.30)',  text: '#BF5AF2' },
-  { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.30)',   text: '#34C759' },
-  { gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.30)',   text: '#FF9500' },
-  { gradient: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)', glow: 'rgba(48,176,199,0.30)',  text: '#30B0C7' },
-  { gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)', glow: 'rgba(255,69,58,0.30)',   text: '#FF453A' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', text: 'var(--apple-chart-color)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', text: 'var(--apple-chart-color)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', text: 'var(--apple-chart-color)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', text: 'var(--apple-chart-color)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', text: 'var(--apple-chart-color)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', text: 'var(--apple-chart-color)' },
 ]
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -84,30 +84,23 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── GradientProgress ─────────────────────────────────────────────────────────
-/* Gradient bar + glow shadow + shimmer sweep. No end-cap dot. */
-function GradientProgress({
-  value,
-  gradient,
-  glow,
-}: {
-  value: number
-  gradient: string
-  glow: string
-}) {
+function GradientProgress({ value, gradient, glow }: { value: number; gradient: string; glow: string }) {
   const pct = Math.min(Math.max(value, 0), 100)
   return (
     <div className="flex items-center gap-2.5 w-full">
       <div className="relative flex-1 h-[7px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-        <div
-          className="absolute inset-y-0 left-0 rounded-full overflow-hidden transition-all duration-700 ease-out"
-          style={{
-            width: `${pct}%`,
-            background: gradient,
-            boxShadow: pct > 2 ? `0 0 10px ${glow}, 0 1px 4px ${glow}` : 'none',
-          }}
-        >
-          {pct > 2 && <span aria-hidden className="progress-shimmer absolute inset-0" />}
-        </div>
+        {pct > 0 && (
+          <div
+            className="progress-bar-animated absolute inset-y-0 left-0 rounded-full overflow-hidden"
+            style={{
+              width: `${pct}%`,
+              background: gradient,
+              boxShadow: `0 0 10px ${glow}, 0 1px 4px ${glow}`,
+            }}
+          >
+            <span aria-hidden className="progress-shimmer absolute inset-0" />
+          </div>
+        )}
       </div>
       <span className="text-xs font-apple-mono font-semibold text-[var(--apple-secondary-label)] w-10 text-right flex-shrink-0 tabular-nums">
         {pct}%
@@ -118,10 +111,14 @@ function GradientProgress({
 
 // ─── ProjectAvatar ────────────────────────────────────────────────────────────
 function ProjectAvatar({ name, gradient }: { name: string; gradient: string }) {
-  const initials = name.split(' ').slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? '').join('')
+  const initials = name
+    .split(' ')
+    .slice(0, 2)
+    .map((w: string) => w[0]?.toUpperCase() ?? '')
+    .join('')
   return (
     <div
-      className="h-9 w-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0 text-white text-xs font-bold select-none shadow-sm"
+      className="h-9 w-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0 shadow-sm text-white text-[13px] font-bold select-none"
       style={{ background: gradient }}
     >
       {initials}
@@ -278,7 +275,7 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
                   value={progress}
                   gradient={palette.gradient}
                   glow={palette.glow}
-                />
+                                  />
 
                 {/* Status badge — fixed 104px column matches badge width exactly */}
                 <StatusBadge status={project.status} />
@@ -306,7 +303,7 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
                   value={progress}
                   gradient={palette.gradient}
                   glow={palette.glow}
-                />
+                                  />
               </div>
             </div>
           )

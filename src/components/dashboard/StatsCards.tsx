@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/Card'
-import { FolderOpen, CheckSquare, Users, Clock, TrendingUp, TrendingDown } from 'lucide-react'
+import { Folder, CheckCircle2, UserRound, Clock, TrendingUp, TrendingDown, type LucideIcon } from 'lucide-react'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
 import { usePermissions } from '@/lib/permissions/permission-hooks'
@@ -49,19 +49,145 @@ function generateSparklineData(currentValue: number, changeType: string, seed: n
   return arr
 }
 
-/* Sparkline stroke colors matching the mockup */
-const CARD_ACCENTS = [
-  { color: '#007AFF', darkColor: '#0A84FF' },
-  { color: '#FF3B30', darkColor: '#FF453A' },
-  { color: '#007AFF', darkColor: '#0A84FF' },
-  { color: '#FF9500', darkColor: '#FF9F0A' },
-]
+
+interface StatItem {
+  title: string
+  value: number
+  formattedValue: string
+  change: string | null
+  changePercentage: string | null
+  changeType: string
+  icon: LucideIcon
+}
+
+interface StatCardItemProps {
+  stat: StatItem
+  index: number
+  sparklineData: { v: number }[]
+}
+
+function StatCardItem({ stat, index, sparklineData }: StatCardItemProps) {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), index * 90 + 60)
+    return () => clearTimeout(t)
+  }, [index])
+
+  const hasChange = stat.change !== null
+  const isEmpty = stat.value === 0
+  const ChangeIcon = stat.changeType === 'positive' ? TrendingUp : TrendingDown
+  const changeColorClass =
+    stat.changeType === 'positive' ? 'text-[var(--apple-system-green)]'
+    : stat.changeType === 'negative' ? 'text-[var(--apple-system-red)]'
+    : 'text-[var(--apple-system-gray)]'
+
+  return (
+    <div
+      className={`relative rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none hover:shadow-[0_6px_24px_rgba(16,72,209,0.12)] dark:hover:shadow-[0_6px_24px_rgba(61,142,255,0.14)] transition-all duration-500 ease-out ${
+        !visible
+          ? 'opacity-0 translate-y-2'
+          : isEmpty
+          ? 'opacity-50 translate-y-0'
+          : 'opacity-100 translate-y-0'
+      }`}
+    >
+      {/* Card content */}
+      <div className="relative z-10 px-4 pt-4 pb-2">
+        {/* Label only — no icon badge */}
+        <div className="mb-3">
+          <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">
+            {stat.title}
+          </span>
+        </div>
+
+        {/* Large value — theme gradient text, fades in */}
+        <div
+          className={`text-[34px] sm:text-[38px] font-bold tracking-tight leading-none mb-2 transition-all duration-700 ease-out delay-100 ${visible ? 'opacity-100' : 'opacity-0'}`}
+          style={
+            !isEmpty
+              ? {
+                  background: 'var(--apple-chart-gradient)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }
+              : { color: 'var(--apple-secondary-label)' }
+          }
+        >
+          {stat.formattedValue}
+        </div>
+
+        {/* Change indicator */}
+        {hasChange && (
+          <div className="flex items-center gap-1 flex-wrap">
+            <ChangeIcon className={`h-3 w-3 flex-shrink-0 ${changeColorClass}`} />
+            <span className={`text-xs font-medium ${changeColorClass}`}>{stat.change}</span>
+            {stat.changePercentage && (
+              <span className={`text-xs ${changeColorClass}`}>({stat.changePercentage})</span>
+            )}
+            <span className="text-xs text-[var(--apple-tertiary-label)]">vs last month</span>
+          </div>
+        )}
+        {!hasChange && stat.value > 0 && (
+          <span className="text-xs text-[var(--apple-tertiary-label)]">No change from last month</span>
+        )}
+      </div>
+
+      {/* Sparkline — animated draw-in, CSS-variable-driven gradient fill + stroke */}
+      <div className="relative z-10 h-[72px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            data={sparklineData}
+            margin={{ top: 6, right: 0, bottom: 0, left: 0 }}
+          >
+            <defs>
+              <linearGradient id={`fill-${index}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor={isEmpty ? '#8E8E93' : 'var(--apple-chart-to)'}   stopOpacity={isEmpty ? 0.15 : 0.42} />
+                <stop offset="55%"  stopColor={isEmpty ? '#8E8E93' : 'var(--apple-chart-from)'} stopOpacity={isEmpty ? 0.05 : 0.14} />
+                <stop offset="100%" stopColor={isEmpty ? '#8E8E93' : 'var(--apple-chart-from)'} stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id={`stroke-${index}`} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%"   stopColor={isEmpty ? '#8E8E93' : 'var(--apple-chart-from)'} />
+                <stop offset="100%" stopColor={isEmpty ? '#8E8E93' : 'var(--apple-chart-to)'}   />
+              </linearGradient>
+            </defs>
+            <Area
+              type="monotone"
+              dataKey="v"
+              stroke={`url(#stroke-${index})`}
+              strokeWidth={2}
+              fill={`url(#fill-${index})`}
+              isAnimationActive={true}
+              animationDuration={900}
+              animationEasing="ease-out"
+              animationBegin={index * 110 + 180}
+              dot={(props: any) => {
+                const lastIdx = sparklineData.length - 1
+                if (props.index !== lastIdx) return <g key={props.key} />
+                return (
+                  <circle
+                    key={props.key}
+                    cx={props.cx}
+                    cy={props.cy}
+                    r={3.5}
+                    fill={isEmpty ? '#8E8E93' : 'var(--apple-chart-to)'}
+                    stroke="var(--apple-system-background)"
+                    strokeWidth={2}
+                  />
+                )
+              }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
 
 export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
   const { organization } = useOrganization()
   const { hasPermission } = usePermissions()
-
-  /* ─── Pure helper functions (no hooks) ─── */
 
   const formatDuration = (minutes: number) => {
     if (minutes === 0) return '0h'
@@ -101,14 +227,12 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
     return Math.abs(pct) >= 1 ? `${Math.abs(pct)}%` : null
   }
 
-  /* ─── Compute derived data (safe even when stats/changes are undefined) ─── */
-
   const lmActiveProjects = (stats?.activeProjects ?? 0) - (changes?.activeProjects ?? 0)
   const lmCompletedTasks = (stats?.completedTasks ?? 0) - (changes?.completedTasks ?? 0)
   const lmTeamMembers    = (stats?.teamMembers ?? 0)    - (changes?.teamMembers ?? 0)
   const lmHoursTracked   = (stats?.hoursTracked ?? 0)   - (changes?.hoursTracked ?? 0)
 
-  const statsData = stats && changes ? [
+  const statsData: StatItem[] = stats && changes ? [
     {
       title: 'Active Projects',
       value: stats.activeProjects,
@@ -116,7 +240,7 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
       change: formatChange(changes.activeProjects),
       changePercentage: getChangePercentage(changes.activeProjects, lmActiveProjects),
       changeType: getChangeType(changes.activeProjects),
-      icon: FolderOpen,
+      icon: Folder,
     },
     {
       title: 'Completed Tasks',
@@ -125,7 +249,7 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
       change: formatChange(changes.completedTasks),
       changePercentage: getChangePercentage(changes.completedTasks, lmCompletedTasks),
       changeType: getChangeType(changes.completedTasks),
-      icon: CheckSquare,
+      icon: CheckCircle2,
     },
     {
       title: 'Team Members',
@@ -134,7 +258,7 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
       change: formatChange(changes.teamMembers),
       changePercentage: getChangePercentage(changes.teamMembers, lmTeamMembers),
       changeType: getChangeType(changes.teamMembers),
-      icon: Users,
+      icon: UserRound,
     },
     {
       title: 'Hours Tracked',
@@ -151,14 +275,11 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
     stat.title === 'Team Members' ? hasPermission(Permission.TEAM_MEMBER_WIDGET_VIEW) : true
   )
 
-  /* ─── ALL hooks must be called unconditionally ─── */
   const sparklineDataSets = useMemo(
     () => filteredStatsData.map((s, i) => generateSparklineData(s.value, s.changeType, i * 7.3 + 1.1)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [filteredStatsData.map(s => `${s.value}-${s.changeType}`).join('|')]
   )
-
-  /* ─── Now it's safe to return early ─── */
 
   if (isLoading) {
     return (
@@ -166,14 +287,11 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden">
             <div className="px-4 pt-4 pb-0">
-              <div className="flex items-center justify-between mb-3">
-                <div className="h-3 w-24 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
-                <div className="h-4 w-4 rounded-full border-2 border-[var(--apple-tertiary-fill)] animate-pulse" />
-              </div>
+              <div className="h-3 w-24 bg-[var(--apple-tertiary-fill)] rounded animate-pulse mb-3" />
               <div className="h-9 w-16 bg-[var(--apple-tertiary-fill)] rounded animate-pulse mb-2" />
               <div className="h-3 w-28 bg-[var(--apple-tertiary-fill)] rounded animate-pulse mb-4" />
             </div>
-            <div className="h-14 bg-[var(--apple-quaternary-fill)] animate-pulse" />
+            <div className="h-[72px] bg-[var(--apple-quaternary-fill)] animate-pulse" />
           </div>
         ))}
       </div>
@@ -198,93 +316,14 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
 
   return (
     <div className={`grid ${gridCols} gap-4`}>
-      {filteredStatsData.map((stat, index) => {
-        const Icon = stat.icon
-        const hasChange = stat.change !== null
-        const isEmpty = stat.value === 0
-        const accent = CARD_ACCENTS[index % 4]
-        const ChangeIcon = stat.changeType === 'positive' ? TrendingUp : TrendingDown
-        const changeColorClass =
-          stat.changeType === 'positive' ? 'text-[var(--apple-system-green)]'
-          : stat.changeType === 'negative' ? 'text-[var(--apple-system-red)]'
-          : 'text-[var(--apple-system-gray)]'
-
-        return (
-          <div
-            key={index}
-            className={`rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.25)] ${isEmpty ? 'opacity-60' : ''}`}
-          >
-            {/* Card content */}
-            <div className="px-4 pt-4 pb-2">
-              {/* Label + circle indicator — matches mockup */}
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-label)]">{stat.title}</span>
-                <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 ${isEmpty ? 'border-[var(--apple-system-gray)]/40' : 'border-[var(--apple-separator)]'}`} />
-              </div>
-
-              {/* Large value */}
-              <div className={`text-[34px] sm:text-[38px] font-bold tracking-tight leading-none mb-2 ${isEmpty ? 'text-[var(--apple-secondary-label)]' : 'text-[var(--apple-label)]'}`}>
-                {stat.formattedValue}
-              </div>
-
-              {/* Change indicator */}
-              {hasChange && (
-                <div className="flex items-center gap-1 flex-wrap">
-                  <ChangeIcon className={`h-3 w-3 flex-shrink-0 ${changeColorClass}`} />
-                  <span className={`text-xs font-medium ${changeColorClass}`}>{stat.change}</span>
-                  {stat.changePercentage && (
-                    <span className={`text-xs ${changeColorClass}`}>({stat.changePercentage})</span>
-                  )}
-                  <span className="text-xs text-[var(--apple-tertiary-label)]">vs last month</span>
-                </div>
-              )}
-              {!hasChange && stat.value > 0 && (
-                <span className="text-xs text-[var(--apple-tertiary-label)]">No change from last month</span>
-              )}
-            </div>
-
-            {/* Sparkline — gradient fill area chart, NO axes, NO labels, NO tooltip */}
-            <div className="h-16 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={sparklineDataSets[index]}
-                  margin={{ top: 4, right: 0, bottom: 0, left: 0 }}
-                >
-                  <defs>
-                    <linearGradient id={`grad-${index}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor={isEmpty ? '#8E8E93' : accent.color} stopOpacity={0.28} />
-                      <stop offset="95%" stopColor={isEmpty ? '#8E8E93' : accent.color} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Area
-                    type="monotone"
-                    dataKey="v"
-                    stroke={isEmpty ? 'var(--apple-system-gray)' : accent.color}
-                    strokeWidth={1.5}
-                    fill={`url(#grad-${index})`}
-                    isAnimationActive={false}
-                    dot={(props: any) => {
-                      const lastIdx = sparklineDataSets[index].length - 1
-                      if (props.index !== lastIdx) return <g key={props.key} />
-                      return (
-                        <circle
-                          key={props.key}
-                          cx={props.cx}
-                          cy={props.cy}
-                          r={3}
-                          fill={isEmpty ? '#8E8E93' : accent.color}
-                          stroke="var(--apple-system-background)"
-                          strokeWidth={1.5}
-                        />
-                      )
-                    }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )
-      })}
+      {filteredStatsData.map((stat, index) => (
+        <StatCardItem
+          key={stat.title}
+          stat={stat}
+          index={index}
+          sparklineData={sparklineDataSets[index]}
+        />
+      ))}
     </div>
   )
 }
