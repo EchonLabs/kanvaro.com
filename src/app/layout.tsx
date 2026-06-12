@@ -8,6 +8,7 @@ import { ToastProviderWrapper } from '@/components/providers/ToastProviderWrappe
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { SessionTimeoutWrapper } from '@/components/auth/SessionTimeoutWrapper'
+import { AccentThemeInitializer } from '@/components/providers/AccentThemeInitializer'
 
 // Use system fonts for better reliability
 const fontClass = "font-sans"
@@ -43,6 +44,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${fontClass} antialiased overflow-y-hidden`} suppressHydrationWarning>
+        <AccentThemeInitializer />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

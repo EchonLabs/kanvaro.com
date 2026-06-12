@@ -157,6 +157,16 @@
   50%       { box-shadow: 0 0 0 0px currentColor;       opacity: 1; }
 }
 
+/* Progress bar grow — scaleX 0→1 from left, no JS state needed */
+@keyframes progress-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.progress-bar-animated {
+  transform-origin: left;
+  animation: progress-grow 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
 /* Transitions.dev — Number pop-in */
 :root {
   --digit-dur: 500ms;
@@ -333,6 +343,14 @@
     --apple-radius-lg: 16px;
     --apple-radius-xl: 20px;
     --apple-radius-pill: 999px;
+
+    /* Premium cobalt-azure gradient — charts, card accents, button bg, progress bars, avatars */
+    --apple-chart-from: #1048D1;
+    --apple-chart-to: #3D8EFF;
+    --apple-chart-gradient: linear-gradient(135deg, #1048D1 0%, #3D8EFF 100%);
+    --apple-chart-glow: rgba(61, 142, 255, 0.32);
+    --apple-chart-color: #3D8EFF;
+    --apple-card-gradient: linear-gradient(135deg, #1048D1 0%, #3D8EFF 100%);
   }
 
   .dark {
@@ -577,6 +595,45 @@
   border-radius: var(--apple-radius-sm);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   background-color: transparent !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Accent theme overrides — applied via data-theme attribute on <html>.
+   Overrides the chart/card gradient tokens and primary color.
+   Blue (default) requires no override — it is already set in :root.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+[data-theme="orange"] {
+  --apple-chart-from:     #BF4D00;
+  --apple-chart-to:       #FF7A00;
+  --apple-chart-gradient: linear-gradient(135deg, #BF4D00 0%, #FF7A00 100%);
+  --apple-chart-glow:     rgba(255, 122, 0, 0.32);
+  --apple-chart-color:    #FF7A00;
+  --apple-card-gradient:  linear-gradient(135deg, #BF4D00 0%, #FF7A00 100%);
+  --primary: 29 100% 50%;
+  --ring:    29 100% 50%;
+}
+
+[data-theme="purple"] {
+  --apple-chart-from:     #5B1E9C;
+  --apple-chart-to:       #9B5FE8;
+  --apple-chart-gradient: linear-gradient(135deg, #5B1E9C 0%, #9B5FE8 100%);
+  --apple-chart-glow:     rgba(155, 95, 232, 0.32);
+  --apple-chart-color:    #9B5FE8;
+  --apple-card-gradient:  linear-gradient(135deg, #5B1E9C 0%, #9B5FE8 100%);
+  --primary: 270 72% 63%;
+  --ring:    270 72% 63%;
+}
+
+[data-theme="red"] {
+  --apple-chart-from:     #A80E1A;
+  --apple-chart-to:       #FF2D30;
+  --apple-chart-gradient: linear-gradient(135deg, #A80E1A 0%, #FF2D30 100%);
+  --apple-chart-glow:     rgba(255, 45, 48, 0.32);
+  --apple-chart-color:    #FF2D30;
+  --apple-card-gradient:  linear-gradient(135deg, #A80E1A 0%, #FF2D30 100%);
+  --primary: 357 100% 59%;
+  --ring:    357 100% 59%;
 }
 
 /* Task description formatting */
