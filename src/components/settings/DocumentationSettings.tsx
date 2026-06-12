@@ -181,10 +181,10 @@ export function DocumentationSettings() {
   }
 
   const stats = [
-    { label: 'Total Articles', value: articles.length, icon: FileText, gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.25)' },
-    { label: 'Public',         value: articles.filter(a => a.visibility === 'public').length,   icon: Globe,    gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.25)' },
-    { label: 'Internal',       value: articles.filter(a => a.visibility === 'internal').length, icon: Lock,     gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.25)' },
-    { label: 'Categories',     value: Object.keys(categoryLabels).length,                       icon: Tag,      gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.25)' },
+    { label: 'Total Articles', value: articles.length, icon: FileText },
+    { label: 'Public',         value: articles.filter(a => a.visibility === 'public').length,   icon: Globe    },
+    { label: 'Internal',       value: articles.filter(a => a.visibility === 'internal').length, icon: Lock     },
+    { label: 'Categories',     value: Object.keys(categoryLabels).length,                       icon: Tag      },
   ]
 
   return (
@@ -192,11 +192,11 @@ export function DocumentationSettings() {
 
       {/* ── Stats Bar ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {stats.map(({ label, value, icon: Icon, gradient, glow }) => (
+        {stats.map(({ label, value, icon: Icon }) => (
           <div key={label}
-            className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 flex items-center gap-3 apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
+            className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 flex items-center gap-3 apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
             <div className="flex-shrink-0 w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-              style={{ background: gradient, boxShadow: `0 4px 12px ${glow}` }}>
+              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 12px var(--apple-chart-glow)' }}>
               <Icon className="h-5 w-5 text-white" strokeWidth={1.8} />
             </div>
             <div>
@@ -214,7 +214,7 @@ export function DocumentationSettings() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
           <div className="flex items-center gap-3">
             <div className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 3px 10px rgba(0,122,255,0.25)' }}>
+              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 3px 10px var(--apple-chart-glow)' }}>
               <BookOpen className="h-[18px] w-[18px] text-white" strokeWidth={1.8} />
             </div>
             <div>
@@ -225,7 +225,7 @@ export function DocumentationSettings() {
           <Button
             onClick={handleCreateArticle}
             className="w-full sm:w-auto h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
-            style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+            style={{ background: 'var(--apple-card-gradient)' }}
           >
             <Plus className="h-3.5 w-3.5" />
             New Article
@@ -282,7 +282,7 @@ export function DocumentationSettings() {
           {filteredArticles.length === 0 ? (
             <div className="py-16 text-center">
               <div className="w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center mx-auto mb-4"
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 16px rgba(0,122,255,0.25)' }}>
+                style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 16px var(--apple-chart-glow)' }}>
                 <BookOpen className="h-7 w-7 text-white" strokeWidth={1.8} />
               </div>
               <p className="text-[17px] font-semibold text-[var(--apple-label)] mb-1">
@@ -295,7 +295,7 @@ export function DocumentationSettings() {
                 <Button
                   onClick={handleCreateArticle}
                   className="h-9 gap-2 px-5 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
-                  style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+                  style={{ background: 'var(--apple-card-gradient)' }}
                 >
                   <Plus className="h-3.5 w-3.5" /> Create First Article
                 </Button>
@@ -576,7 +576,7 @@ function ArticleForm({ formData, setFormData, toggleAudience, onSave, onCancel, 
         </Button>
         <Button onClick={onSave} disabled={saving || !isValid}
           className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] text-[13px]"
-          style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}>
+          style={{ background: 'var(--apple-card-gradient)' }}>
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
           {saving ? 'Saving…' : isEdit ? 'Update Article' : 'Create Article'}
         </Button>

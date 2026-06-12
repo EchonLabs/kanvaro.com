@@ -117,7 +117,7 @@ export function DatabaseSettings() {
         <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
           <div
             className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 3px 10px rgba(52,199,89,0.25)' }}
+            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 3px 10px var(--apple-chart-glow)' }}
           >
             <Database className="h-[18px] w-[18px] text-white" strokeWidth={1.8} />
           </div>
@@ -202,7 +202,7 @@ export function DatabaseSettings() {
               onClick={handleSave}
               disabled={saving || testing || !hasChanges}
               className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
-              style={{ background: hasChanges ? 'linear-gradient(135deg,#34C759 0%,#30D158 100%)' : undefined }}
+              style={{ background: hasChanges ? 'var(--apple-card-gradient)' : undefined }}
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               {saving ? 'Saving…' : 'Save Configuration'}

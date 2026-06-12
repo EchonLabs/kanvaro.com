@@ -16,24 +16,24 @@ const PROVIDERS = [
     label: 'SMTP Server',
     description: 'Use your own SMTP server',
     icon: Server,
-    gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
-    glow: 'rgba(0,122,255,0.25)',
+    gradient: 'var(--apple-card-gradient)',
+    glow: 'var(--apple-chart-glow)',
   },
   {
     id: 'azure',
     label: 'Azure App',
     description: 'Azure App with Exchange Online',
     icon: Cloud,
-    gradient: 'linear-gradient(135deg,#0078D4 0%,#50C0FF 100%)',
-    glow: 'rgba(0,120,212,0.25)',
+    gradient: 'var(--apple-card-gradient)',
+    glow: 'var(--apple-chart-glow)',
   },
   {
     id: 'skip',
     label: 'Skip Email',
     description: 'Disable email notifications',
     icon: Ban,
-    gradient: 'linear-gradient(135deg,#8E8E93 0%,#AEAEB2 100%)',
-    glow: 'rgba(142,142,147,0.20)',
+    gradient: 'var(--apple-card-gradient)',
+    glow: 'var(--apple-chart-glow)',
   },
 ] as const
 
@@ -169,7 +169,7 @@ export function EmailSettings() {
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
           <div className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 3px 10px rgba(0,122,255,0.25)' }}>
+            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 3px 10px var(--apple-chart-glow)' }}>
             <Mail className="h-[18px] w-[18px] text-white" strokeWidth={1.8} />
           </div>
           <div>
@@ -192,7 +192,7 @@ export function EmailSettings() {
                     className={cn(
                       'flex flex-col items-center gap-2 p-4 rounded-[var(--apple-radius-md)] border apple-transition text-center',
                       active
-                        ? 'border-[var(--apple-system-blue)] bg-blue-50 dark:bg-blue-950/30'
+                        ? 'border-transparent bg-[var(--apple-tertiary-fill)]'
                         : 'border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] hover:bg-[var(--apple-tertiary-fill)]'
                     )}
                   >
@@ -201,7 +201,7 @@ export function EmailSettings() {
                       <Icon className="h-5 w-5 text-white" strokeWidth={1.8} />
                     </div>
                     <div>
-                      <p className={cn('text-[13px] font-semibold', active ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-label)]')}>{label}</p>
+                      <p className="text-[13px] font-semibold" style={{ color: active ? 'var(--apple-chart-color)' : 'var(--apple-label)' }}>{label}</p>
                       <p className="text-[11px] text-[var(--apple-tertiary-label)] mt-0.5">{description}</p>
                     </div>
                   </button>
@@ -349,7 +349,7 @@ export function EmailSettings() {
               onClick={handleSave}
               disabled={saving || !hasChanges}
               className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
-              style={{ background: hasChanges ? 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' : undefined }}
+              style={{ background: hasChanges ? 'var(--apple-card-gradient)' : undefined }}
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               {saving ? 'Saving…' : 'Save Configuration'}

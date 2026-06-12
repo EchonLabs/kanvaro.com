@@ -49,7 +49,7 @@ export default function SettingsPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="w-12 h-12 rounded-[var(--apple-radius-md)] flex items-center justify-center mx-auto mb-4"
-            style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 16px rgba(0,122,255,0.35)' }}>
+            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 16px var(--apple-chart-glow)' }}>
             <Loader2 className="h-6 w-6 text-white animate-spin" />
           </div>
           <p className="text-[13px] text-[var(--apple-secondary-label)]">Loading settings…</p>
@@ -100,7 +100,7 @@ export default function SettingsPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div
             className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center shadow-lg"
-            style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 16px rgba(0,122,255,0.35)' }}
+            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 16px var(--apple-chart-glow)' }}
           >
             <SettingsIcon className="h-7 w-7 text-white" strokeWidth={1.8} />
           </div>
@@ -126,7 +126,7 @@ export default function SettingsPage() {
                   className={cn(
                     'flex-1 flex items-center justify-center gap-1.5 h-9 px-2 sm:px-3 rounded-full text-[13px] font-medium apple-transition select-none min-w-0',
                     isActive
-                      ? 'bg-card text-[var(--apple-label)] shadow-sm'
+                      ? 'bg-card text-[var(--apple-chart-color)] shadow-sm'
                       : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]'
                   )}
                 >

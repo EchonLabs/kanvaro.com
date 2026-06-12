@@ -512,12 +512,12 @@ export function OrganizationSettings() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {(
             [
-              { id: 'blue',   label: 'Blue',   from: '#1048D1', to: '#3D8EFF' },
-              { id: 'orange', label: 'Orange', from: '#BF4D00', to: '#FF7A00' },
-              { id: 'purple', label: 'Purple', from: '#5B1E9C', to: '#9B5FE8' },
-              { id: 'red',    label: 'Red',    from: '#A80E1A', to: '#FF2D30' },
-            ] as { id: AccentTheme; label: string; from: string; to: string }[]
-          ).map(({ id, label, from, to }) => {
+              { id: 'blue',   label: 'Blue',   color: '#3D8EFF' },
+              { id: 'orange', label: 'Orange', color: '#FF7A00' },
+              { id: 'purple', label: 'Purple', color: '#9B5FE8' },
+              { id: 'red',    label: 'Red',    color: '#FF2D30' },
+            ] as { id: AccentTheme; label: string; color: string }[]
+          ).map(({ id, label, color }) => {
             const active = accentTheme === id
             return (
               <button
@@ -528,18 +528,18 @@ export function OrganizationSettings() {
                     ? 'border-transparent ring-2 ring-offset-2 ring-offset-card'
                     : 'border-[var(--apple-separator)] hover:border-transparent hover:ring-2 hover:ring-offset-2 hover:ring-offset-card'
                 }`}
-                style={active ? { ['--tw-ring-color' as any]: to } : { ['--tw-ring-color' as any]: to }}
+                style={{ ['--tw-ring-color' as any]: color }}
               >
                 {/* Colour swatch */}
                 <div
                   className="h-10 w-full rounded-[var(--apple-radius-sm)] shadow-sm"
-                  style={{ background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` }}
+                  style={{ backgroundColor: color }}
                 />
                 <span className={`text-[12px] font-semibold ${active ? 'text-[var(--apple-label)]' : 'text-[var(--apple-secondary-label)]'}`}>
                   {label}
                 </span>
                 {active && (
-                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full" style={{ background: to }} />
+                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
                 )}
               </button>
             )
@@ -553,8 +553,8 @@ export function OrganizationSettings() {
       {/* ── Organization Information ── */}
       <SectionCard
         icon={Building2}
-        gradient="linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)"
-        glow="rgba(0,122,255,0.25)"
+        gradient="var(--apple-card-gradient)"
+        glow="var(--apple-chart-glow)"
         title="Organization Information"
         description="Basic identity and locale settings"
       >
@@ -717,8 +717,8 @@ export function OrganizationSettings() {
       {/* ── User Registration ── */}
       <SectionCard
         icon={UserCheck}
-        gradient="linear-gradient(135deg,#34C759 0%,#30D158 100%)"
-        glow="rgba(52,199,89,0.25)"
+        gradient="var(--apple-card-gradient)"
+        glow="var(--apple-chart-glow)"
         title="User Registration"
         description="Default role assigned to newly registered users"
       >
@@ -743,8 +743,8 @@ export function OrganizationSettings() {
       {/* ── Time Tracking ── */}
       <SectionCard
         icon={Timer}
-        gradient="linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)"
-        glow="rgba(255,149,0,0.25)"
+        gradient="var(--apple-card-gradient)"
+        glow="var(--apple-chart-glow)"
         title="Time Tracking"
         description="Global time tracking rules for your organization"
       >
@@ -921,8 +921,8 @@ export function OrganizationSettings() {
       {/* ── Notifications ── */}
       <SectionCard
         icon={Bell}
-        gradient="linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)"
-        glow="rgba(191,90,242,0.25)"
+        gradient="var(--apple-card-gradient)"
+        glow="var(--apple-chart-glow)"
         title="Notification Settings"
         description="Retention and cleanup rules for in-app notifications"
       >
@@ -1024,7 +1024,7 @@ function SaveButton({ loading, disabled = false, onClick, label }: {
       onClick={onClick}
       disabled={loading || disabled}
       className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
-      style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+      style={{ background: 'var(--apple-card-gradient)' }}
     >
       {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
       {loading ? 'Saving…' : label}
