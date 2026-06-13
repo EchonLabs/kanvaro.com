@@ -845,7 +845,8 @@ export default function EpicsPage() {
                       </div>
                       <GradientProgress
                         pct={pct}
-                        colorIndex={displayedEpics.indexOf(epic)}
+                        gradient="var(--apple-card-gradient)"
+                        glow="var(--apple-chart-glow)"
                         showPct={true}
                       />
                     </div>

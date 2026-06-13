@@ -112,13 +112,13 @@ interface Project {
 }
 
 const EVENT_ICONS: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-  planning:      { icon: <Target className="h-5 w-5" />,   color: 'text-blue-600 dark:text-blue-400',    bg: 'bg-blue-50 dark:bg-blue-950/30' },
-  review:        { icon: <Eye className="h-5 w-5" />,      color: 'text-amber-600 dark:text-amber-400',  bg: 'bg-amber-50 dark:bg-amber-950/30' },
-  retrospective: { icon: <RotateCcw className="h-5 w-5" />,color: 'text-purple-600 dark:text-purple-400',bg: 'bg-purple-50 dark:bg-purple-950/30' },
-  standup:       { icon: <Users className="h-5 w-5" />,    color: 'text-emerald-600 dark:text-emerald-400',bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-  daily_standup: { icon: <Users className="h-5 w-5" />,    color: 'text-emerald-600 dark:text-emerald-400',bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-  grooming:      { icon: <List className="h-5 w-5" />,     color: 'text-sky-600 dark:text-sky-400',      bg: 'bg-sky-50 dark:bg-sky-950/30' },
-  demo:          { icon: <Zap className="h-5 w-5" />,      color: 'text-orange-600 dark:text-orange-400',bg: 'bg-orange-50 dark:bg-orange-950/30' },
+  planning:      { icon: <Target className="h-5 w-5" />,    color: 'text-blue-600 dark:text-blue-400',     bg: 'bg-blue-50 dark:bg-blue-950/30' },
+  review:        { icon: <Eye className="h-5 w-5" />,       color: 'text-amber-600 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-950/30' },
+  retrospective: { icon: <RotateCcw className="h-5 w-5" />, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/30' },
+  standup:       { icon: <Users className="h-5 w-5" />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  daily_standup: { icon: <Users className="h-5 w-5" />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  grooming:      { icon: <List className="h-5 w-5" />,      color: 'text-sky-600 dark:text-sky-400',       bg: 'bg-sky-50 dark:bg-sky-950/30' },
+  demo:          { icon: <Zap className="h-5 w-5" />,       color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/30' },
 }
 const defaultEventStyle = {
   icon: <Calendar className="h-5 w-5" />,
@@ -457,6 +457,8 @@ export default function SprintEventsPage() {
           title="Sprint Events"
           subtitle="Plan and track your sprint ceremonies"
           icon={Calendar}
+          iconGradient="var(--apple-card-gradient)"
+          iconGlow="var(--apple-chart-glow)"
           actions={
             <PermissionGate permission={Permission.SPRINT_EVENT_VIEW_ALL}>
               <Button
@@ -719,15 +721,23 @@ export default function SprintEventsPage() {
                       )}
                       onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                     >
+                      {/* Theme-color accent strip */}
+                      <div className="h-[3px] w-full flex-shrink-0" style={{ background: 'var(--apple-card-gradient)' }} />
+
                       <div className="p-5 space-y-4">
                         {/* Header: icon + title + status + menu */}
                         <div className="flex items-start gap-3">
-                          <div className="h-10 w-10 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
+                          <div
+                            className="h-10 w-10 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white"
+                            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}
+                          >
                             {style.icon}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-[16px] font-semibold text-[var(--apple-label)] truncate">{event.title}</h3>
-                            <span className="text-[12px] text-[var(--apple-secondary-label)]">{formatToTitleCase(event.eventType)}</span>
+                            <h3 className="text-[16px] font-semibold text-[var(--apple-label)] truncate leading-snug">{event.title}</h3>
+                            <span className={cn('inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md mt-0.5', style.bg, style.color)}>
+                              {formatToTitleCase(event.eventType)}
+                            </span>
                           </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
                             <StatusBadge status={event.status} size="sm" />
@@ -832,10 +842,15 @@ export default function SprintEventsPage() {
                   return (
                     <div
                       key={event._id}
-                      className="card-fade-in group flex items-center gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px cursor-pointer"
+                      className="card-fade-in group relative flex items-center gap-4 pl-5 pr-4 py-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px cursor-pointer overflow-hidden"
                       onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                     >
-                      <div className="h-9 w-9 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 6px var(--apple-chart-glow)' }}>
+                      {/* Theme-color left accent strip */}
+                      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: 'var(--apple-card-gradient)' }} />
+                      <div
+                        className="h-9 w-9 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white"
+                        style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 6px var(--apple-chart-glow)' }}
+                      >
                         {style.icon}
                       </div>
                       <div className="flex-1 min-w-0">

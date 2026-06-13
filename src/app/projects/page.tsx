@@ -210,7 +210,7 @@ function GradientProgress({
           {pct > 2 && <span aria-hidden className="progress-shimmer absolute inset-0" />}
         </div>
       </div>
-      <span className="text-xs font-apple-mono font-semibold text-[var(--apple-secondary-label)] w-7 text-right flex-shrink-0 tabular-nums">
+      <span className="text-xs font-apple-mono font-semibold text-[var(--apple-secondary-label)] w-9 text-right flex-shrink-0 tabular-nums">
         {pct}%
       </span>
     </div>

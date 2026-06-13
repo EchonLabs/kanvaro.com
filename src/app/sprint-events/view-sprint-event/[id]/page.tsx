@@ -1,34 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { usePermissions } from '@/lib/permissions/permission-context'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { 
-  Calendar, 
-  Clock, 
-  Users, 
-  MapPin,
-  Link as LinkIcon,
-  Edit,
-  Trash2,
-  CheckCircle,
-  Play,
-  Square,
-  ArrowLeft,
-  FileText,
-  Image as ImageIcon,
-  ExternalLink,
-  Target
+import {
+  Calendar, Clock, Users, MapPin, Link as LinkIcon, Edit, Trash2,
+  CheckCircle, Play, Square, ArrowLeft, FileText, Image as ImageIcon,
+  ExternalLink, Target, Eye, RotateCcw, List, Zap, MoreVertical, User,
 } from 'lucide-react'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { EditSprintEventModal } from '@/components/sprint-events/EditSprintEventModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { cn, formatToTitleCase } from '@/lib/utils'
+import { StatusBadge } from '@/components/tasks/TasksShared'
 
 interface SprintEvent {
   _id: string
@@ -91,6 +79,78 @@ interface SprintEvent {
   updatedAt: string
 }
 
+// ─── Event type styles ────────────────────────────────────────────────────────
+
+const EVENT_STYLE: Record<string, { icon: ReactNode; color: string; bg: string }> = {
+  planning:      { icon: <Target className="h-5 w-5" />,    color: 'text-blue-600 dark:text-blue-400',     bg: 'bg-blue-50 dark:bg-blue-950/30' },
+  review:        { icon: <Eye className="h-5 w-5" />,       color: 'text-amber-600 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-950/30' },
+  retrospective: { icon: <RotateCcw className="h-5 w-5" />, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/30' },
+  standup:       { icon: <Users className="h-5 w-5" />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  daily_standup: { icon: <Users className="h-5 w-5" />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  grooming:      { icon: <List className="h-5 w-5" />,      color: 'text-sky-600 dark:text-sky-400',       bg: 'bg-sky-50 dark:bg-sky-950/30' },
+  demo:          { icon: <Zap className="h-5 w-5" />,       color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/30' },
+}
+const defaultEventStyle = {
+  icon: <Calendar className="h-5 w-5" />,
+  color: 'text-gray-600 dark:text-gray-400',
+  bg: 'bg-gray-50 dark:bg-gray-900/40',
+}
+
+// ─── Avatar gradient (stable per name) ───────────────────────────────────────
+
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
+  'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)',
+  'linear-gradient(135deg,#34C759 0%,#30D158 100%)',
+  'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)',
+  'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)',
+  'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)',
+]
+
+function avatarGradient(name: string): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length]
+}
+
+// ─── InfoRow ──────────────────────────────────────────────────────────────────
+
+function InfoRow({ icon, label, value }: { icon?: ReactNode; label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-start gap-4 px-5 py-3.5">
+      <span className="flex-shrink-0 mt-0.5 text-[var(--apple-tertiary-label)] h-4 w-4 flex items-center justify-center">
+        {icon}
+      </span>
+      <span className="text-[13px] text-[var(--apple-secondary-label)] w-24 flex-shrink-0 pt-px">{label}</span>
+      <span className="text-[14px] text-[var(--apple-label)] flex-1 min-w-0 break-words">{value}</span>
+    </div>
+  )
+}
+
+// ─── Card shell ───────────────────────────────────────────────────────────────
+
+function SectionCard({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn(
+      'rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
+      'shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden',
+      className,
+    )}>
+      {children}
+    </div>
+  )
+}
+
+function SectionHeader({ label }: { label: string }) {
+  return (
+    <div className="px-5 pt-4 pb-3 border-b border-[var(--apple-separator)]">
+      <span className="apple-section-label text-[var(--apple-tertiary-label)]">{label}</span>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function SprintEventDetailsPage() {
   const params = useParams()
   const router = useRouter()
@@ -98,8 +158,6 @@ export default function SprintEventDetailsPage() {
   const { hasPermission } = usePermissions()
   const eventId = params.id as string
   const [event, setEvent] = useState<SprintEvent | null>(null)
-  const [fullProject, setFullProject] = useState<{ _id: string; name: string } | null>(null)
-const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingEvent, setEditingEvent] = useState<SprintEvent | null>(null)
   const { formatDate, formatTime } = useDateTime()
@@ -107,14 +165,11 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/login')
-      return
     }
   }, [authLoading, isAuthenticated, router])
 
   useEffect(() => {
-    if (isAuthenticated && eventId) {
-      fetchEvent()
-    }
+    if (isAuthenticated && eventId) fetchEvent()
   }, [eventId, isAuthenticated])
 
   const fetchEvent = async () => {
@@ -124,15 +179,6 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
       if (response.ok) {
         const data = await response.json()
         setEvent(data)
-          // Fetch full project
-      const projectRes = await fetch(`/api/projects/${data?.project?._id}`)
-      const projectData = projectRes.ok ? await projectRes.json() : null
-      setFullProject(projectData)
-
-      // Fetch full sprint
-      const sprintRes = await fetch(`/api/sprints/${data?.sprint?._id}`)
-      const sprintData = sprintRes.ok ? await sprintRes.json() : null
-      setFullSprint(sprintData)
       }
     } catch (error) {
       console.error('Error fetching sprint event:', error)
@@ -146,118 +192,21 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
     setEditingEvent(null)
   }
 
-  const handleEventDeleted = async () => {
-    if (!confirm('Are you sure you want to delete this event?')) {
-      return
-    }
-    try {
-      const response = await fetch(`/api/sprint-events/view-sprint-event/${eventId}`, {
-        method: 'DELETE'
-      })
-      if (response.ok) {
-        router.push('/sprint-events')
-      }
-    } catch (error) {
-      console.error('Error deleting sprint event:', error)
-    }
-  }
-
   const updateStatus = async (newStatus: string) => {
     try {
       const response = await fetch(`/api/sprint-events/view-sprint-event/${eventId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
       })
-      if (response.ok) {
-        fetchEvent()
-      }
+      if (response.ok) fetchEvent()
     } catch (error) {
       console.error('Error updating status:', error)
     }
   }
 
-  const formatMeetingLink = (link: string) => {
-    // If the link already has a protocol, return it as is
-    if (link.match(/^https?:\/\//i)) {
-      return link
-    }
-    // Otherwise, prepend https://
-    return `https://${link}`
-  }
-
-  const getEventTypeIcon = (eventType: string) => {
-    switch (eventType) {
-      case 'planning':
-        return <Target className="h-5 w-5" />
-      case 'review':
-        return <CheckCircle className="h-5 w-5" />
-      case 'retrospective':
-        return <Users className="h-5 w-5" />
-      case 'daily_standup':
-        return <Clock className="h-5 w-5" />
-      case 'demo':
-        return <Play className="h-5 w-5" />
-      default:
-        return <Calendar className="h-5 w-5" />
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      'scheduled': 'secondary',
-      'in_progress': 'default',
-      'completed': 'outline',
-      'cancelled': 'destructive'
-    } as const
-    
-    const labels = {
-      'scheduled': 'Scheduled',
-      'in_progress': 'In Progress',
-      'completed': 'Completed',
-      'cancelled': 'Cancelled'
-    } as const
-    
-    return (
-      <Badge 
-        variant={variants[status as keyof typeof variants] || 'secondary'} 
-        className="pointer-events-none"
-      >
-        {labels[status as keyof typeof labels] || status}
-      </Badge>
-    )
-  }
-
-  const getEventTypeBadge = (eventType: string) => {
-    const colors = {
-      'planning': 'bg-blue-500',
-      'review': 'bg-green-500',
-      'retrospective': 'bg-purple-500',
-      'daily_standup': 'bg-yellow-500',
-      'demo': 'bg-orange-500',
-      'other': 'bg-gray-500'
-    }
-    
-    const labels = {
-      'planning': 'Planning',
-      'review': 'Review',
-      'retrospective': 'Retrospective',
-      'daily_standup': 'Daily Standup',
-      'demo': 'Demo',
-      'other': 'Other'
-    }
-    
-    return (
-      <Badge 
-        variant="outline" 
-        className={`${colors[eventType as keyof typeof colors] || 'bg-gray-500'} text-white border-0 pointer-events-none`}
-      >
-        {labels[eventType as keyof typeof labels] || eventType}
-      </Badge>
-    )
-  }
+  const formatMeetingLink = (link: string) =>
+    link.match(/^https?:\/\//i) ? link : `https://${link}`
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -267,11 +216,13 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
   }
 
+  // ── Loading / auth guards ──────────────────────────────────────────────────
+
   if (authLoading || loading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--apple-system-blue)]" />
         </div>
       </MainLayout>
     )
@@ -280,13 +231,11 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
   if (!isAuthenticated) {
     return (
       <MainLayout>
-        <div className="text-center py-8">
-          <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-2xl font-semibold mb-2">Authentication Required</h2>
-          <p className="text-muted-foreground mb-4">
-            Please log in to access sprint events.
-          </p>
-          <Button onClick={() => router.push('/login')}>
+        <div className="text-center py-12 space-y-3">
+          <Calendar className="h-10 w-10 text-[var(--apple-tertiary-label)] mx-auto" />
+          <h2 className="text-[22px] font-semibold text-[var(--apple-label)]">Authentication Required</h2>
+          <p className="text-[15px] text-[var(--apple-secondary-label)]">Please log in to access sprint events.</p>
+          <Button onClick={() => router.push('/login')} className="rounded-full bg-[var(--apple-system-blue)] text-white px-5 h-9 hover:opacity-90 apple-transition">
             Go to Login
           </Button>
         </div>
@@ -297,13 +246,11 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
   if (!event) {
     return (
       <MainLayout>
-        <div className="text-center py-8">
-          <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-2xl font-semibold mb-2">Event Not Found</h2>
-          <p className="text-muted-foreground mb-4">
-            The sprint event you're looking for doesn't exist.
-          </p>
-          <Button onClick={() => router.push('/sprint-events')}>
+        <div className="text-center py-12 space-y-3">
+          <Calendar className="h-10 w-10 text-[var(--apple-tertiary-label)] mx-auto" />
+          <h2 className="text-[22px] font-semibold text-[var(--apple-label)]">Event not found</h2>
+          <Button onClick={() => router.push('/sprint-events')} className="rounded-full border border-[var(--apple-separator)] px-5 h-9 text-[14px] hover:bg-[var(--apple-tertiary-fill)] apple-transition">
+            <ArrowLeft className="h-4 w-4 mr-1.5" />
             Back to Events
           </Button>
         </div>
@@ -311,368 +258,352 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
     )
   }
 
+  const eventStyle = EVENT_STYLE[event.eventType?.toLowerCase()] ?? defaultEventStyle
+  const canEdit = hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id)
+
+  const hasOutcomes =
+    (event.outcomes?.decisions?.some(d => d.trim())) ||
+    (event.outcomes?.actionItems?.some(i => i.description.trim())) ||
+    (event.outcomes?.notes?.trim())
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <MainLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => router.push('/sprint-events')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+      <div className="space-y-5 animate-in fade-in-0 duration-300 overflow-x-hidden">
+
+        {/* ── Page Header ───────────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            {/* Back */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/sprint-events')}
+              className="rounded-full h-9 px-3 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition flex-shrink-0 mt-1"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
               Back
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold">{event.title}</h1>
-              <p className="text-muted-foreground">
-                {event.project?.name} • {event.sprint?.name}
-              </p>
+
+            {/* Theme-color icon */}
+            <div
+              className="h-12 w-12 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white"
+              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 12px var(--apple-chart-glow)' }}
+            >
+              {eventStyle.icon}
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)] leading-tight">
+                  {event.title}
+                </h1>
+                <StatusBadge status={event.status} />
+              </div>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className={cn('inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md', eventStyle.bg, eventStyle.color)}>
+                  {formatToTitleCase(event.eventType)}
+                </span>
+                <span className="text-[var(--apple-tertiary-label)] text-[13px]">•</span>
+                <span className="text-[14px] text-[var(--apple-secondary-label)]">{event.project?.name}</span>
+                {event.sprint?.name && (
+                  <>
+                    <span className="text-[var(--apple-tertiary-label)] text-[13px]">•</span>
+                    <span className="text-[14px] text-[var(--apple-secondary-label)]">{event.sprint.name}</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            {hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id) ? (
-              <><Button variant="outline" onClick={() => setEditingEvent(event)}>
-                <Edit className="h-4 w-4 mr-2" />
+
+          {/* Actions */}
+          {canEdit && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingEvent(event)}
+                className="h-9 px-4 rounded-full border-[var(--apple-separator)] text-[14px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+              >
+                <Edit className="h-3.5 w-3.5 mr-1.5" />
                 Edit
-              </Button><DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
-                      Actions
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {event.status !== 'completed' && (
-                      <DropdownMenuItem onClick={() => updateStatus('completed')}>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Mark as Completed
-                      </DropdownMenuItem>
-                    )}
-                    {event.status !== 'in_progress' && event.status !== 'completed' && (
-                      <DropdownMenuItem onClick={() => updateStatus('in_progress')}>
-                        <Play className="h-4 w-4 mr-2" />
-                        Mark as In Progress
-                      </DropdownMenuItem>
-                    )}
-                    {event.status !== 'cancelled' && (
-                      <DropdownMenuItem onClick={() => updateStatus('cancelled')}>
-                        <Square className="h-4 w-4 mr-2" />
-                        Cancel Event
-                      </DropdownMenuItem>
-                    )}
-                    {false && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={handleEventDeleted}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Event
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu></>
-            ) : null}
-            
-          </div>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-4 rounded-full border-[var(--apple-separator)] text-[14px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+                  >
+                    Actions
+                    <MoreVertical className="h-3.5 w-3.5 ml-1.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {event.status !== 'completed' && (
+                    <DropdownMenuItem onClick={() => updateStatus('completed')}>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Mark as Completed
+                    </DropdownMenuItem>
+                  )}
+                  {event.status !== 'in_progress' && event.status !== 'completed' && (
+                    <DropdownMenuItem onClick={() => updateStatus('in_progress')}>
+                      <Play className="h-4 w-4 mr-2" />
+                      Mark as In Progress
+                    </DropdownMenuItem>
+                  )}
+                  {event.status !== 'cancelled' && (
+                    <DropdownMenuItem onClick={() => updateStatus('cancelled')}>
+                      <Square className="h-4 w-4 mr-2" />
+                      Cancel Event
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* Event Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Event Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-2">
-                  {getEventTypeIcon(event.eventType)}
-                  {getEventTypeBadge(event.eventType)}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Project</p>
-                    <p className="font-medium">{event.project.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Sprint</p>
-                    <p className="font-medium">{event.sprint?.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Created By</p>
-                    <p className="font-medium">
-                      {event.facilitator.firstName} {event.facilitator.lastName}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Created Date(Time)</p>
-                    <p className="font-medium">
-                      {formatDate(event.createdAt)} ({formatTime(event.createdAt)})
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        {/* ── Content grid ──────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-            {/* Schedule */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Schedule</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Date</p>
-                    <p className="font-medium">
-                      {formatDate(event.scheduledDate)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Time</p>
-                    <p className="font-medium">
-                      {event.startTime && event.endTime 
-                        ? `${event.startTime} → ${event.endTime}`
-                        : event.startTime 
-                        ? `${event.startTime} (${event.duration} min)`
-                        : `${event.duration} minutes`
-                      }
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    {getStatusBadge(event.status)}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Duration</p>
-                    <p className="font-medium">{event.duration} minutes</p>
-                  </div>
-                </div>
+          {/* ── Main column ─────────────────────────────────────────────────── */}
+          <div className="lg:col-span-2 space-y-5">
+
+            {/* Event Details */}
+            <SectionCard>
+              <div className="h-[3px] w-full" style={{ background: 'var(--apple-card-gradient)' }} />
+              <SectionHeader label="Event Details" />
+              <div className="divide-y divide-[var(--apple-separator)]">
+                <InfoRow icon={<Calendar className="h-4 w-4" />} label="Date" value={formatDate(event.scheduledDate)} />
+                <InfoRow
+                  icon={<Clock className="h-4 w-4" />}
+                  label="Time"
+                  value={
+                    event.startTime && event.endTime
+                      ? `${event.startTime} → ${event.endTime}`
+                      : event.startTime ?? '—'
+                  }
+                />
+                <InfoRow icon={<Clock className="h-4 w-4" />} label="Duration" value={`${event.duration} min`} />
                 {event.location && (
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>{event.location}</span>
-                  </div>
+                  <InfoRow icon={<MapPin className="h-4 w-4" />} label="Location" value={event.location} />
                 )}
                 {event.meetingLink && (
-                  <div className="flex items-center space-x-2">
-                    <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                    <a 
-                      href={formatMeetingLink(event.meetingLink)} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                    >
-                      {event.meetingLink}
-                    </a>
-                  </div>
+                  <InfoRow
+                    icon={<LinkIcon className="h-4 w-4" />}
+                    label="Meeting Link"
+                    value={
+                      <a
+                        href={formatMeetingLink(event.meetingLink)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--apple-system-blue)] hover:underline break-all"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {event.meetingLink}
+                      </a>
+                    }
+                  />
                 )}
-              </CardContent>
-            </Card>
+                <InfoRow icon={<Target className="h-4 w-4" />} label="Project" value={event.project.name} />
+                {event.sprint?.name && (
+                  <InfoRow icon={<Zap className="h-4 w-4" />} label="Sprint" value={event.sprint.name} />
+                )}
+                <InfoRow
+                  icon={<User className="h-4 w-4" />}
+                  label="Facilitator"
+                  value={`${event.facilitator.firstName} ${event.facilitator.lastName}`}
+                />
+                <InfoRow
+                  icon={<Calendar className="h-4 w-4" />}
+                  label="Created"
+                  value={`${formatDate(event.createdAt)} at ${formatTime(event.createdAt)}`}
+                />
+              </div>
+            </SectionCard>
 
-            {/* Description / Notes */}
+            {/* Description */}
             {event.description && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Description / Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose max-w-none">
-                    <p className="whitespace-pre-wrap">{event.description}</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <SectionCard>
+                <SectionHeader label="Description / Notes" />
+                <div className="px-5 py-4">
+                  <p className="text-[15px] text-[var(--apple-label)] leading-relaxed whitespace-pre-wrap">
+                    {event.description}
+                  </p>
+                </div>
+              </SectionCard>
             )}
 
-            {/* Event Outcomes */}
-            {event.outcomes && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Event Outcomes</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Decisions Made */}
-                  {event.outcomes.decisions && event.outcomes.decisions.length > 0 && (
+            {/* Outcomes */}
+            {event.outcomes && hasOutcomes && (
+              <SectionCard>
+                <SectionHeader label="Event Outcomes" />
+                <div className="px-5 py-4 space-y-6">
+
+                  {/* Decisions */}
+                  {event.outcomes.decisions?.filter(d => d.trim()).length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 mt-4">
-                        <CheckCircle className="h-4 w-4" />
-                        Decisions Made
-                      </h4>
+                      <div className="flex items-center gap-2 mb-3">
+                        <CheckCircle className="h-4 w-4 text-[var(--apple-system-green)]" />
+                        <span className="text-[13px] font-semibold text-[var(--apple-label)]">Decisions Made</span>
+                      </div>
                       <ul className="space-y-2">
-                        {event.outcomes.decisions.map((decision, index) => (
-                          decision.trim() && (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-muted-foreground mt-1">•</span>
-                              <span className="flex-1">{decision}</span>
-                            </li>
-                          )
+                        {event.outcomes.decisions.filter(d => d.trim()).map((decision, i) => (
+                          <li key={i} className="flex items-start gap-2.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--apple-system-green)] flex-shrink-0 mt-[7px]" />
+                            <span className="text-[14px] text-[var(--apple-label)]">{decision}</span>
+                          </li>
                         ))}
                       </ul>
                     </div>
                   )}
 
                   {/* Action Items */}
-                  {event.outcomes.actionItems && event.outcomes.actionItems.length > 0 && (
+                  {event.outcomes.actionItems?.filter(i => i.description.trim()).length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 mt-4">
-                        <Target className="h-4 w-4" />
-                        Action Items
-                      </h4>
-                      <div className="space-y-3">
-                        {event.outcomes.actionItems.map((item, index) => (
-                          item.description.trim() && (
-                            <div key={index} className="border rounded-md p-3 space-y-2">
-                              <p className="font-medium">{item.description}</p>
-                              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                                {item.assignedTo && (
-                                  <div className="flex items-center gap-1">
-                                    <Users className="h-3 w-3" />
-                                    <span>
-                                      {typeof item.assignedTo === 'object' && item.assignedTo !== null && 'firstName' in item.assignedTo
-                                        ? `${item.assignedTo.firstName} ${item.assignedTo.lastName}`.trim()
-                                        : typeof item.assignedTo === 'string' && item.assignedTo.length > 0
-                                        ? item.assignedTo
-                                        : 'Unassigned'}
-                                    </span>
-                                  </div>
-                                )}
-                                {item.dueDate && (
-                                  <div className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    <span>Due {formatDate(item.dueDate)}</span>
-                                  </div>
-                                )}
-                                {item.status && (
-                                  <Badge variant={item.status === 'completed' ? 'outline' : 'secondary'}>
-                                    {item.status === 'completed' ? 'Completed' : item.status === 'in_progress' ? 'In Progress' : 'Pending'}
-                                  </Badge>
-                                )}
-                              </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Target className="h-4 w-4 text-[var(--apple-system-blue)]" />
+                        <span className="text-[13px] font-semibold text-[var(--apple-label)]">Action Items</span>
+                      </div>
+                      <div className="space-y-2.5">
+                        {event.outcomes.actionItems.filter(i => i.description.trim()).map((item, i) => (
+                          <div key={i} className="rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-3 space-y-2">
+                            <p className="text-[14px] font-medium text-[var(--apple-label)]">{item.description}</p>
+                            <div className="flex flex-wrap items-center gap-3 text-[12px] text-[var(--apple-secondary-label)]">
+                              {item.assignedTo && (
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {typeof item.assignedTo === 'object' && 'firstName' in item.assignedTo
+                                    ? `${item.assignedTo.firstName} ${item.assignedTo.lastName}`.trim()
+                                    : typeof item.assignedTo === 'string' && item.assignedTo.length > 0
+                                    ? item.assignedTo : 'Unassigned'}
+                                </span>
+                              )}
+                              {item.dueDate && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  Due {formatDate(item.dueDate)}
+                                </span>
+                              )}
+                              {item.status && <StatusBadge status={item.status} size="sm" animated={false} />}
                             </div>
-                          )
+                          </div>
                         ))}
                       </div>
                     </div>
                   )}
 
                   {/* Notes */}
-                  {event.outcomes.notes && event.outcomes.notes.trim() && (
+                  {event.outcomes.notes?.trim() && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 mt-4">
-                        <FileText className="h-4 w-4" />
-                        Notes
-                      </h4>
-                      <div className="prose max-w-none">
-                        <p className="whitespace-pre-wrap text-sm">{event.outcomes.notes}</p>
+                      <div className="flex items-center gap-2 mb-3">
+                        <FileText className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+                        <span className="text-[13px] font-semibold text-[var(--apple-label)]">Notes</span>
                       </div>
+                      <p className="text-[14px] text-[var(--apple-label)] leading-relaxed whitespace-pre-wrap">
+                        {event.outcomes.notes}
+                      </p>
                     </div>
                   )}
-
-                  {/* Show message if no outcomes */}
-                  {(!event.outcomes.decisions || event.outcomes.decisions.length === 0) &&
-                   (!event.outcomes.actionItems || event.outcomes.actionItems.length === 0) &&
-                   (!event.outcomes.notes || !event.outcomes.notes.trim()) && (
-                    <p className="text-sm text-muted-foreground">No outcomes recorded yet.</p>
-                  )}
-                </CardContent>
-              </Card>
+                </div>
+              </SectionCard>
             )}
 
             {/* Attachments */}
             {event.attachments && event.attachments.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Attachments</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {event.attachments.map((attachment, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded-md">
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          {attachment.type === 'link' ? (
-                            <LinkIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                          ) : attachment.type.startsWith('image/') ? (
-                            <ImageIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                          ) : (
-                            <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{attachment.name}</p>
-                            {attachment.size > 0 && (
-                              <p className="text-sm text-muted-foreground">
-                                {formatFileSize(attachment.size)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <a
-                          href={attachment.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-2"
-                        >
-                          <Button variant="ghost" size="sm">
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </a>
+              <SectionCard>
+                <SectionHeader label="Attachments" />
+                <div className="divide-y divide-[var(--apple-separator)]">
+                  {event.attachments.map((attachment, i) => (
+                    <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+                      <div className="h-9 w-9 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] flex items-center justify-center flex-shrink-0">
+                        {attachment.type === 'link' ? (
+                          <LinkIcon className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+                        ) : attachment.type.startsWith('image/') ? (
+                          <ImageIcon className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+                        ) : (
+                          <FileText className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-medium text-[var(--apple-label)] truncate">{attachment.name}</p>
+                        {attachment.size > 0 && (
+                          <p className="text-[12px] text-[var(--apple-secondary-label)]">{formatFileSize(attachment.size)}</p>
+                        )}
+                      </div>
+                      <a href={attachment.url} target="_blank" rel="noopener noreferrer">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 rounded-[var(--apple-radius-sm)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+                        >
+                          <ExternalLink className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+                        </Button>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
             )}
           </div>
 
-          {/* Sidebar */}
-          <div className="flex flex-col gap-6">
+          {/* ── Sidebar ───────────────────────────────────────────────────────── */}
+          <div className="space-y-5">
+
             {/* Participants */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Participants</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Facilitator</p>
-                    <div className="flex items-center space-x-2">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-xs font-medium">
-                          {event.facilitator.firstName[0]}{event.facilitator.lastName[0]}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {event.facilitator.firstName} {event.facilitator.lastName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{event.facilitator.email}</p>
-                      </div>
+            <SectionCard>
+              <SectionHeader label="Participants" />
+              <div className="divide-y divide-[var(--apple-separator)]">
+
+                {/* Facilitator */}
+                <div className="px-5 py-4">
+                  <p className="apple-section-label text-[var(--apple-tertiary-label)] mb-3">Facilitator</p>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[13px] font-bold select-none"
+                      style={{ background: avatarGradient(`${event.facilitator.firstName}${event.facilitator.lastName}`) }}
+                    >
+                      {event.facilitator.firstName[0]}{event.facilitator.lastName[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">
+                        {event.facilitator.firstName} {event.facilitator.lastName}
+                      </p>
+                      <p className="text-[12px] text-[var(--apple-secondary-label)] truncate">{event.facilitator.email}</p>
                     </div>
                   </div>
-                  {event.attendees.length > 0 && (
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Attendees ({event.attendees.length})</p>
-                      <div className="space-y-2">
-                        {event.attendees.map((attendee) => (
-                          <div key={attendee._id} className="flex items-center space-x-2">
-                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                              <span className="text-xs font-medium">
-                                {attendee.firstName[0]}{attendee.lastName[0]}
-                              </span>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">
-                                {attendee.firstName} {attendee.lastName}
-                              </p>
-                              <p className="text-xs text-muted-foreground">{attendee.email}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </CardContent>
-            </Card>
+
+                {/* Attendees */}
+                {event.attendees.length > 0 && (
+                  <div className="px-5 py-4">
+                    <p className="apple-section-label text-[var(--apple-tertiary-label)] mb-3">
+                      Attendees ({event.attendees.length})
+                    </p>
+                    <div className="space-y-3">
+                      {event.attendees.map((attendee) => (
+                        <div key={attendee._id} className="flex items-center gap-3">
+                          <div
+                            className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[13px] font-bold select-none"
+                            style={{ background: avatarGradient(`${attendee.firstName}${attendee.lastName}`) }}
+                          >
+                            {attendee.firstName[0]}{attendee.lastName[0]}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">
+                              {attendee.firstName} {attendee.lastName}
+                            </p>
+                            <p className="text-[12px] text-[var(--apple-secondary-label)] truncate">{attendee.email}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </SectionCard>
           </div>
         </div>
 
@@ -688,4 +619,3 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
     </MainLayout>
   )
 }
-
