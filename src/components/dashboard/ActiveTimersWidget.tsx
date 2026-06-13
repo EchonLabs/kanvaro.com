@@ -373,7 +373,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
               <User className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] mr-1.5 flex-shrink-0" />
               <SelectValue placeholder="Employee" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="w-[var(--radix-select-trigger-width)]">
               {/* Pinned search — not inside any overflow container */}
               <div className="p-2 border-b border-[var(--apple-separator)]">
                 <div className="relative">
@@ -414,7 +414,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
               <FolderOpen className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] mr-1.5 flex-shrink-0" />
               <SelectValue placeholder="Project" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="w-[var(--radix-select-trigger-width)]">
               <div className="p-2 border-b border-[var(--apple-separator)]">
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" />

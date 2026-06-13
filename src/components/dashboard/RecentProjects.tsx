@@ -49,6 +49,7 @@ function formatHoursTracked(minutes?: number): string {
   const hours = Math.floor(minutes / 60)
   const mins  = Math.floor(minutes % 60)
   if (hours === 0) return `${mins}m`
+  if (hours >= 1000) return `${hours}h`
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
 }
 
