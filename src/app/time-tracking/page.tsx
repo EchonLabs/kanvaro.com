@@ -164,7 +164,7 @@ export default function TimeTrackingPage() {
         {/* ── Page Header ─────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Clock className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+            <Clock className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
             <div>
               <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
                 Time Tracking
@@ -179,7 +179,7 @@ export default function TimeTrackingPage() {
             className="h-9 px-4 rounded-[var(--apple-radius-md)] text-[15px] font-medium flex-shrink-0"
             style={{ background: 'var(--apple-card-gradient)' }}
           >
-            <Play className="h-4 w-4 mr-2" />
+            <Play className="h-4 w-4 mr-2" strokeWidth={1.5} />
             Start Timer
           </Button>
         </div>
@@ -198,9 +198,7 @@ export default function TimeTrackingPage() {
                 key={stat.label}
                 className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4 apple-transition hover:shadow-[0_4px_14px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_4px_14px_rgba(0,0,0,0.35)]"
               >
-                <div className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--apple-radius-sm)] mb-3" style={{ background: 'var(--apple-card-gradient)' }}>
-                  <Icon className="h-4 w-4 text-white" />
-                </div>
+                <Icon className={cn('h-5 w-5 mb-3', stat.color)} strokeWidth={1.5} />
                 <p className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">
                   {stat.label}
                 </p>
@@ -227,13 +225,8 @@ export default function TimeTrackingPage() {
                 className="card-fade-in text-left rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5 group"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div
-                    className="h-10 w-10 rounded-[var(--apple-radius-md)] flex items-center justify-center shadow-sm"
-                    style={{ background: action.gradient, boxShadow: `0 2px 8px ${action.glow}` }}
-                  >
-                    <Icon className="h-5 w-5 text-white" />
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-[var(--apple-tertiary-label)] group-hover:text-[var(--apple-system-blue)] group-hover:translate-x-0.5 apple-transition" />
+                  <Icon className={cn('h-6 w-6', action.text)} strokeWidth={1.5} />
+                  <ArrowRight className="h-4 w-4 text-[var(--apple-tertiary-label)] group-hover:text-[var(--apple-system-blue)] group-hover:translate-x-0.5 apple-transition" strokeWidth={1.5} />
                 </div>
                 <p className="text-[17px] font-semibold text-[var(--apple-label)]">{action.label}</p>
                 <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{action.desc}</p>
@@ -248,7 +241,7 @@ export default function TimeTrackingPage() {
           {/* Active Timer */}
           <div className="lg:col-span-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
             <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center gap-2">
-              <Timer className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+              <Timer className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
               <span className="text-[15px] font-semibold text-[var(--apple-label)]">Active Timer</span>
               {activeTimer && (
                 <span
@@ -273,12 +266,7 @@ export default function TimeTrackingPage() {
                 <div className="space-y-5">
                   {/* Clock display */}
                   <div className="flex flex-col items-center py-4">
-                    <div
-                      className="h-24 w-24 rounded-full flex items-center justify-center mb-4"
-                      style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 20px var(--apple-chart-glow)' }}
-                    >
-                      <Clock className="h-10 w-10 text-white" />
-                    </div>
+                    <Clock className="h-12 w-12 mb-4 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                     <span className="text-[44px] font-bold font-apple-mono tabular-nums tracking-[-0.02em] text-[var(--apple-label)]">
                       {displayTime}
                     </span>
@@ -287,20 +275,20 @@ export default function TimeTrackingPage() {
                   {/* Timer details */}
                   <div className="rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] p-4 space-y-2.5">
                     <div className="flex items-center gap-2.5 text-[14px]">
-                      <FolderOpen className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" />
+                      <FolderOpen className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
                       <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Project</span>
                       <span className="text-[var(--apple-label)] font-medium truncate">{activeTimer.project?.name}</span>
                     </div>
                     {activeTimer.task && (
                       <div className="flex items-center gap-2.5 text-[14px]">
-                        <Target className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" />
+                        <Target className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
                         <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Task</span>
                         <span className="text-[var(--apple-label)] truncate">{activeTimer.task.title}</span>
                       </div>
                     )}
                     {activeTimer.description && (
                       <div className="flex items-start gap-2.5 text-[14px]">
-                        <FileText className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0 mt-0.5" />
+                        <FileText className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
                         <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Memo</span>
                         <span className="text-[var(--apple-label)] line-clamp-2">{activeTimer.description}</span>
                       </div>
@@ -325,15 +313,13 @@ export default function TimeTrackingPage() {
                     }}
                     className="w-full h-9 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] text-[15px] font-medium apple-transition hover:bg-[var(--apple-quaternary-fill)]"
                   >
-                    <Clock className="h-4 w-4 mr-2" />
+                    <Clock className="h-4 w-4 mr-2" strokeWidth={1.5} />
                     Manage Timer
                   </Button>
                 </div>
               ) : (
                 <div className="flex flex-col items-center py-8 gap-4">
-                  <div className="h-20 w-20 rounded-full bg-[var(--apple-tertiary-fill)] flex items-center justify-center">
-                    <Clock3 className="h-9 w-9 text-[var(--apple-tertiary-label)]" />
-                  </div>
+                  <Clock3 className="h-10 w-10 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                   <div className="text-center">
                     <p className="text-[17px] font-semibold text-[var(--apple-label)]">No Active Timer</p>
                     <p className="text-[14px] text-[var(--apple-secondary-label)] mt-1">
@@ -345,7 +331,7 @@ export default function TimeTrackingPage() {
                     className="h-9 px-5 rounded-[var(--apple-radius-md)] text-[15px] font-medium"
                     style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
                   >
-                    <Play className="h-4 w-4 mr-2" />
+                    <Play className="h-4 w-4 mr-2" strokeWidth={1.5} />
                     Start Timer
                   </Button>
                 </div>
@@ -356,7 +342,7 @@ export default function TimeTrackingPage() {
           {/* Weekly Summary */}
           <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
             <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+              <TrendingUp className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
               <span className="text-[15px] font-semibold text-[var(--apple-label)]">Weekly Overview</span>
             </div>
             <div className="p-5 space-y-4">
@@ -381,7 +367,7 @@ export default function TimeTrackingPage() {
                 onClick={() => router.push('/time-tracking/reports')}
                 className="w-full h-9 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] text-[14px] font-medium mt-2 apple-transition hover:bg-[var(--apple-quaternary-fill)]"
               >
-                <BarChart3 className="h-4 w-4 mr-2" />
+                <BarChart3 className="h-4 w-4 mr-2" strokeWidth={1.5} />
                 View Reports
               </Button>
             </div>
@@ -392,7 +378,7 @@ export default function TimeTrackingPage() {
         <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
           <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+              <Clock className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
               <span className="text-[15px] font-semibold text-[var(--apple-label)]">Recent Activity</span>
             </div>
             <Button
@@ -440,7 +426,7 @@ export default function TimeTrackingPage() {
                         <div className="flex items-center gap-2 mt-0.5">
                           {entry.project && (
                             <span className="text-[12px] text-[var(--apple-secondary-label)] flex items-center gap-1">
-                              <FolderOpen className="h-3 w-3" />
+                              <FolderOpen className="h-3 w-3" strokeWidth={1.5} />
                               {entry.project.name}
                             </span>
                           )}

@@ -45,12 +45,7 @@ export default function TimeReportsPage() {
       <MainLayout>
         <div className="min-h-[60vh] flex items-center justify-center p-6">
           <div className="max-w-sm w-full text-center space-y-5">
-            <div
-              className="h-16 w-16 rounded-[var(--apple-radius-xl)] flex items-center justify-center mx-auto shadow-[0_4px_16px_rgba(255,59,48,0.25)]"
-              style={{ background: 'linear-gradient(135deg,#FF3B30 0%,#FF453A 100%)' }}
-            >
-              <ShieldOff className="h-8 w-8 text-white" />
-            </div>
+            <ShieldOff className="h-10 w-10 mx-auto text-[var(--apple-system-red)]" strokeWidth={1.5} />
             <div className="space-y-1.5">
               <h2 className="text-[20px] font-bold tracking-tight text-[var(--apple-label)]">Access Restricted</h2>
               <p className="text-[14px] text-[var(--apple-secondary-label)] leading-relaxed">
@@ -62,7 +57,7 @@ export default function TimeReportsPage() {
                 onClick={() => router.push('/time-tracking')}
                 className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-[var(--apple-radius-md)] text-[14px] font-medium border border-[var(--apple-separator)] bg-card text-[var(--apple-label)] apple-transition hover:bg-[var(--apple-quaternary-fill)]"
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
                 Time Tracking
               </button>
               <button
@@ -70,7 +65,7 @@ export default function TimeReportsPage() {
                 className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-[var(--apple-radius-md)] text-[14px] font-semibold text-white apple-transition"
                 style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}
               >
-                <LayoutDashboard className="h-4 w-4" />
+                <LayoutDashboard className="h-4 w-4" strokeWidth={1.5} />
                 Dashboard
               </button>
             </div>
@@ -87,7 +82,7 @@ export default function TimeReportsPage() {
         {/* ── Page Header ─────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <BarChart3 className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+            <BarChart3 className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
             <div>
               <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
                 Time Reports
@@ -101,7 +96,7 @@ export default function TimeReportsPage() {
             onClick={() => router.push('/time-tracking')}
             className="self-start sm:self-auto inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--apple-radius-md)] text-[14px] font-medium border border-[var(--apple-separator)] bg-card text-[var(--apple-label)] apple-transition hover:bg-[var(--apple-quaternary-fill)]"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
             Time Tracking
           </button>
         </div>

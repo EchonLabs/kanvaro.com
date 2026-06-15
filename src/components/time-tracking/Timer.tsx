@@ -419,12 +419,11 @@ export function Timer({
       <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
         {/* Card header */}
         <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center gap-2">
-          <div
-            className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0"
-            style={{ background: activeTimer.isPaused ? 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' : 'linear-gradient(135deg,#34C759 0%,#30D158 100%)' }}
-          >
-            <Clock className="h-3.5 w-3.5 text-white" />
-          </div>
+          <Clock
+            className="h-5 w-5 flex-shrink-0"
+            strokeWidth={1.5}
+            style={{ color: activeTimer.isPaused ? '#FF9500' : '#34C759' }}
+          />
           <span className="text-[15px] font-semibold text-[var(--apple-label)]">Active Timer</span>
           <span
             className={cn(
@@ -446,7 +445,7 @@ export function Timer({
         <div className="p-5 space-y-5">
           {error && (
             <div className="flex items-start gap-2.5 rounded-[var(--apple-radius-md)] bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3">
-              <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
               <p className="text-[13px] text-red-600 dark:text-red-400">{error}</p>
             </div>
           )}
@@ -472,13 +471,13 @@ export function Timer({
           {/* Details row */}
           <div className="rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] p-4 space-y-2.5">
             <div className="flex items-center gap-2.5 text-[14px]">
-              <FolderOpen className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" />
+              <FolderOpen className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
               <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Project</span>
               <span className="text-[var(--apple-label)] font-medium truncate">{activeTimer.project.name}</span>
             </div>
             {activeTimer.task && (
               <div className="flex items-center gap-2.5 text-[14px]">
-                <Target className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" />
+                <Target className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
                 <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Task</span>
                 <div className="flex items-center gap-2 min-w-0">
                   {activeTimer.task.displayId && (
@@ -492,7 +491,7 @@ export function Timer({
             )}
             {activeTimer.description && (
               <div className="flex items-start gap-2.5 text-[14px]">
-                <FileText className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0 mt-0.5" />
+                <FileText className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
                 <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Memo</span>
                 <span className="text-[var(--apple-label)] line-clamp-2">{activeTimer.description}</span>
               </div>
@@ -508,7 +507,7 @@ export function Timer({
                 className="flex-1 h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 2px 8px rgba(52,199,89,0.30)' }}
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Play className="h-4 w-4" strokeWidth={1.5} fill="none" />}
                 Resume
               </button>
             ) : (
@@ -518,7 +517,7 @@ export function Timer({
                 className="flex-1 h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', boxShadow: '0 2px 8px rgba(255,149,0,0.30)' }}
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pause className="h-4 w-4" />}
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Pause className="h-4 w-4" strokeWidth={1.5} fill="none" />}
                 Pause
               </button>
             )}
@@ -528,7 +527,7 @@ export function Timer({
               className="flex-1 h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
               style={{ background: 'linear-gradient(135deg,#FF3B30 0%,#FF453A 100%)', boxShadow: '0 2px 8px rgba(255,59,48,0.30)' }}
             >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Square className="h-4 w-4" strokeWidth={1.5} fill="none" />}
               Stop
             </button>
           </div>
@@ -548,7 +547,7 @@ export function Timer({
               </>
             }
             confirmText="Stop Timer"
-            confirmIcon={<Square className="h-4 w-4" />}
+            confirmIcon={<Square className="h-4 w-4" strokeWidth={1.5} fill="none" />}
             cancelText="Cancel"
             variant="destructive"
             isLoading={isLoading}
@@ -562,14 +561,14 @@ export function Timer({
     <div className="space-y-4">
       {error && (
         <div className="flex items-start gap-2.5 rounded-[var(--apple-radius-md)] bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3">
-          <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+          <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
           <p className="text-[13px] text-red-600 dark:text-red-400">{error}</p>
         </div>
       )}
 
       {!allowOvertime && maxDailyHours && dailyHoursLogged >= maxDailyHours && (
         <div className="flex items-start gap-2.5 rounded-[var(--apple-radius-md)] bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3">
-          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
           <p className="text-[13px] text-amber-600 dark:text-amber-400">
             Daily time limit reached ({dailyHoursLogged.toFixed(1)}h / {maxDailyHours}h). You cannot start a new timer until tomorrow.
           </p>
@@ -588,7 +587,7 @@ export function Timer({
         className="w-full h-11 rounded-[var(--apple-radius-md)] text-[16px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
         style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 2px 8px rgba(0,122,255,0.30)' }}
       >
-        {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
+        {isLoading ? <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} /> : <Play className="h-5 w-5" strokeWidth={1.5} fill="none" />}
         {isLoading ? 'Starting…' : 'Start Timer'}
       </button>
     </div>

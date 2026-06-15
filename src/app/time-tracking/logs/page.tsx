@@ -99,7 +99,7 @@ export default function TimeLogsPage() {
         {/* ── Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <FileText className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+            <FileText className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
             <div>
               <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Time Logs</h1>
               <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">Review and manage your time entries</p>
@@ -111,14 +111,14 @@ export default function TimeLogsPage() {
               className="inline-flex items-center gap-1.5 h-9 px-4 rounded-[var(--apple-radius-md)] text-[14px] font-semibold text-white apple-transition"
               style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}
             >
-              <Clock className="h-4 w-4" />
+              <Clock className="h-4 w-4" strokeWidth={1.5} />
               Start Timer
             </button>
             <button
               onClick={() => router.push('/time-tracking')}
               className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--apple-radius-md)] text-[14px] font-medium border border-[var(--apple-separator)] bg-card text-[var(--apple-label)] apple-transition hover:bg-[var(--apple-quaternary-fill)]"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
               Time Tracking
             </button>
           </div>
@@ -133,12 +133,7 @@ export default function TimeLogsPage() {
                 key={item.label}
                 className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-3 sm:p-4 flex items-center gap-3"
               >
-                <div
-                  className="h-9 w-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0"
-                  style={{ background: item.gradient, boxShadow: `0 2px 8px ${item.shadow}` }}
-                >
-                  <Icon className="h-4 w-4 text-white" />
-                </div>
+                <Icon className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                 <div className="min-w-0">
                   <p className="text-[18px] sm:text-[20px] font-bold tracking-tight text-[var(--apple-label)] tabular-nums">{item.value}</p>
                   <p className="text-[11px] font-semibold text-[var(--apple-secondary-label)] uppercase tracking-[0.06em]">{item.label}</p>
@@ -150,12 +145,7 @@ export default function TimeLogsPage() {
 
         {/* ── Section Header */}
         <div className="flex items-center gap-2.5">
-          <div
-            className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0"
-            style={{ background: 'var(--apple-card-gradient)' }}
-          >
-            <Calendar className="h-3.5 w-3.5 text-white" />
-          </div>
+          <Calendar className="h-4 w-4 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
           <h2 className="text-[17px] font-semibold text-[var(--apple-label)]">All Entries</h2>
           <span className="text-[13px] text-[var(--apple-tertiary-label)]">· Browse and filter your logs</span>
         </div>
