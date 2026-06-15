@@ -65,26 +65,14 @@ interface FilterState {
   sortOrder: 'asc' | 'desc'
 }
 
-const STAT_ACCENTS = [
-  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
-  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
-  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
-  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
-]
-
 function StatCard({
-  label, value, sub, icon: Icon, accent,
+  label, value, sub, icon: Icon,
 }: {
-  label: string; value: string; sub: string; icon: React.ElementType; accent: typeof STAT_ACCENTS[0]
+  label: string; value: string; sub: string; icon: React.ElementType
 }) {
   return (
     <div className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5 flex items-center gap-4 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5">
-      <div
-        className="flex h-11 w-11 items-center justify-center rounded-[var(--apple-radius-sm)] flex-shrink-0"
-        style={{ background: accent.gradient, boxShadow: `0 4px 14px ${accent.glow}` }}
-      >
-        <Icon className="h-5 w-5 text-white" />
-      </div>
+      <Icon className="h-6 w-6 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
       <div className="min-w-0 flex-1">
         <p className="apple-section-label text-[var(--apple-secondary-label)]">{label}</p>
         <p className="text-[24px] font-bold tracking-tight leading-tight font-apple-mono">{value}</p>
@@ -190,9 +178,7 @@ export default function ProjectReportsPage() {
       <MainLayout>
         <PageWrapper>
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-[var(--apple-radius-lg)]" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 20px var(--apple-chart-glow)' }}>
-              <FolderKanban className="h-7 w-7 text-white" />
-            </div>
+            <FolderKanban className="h-10 w-10 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
             <p className="text-[17px] font-semibold">No project data available</p>
             <p className="text-[13px] text-[var(--apple-secondary-label)]">Projects will appear here once data is available.</p>
           </div>
@@ -213,7 +199,7 @@ export default function ProjectReportsPage() {
           {/* ── Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <BarChart3 className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+              <BarChart3 className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight">Project Reports</h1>
                 <p className="text-[13px] text-[var(--apple-secondary-label)]">Comprehensive analytics and insights for all projects</p>
@@ -225,17 +211,17 @@ export default function ProjectReportsPage() {
                 onClick={() => setShowFilters(v => !v)}
                 className={cn("rounded-full h-8 px-4 text-[13px] border-[var(--apple-separator)] apple-transition", showFilters && "bg-[var(--apple-tertiary-fill)]")}
               >
-                <Filter className="h-3.5 w-3.5 mr-1.5" />Filters
+                <Filter className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />Filters
               </Button>
               <Button variant="outline" size="sm" onClick={fetchProjectReports} className="rounded-full h-8 px-3 border-[var(--apple-separator)] apple-transition">
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
               </Button>
               <Button
                 size="sm" onClick={() => exportReport('csv')}
                 className="rounded-full h-8 px-4 text-[13px] apple-transition"
                 style={{ background: 'var(--apple-card-gradient)' }}
               >
-                <Download className="h-3.5 w-3.5 mr-1.5" />Export
+                <Download className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />Export
               </Button>
             </div>
           </div>
@@ -246,12 +232,12 @@ export default function ProjectReportsPage() {
               <div className="flex items-center justify-between">
                 <p className="text-[13px] font-semibold text-[var(--apple-secondary-label)] uppercase tracking-[0.06em]">Filters</p>
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-3 text-[12px] rounded-full text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]">
-                  <X className="h-3 w-3 mr-1" />Clear
+                  <X className="h-3 w-3 mr-1" strokeWidth={1.5} />Clear
                 </Button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                   <Input
                     placeholder="Search projects…"
                     value={filters.search}
@@ -272,7 +258,7 @@ export default function ProjectReportsPage() {
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("h-9 rounded-full text-[13px] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] justify-start font-normal w-full", !filters.dateRange.from && "text-[var(--apple-tertiary-label)]")}>
-                      <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                      <CalendarIcon className="mr-2 h-3.5 w-3.5" strokeWidth={1.5} />
                       {filters.dateRange.from ? format(filters.dateRange.from, "PPP") : "From date"}
                     </Button>
                   </PopoverTrigger>
@@ -283,7 +269,7 @@ export default function ProjectReportsPage() {
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("h-9 rounded-full text-[13px] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] justify-start font-normal w-full", !filters.dateRange.to && "text-[var(--apple-tertiary-label)]")}>
-                      <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                      <CalendarIcon className="mr-2 h-3.5 w-3.5" strokeWidth={1.5} />
                       {filters.dateRange.to ? format(filters.dateRange.to, "PPP") : "To date"}
                     </Button>
                   </PopoverTrigger>
@@ -320,22 +306,22 @@ export default function ProjectReportsPage() {
           {/* ── Stats Bar ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              label="Total Projects" icon={FolderKanban} accent={STAT_ACCENTS[0]}
+              label="Total Projects" icon={FolderKanban}
               value={String(reportData.summary.totalProjects)}
               sub={`${reportData.summary.activeProjects} active · ${reportData.summary.completedProjects} done`}
             />
             <StatCard
-              label="Budget Utilization" icon={DollarSign} accent={STAT_ACCENTS[1]}
+              label="Budget Utilization" icon={DollarSign}
               value={formatCurrency(reportData.summary.totalSpent)}
               sub={`${budgetPct.toFixed(1)}% of ${formatCurrency(reportData.summary.totalBudget)}`}
             />
             <StatCard
-              label="Avg Completion" icon={CheckCircle2} accent={STAT_ACCENTS[2]}
+              label="Avg Completion" icon={CheckCircle2}
               value={`${reportData.summary.averageCompletionRate.toFixed(1)}%`}
               sub="Across all projects"
             />
             <StatCard
-              label="Project Velocity" icon={Gauge} accent={STAT_ACCENTS[3]}
+              label="Project Velocity" icon={Gauge}
               value={reportData.trends.projectVelocity.toFixed(1)}
               sub="Projects per month"
             />
@@ -354,7 +340,7 @@ export default function ProjectReportsPage() {
                   key={v} value={v}
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-1.5 text-[13px] font-medium apple-transition data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-[var(--apple-chart-color)] text-[var(--apple-secondary-label)]"
                 >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <Icon className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />
                   <span className="hidden sm:inline">{l}</span>
                 </TabsTrigger>
               ))}

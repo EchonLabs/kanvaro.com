@@ -1570,7 +1570,7 @@ export default function BacklogPage() {
                 className="rounded-full h-9 w-9 p-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
                 title="Refresh backlog items"
               >
-                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" strokeWidth={1.5} />}
               </Button>
               <PermissionGate permission={Permission.EPIC_CREATE}>
                 <Button
@@ -1579,7 +1579,7 @@ export default function BacklogPage() {
                   onClick={() => router.push('/epics/create-epic')}
                   className="rounded-full h-9 border-[var(--apple-separator)] text-[13px] flex-1 sm:flex-none"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  <Plus className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                   New Epic
                 </Button>
               </PermissionGate>
@@ -1590,7 +1590,7 @@ export default function BacklogPage() {
                   onClick={() => router.push('/stories/create-story')}
                   className="rounded-full h-9 border-[var(--apple-separator)] text-[13px] flex-1 sm:flex-none"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  <Plus className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                   New Story
                 </Button>
               </PermissionGate>
@@ -1600,7 +1600,7 @@ export default function BacklogPage() {
                   onClick={() => router.push('/tasks/create-new-task')}
                   className="rounded-full h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px] w-full sm:w-auto"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  <Plus className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                   New Task
                 </Button>
               )}
@@ -1614,7 +1614,7 @@ export default function BacklogPage() {
         {/* Row 1: Search (50%) + Status (25%) + Priority (25%) — Desktop */}
         <div className="hidden sm:flex items-center gap-2">
             <div className="relative w-1/2">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                 <input
                     ref={searchInputRef}
                     placeholder="Search backlog..."
@@ -1629,7 +1629,7 @@ export default function BacklogPage() {
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
                         aria-label="Clear search"
                     >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4" strokeWidth={1.5} />
                     </button>
                 )}
             </div>
@@ -1664,7 +1664,7 @@ export default function BacklogPage() {
         {/* Row 1: Mobile layout (stack) */}
         <div className="flex sm:hidden flex-col gap-2">
             <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                 <input
                     placeholder="Search backlog..."
                     value={searchQuery}
@@ -1678,7 +1678,7 @@ export default function BacklogPage() {
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
                         aria-label="Clear search"
                     >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4" strokeWidth={1.5} />
                     </button>
                 )}
             </div>
@@ -1848,7 +1848,7 @@ export default function BacklogPage() {
                         !createdDateRange.from && "text-[var(--apple-tertiary-label)]"
                       )}
                     >
-                      <Calendar className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" />
+                      <Calendar className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
                       <span className="truncate">{createdDateRange.from ? format(createdDateRange.from, "MMM d") : "From"}</span>
                     </Button>
                   </PopoverTrigger>
@@ -1910,7 +1910,7 @@ export default function BacklogPage() {
                     className="h-8 w-8 p-0 rounded-full border-[var(--apple-separator)] bg-transparent"
                     aria-label={sortOrder === 'asc' ? 'Sort descending' : 'Sort ascending'}
                   >
-                    {sortOrder === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
+                    {sortOrder === 'asc' ? <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.5} /> : <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.5} />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -1930,49 +1930,49 @@ export default function BacklogPage() {
                     {searchQuery && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Search: {searchQuery}
-                            <button onClick={() => setSearchQuery('')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setSearchQuery('')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                     {typeFilter !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Type: {formatToTitleCase(typeFilter)}
-                            <button onClick={() => setTypeFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setTypeFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                     {statusFilter !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Status: {formatToTitleCase(statusFilter.replace('_', ' '))}
-                            <button onClick={() => setStatusFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setStatusFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                     {priorityFilter !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Priority: {formatToTitleCase(priorityFilter)}
-                            <button onClick={() => setPriorityFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setPriorityFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                     {projectFilterValue !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Project: {projectOptions.find(p => p._id === projectFilterValue)?.name || 'Selected'}
-                            <button onClick={() => setProjectFilterValue('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setProjectFilterValue('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                     {assignedToFilter !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Assignee: {assignedToOptions.find(p => p._id === assignedToFilter)?.firstName || 'Selected'}
-                            <button onClick={() => setAssignedToFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setAssignedToFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                     {createdByFilter !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Creator: {createdByOptions.find(p => p._id === createdByFilter)?.firstName || 'Selected'}
-                            <button onClick={() => setCreatedByFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setCreatedByFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                     {(createdDateRange.from || createdDateRange.to) && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Date: {createdDateRange.from ? format(createdDateRange.from, "MMM d") : ""} - {createdDateRange.to ? format(createdDateRange.to, "MMM d") : ""}
-                            <button onClick={() => setCreatedDateRange({from: undefined, to: undefined})} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setCreatedDateRange({from: undefined, to: undefined})} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                 </div>
@@ -1997,7 +1997,7 @@ export default function BacklogPage() {
               title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
               className="rounded-full h-9 text-[13px] border-[var(--apple-separator)]"
             >
-              <List className="h-3.5 w-3.5 mr-1.5" />
+              <List className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
               {selectMode ? 'Cancel Selection' : 'Select Mode'}
             </Button>
             {selectMode && (
@@ -2020,7 +2020,7 @@ export default function BacklogPage() {
                     {assigningSprint ? (
                       <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                     ) : (
-                      <Kanban className="h-3.5 w-3.5 mr-1.5" />
+                      <Kanban className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                     )}
                     {assigningSprint ? 'Processing…' : 'Add to Sprint'}
                   </Button>
@@ -2067,7 +2067,7 @@ export default function BacklogPage() {
                     onClick={resetFilters}
                     className="rounded-full border-[var(--apple-separator)] text-[13px]"
                   >
-                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                     Reset Filters
                   </Button>
                 ) : undefined
@@ -2088,10 +2088,10 @@ export default function BacklogPage() {
 
             // Type icon
             const typeIconNode = isEpic
-              ? <Layers className="h-4 w-4 text-white" />
+              ? <Layers className="h-5 w-5 flex-shrink-0 mt-0.5 text-violet-500 dark:text-violet-400" strokeWidth={1.5} />
               : isStory
-                ? <BookOpen className="h-4 w-4 text-white" />
-                : <ListTodo className="h-4 w-4 text-white" />
+                ? <BookOpen className="h-5 w-5 flex-shrink-0 mt-0.5 text-[var(--apple-system-blue)]" strokeWidth={1.5} />
+                : <ListTodo className="h-5 w-5 flex-shrink-0 mt-0.5 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
 
             // Epic label for stories
             const epicLabel = (() => {
@@ -2155,12 +2155,7 @@ export default function BacklogPage() {
                 )}
 
                 {/* Type icon */}
-                <div
-                  className="flex-shrink-0 h-9 w-9 rounded-[var(--apple-radius-md)] flex items-center justify-center mt-0.5"
-                  style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 6px var(--apple-chart-glow)' }}
-                >
-                  {typeIconNode}
-                </div>
+                {typeIconNode}
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
@@ -2194,21 +2189,21 @@ export default function BacklogPage() {
                   {/* Row 3: MetaChips */}
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     {item.project?.name ? (
-                      <MetaChip icon={<Target className="h-3 w-3" />} label={item.project.name} title={item.project.name} />
+                      <MetaChip icon={<Target className="h-3 w-3" strokeWidth={1.5} />} label={item.project.name} title={item.project.name} />
                     ) : (
-                      <MetaChip icon={<Target className="h-3 w-3" />} label="No project" className="italic" />
+                      <MetaChip icon={<Target className="h-3 w-3" strokeWidth={1.5} />} label="No project" className="italic" />
                     )}
                     {epicLabel && isStory && (
-                      <MetaChip icon={<Layers className="h-3 w-3" />} label={epicLabel} title={epicLabel} />
+                      <MetaChip icon={<Layers className="h-3 w-3" strokeWidth={1.5} />} label={epicLabel} title={epicLabel} />
                     )}
                     {item.dueDate && (
-                      <MetaChip icon={<Calendar className="h-3 w-3" />} label={`Due ${formatDate(item.dueDate)}`} />
+                      <MetaChip icon={<Calendar className="h-3 w-3" strokeWidth={1.5} />} label={`Due ${formatDate(item.dueDate)}`} />
                     )}
                     {item.storyPoints ? (
-                      <MetaChip icon={<BarChart3 className="h-3 w-3" />} label={`${item.storyPoints} pts`} />
+                      <MetaChip icon={<BarChart3 className="h-3 w-3" strokeWidth={1.5} />} label={`${item.storyPoints} pts`} />
                     ) : null}
                     {item.estimatedHours ? (
-                      <MetaChip icon={<Clock className="h-3 w-3" />} label={`${item.estimatedHours}h`} />
+                      <MetaChip icon={<Clock className="h-3 w-3" strokeWidth={1.5} />} label={`${item.estimatedHours}h`} />
                     ) : null}
                   </div>
                 </div>
@@ -2223,7 +2218,7 @@ export default function BacklogPage() {
                         className="h-8 w-8 p-0 rounded-[var(--apple-radius-sm)] hover:bg-[var(--apple-quaternary-fill)]"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <MoreHorizontal className="h-4 w-4" />
+                        <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
@@ -2236,7 +2231,7 @@ export default function BacklogPage() {
                           onClick={() => router.push(`/tasks/${item._id}`)}
                           className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
                         >
-                          <Eye className="h-4 w-4 mr-2" />
+                          <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
                           <span>View Task</span>
                         </DropdownMenuItem>
                       )}
@@ -2245,7 +2240,7 @@ export default function BacklogPage() {
                           onClick={() => router.push(`/stories/${item._id}`)}
                           className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
                         >
-                          <Eye className="h-4 w-4 mr-2" />
+                          <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
                           <span>View Story</span>
                         </DropdownMenuItem>
                       )}
@@ -2254,7 +2249,7 @@ export default function BacklogPage() {
                           onClick={() => router.push(`/epics/${item._id}`)}
                           className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
                         >
-                          <Eye className="h-4 w-4 mr-2" />
+                          <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
                           <span>View Epic</span>
                         </DropdownMenuItem>
                       )}
@@ -2265,7 +2260,7 @@ export default function BacklogPage() {
                           onClick={() => router.push(`/tasks/${item._id}/edit`)}
                           className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
                         >
-                          <Edit className="h-4 w-4 mr-2" />
+                          <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                           <span>Edit Task</span>
                         </DropdownMenuItem>
                       )}
@@ -2274,7 +2269,7 @@ export default function BacklogPage() {
                           onClick={() => router.push(`/stories/${item._id}/edit`)}
                           className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
                         >
-                          <Edit className="h-4 w-4 mr-2" />
+                          <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                           <span>Edit Story</span>
                         </DropdownMenuItem>
                       )}
@@ -2283,7 +2278,7 @@ export default function BacklogPage() {
                           onClick={() => router.push(`/epics/${item._id}/edit`)}
                           className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
                         >
-                          <Edit className="h-4 w-4 mr-2" />
+                          <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                           <span>Edit Epic</span>
                         </DropdownMenuItem>
                       )}
@@ -2304,7 +2299,7 @@ export default function BacklogPage() {
                           )}
                           title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
                         >
-                          <Kanban className="h-4 w-4 mr-2" />
+                          <Kanban className="h-4 w-4 mr-2" strokeWidth={1.5} />
                           <span>Add to Sprint</span>
                         </DropdownMenuItem>
                       )}
@@ -2330,7 +2325,7 @@ export default function BacklogPage() {
                           )}
                           title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
                         >
-                          <Kanban className="h-4 w-4 mr-2" />
+                          <Kanban className="h-4 w-4 mr-2" strokeWidth={1.5} />
                           <span>Manage Sprint</span>
                         </DropdownMenuItem>
                       )}
@@ -2348,7 +2343,7 @@ export default function BacklogPage() {
                           )}
                           title={!item.sprint ? 'Assign the task to a sprint to change its status' : undefined}
                         >
-                          <CheckCircle className="h-4 w-4 mr-2" />
+                          <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
                           <span>Change Status</span>
                         </DropdownMenuItem>
                       )}
@@ -2361,7 +2356,7 @@ export default function BacklogPage() {
                             onClick={() => handleDeleteClick(item)}
                             className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
+                            <Trash2 className="h-4 w-4 mr-2" strokeWidth={1.5} />
                             <span>
                               Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                             </span>
@@ -2441,7 +2436,7 @@ export default function BacklogPage() {
                     </>
                   ) : (
                     <>
-                      <Kanban className="h-4 w-4 mr-2" />
+                      <Kanban className="h-4 w-4 mr-2" strokeWidth={1.5} />
                       {sprintModalMode === 'manage' ? 'Update Sprint' : 'Add to Sprint'}
                     </>
                   )}
@@ -2679,7 +2674,7 @@ export default function BacklogPage() {
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
+                    <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
                     Update Status
                   </>
                 )}

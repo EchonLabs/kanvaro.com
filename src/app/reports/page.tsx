@@ -100,12 +100,7 @@ export default function ReportsPage() {
       <MainLayout>
         <PageWrapper>
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div
-              className="w-16 h-16 rounded-[var(--apple-radius-md)] flex items-center justify-center"
-              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 20px var(--apple-chart-glow)' }}
-            >
-              <BarChart3 className="h-7 w-7 text-white" strokeWidth={1.8} />
-            </div>
+            <BarChart3 className="h-10 w-10 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
             <p className="text-[17px] font-semibold text-[var(--apple-label)]">No report data available</p>
             <p className="text-[13px] text-[var(--apple-secondary-label)]">Report data will appear here once a project is selected.</p>
           </div>
@@ -126,7 +121,7 @@ export default function ReportsPage() {
           {/* ── Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <BarChart3 className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+              <BarChart3 className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
                   Project Reports
@@ -144,7 +139,7 @@ export default function ReportsPage() {
                 variant="outline" size="sm"
                 className="rounded-full h-8 px-4 text-[13px] border-[var(--apple-separator)] apple-transition"
               >
-                <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                <BarChart3 className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                 Export Report
               </Button>
             </div>
@@ -186,10 +181,7 @@ export default function ReportsPage() {
                 className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-5 space-y-2.5 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] hover:-translate-y-0.5">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] font-bold text-[var(--apple-secondary-label)] uppercase tracking-[0.06em]">{label}</p>
-                  <div className="w-8 h-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-                    style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
-                    <Icon className="h-4 w-4 text-white" strokeWidth={1.8} />
-                  </div>
+                  <Icon className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                 </div>
                 <p className="text-[28px] font-bold tracking-tight text-[var(--apple-label)] font-apple-mono leading-none">{value}</p>
                 <p className="text-[11px] text-[var(--apple-tertiary-label)]">{sub}</p>
@@ -219,7 +211,7 @@ export default function ReportsPage() {
                   value={tab.value}
                   className="flex-1 h-8 px-2 gap-1.5 text-[13px] rounded-full data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-[var(--apple-chart-color)] apple-transition"
                 >
-                  <tab.icon className="h-3.5 w-3.5 flex-shrink-0" />
+                  <tab.icon className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
                   <span className="hidden sm:inline">{tab.label}</span>
                 </TabsTrigger>
               ))}
