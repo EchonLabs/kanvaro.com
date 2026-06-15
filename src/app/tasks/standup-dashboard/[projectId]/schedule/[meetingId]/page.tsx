@@ -187,16 +187,11 @@ export default function StandupScheduleDetailPage() {
                 Back to project
               </Button>
 
-              <div className="flex items-center gap-4">
-                <div
-                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--apple-radius-md)] shadow-lg"
-                  style={{ background: HEADER_GRADIENT, boxShadow: `0 8px 24px ${HEADER_GLOW}` }}
-                >
-                  <CalendarCheck className="h-7 w-7 text-white" />
-                </div>
+              <div className="flex items-center gap-3">
+                <CalendarCheck className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
                 <div>
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight">{detail.meeting.title}</h1>
+                    <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">{detail.meeting.title}</h1>
                     <div
                       className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
                       style={{ animation: 'badge-border-pulse 3s ease-in-out infinite' }}
