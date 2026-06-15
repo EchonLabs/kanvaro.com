@@ -1,3 +1,36 @@
+# [1.40.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.39.1...v1.40.0) (2026-06-15)
+
+
+### Bug Fixes
+
+* added the outline svg style to all Title svgs in all pages and made the sidebar active state follow the new UI theme ([3bffcb1](https://github.com/EchonLabs/kanvaro.com/commit/3bffcb13f5f88ad1809d2c969032aafe900b5590))
+* changed all svgs to outlined svgs in all pages belonging to the Time Tracking Module ([4b64083](https://github.com/EchonLabs/kanvaro.com/commit/4b640835ffc8ff413fd3940af8c09dbeb00731e3))
+* final adjustments for the sprint events and epic pages to follow the new UI theme. ([f12dfa6](https://github.com/EchonLabs/kanvaro.com/commit/f12dfa6154cbfa8440443e5618864806e8a521f4))
+* member avatars not showing in the dashboard and Standup Dashboard ([7707d8d](https://github.com/EchonLabs/kanvaro.com/commit/7707d8d6b8e7cac2560a0ae85f3de0da93c7afad))
+* redesigned the dashboard to fit the new theme and align with Apple design standards. ([d7d3af6](https://github.com/EchonLabs/kanvaro.com/commit/d7d3af6e52e6f73f3297096bf9ce993dd9474ac8))
+* removed unnecessary and redundant .md files ([588bcd7](https://github.com/EchonLabs/kanvaro.com/commit/588bcd7a4ed68428948d200e0539660be33f9da7))
+* replaced lucide icons with Outlined icons in the dashboard. ([d368cd9](https://github.com/EchonLabs/kanvaro.com/commit/d368cd96426bde0d3bf6dd28e5f5cd8c6ff409c2))
+* upadeted all pages in the Test Management Module to use outlined svgs ([55c3c98](https://github.com/EchonLabs/kanvaro.com/commit/55c3c984e3458be630d5e6a1ba4bf914c769fe52))
+* updated all pages in Settings Module to use outlined svgs ([ef5743b](https://github.com/EchonLabs/kanvaro.com/commit/ef5743b438e275982b4a70f88c8def56401fdcb8))
+* updated all pages in the Reports Module to use outlined svgs ([472a0fd](https://github.com/EchonLabs/kanvaro.com/commit/472a0fd5db0a4c302aedb44063c899aeacf939dc))
+* updated all pages related to Tasks Module and Project Module to use oulined svgs. ([94b5d74](https://github.com/EchonLabs/kanvaro.com/commit/94b5d74b70bb67597e660d3a1343367a1c6db93c))
+* updated all scheduled standup pages to follow the new UI theme ([58c5667](https://github.com/EchonLabs/kanvaro.com/commit/58c5667d4a84eea2f733ff0822228aa43d32410e))
+
+
+### Features
+
+* added the new theme as a toggle for users and removed the gradient background for both dark and light modes. ([6e4ed49](https://github.com/EchonLabs/kanvaro.com/commit/6e4ed49bbc6df901edb03209f105681caadfbf6c))
+* changed all page related to the Projects Module to follow the new UI color theme ([dd23adf](https://github.com/EchonLabs/kanvaro.com/commit/dd23adf030ae2b4623cfb72cbf213a2ce01a700a))
+* changed the Standup Dashboard and all pages related to this feature follow the new theme. ([e183b42](https://github.com/EchonLabs/kanvaro.com/commit/e183b42ca65c9a1e227eab9ee48e6c9a29bf7700))
+* final design fixes for the dashboard and updated the signout confirmation modal. ([5dc9c1c](https://github.com/EchonLabs/kanvaro.com/commit/5dc9c1c4a707e3febe651a6b481f71f7c53a495e))
+* redesigned both sprint and task popup modals and and the task view page ([1eb3159](https://github.com/EchonLabs/kanvaro.com/commit/1eb31598867f336e4bdb5709e0b8b1e31676632c))
+* **ui:** Added a new theme feature for users to select from a group of four premium colors as the global theme. ([039ab6f](https://github.com/EchonLabs/kanvaro.com/commit/039ab6fa51fea419e58dfb363b47ddd2e0a24619))
+* updated all pages and components related to the reports module to follow the new UI theme ([13535f2](https://github.com/EchonLabs/kanvaro.com/commit/13535f24c8d96224dd4153b6e7a8ca5f70a3f77b))
+* updated all pages of the Tasks Module to follow the new UI color theme ([2a1e1f0](https://github.com/EchonLabs/kanvaro.com/commit/2a1e1f0a00500127c8ee926b54d7425b3d173633))
+* updated all pages of the Timer Tracking Module to fit the new UI color theme ([35ab351](https://github.com/EchonLabs/kanvaro.com/commit/35ab3512904452de34abfcc6d5d1e14a0ebe2414))
+* updated all the pages in Test Management Module to follow the new UI theme. ([fc560a6](https://github.com/EchonLabs/kanvaro.com/commit/fc560a6d95256b240978e6497968411166c28a21))
+* updated pages in the Settings Module to follow the new UI theme ([485851b](https://github.com/EchonLabs/kanvaro.com/commit/485851b72df0157014c733bb4494f4c9502306dd))
+
 ## [1.39.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.39.0...v1.39.1) (2026-06-10)
 
 
