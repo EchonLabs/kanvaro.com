@@ -955,12 +955,7 @@ export default function TimerPage() {
         {/* ── Page Header ─────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div
-              className="h-11 w-11 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 shadow-[0_2px_8px_rgba(0,122,255,0.30)]"
-              style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
-            >
-              <Clock className="h-5 w-5 text-white" />
-            </div>
+            <Clock className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
             <div>
               <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
                 Timer
@@ -974,7 +969,7 @@ export default function TimerPage() {
             onClick={() => router.push('/time-tracking')}
             className="self-start sm:self-auto inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--apple-radius-md)] text-[14px] font-medium border border-[var(--apple-separator)] bg-card text-[var(--apple-label)] apple-transition hover:bg-[var(--apple-quaternary-fill)]"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
             Time Tracking
           </button>
         </div>
@@ -982,7 +977,7 @@ export default function TimerPage() {
         {/* ── Error banner ─────────────────────────────────────────────── */}
         {error && (
           <div className="flex items-start gap-3 rounded-[var(--apple-radius-md)] bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-4">
-            <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
             <p className="text-[13px] text-red-600 dark:text-red-400 whitespace-pre-wrap break-words">{error}</p>
           </div>
         )}
@@ -990,7 +985,7 @@ export default function TimerPage() {
         {/* ── Time tracking disabled banner ───────────────────────────── */}
         {timeTrackingSettings && !timeTrackingSettings.allowTimeTracking && (
           <div className="flex items-start gap-3 rounded-[var(--apple-radius-md)] bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4">
-            <Settings className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <Settings className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
             <div>
               <p className="text-[14px] font-semibold text-amber-700 dark:text-amber-300">Time Tracking Disabled</p>
               <p className="text-[13px] text-amber-600 dark:text-amber-400 mt-0.5">
@@ -1012,12 +1007,7 @@ export default function TimerPage() {
 
             {/* Section header */}
             <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center gap-2.5">
-              <div
-                className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
-              >
-                <FolderOpen className="h-3.5 w-3.5 text-white" />
-              </div>
+              <FolderOpen className="h-4 w-4 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <p className="text-[15px] font-semibold text-[var(--apple-label)]">Select Work</p>
                 <p className="text-[12px] text-[var(--apple-secondary-label)]">Choose a project and task to track</p>
@@ -1056,7 +1046,7 @@ export default function TimerPage() {
                         filteredProjects.map((project) => (
                           <SelectItem key={project._id} value={project._id}>
                             <div className="flex items-center gap-2 min-w-0">
-                              <FolderOpen className="h-3.5 w-3.5 flex-shrink-0 text-[var(--apple-secondary-label)]" />
+                              <FolderOpen className="h-3.5 w-3.5 flex-shrink-0 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                               <span className="truncate">{project.name}</span>
                             </div>
                           </SelectItem>
@@ -1159,7 +1149,7 @@ export default function TimerPage() {
                                   title={`${task.displayId || task.taskNumber || 'N/A'} – ${task.title}`}
                                 >
                                   <div className="flex items-center gap-2 w-full">
-                                    <Target className="h-3.5 w-3.5 flex-shrink-0 text-[var(--apple-secondary-label)]" />
+                                    <Target className="h-3.5 w-3.5 flex-shrink-0 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2">
                                         <span className="text-[11px] font-apple-mono bg-[var(--apple-quaternary-fill)] px-1.5 py-0.5 rounded flex-shrink-0">
@@ -1267,7 +1257,7 @@ export default function TimerPage() {
               {/* Time tracking disabled info */}
               {!timeTrackingSettings?.allowTimeTracking && (
                 <div className="flex items-center gap-2.5 rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] p-3.5">
-                  <Info className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" />
+                  <Info className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
                   <p className="text-[13px] text-[var(--apple-secondary-label)]">
                     Time tracking is disabled. Enable it in Application Settings to use the timer.
                   </p>
@@ -1281,16 +1271,11 @@ export default function TimerPage() {
           <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
             <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div
-                  className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0"
-                  style={{
-                    background: dailyHoursLogged >= timeTrackingSettings.maxDailyHours
-                      ? 'linear-gradient(135deg,#FF3B30 0%,#FF453A 100%)'
-                      : 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)'
-                  }}
-                >
-                  <Clock className="h-3.5 w-3.5 text-white" />
-                </div>
+                <Clock
+                  className="h-4 w-4 flex-shrink-0"
+                  strokeWidth={1.5}
+                  style={{ color: dailyHoursLogged >= timeTrackingSettings.maxDailyHours ? 'var(--apple-system-red)' : 'var(--apple-chart-to)' }}
+                />
                 <div>
                   <p className="text-[15px] font-semibold text-[var(--apple-label)]">Today's Progress</p>
                   <p className="text-[12px] text-[var(--apple-secondary-label)]">Daily time logged</p>
@@ -1309,10 +1294,10 @@ export default function TimerPage() {
                     width: `${dailyPct}%`,
                     background: dailyHoursLogged >= timeTrackingSettings.maxDailyHours
                       ? 'linear-gradient(135deg,#FF3B30 0%,#FF453A 100%)'
-                      : 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
+                      : 'var(--apple-card-gradient)',
                     boxShadow: dailyHoursLogged >= timeTrackingSettings.maxDailyHours
                       ? '0 2px 8px rgba(255,59,48,0.20)'
-                      : '0 2px 8px rgba(0,122,255,0.20)'
+                      : '0 2px 8px var(--apple-chart-glow)'
                   }}
                 >
                   <span className="progress-shimmer absolute inset-0" />

@@ -2,15 +2,16 @@
 
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { ArrowRight, Calendar, Users } from 'lucide-react'
+import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import type { StandupProjectSummary } from './standup-dashboard-types'
 
 const PROJECT_PALETTE = [
-  { gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.25)' },
-  { gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.25)' },
-  { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.25)' },
-  { gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.25)' },
-  { gradient: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)', glow: 'rgba(48,176,199,0.25)' },
-  { gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)', glow: 'rgba(255,69,58,0.25)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
 ]
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; border: string; label: string }> = {
@@ -83,31 +84,26 @@ export function StandupProjectCard({ project, index, onOpen }: StandupProjectCar
         {/* Meta row */}
         <div className="flex flex-wrap items-center gap-3 text-[12px] text-[var(--apple-secondary-label)]">
           <span className="flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5" />
+            <Users className="h-3.5 w-3.5" strokeWidth={1.5} />
             {project.teamMembers.length} member{project.teamMembers.length !== 1 ? 's' : ''}
           </span>
           <span className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5" />
+            <Calendar className="h-3.5 w-3.5" strokeWidth={1.5} />
             {formatDate(project.lastStandupAt)}
           </span>
         </div>
 
-        {/* Team avatar strip — initials badges (reliable without email/Gravatar) */}
+        {/* Team avatar strip — real Gravatar avatars */}
         {project.teamMembers.length > 0 && (
           <div className="flex -space-x-2">
-            {project.teamMembers.slice(0, 6).map((member: any, i: number) => {
-              const initials = `${member.firstName?.[0] ?? ''}${member.lastName?.[0] ?? ''}`.toUpperCase() || '?'
-              return (
-                <div
-                  key={member._id}
-                  title={`${member.firstName} ${member.lastName}`.trim()}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-card text-[10px] font-bold text-white"
-                  style={{ background: PROJECT_PALETTE[i % PROJECT_PALETTE.length].gradient }}
-                >
-                  {initials}
-                </div>
-              )
-            })}
+            {project.teamMembers.slice(0, 6).map((member: any) => (
+              <GravatarAvatar
+                key={member._id}
+                user={member}
+                size={28}
+                className="border-2 border-card rounded-full"
+              />
+            ))}
             {project.teamMembers.length > 6 && (
               <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-card bg-[var(--apple-tertiary-fill)] text-[10px] font-semibold text-[var(--apple-secondary-label)]">
                 +{project.teamMembers.length - 6}
@@ -123,7 +119,7 @@ export function StandupProjectCard({ project, index, onOpen }: StandupProjectCar
           style={{ background: palette.gradient, boxShadow: `0 2px 12px ${palette.glow}` }}
         >
           Open Dashboard
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
         </button>
       </div>
     </div>

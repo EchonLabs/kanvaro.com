@@ -24,11 +24,11 @@ function GradientProgress({ value, gradient, glow }: { value: number; gradient: 
   return (
     <div className="relative h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
       {value > 2 && (
-        <div className="absolute inset-y-0 left-0 rounded-full overflow-hidden" style={{
+        <div className="progress-bar-animated absolute inset-y-0 left-0 rounded-full overflow-hidden" style={{
           width: `${value}%`,
           background: gradient,
           boxShadow: `0 0 8px ${glow}`,
-          transition: 'width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+          transformOrigin: 'left'
         }}>
           <span className="progress-shimmer absolute inset-0" />
         </div>
@@ -122,16 +122,16 @@ export default function TestReportsPage() {
       value: loading ? null : summary.totalTestCases,
       sub: 'Across all projects',
       icon: FileText,
-      gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
-      glow: 'rgba(0,122,255,0.25)',
+      gradient: 'var(--apple-card-gradient)',
+      glow: 'var(--apple-chart-glow)',
     },
     {
       label: 'Execution Rate',
       value: loading ? null : `${summary.executionRate}%`,
       sub: 'Cases executed at least once',
       icon: TrendingUp,
-      gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)',
-      glow: 'rgba(191,90,242,0.25)',
+      gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
+      glow: 'rgba(0,122,255,0.25)',
       progress: summary.executionRate,
     },
     {
@@ -148,8 +148,8 @@ export default function TestReportsPage() {
       value: loading ? null : summary.failed,
       sub: loading ? '—' : `${summary.blocked} blocked`,
       icon: XCircle,
-      gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)',
-      glow: 'rgba(255,69,58,0.25)',
+      gradient: 'var(--apple-card-gradient)',
+      glow: 'var(--apple-chart-glow)',
     },
   ]
 
@@ -191,13 +191,8 @@ export default function TestReportsPage() {
 
           {/* ── Page Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div
-                className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center shadow-lg"
-                style={{ background: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)', boxShadow: '0 4px 16px rgba(48,176,199,0.35)' }}
-              >
-                <BarChart3 className="h-7 w-7 text-white" strokeWidth={1.8} />
-              </div>
+            <div className="flex items-center gap-3">
+              <BarChart3 className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Test Reports</h1>
                 <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
@@ -208,9 +203,9 @@ export default function TestReportsPage() {
             <Button
               onClick={handleExport}
               className="w-full sm:w-auto h-9 gap-1.5 rounded-[var(--apple-radius-sm)] apple-transition"
-              style={{ background: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)' }}
+              style={{ background: 'var(--apple-card-gradient)' }}
             >
-              <Download className="h-4 w-4" />
+              <Download className="h-4 w-4" strokeWidth={1.5} />
               <span className="text-[13px]">Export CSV</span>
             </Button>
           </div>
@@ -218,13 +213,10 @@ export default function TestReportsPage() {
           {/* ── Summary Stats Bar ── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {SUMMARY_STATS.map((stat) => (
-              <div key={stat.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
+              <div key={stat.label} className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[12px] text-[var(--apple-tertiary-label)]">{stat.label}</p>
-                  <div className="w-7 h-7 rounded-[8px] flex items-center justify-center flex-shrink-0"
-                    style={{ background: stat.gradient, boxShadow: `0 2px 8px ${stat.glow}` }}>
-                    <stat.icon className="h-3.5 w-3.5 text-white" strokeWidth={2} />
-                  </div>
+                  <stat.icon className="h-4 w-4 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                 </div>
                 {loading ? (
                   <div className="h-7 w-16 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
@@ -262,10 +254,7 @@ export default function TestReportsPage() {
                 </div>
               ) : projectStats.length === 0 ? (
                 <div className="py-12 flex flex-col items-center gap-3 text-center text-[var(--apple-tertiary-label)]">
-                  <div className="w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center"
-                    style={{ background: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)', boxShadow: '0 4px 16px rgba(48,176,199,0.25)' }}>
-                    <Target className="h-7 w-7 text-white" strokeWidth={1.8} />
-                  </div>
+                  <Target className="h-10 w-10 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                   <div>
                     <p className="text-[15px] font-medium text-[var(--apple-label)]">No Test Data Found</p>
                     <p className="text-[13px] text-[var(--apple-secondary-label)] mt-1 max-w-xs">

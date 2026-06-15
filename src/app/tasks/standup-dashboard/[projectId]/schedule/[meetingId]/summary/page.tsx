@@ -15,8 +15,6 @@ import { formatLoggedHours } from '@/components/standup-dashboard/standup-timelo
 import { ArrowLeft, CalendarDays, Clock3, Loader2, Sparkles, Users, CalendarCheck, AlertTriangle } from 'lucide-react'
 import { formatToTitleCase } from '@/lib/utils'
 
-const HEADER_GRADIENT = 'linear-gradient(135deg, #FF9500 0%, #FFD60A 100%)'
-const HEADER_GLOW = 'rgba(255, 149, 0, 0.25)'
 
 const STATUS_LABEL: Record<string, string> = {
   scheduled: 'Scheduled', in_progress: 'In Progress', completed: 'Completed', missed: 'Missed'
@@ -74,7 +72,7 @@ export default function StandupSummaryPage() {
       <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <div className="flex items-center justify-center gap-2.5 py-20 text-[13px] text-[var(--apple-secondary-label)]">
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} />
             Loading summary…
           </div>
         </PageContent>
@@ -96,19 +94,14 @@ export default function StandupSummaryPage() {
                 className="w-fit gap-1.5 px-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
                 onClick={() => router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meetingId}`)}
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
                 Back to details
               </Button>
 
-              <div className="flex items-center gap-4">
-                <div
-                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--apple-radius-md)] shadow-lg"
-                  style={{ background: HEADER_GRADIENT, boxShadow: `0 8px 24px ${HEADER_GLOW}` }}
-                >
-                  <Sparkles className="h-7 w-7 text-white" />
-                </div>
+              <div className="flex items-center gap-3">
+                <Sparkles className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
                 <div>
-                  <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight">{detail.meeting.title} Summary</h1>
+                  <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">{detail.meeting.title} Summary</h1>
                   <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
                     {detail.project.name} · {formatDate(detail.meeting.date)}
                   </p>
@@ -116,9 +109,9 @@ export default function StandupSummaryPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-[13px] text-[var(--apple-secondary-label)]">
-                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" />{detail.meeting.participants.length} participants</span>
-                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{detail.meeting.time}</span>
-                <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4" />{detail.meeting.durationMinutes} mins</span>
+                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.participants.length} participants</span>
+                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.time}</span>
+                <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.durationMinutes} mins</span>
                 <span className="flex items-center gap-1.5 rounded-full bg-[var(--apple-tertiary-fill)] px-2.5 py-0.5 text-[11px] font-medium">
                   {STATUS_LABEL[detail.meeting.status] || formatToTitleCase(detail.meeting.status)}
                 </span>
@@ -133,12 +126,7 @@ export default function StandupSummaryPage() {
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
               {/* Card header */}
               <div className="flex items-center gap-3 border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-5 py-4">
-                <div
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--apple-radius-sm)]"
-                  style={{ background: HEADER_GRADIENT }}
-                >
-                  <Sparkles className="h-4 w-4 text-white" />
-                </div>
+                <Sparkles className="h-5 w-5 shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                 <div>
                   <p className="text-[15px] font-semibold">Summary Preview</p>
                   <p className="text-[11px] text-[var(--apple-secondary-label)] mt-0.5">
@@ -196,7 +184,7 @@ export default function StandupSummaryPage() {
                   </div>
                 ) : (
                   <div className="rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-6 py-10 text-center space-y-2">
-                    <Sparkles className="h-6 w-6 text-amber-400 mx-auto opacity-50" />
+                    <Sparkles className="h-6 w-6 text-amber-400 mx-auto opacity-50" strokeWidth={1.5} />
                     <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">No summary generated yet</p>
                     <p className="text-[11px] text-[var(--apple-tertiary-label)]">
                       This page still shows the current standup snapshot so you can review the meeting in context.
@@ -245,7 +233,7 @@ export default function StandupSummaryPage() {
               <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
                 <div className="border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-3.5 w-3.5 text-[var(--apple-system-red)]" />
+                    <AlertTriangle className="h-3.5 w-3.5 text-[var(--apple-system-red)]" strokeWidth={1.5} />
                     <p className="text-[15px] font-semibold">Delayed Tasks</p>
                   </div>
                   <p className="text-[11px] text-[var(--apple-secondary-label)] mt-0.5">Tasks that exceeded their estimates.</p>

@@ -51,7 +51,7 @@ export default function TimeLogsPage() {
 
   const fmtMins = (mins: number) => {
     const h = Math.floor(mins / 60)
-    const m = mins % 60
+    const m = Math.round(mins % 60)
     return h > 0 ? `${h}h ${m > 0 ? `${m}m` : ''}`.trim() : `${m}m`
   }
 
@@ -73,22 +73,22 @@ export default function TimeLogsPage() {
       label: "Today",
       value: stats ? fmtMins(stats.today) : '—',
       icon: Clock,
-      gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
-      shadow: 'rgba(0,122,255,0.25)',
+      gradient: 'var(--apple-card-gradient)',
+      shadow: 'var(--apple-chart-glow)',
     },
     {
       label: "This Week",
       value: stats ? fmtMins(stats.week) : '—',
       icon: TrendingUp,
-      gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)',
-      shadow: 'rgba(52,199,89,0.25)',
+      gradient: 'var(--apple-card-gradient)',
+      shadow: 'var(--apple-chart-glow)',
     },
     {
       label: "Pending",
       value: stats ? String(stats.pending) : '—',
       icon: CheckCircle2,
-      gradient: 'linear-gradient(135deg,#FF9F0A 0%,#FFD60A 100%)',
-      shadow: 'rgba(255,159,10,0.25)',
+      gradient: 'var(--apple-card-gradient)',
+      shadow: 'var(--apple-chart-glow)',
     },
   ]
 
@@ -99,12 +99,7 @@ export default function TimeLogsPage() {
         {/* ── Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div
-              className="h-11 w-11 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 shadow-[0_2px_8px_rgba(52,199,89,0.30)]"
-              style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)' }}
-            >
-              <FileText className="h-5 w-5 text-white" />
-            </div>
+            <FileText className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
             <div>
               <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Time Logs</h1>
               <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">Review and manage your time entries</p>
@@ -114,16 +109,16 @@ export default function TimeLogsPage() {
             <button
               onClick={() => router.push('/time-tracking/timer')}
               className="inline-flex items-center gap-1.5 h-9 px-4 rounded-[var(--apple-radius-md)] text-[14px] font-semibold text-white apple-transition"
-              style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 2px 8px rgba(52,199,89,0.25)' }}
+              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}
             >
-              <Clock className="h-4 w-4" />
+              <Clock className="h-4 w-4" strokeWidth={1.5} />
               Start Timer
             </button>
             <button
               onClick={() => router.push('/time-tracking')}
               className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--apple-radius-md)] text-[14px] font-medium border border-[var(--apple-separator)] bg-card text-[var(--apple-label)] apple-transition hover:bg-[var(--apple-quaternary-fill)]"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
               Time Tracking
             </button>
           </div>
@@ -136,14 +131,9 @@ export default function TimeLogsPage() {
             return (
               <div
                 key={item.label}
-                className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-3 sm:p-4 flex items-center gap-3"
+                className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-3 sm:p-4 flex items-center gap-3"
               >
-                <div
-                  className="h-9 w-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0"
-                  style={{ background: item.gradient, boxShadow: `0 2px 8px ${item.shadow}` }}
-                >
-                  <Icon className="h-4 w-4 text-white" />
-                </div>
+                <Icon className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                 <div className="min-w-0">
                   <p className="text-[18px] sm:text-[20px] font-bold tracking-tight text-[var(--apple-label)] tabular-nums">{item.value}</p>
                   <p className="text-[11px] font-semibold text-[var(--apple-secondary-label)] uppercase tracking-[0.06em]">{item.label}</p>
@@ -155,12 +145,7 @@ export default function TimeLogsPage() {
 
         {/* ── Section Header */}
         <div className="flex items-center gap-2.5">
-          <div
-            className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)' }}
-          >
-            <Calendar className="h-3.5 w-3.5 text-white" />
-          </div>
+          <Calendar className="h-4 w-4 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
           <h2 className="text-[17px] font-semibold text-[var(--apple-label)]">All Entries</h2>
           <span className="text-[13px] text-[var(--apple-tertiary-label)]">· Browse and filter your logs</span>
         </div>

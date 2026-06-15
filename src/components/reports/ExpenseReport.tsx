@@ -18,7 +18,7 @@ interface ExpenseReportProps {
   filters: any
 }
 
-const APPLE_COLORS = ['#007AFF','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7','#FF375F','#FFD60A']
+const APPLE_COLORS = ['var(--apple-chart-color)','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7','#FF375F','#FFD60A']
 
 const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
   if (!active || !payload?.length) return null
@@ -82,7 +82,7 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
     percent: 0,
   }))
 
-  const barData = budgetBreakdown.map((item, i) => ({
+  const barData = budgetBreakdown.map((item) => ({
     name: item.category.length > 10 ? item.category.slice(0, 10) + '…' : item.category,
     Budgeted: item.budgeted,
     Spent: item.spent,
@@ -99,10 +99,10 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
       {/* ── Stats Strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Expenses', value: formatCurrency(totalExpenses), sub: 'Across all categories', color: '#FF453A' },
-          { label: 'Average Expense', value: formatCurrency(avgExpense), sub: 'Per transaction', color: '#FF9500' },
-          { label: 'Highest Expense', value: formatCurrency(highestExpense), sub: 'Single transaction', color: '#BF5AF2' },
-          { label: 'Total Transactions', value: String(topExpenses.length), sub: 'Expense entries', color: '#007AFF' },
+          { label: 'Total Expenses',    value: formatCurrency(totalExpenses),  sub: 'Across all categories', color: '#FF453A' },
+          { label: 'Average Expense',   value: formatCurrency(avgExpense),     sub: 'Per transaction',       color: '#FF9500' },
+          { label: 'Highest Expense',   value: formatCurrency(highestExpense), sub: 'Single transaction',    color: 'var(--apple-chart-color)' },
+          { label: 'Total Transactions',value: String(topExpenses.length),     sub: 'Expense entries',       color: 'var(--apple-chart-color)' },
         ].map(s => (
           <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
             <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
@@ -139,19 +139,11 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
         <ChartCard title="Category Spending vs Budget" subtitle="Actual spending compared to budgeted amounts">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={barData} barCategoryGap="30%" barGap={4} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="exp-budgeted" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.9} /><stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.7} />
-                </linearGradient>
-                <linearGradient id="exp-spent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FF453A" stopOpacity={0.9} /><stop offset="100%" stopColor="#FF9F0A" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
               <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Budgeted" fill="url(#exp-budgeted)" radius={[6,6,0,0]} maxBarSize={32} />
-              <Bar dataKey="Spent" fill="url(#exp-spent)" radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Budgeted" fill="var(--apple-chart-color)" radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Spent"    fill="#FF9500"                  radius={[6,6,0,0]} maxBarSize={32} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </BarChart>
           </ResponsiveContainer>
@@ -161,15 +153,10 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
         <ChartCard title="Top Expense Transactions" subtitle="Highest value individual expenses">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={topExpenseBar} barCategoryGap="35%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="exp-top" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FF9500" stopOpacity={0.9} /><stop offset="100%" stopColor="#FFD60A" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} angle={-30} textAnchor="end" height={48} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
               <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Amount" fill="url(#exp-top)" radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Amount" fill="var(--apple-chart-color)" radius={[6,6,0,0]} maxBarSize={32} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

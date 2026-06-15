@@ -123,7 +123,7 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" strokeWidth={1.5} />
           <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
@@ -176,7 +176,7 @@ export default function DashboardPage() {
                 disabled={isRefreshing}
                 className="h-8"
               >
-                <RefreshCw className={`h-3 w-3 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3 w-3 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} strokeWidth={1.5} />
                 Refresh
               </Button>
             </div>

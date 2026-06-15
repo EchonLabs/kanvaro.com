@@ -52,25 +52,20 @@ interface FilterState {
 }
 
 const STAT_ACCENTS = [
-  { gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.22)' },
-  { gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)', glow: 'rgba(255,69,58,0.22)' },
-  { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.22)' },
-  { gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.22)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
 ]
 
 function StatCard({
-  label, value, sub, icon: Icon, accent, valueColor,
+  label, value, sub, icon: Icon, valueColor,
 }: {
-  label: string; value: string; sub: string; icon: React.ElementType; accent: typeof STAT_ACCENTS[0]; valueColor?: string
+  label: string; value: string; sub: string; icon: React.ElementType; valueColor?: string
 }) {
   return (
-    <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5 flex items-center gap-4 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5">
-      <div
-        className="flex h-11 w-11 items-center justify-center rounded-[var(--apple-radius-sm)] flex-shrink-0"
-        style={{ background: accent.gradient, boxShadow: `0 4px 14px ${accent.glow}` }}
-      >
-        <Icon className="h-5 w-5 text-white" />
-      </div>
+    <div className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5 flex items-center gap-4 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5">
+      <Icon className="h-6 w-6 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
       <div className="min-w-0 flex-1">
         <p className="apple-section-label text-[var(--apple-secondary-label)]">{label}</p>
         <p className={cn("text-[22px] font-bold tracking-tight leading-tight font-apple-mono", valueColor)}>{value}</p>
@@ -191,9 +186,7 @@ export default function FinancialReportsPage() {
       <MainLayout>
         <PageWrapper>
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-[var(--apple-radius-lg)]" style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)' }}>
-              <DollarSign className="h-7 w-7 text-white" />
-            </div>
+            <DollarSign className="h-10 w-10 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
             <p className="text-[17px] font-semibold">No financial data available</p>
             <p className="text-[13px] text-[var(--apple-secondary-label)]">Financial data will appear here once available.</p>
           </div>
@@ -212,12 +205,7 @@ export default function FinancialReportsPage() {
           {/* ── Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-[var(--apple-radius-md)] shadow-sm flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 4px 14px rgba(52,199,89,0.30)' }}
-              >
-                <DollarSign className="h-5 w-5 text-white" />
-              </div>
+              <DollarSign className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight">Financial Reports</h1>
                 <p className="text-[13px] text-[var(--apple-secondary-label)]">Comprehensive financial analytics and budget insights</p>
@@ -229,17 +217,17 @@ export default function FinancialReportsPage() {
                 onClick={() => setShowFilters(v => !v)}
                 className={cn("rounded-full h-8 px-4 text-[13px] border-[var(--apple-separator)] apple-transition", showFilters && "bg-[var(--apple-tertiary-fill)]")}
               >
-                <Filter className="h-3.5 w-3.5 mr-1.5" />Filters
+                <Filter className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />Filters
               </Button>
               <Button variant="outline" size="sm" onClick={fetchFinancialReports} className="rounded-full h-8 px-3 border-[var(--apple-separator)] apple-transition">
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
               </Button>
               <Button
                 size="sm" onClick={() => exportReport('csv')}
                 className="rounded-full h-8 px-4 text-[13px] apple-transition"
-                style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)' }}
+                style={{ background: 'var(--apple-card-gradient)' }}
               >
-                <Download className="h-3.5 w-3.5 mr-1.5" />Export
+                <Download className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />Export
               </Button>
             </div>
           </div>
@@ -250,12 +238,12 @@ export default function FinancialReportsPage() {
               <div className="flex items-center justify-between">
                 <p className="text-[13px] font-semibold text-[var(--apple-secondary-label)] uppercase tracking-[0.06em]">Filters</p>
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-3 text-[12px] rounded-full text-[var(--apple-secondary-label)]">
-                  <X className="h-3 w-3 mr-1" />Clear
+                  <X className="h-3 w-3 mr-1" strokeWidth={1.5} />Clear
                 </Button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                   <Input
                     placeholder="Search transactions…"
                     value={filters.search}
@@ -288,7 +276,7 @@ export default function FinancialReportsPage() {
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className={cn("h-9 rounded-full text-[13px] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] justify-start font-normal flex-1", !filters.dateRange.from && "text-[var(--apple-tertiary-label)]")}>
-                        <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                        <CalendarIcon className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.5} />
                         {filters.dateRange.from ? format(filters.dateRange.from, "MMM d") : "From"}
                       </Button>
                     </PopoverTrigger>
@@ -299,7 +287,7 @@ export default function FinancialReportsPage() {
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className={cn("h-9 rounded-full text-[13px] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] justify-start font-normal flex-1", !filters.dateRange.to && "text-[var(--apple-tertiary-label)]")}>
-                        <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                        <CalendarIcon className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.5} />
                         {filters.dateRange.to ? format(filters.dateRange.to, "MMM d") : "To"}
                       </Button>
                     </PopoverTrigger>
@@ -337,23 +325,23 @@ export default function FinancialReportsPage() {
           {/* ── Stats Bar ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              label="Total Budget" icon={Wallet} accent={STAT_ACCENTS[0]}
+              label="Total Budget" icon={Wallet}
               value={formatCurrency(reportData.overview.totalBudget)}
               sub="Across all projects"
             />
             <StatCard
-              label="Total Spent" icon={TrendingDown} accent={STAT_ACCENTS[1]}
+              label="Total Spent" icon={TrendingDown}
               value={formatCurrency(reportData.overview.totalSpent)}
               sub={`${reportData.overview.budgetUtilization.toFixed(1)}% of budget`}
             />
             <StatCard
-              label="Total Revenue" icon={TrendingUp} accent={STAT_ACCENTS[2]}
+              label="Total Revenue" icon={TrendingUp}
               value={formatCurrency(reportData.overview.totalRevenue)}
               sub="Generated revenue"
               valueColor="text-emerald-500"
             />
             <StatCard
-              label="Net Profit" icon={PiggyBank} accent={STAT_ACCENTS[3]}
+              label="Net Profit" icon={PiggyBank}
               value={`${isProfit ? '+' : ''}${formatCurrency(reportData.overview.netProfit)}`}
               sub={`${reportData.overview.profitMargin.toFixed(1)}% profit margin`}
               valueColor={isProfit ? 'text-emerald-500' : 'text-red-500'}
@@ -371,9 +359,9 @@ export default function FinancialReportsPage() {
               ] as [string, string, React.ElementType][]).map(([v, l, Icon]) => (
                 <TabsTrigger
                   key={v} value={v}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-1.5 text-[13px] font-medium apple-transition data-[state=active]:bg-white dark:data-[state=active]:bg-[rgba(255,255,255,0.12)] data-[state=active]:shadow-sm data-[state=active]:text-[var(--apple-label)] text-[var(--apple-secondary-label)]"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-1.5 text-[13px] font-medium apple-transition data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-[var(--apple-chart-color)] text-[var(--apple-secondary-label)]"
                 >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <Icon className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />
                   <span className="hidden sm:inline">{l}</span>
                 </TabsTrigger>
               ))}

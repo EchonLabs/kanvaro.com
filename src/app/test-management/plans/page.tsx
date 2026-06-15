@@ -32,12 +32,12 @@ interface TestPlan {
 }
 
 const PLAN_PALETTE = [
-  { gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.25)' },
-  { gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.25)' },
-  { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.25)' },
-  { gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.25)' },
-  { gradient: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)', glow: 'rgba(48,176,199,0.25)' },
-  { gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)', glow: 'rgba(255,69,58,0.25)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
 ]
 
 export default function TestPlansPage() {
@@ -137,13 +137,8 @@ export default function TestPlansPage() {
 
           {/* ── Page Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div
-                className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center shadow-lg"
-                style={{ background: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', boxShadow: '0 4px 16px rgba(191,90,242,0.35)' }}
-              >
-                <ListChecks className="h-7 w-7 text-white" strokeWidth={1.8} />
-              </div>
+            <div className="flex items-center gap-3">
+              <ListChecks className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Test Plans</h1>
                 <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
@@ -154,9 +149,9 @@ export default function TestPlansPage() {
             <Button
               onClick={handleCreateTestPlan}
               className="w-full sm:w-auto h-9 gap-1.5 rounded-[var(--apple-radius-sm)] apple-transition"
-              style={{ background: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)' }}
+              style={{ background: 'var(--apple-card-gradient)' }}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" strokeWidth={1.5} />
               <span className="text-[13px]">Create Test Plan</span>
             </Button>
           </div>
@@ -181,18 +176,15 @@ export default function TestPlansPage() {
             </div>
           ) : testPlans.length === 0 ? (
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-12 text-center">
-              <div className="mx-auto w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center mb-4"
-                style={{ background: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', boxShadow: '0 4px 16px rgba(191,90,242,0.25)' }}>
-                <ListChecks className="h-7 w-7 text-white" strokeWidth={1.8} />
-              </div>
+              <ListChecks className="h-10 w-10 mx-auto mb-4 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <h3 className="text-[17px] font-semibold text-[var(--apple-label)] mb-2">No Test Plans Yet</h3>
               <p className="text-[15px] text-[var(--apple-secondary-label)] mb-6 max-w-xs mx-auto">
                 Create your first test plan to start organizing test runs.
               </p>
               <Button onClick={handleCreateTestPlan}
                 className="rounded-[var(--apple-radius-sm)]"
-                style={{ background: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)' }}>
-                <Plus className="h-4 w-4 mr-1.5" />
+                style={{ background: 'var(--apple-card-gradient)' }}>
+                <Plus className="h-4 w-4 mr-1.5" strokeWidth={1.5} />
                 Create Test Plan
               </Button>
             </div>
@@ -206,17 +198,14 @@ export default function TestPlansPage() {
                 return (
                   <div
                     key={plan._id}
-                    className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] hover:-translate-y-0.5 dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)]"
+                    className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] hover:-translate-y-0.5 dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)]"
                   >
                     {/* Gradient accent bar */}
                     <div className="h-[3px]" style={{ background: palette.gradient }} />
                     <div className="p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 min-w-0 flex-1">
-                          <div className="flex-shrink-0 w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-                            style={{ background: palette.gradient, boxShadow: `0 4px 10px ${palette.glow}` }}>
-                            <ListChecks className="h-5 w-5 text-white" strokeWidth={1.8} />
-                          </div>
+                          <ListChecks className="h-6 w-6 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                           <div className="min-w-0 flex-1">
                             <p className="text-[17px] font-semibold text-[var(--apple-label)] truncate">{plan.name}</p>
                             {plan.description && (

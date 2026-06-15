@@ -100,10 +100,10 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
       {/* ── Stats Strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Projects', value: String(projects.length), sub: 'All tracked projects', color: '#007AFF' },
+          { label: 'Total Projects', value: String(projects.length), sub: 'All tracked projects', color: 'var(--apple-chart-color)' },
           { label: 'Avg Completion', value: `${avgCompletion.toFixed(1)}%`, sub: 'Across all projects', color: '#34C759' },
           { label: 'Active Projects', value: String(projects.filter(p => p.status === 'active').length), sub: 'Currently in progress', color: '#FF9500' },
-          { label: 'Completed', value: String(projects.filter(p => p.status === 'completed').length), sub: 'Successfully finished', color: '#BF5AF2' },
+          { label: 'Completed', value: String(projects.filter(p => p.status === 'completed').length), sub: 'Successfully finished', color: 'var(--apple-chart-color)' },
         ].map(s => (
           <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
             <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
@@ -120,19 +120,11 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
         <ChartCard title="Completion vs Budget Utilization" subtitle="Task progress vs budget burn correlation">
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={progressData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="pp-comp" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#34C759" stopOpacity={0.25} /><stop offset="100%" stopColor="#34C759" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="pp-budget" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FF9500" stopOpacity={0.20} /><stop offset="100%" stopColor="#FF9500" stopOpacity={0} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0,100]} />
               <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}%`} />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
-              <Area type="monotone" dataKey="Completion %" stroke="#34C759" strokeWidth={2} fill="url(#pp-comp)" dot={false} activeDot={{ r: 4 }} />
-              <Area type="monotone" dataKey="Budget %" stroke="#FF9500" strokeWidth={2} fill="url(#pp-budget)" dot={false} activeDot={{ r: 4 }} />
+              <Area type="monotone" dataKey="Completion %" stroke="#34C759" strokeWidth={2} fill="#34C759" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
+              <Area type="monotone" dataKey="Budget %"     stroke="#FF9500" strokeWidth={2} fill="#FF9500" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </AreaChart>
           </ResponsiveContainer>
@@ -158,19 +150,11 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
         <ChartCard title="Task Progress by Project" subtitle="Completed tasks vs total tasks per project">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={taskData} barCategoryGap="30%" barGap={4} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="pp-total" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.9} /><stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.7} />
-                </linearGradient>
-                <linearGradient id="pp-done" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#34C759" stopOpacity={0.9} /><stop offset="100%" stopColor="#30D158" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={28} />
               <Tooltip content={<AppleTooltip />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Total" fill="url(#pp-total)" radius={[5,5,0,0]} maxBarSize={28} />
-              <Bar dataKey="Completed" fill="url(#pp-done)" radius={[5,5,0,0]} maxBarSize={28} />
+              <Bar dataKey="Total"     fill="var(--apple-chart-color)" radius={[5,5,0,0]} maxBarSize={28} />
+              <Bar dataKey="Completed" fill="#34C759"                  radius={[5,5,0,0]} maxBarSize={28} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </BarChart>
           </ResponsiveContainer>
@@ -187,12 +171,12 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
                     className="h-full rounded-full transition-all duration-700"
                     style={{
                       width: `${p.stats.sprints.total > 0 ? (p.stats.sprints.active / p.stats.sprints.total) * 100 : 0}%`,
-                      background: 'linear-gradient(90deg,#007AFF,#5AC8FA)',
+                      backgroundColor: 'var(--apple-chart-color)',
                     }}
                   />
                 </div>
                 <div className="flex items-center gap-1 text-[12px] font-apple-mono flex-shrink-0">
-                  <span className="font-semibold text-[var(--apple-system-blue)]">{p.stats.sprints.active}</span>
+                  <span className="font-semibold" style={{ color: 'var(--apple-chart-color)' }}>{p.stats.sprints.active}</span>
                   <span className="text-[var(--apple-tertiary-label)]">/ {p.stats.sprints.total}</span>
                 </div>
               </div>
@@ -212,7 +196,7 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
             const st = getStatus(project.status)
             const compPct = project.stats.tasks.completionRate
             const budPct = Math.min(100, project.stats.budget.utilizationRate)
-            const budColor = budPct > 85 ? '#FF453A' : budPct > 65 ? '#FF9F0A' : '#007AFF'
+            const budColor = budPct > 85 ? '#FF453A' : budPct > 65 ? '#FF9F0A' : 'var(--apple-chart-color)'
             return (
               <div key={project._id} className="px-5 py-4 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
                 <div className="flex items-center gap-2.5 flex-wrap mb-3">

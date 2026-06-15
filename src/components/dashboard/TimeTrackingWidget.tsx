@@ -390,7 +390,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
                 onClick={() => updateTimerAction(activeTimer.isPaused ? 'resume' : 'pause')}
                 className="text-xs"
               >
-                {activeTimer.isPaused ? <><Play className="h-3 w-3 mr-1" />Resume</> : <><Pause className="h-3 w-3 mr-1" />Pause</>}
+                {activeTimer.isPaused ? <><Play className="h-3 w-3 mr-1" strokeWidth={1.5} />Resume</> : <><Pause className="h-3 w-3 mr-1" strokeWidth={1.5} />Pause</>}
               </Button>
               <Button
                 size="sm"
@@ -399,7 +399,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
                 onClick={() => setShowStopConfirm(true)}
                 className="text-xs"
               >
-                <Square className="h-3 w-3 mr-1" />Stop
+                <Square className="h-3 w-3 mr-1" strokeWidth={1.5} />Stop
               </Button>
               <Button
                 size="sm"
@@ -414,7 +414,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
                 }}
                 className="text-xs"
               >
-                <Clock className="h-3 w-3 mr-1" />Info
+                <Clock className="h-3 w-3 mr-1" strokeWidth={1.5} />Info
               </Button>
             </div>
           </CardContent>
@@ -426,7 +426,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-[var(--apple-system-red)]" />
+              <AlertTriangle className="h-5 w-5 text-[var(--apple-system-red)]" strokeWidth={1.5} />
               Stop Timer
             </DialogTitle>
             <DialogDescription>
@@ -442,7 +442,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowStopConfirm(false)}>Cancel</Button>
             <Button variant="destructive" onClick={() => { setShowStopConfirm(false); updateTimerAction('stop') }}>
-              <Square className="h-4 w-4 mr-2" />Stop Timer
+              <Square className="h-4 w-4 mr-2" strokeWidth={1.5} />Stop Timer
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -503,11 +503,11 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
           {/* Action buttons */}
           <div className="flex flex-col gap-2 pt-1">
             <Button size="sm" onClick={() => router.push('/time-tracking')} className="w-full">
-              <Play className="h-3.5 w-3.5 mr-1.5" />
+              <Play className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
               Time Tracking Details
             </Button>
             <Button size="sm" variant="outline" onClick={() => router.push('/time-tracking/logs')} className="w-full">
-              <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
+              <TrendingUp className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
               View Logs
             </Button>
           </div>

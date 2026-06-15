@@ -77,7 +77,7 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
       {/* ── Stats Strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Projects', value: String(projects.length), sub: 'All tracked', color: '#007AFF' },
+          { label: 'Total Projects', value: String(projects.length), sub: 'All tracked', color: 'var(--apple-chart-color)' },
           { label: 'Avg Duration', value: `${avgDuration.toFixed(0)} days`, sub: 'Per project', color: '#FF9500' },
           { label: 'Overdue', value: String(overdueCount), sub: 'Past deadline', color: '#FF453A' },
           { label: 'On Track', value: String(onTimeCount), sub: 'Within schedule', color: '#34C759' },
@@ -98,15 +98,10 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
         </div>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={durationData} barCategoryGap="40%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="dur-bar" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#30B0C7" stopOpacity={0.9} /><stop offset="100%" stopColor="#64D2FF" stopOpacity={0.7} />
-              </linearGradient>
-            </defs>
             <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}d`} />
             <Tooltip content={<AppleTooltip />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-            <Bar dataKey="Duration" fill="url(#dur-bar)" radius={[5,5,0,0]} maxBarSize={44} />
+            <Bar dataKey="Duration" fill="var(--apple-chart-color)" radius={[5,5,0,0]} maxBarSize={44} />
           </BarChart>
         </ResponsiveContainer>
       </div>

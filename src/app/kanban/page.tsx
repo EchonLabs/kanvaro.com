@@ -44,6 +44,7 @@ import {
   GripVertical,
   X,
   RotateCcw,
+  Columns,
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import EditTaskModal from '@/components/tasks/EditTaskModal'
@@ -814,7 +815,8 @@ export default function KanbanPage() {
           {/* ─── Header ────────────────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-3">
+                <Columns className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
                   Kanban Board
                 </h1>

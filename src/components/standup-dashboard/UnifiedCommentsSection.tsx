@@ -66,12 +66,7 @@ export function UnifiedCommentsSection({
     <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-5 py-4">
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--apple-radius-sm)]"
-          style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 12px rgba(0,122,255,0.2)' }}
-        >
-          <MessageSquare className="h-4 w-4 text-white" />
-        </div>
+        <MessageSquare className="h-5 w-5 shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
         <div>
           <p className="text-[15px] font-semibold">Discussion & Notes</p>
           <p className="text-[11px] text-[var(--apple-secondary-label)] mt-0.5">
@@ -140,9 +135,9 @@ export function UnifiedCommentsSection({
               size="sm"
               disabled={submitting || !commentText.trim()}
               className="h-8 text-[12px] gap-1.5 apple-transition"
-              style={!submitting && commentText.trim() ? { background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' } : undefined}
+              style={!submitting && commentText.trim() ? { background: 'var(--apple-card-gradient)' } : undefined}
             >
-              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <Send className="h-3.5 w-3.5" strokeWidth={1.5} />}
               {submitting ? 'Posting…' : 'Add Comment'}
             </Button>
           </div>
@@ -163,9 +158,7 @@ export function UnifiedCommentsSection({
                 return (
                   <div key={comment._id} className="flex items-start gap-3 py-3.5 first:pt-0 last:pb-0">
                     {/* Avatar */}
-                    <div className="h-8 w-8 rounded-full bg-[var(--apple-tertiary-fill)] flex items-center justify-center shrink-0 mt-0.5">
-                      <User2 className="h-4 w-4 text-[var(--apple-secondary-label)]" />
-                    </div>
+                    <User2 className="h-5 w-5 text-[var(--apple-secondary-label)] shrink-0 mt-0.5" strokeWidth={1.5} />
 
                     {/* Body */}
                     <div className="flex-1 min-w-0 space-y-1">

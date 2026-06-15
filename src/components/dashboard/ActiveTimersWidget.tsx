@@ -336,7 +336,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+            <Clock className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
             <CardTitle>Active Timers</CardTitle>
           </div>
           <Button
@@ -346,7 +346,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
             disabled={isLoading}
             className="h-7 w-7 rounded-full"
           >
-            <RefreshCw className={`h-3.5 w-3.5 text-[var(--apple-secondary-label)] ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 text-[var(--apple-secondary-label)] ${isLoading ? 'animate-spin' : ''}`} strokeWidth={1.5} />
           </Button>
         </div>
       </CardHeader>
@@ -370,14 +370,14 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
             onOpenChange={(open) => { if (!open) setEmployeeSearch('') }}
           >
             <SelectTrigger className="flex-1 h-8 text-sm min-w-0">
-              <User className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] mr-1.5 flex-shrink-0" />
+              <User className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] mr-1.5 flex-shrink-0" strokeWidth={1.5} />
               <SelectValue placeholder="Employee" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="w-[var(--radix-select-trigger-width)]">
               {/* Pinned search — not inside any overflow container */}
               <div className="p-2 border-b border-[var(--apple-separator)]">
                 <div className="relative">
-                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" />
+                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                   <Input
                     placeholder="Search…"
                     value={employeeSearch}
@@ -411,13 +411,13 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
             onOpenChange={(open) => { if (!open) setProjectSearch('') }}
           >
             <SelectTrigger className="flex-1 h-8 text-sm min-w-0">
-              <FolderOpen className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] mr-1.5 flex-shrink-0" />
+              <FolderOpen className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] mr-1.5 flex-shrink-0" strokeWidth={1.5} />
               <SelectValue placeholder="Project" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="w-[var(--radix-select-trigger-width)]">
               <div className="p-2 border-b border-[var(--apple-separator)]">
                 <div className="relative">
-                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" />
+                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                   <Input
                     placeholder="Search…"
                     value={projectSearch}
@@ -447,7 +447,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
         {/* Timers List */}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-[var(--apple-secondary-label)]" />
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
           </div>
         ) : filteredTimers.length === 0 ? (
           <div className="text-center py-8 text-sm text-[var(--apple-secondary-label)]">
@@ -466,7 +466,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-1">
-                        <User className="h-3 w-3 text-[var(--apple-tertiary-label)] flex-shrink-0" />
+                        <User className="h-3 w-3 text-[var(--apple-tertiary-label)] flex-shrink-0" strokeWidth={1.5} />
                         <span className="text-[15px] font-medium text-[var(--apple-label)] truncate">
                           {timer.user.firstName} {timer.user.lastName}
                         </span>
@@ -477,7 +477,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 text-sm text-[var(--apple-secondary-label)]">
-                        <FolderOpen className="h-3 w-3 flex-shrink-0" />
+                        <FolderOpen className="h-3 w-3 flex-shrink-0" strokeWidth={1.5} />
                         <span className="truncate">{timer.project.name}</span>
                       </div>
                       {timer.task && (
@@ -509,9 +509,9 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
                         className="h-7 px-2 text-xs"
                       >
                         {isStopping === timer._id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
                         ) : (
-                          <><Square className="h-3 w-3 mr-1" />Stop</>
+                          <><Square className="h-3 w-3 mr-1" strokeWidth={1.5} />Stop</>
                         )}
                       </Button>
                     </div>

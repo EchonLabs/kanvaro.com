@@ -556,10 +556,9 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
               variant="ghost"
               className={cn(
                 'w-full justify-center px-2 h-8 rounded-[12px] apple-transition',
-                isActive
-                  ? 'bg-[var(--apple-system-blue)]/12 text-[var(--apple-system-blue)]'
-                  : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
+                !isActive && 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
               )}
+              style={isActive ? { color: 'var(--apple-card-gradient)', backgroundColor: 'color-mix(in srgb, var(--apple-card-gradient) 12%, transparent)' } : undefined}
               title={item.label}
             >
               <Icon className="h-4 w-4" />
@@ -577,9 +576,10 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
                     className={cn(
                       'w-full justify-start text-[14px] h-8 rounded-[10px] apple-transition',
                       pathname === child.path
-                        ? 'bg-[var(--apple-system-blue)]/12 text-[var(--apple-system-blue)] font-medium'
+                        ? 'font-medium'
                         : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
                     )}
+                    style={pathname === child.path ? { color: 'var(--apple-card-gradient)', backgroundColor: 'color-mix(in srgb, var(--apple-card-gradient) 12%, transparent)' } : undefined}
                     asChild
                   >
                     <Link href={child.path} prefetch onMouseEnter={() => router.prefetch(child.path)}>
@@ -606,9 +606,10 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
             'w-full justify-start h-8 rounded-[12px] apple-transition',
             collapsed ? 'px-2' : 'px-3',
             isActive
-              ? 'bg-[var(--apple-system-blue)]/12 text-[var(--apple-system-blue)] font-medium'
+              ? 'font-medium'
               : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
           )}
+          style={isActive ? { color: 'var(--apple-card-gradient)', backgroundColor: 'color-mix(in srgb, var(--apple-card-gradient) 12%, transparent)' } : undefined}
           title={collapsed ? item.label : undefined}
           onClick={() => {
             if (hasChildren && !collapsed) {
@@ -625,8 +626,7 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
         >
           <Icon className={cn(
             'h-4 w-4 flex-shrink-0',
-            collapsed ? 'mx-auto' : 'mr-2',
-            isActive ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-secondary-label)]'
+            collapsed ? 'mx-auto' : 'mr-2'
           )} />
           {!collapsed && (
             <>
@@ -655,9 +655,10 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
                     className={cn(
                       'w-full justify-start text-[14px] h-7 rounded-[10px] apple-transition px-2',
                       isChildActive
-                        ? 'bg-[var(--apple-system-blue)]/12 text-[var(--apple-system-blue)] font-medium'
+                        ? 'font-medium'
                         : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
                     )}
+                    style={isChildActive ? { color: 'var(--apple-card-gradient)', backgroundColor: 'color-mix(in srgb, var(--apple-card-gradient) 12%, transparent)' } : undefined}
                     asChild
                   >
                     <Link
@@ -670,10 +671,7 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
                         }
                       }}
                     >
-                      <child.icon className={cn(
-                        'mr-2 h-3.5 w-3.5',
-                        isChildActive ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-tertiary-label)]'
-                      )} />
+                      <child.icon className="mr-2 h-3.5 w-3.5" />
                       {child.label}
                     </Link>
                   </Button>

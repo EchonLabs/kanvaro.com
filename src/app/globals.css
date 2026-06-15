@@ -41,14 +41,10 @@
 
   /* Apple HIG glass material — header, popovers */
   .apple-glass {
-    background: rgba(255, 255, 255, 0.58);
-    backdrop-filter: saturate(180%) blur(8px);
-    -webkit-backdrop-filter: saturate(180%) blur(8px);
+    background: rgba(255, 255, 255, 1);
   }
   .dark .apple-glass {
-    background: rgba(22, 22, 24, 0.58);
-    backdrop-filter: saturate(180%) blur(8px);
-    -webkit-backdrop-filter: saturate(180%) blur(8px);
+    background: rgba(22, 22, 24, 1);
   }
 
   /* Auth page glass card — premium frosted panel, light + dark */
@@ -71,14 +67,10 @@
 
   /* Apple HIG sidebar material */
   .apple-sidebar-material {
-    background: rgba(246, 246, 248, 0.58);
-    backdrop-filter: saturate(180%) blur(8px);
-    -webkit-backdrop-filter: saturate(180%) blur(8px);
+    background: rgba(246, 246, 248, 1);
   }
   .dark .apple-sidebar-material {
-    background: rgba(16, 16, 18, 0.62);
-    backdrop-filter: saturate(180%) blur(8px);
-    -webkit-backdrop-filter: saturate(180%) blur(8px);
+    background: rgba(16, 16, 18, 1);
   }
 
   /* Apple HIG section header label */
@@ -156,6 +148,29 @@
   0%, 100% { box-shadow: 0 0 0 1px currentColor;       opacity: 0.85;    }
   50%       { box-shadow: 0 0 0 0px currentColor;       opacity: 1; }
 }
+
+/* Progress bar grow — scaleX 0→1 from left, no JS state needed */
+@keyframes progress-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.progress-bar-animated {
+  transform-origin: left;
+  animation: progress-grow 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Card fade-in — subtle entrance for content cards */
+@keyframes card-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-fade-in {
+  animation: card-fade-in 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+.card-fade-in-delay-1 { animation-delay:  40ms; }
+.card-fade-in-delay-2 { animation-delay:  80ms; }
+.card-fade-in-delay-3 { animation-delay: 120ms; }
+.card-fade-in-delay-4 { animation-delay: 160ms; }
 
 /* Transitions.dev — Number pop-in */
 :root {
@@ -333,6 +348,14 @@
     --apple-radius-lg: 16px;
     --apple-radius-xl: 20px;
     --apple-radius-pill: 999px;
+
+    /* Premium cobalt-azure — charts, card accents, button bg, progress bars, avatars */
+    --apple-chart-from: #3D8EFF;
+    --apple-chart-to: #3D8EFF;
+    --apple-chart-gradient: #3D8EFF;
+    --apple-chart-glow: rgba(61, 142, 255, 0.32);
+    --apple-chart-color: #3D8EFF;
+    --apple-card-gradient: #3D8EFF;
   }
 
   .dark {
@@ -577,6 +600,45 @@
   border-radius: var(--apple-radius-sm);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   background-color: transparent !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Accent theme overrides — applied via data-theme attribute on <html>.
+   Overrides the chart/card gradient tokens and primary color.
+   Blue (default) requires no override — it is already set in :root.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+[data-theme="orange"] {
+  --apple-chart-from:     #FF7A00;
+  --apple-chart-to:       #FF7A00;
+  --apple-chart-gradient: #FF7A00;
+  --apple-chart-glow:     rgba(255, 122, 0, 0.32);
+  --apple-chart-color:    #FF7A00;
+  --apple-card-gradient:  #FF7A00;
+  --primary: 29 100% 50%;
+  --ring:    29 100% 50%;
+}
+
+[data-theme="purple"] {
+  --apple-chart-from:     #9B5FE8;
+  --apple-chart-to:       #9B5FE8;
+  --apple-chart-gradient: #9B5FE8;
+  --apple-chart-glow:     rgba(155, 95, 232, 0.32);
+  --apple-chart-color:    #9B5FE8;
+  --apple-card-gradient:  #9B5FE8;
+  --primary: 270 72% 63%;
+  --ring:    270 72% 63%;
+}
+
+[data-theme="red"] {
+  --apple-chart-from:     #FF2D30;
+  --apple-chart-to:       #FF2D30;
+  --apple-chart-gradient: #FF2D30;
+  --apple-chart-glow:     rgba(255, 45, 48, 0.32);
+  --apple-chart-color:    #FF2D30;
+  --apple-card-gradient:  #FF2D30;
+  --primary: 357 100% 59%;
+  --ring:    357 100% 59%;
 }
 
 /* Task description formatting */

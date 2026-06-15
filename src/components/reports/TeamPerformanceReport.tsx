@@ -111,10 +111,10 @@ export function TeamPerformanceReport({ members, performanceTrends, productivity
       {/* ── Stats Strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Avg Score', value: `${avgScore.toFixed(1)}%`, sub: 'Team productivity', color: '#007AFF' },
+          { label: 'Avg Score', value: `${avgScore.toFixed(1)}%`, sub: 'Team productivity', color: 'var(--apple-chart-color)' },
           { label: 'Avg Completion', value: `${avgCompletion.toFixed(1)}%`, sub: 'Task completion rate', color: '#34C759' },
           { label: 'High Performers', value: String(topCount), sub: 'Score ≥ 75%', color: '#FF9500' },
-          { label: 'Tasks Completed', value: String(totalTasks), sub: 'Total by team', color: '#BF5AF2' },
+          { label: 'Tasks Completed', value: String(totalTasks), sub: 'Total by team', color: 'var(--apple-chart-color)' },
         ].map(s => (
           <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
             <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
@@ -133,9 +133,6 @@ export function TeamPerformanceReport({ members, performanceTrends, productivity
             <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={trendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="tp-prod" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#007AFF" stopOpacity={0.25} /><stop offset="100%" stopColor="#007AFF" stopOpacity={0} />
-                  </linearGradient>
                   <linearGradient id="tp-comp" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#34C759" stopOpacity={0.20} /><stop offset="100%" stopColor="#34C759" stopOpacity={0} />
                   </linearGradient>
@@ -143,7 +140,7 @@ export function TeamPerformanceReport({ members, performanceTrends, productivity
                 <XAxis dataKey="period" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, 100]} />
                 <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
-                <Area type="monotone" dataKey="Productivity" stroke="#007AFF" strokeWidth={2} fill="url(#tp-prod)" dot={false} activeDot={{ r: 4 }} />
+                <Area type="monotone" dataKey="Productivity" stroke="var(--apple-chart-color)" strokeWidth={2} fill="var(--apple-chart-color)" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
                 <Area type="monotone" dataKey="Completion Rate" stroke="#34C759" strokeWidth={2} fill="url(#tp-comp)" dot={false} activeDot={{ r: 4 }} />
                 <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
               </AreaChart>
@@ -160,9 +157,6 @@ export function TeamPerformanceReport({ members, performanceTrends, productivity
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={memberBarData} layout="vertical" barCategoryGap="30%" margin={{ top: 4, right: 8, left: 40, bottom: 0 }}>
               <defs>
-                <linearGradient id="tp-score" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.9} /><stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.8} />
-                </linearGradient>
                 <linearGradient id="tp-compl" x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0%" stopColor="#34C759" stopOpacity={0.9} /><stop offset="100%" stopColor="#30D158" stopOpacity={0.8} />
                 </linearGradient>
@@ -170,7 +164,7 @@ export function TeamPerformanceReport({ members, performanceTrends, productivity
               <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={40} />
               <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Score" fill="url(#tp-score)" radius={[0, 5, 5, 0]} maxBarSize={10} />
+              <Bar dataKey="Score" fill="var(--apple-chart-color)" radius={[0, 5, 5, 0]} maxBarSize={10} />
               <Bar dataKey="Completion" fill="url(#tp-compl)" radius={[0, 5, 5, 0]} maxBarSize={10} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </BarChart>

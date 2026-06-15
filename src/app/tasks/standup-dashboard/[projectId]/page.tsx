@@ -22,20 +22,20 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { getStandupDateKey } from '@/components/standup-dashboard/standup-date-utils'
 import type { StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 
-const HEADER_GRADIENT = 'linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%)'
-const HEADER_GLOW = 'rgba(0, 122, 255, 0.25)'
+const HEADER_GRADIENT = 'var(--apple-card-gradient)'
+const HEADER_GLOW = 'var(--apple-chart-glow)'
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; border: string; label: string }> = {
   active:    { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'Active' },
   planning:  { bg: 'bg-blue-50 dark:bg-blue-950/30',       text: 'text-blue-600 dark:text-blue-400',       dot: 'bg-blue-500',   border: 'border-blue-200 dark:border-blue-800',   label: 'Planning' },
   on_hold:   { bg: 'bg-amber-50 dark:bg-amber-950/30',     text: 'text-amber-600 dark:text-amber-400',     dot: 'bg-amber-500',  border: 'border-amber-200 dark:border-amber-800', label: 'On Hold' },
-  completed: { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',       dot: 'bg-gray-400',   border: 'border-gray-200 dark:border-gray-700',   label: 'Completed' },
+  completed: { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'Completed' },
 }
 
 const MEETING_STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; border: string; label: string }> = {
   scheduled:   { bg: 'bg-blue-50 dark:bg-blue-950/30',   text: 'text-blue-600 dark:text-blue-400',   dot: 'bg-blue-500',   border: 'border-blue-200 dark:border-blue-800',   label: 'Scheduled' },
   in_progress: { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'In Progress' },
-  completed:   { bg: 'bg-gray-50 dark:bg-gray-900/40',   text: 'text-gray-500 dark:text-gray-400',   dot: 'bg-gray-400',   border: 'border-gray-200 dark:border-gray-700',   label: 'Completed' },
+  completed:   { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'Completed' },
   missed:      { bg: 'bg-red-50 dark:bg-red-950/30',     text: 'text-red-600 dark:text-red-400',     dot: 'bg-red-500',    border: 'border-red-200 dark:border-red-800',     label: 'Missed' },
 }
 
@@ -140,7 +140,7 @@ export default function StandupProjectPage() {
       <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <div className="flex items-center justify-center gap-2.5 py-20 text-[13px] text-[var(--apple-secondary-label)]">
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} />
             Loading standup project…
           </div>
         </PageContent>
@@ -155,7 +155,7 @@ export default function StandupProjectPage() {
           <div className="rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card p-12 text-center space-y-4">
             <p className="text-[15px] font-semibold">Standup project not found</p>
             <Button variant="outline" onClick={() => router.push('/tasks/standup-dashboard')}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="mr-2 h-4 w-4" strokeWidth={1.5} />
               Back to Standup Dashboard
             </Button>
           </div>
@@ -183,20 +183,15 @@ export default function StandupProjectPage() {
                 className="w-fit gap-1.5 px-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
                 onClick={() => router.push('/tasks/standup-dashboard')}
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
                 Standup Dashboard
               </Button>
 
-              <div className="flex items-center gap-4">
-                <div
-                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--apple-radius-md)] shadow-lg"
-                  style={{ background: HEADER_GRADIENT, boxShadow: `0 8px 24px ${HEADER_GLOW}` }}
-                >
-                  <CalendarCheck className="h-7 w-7 text-white" />
-                </div>
+              <div className="flex items-center gap-3">
+                <CalendarCheck className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
                 <div>
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight">{project.name}</h1>
+                    <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">{project.name}</h1>
                     <div
                       className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
                       style={{ animation: 'badge-border-pulse 3s ease-in-out infinite' }}
@@ -210,9 +205,9 @@ export default function StandupProjectPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-[13px] text-[var(--apple-secondary-label)]">
-                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" />{project.teamMembers.length} team members</span>
-                {project.sprintName && <span className="flex items-center gap-1.5"><Activity className="h-4 w-4" />{project.sprintName}</span>}
-                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" />Last standup {formatDateTimeSafe(project.lastStandupAt)}</span>
+                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" strokeWidth={1.5} />{project.teamMembers.length} team members</span>
+                {project.sprintName && <span className="flex items-center gap-1.5"><Activity className="h-4 w-4" strokeWidth={1.5} />{project.sprintName}</span>}
+                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" strokeWidth={1.5} />Last standup {formatDateTimeSafe(project.lastStandupAt)}</span>
               </div>
             </div>
 
@@ -223,7 +218,7 @@ export default function StandupProjectPage() {
                 style={{ background: HEADER_GRADIENT }}
                 className="text-white hover:opacity-90"
               >
-                <CalendarDays className="mr-2 h-4 w-4" />
+                <CalendarDays className="mr-2 h-4 w-4" strokeWidth={1.5} />
                 Create Standup
               </Button>
             </div>
@@ -232,7 +227,7 @@ export default function StandupProjectPage() {
           {/* Stats bar */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: 'Team Members',  value: project.teamMembers.length, icon: Users,        color: '#007AFF' },
+              { label: 'Team Members',  value: project.teamMembers.length, icon: Users,        color: 'var(--apple-chart-to)' },
               { label: 'Total Meetings',value: totalMeetings,              icon: CalendarCheck, color: '#AF52DE' },
               { label: 'Upcoming',      value: upcomingMeetings.length,    icon: CalendarDays,  color: '#FF9500' },
               { label: 'Completed',     value: completedMeetings,          icon: Activity,      color: '#34C759' },
@@ -240,7 +235,7 @@ export default function StandupProjectPage() {
               <div key={label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="apple-section-label text-[var(--apple-secondary-label)]">{label}</p>
-                  <Icon className="h-4 w-4" style={{ color }} />
+                  <Icon className="h-4 w-4" style={{ color }} strokeWidth={1.5} />
                 </div>
                 <p className="text-[24px] font-bold tracking-tight font-apple-mono tabular-nums" style={{ color }}>{value}</p>
               </div>
@@ -254,7 +249,7 @@ export default function StandupProjectPage() {
                 <p className="text-[15px] font-semibold">Project Progress</p>
                 <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">Standup coverage and team momentum for the current sprint window.</p>
               </div>
-              <span className="text-[22px] font-bold font-apple-mono tabular-nums" style={{ color: '#007AFF' }}>
+              <span className="text-[22px] font-bold font-apple-mono tabular-nums" style={{ color: 'var(--apple-chart-to)' }}>
                 {project.progressPercent}%
               </span>
             </div>
@@ -303,7 +298,7 @@ export default function StandupProjectPage() {
                   />
                 </div>
                 <Button variant="outline" size="sm" onClick={() => setStandupDateFilter('')} className="apple-transition">
-                  <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                  <RefreshCw className="mr-2 h-3.5 w-3.5" strokeWidth={1.5} />
                   Clear
                 </Button>
               </div>
@@ -489,12 +484,12 @@ function MeetingCard({ meeting, canManage, formatDate, onView, onDelete, showSta
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 pt-1">
           <Button variant="outline" size="sm" onClick={onView} className="h-8 text-[12px] apple-transition">
-            <Eye className="mr-1.5 h-3.5 w-3.5" />
+            <Eye className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.5} />
             View Details
           </Button>
           {canManage && (
             <Button variant="destructive" size="sm" onClick={onDelete} className="h-8 text-[12px] apple-transition">
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Button>
           )}
         </div>

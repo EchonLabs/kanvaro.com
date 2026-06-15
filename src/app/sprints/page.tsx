@@ -850,6 +850,7 @@ const [searchQuery, setSearchQuery] = useState('')
         <PageHeader
           title="Sprints"
           subtitle="Manage your agile sprints and iterations"
+          icon={Zap}
           actions={
             <Button
               onClick={() => {
@@ -996,21 +997,15 @@ const [searchQuery, setSearchQuery] = useState('')
                   <div
                     key={sprint._id}
                     className={cn(
-                      "group rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card overflow-hidden",
+                      "card-fade-in group rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card overflow-hidden",
                       "shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none",
                       "hover:shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_8px_32px_rgba(0,0,0,0.40)]",
                       "hover:-translate-y-0.5 apple-transition cursor-pointer"
                     )}
                     onClick={() => canViewSprint && router.push(`/sprints/${sprint._id}`)}
                   >
-                    {/* Top accent bar colored by status */}
-                    <div className={cn(
-                      "h-1 w-full",
-                      sprint.status === 'active'    ? "bg-gradient-to-r from-emerald-400 to-teal-400" :
-                      sprint.status === 'planning'  ? "bg-gradient-to-r from-blue-400 to-sky-400" :
-                      sprint.status === 'completed' ? "bg-gradient-to-r from-gray-300 to-gray-400" :
-                                                      "bg-gradient-to-r from-red-400 to-orange-400"
-                    )} />
+                    {/* Top accent bar */}
+                    <div className="h-1 w-full" style={{ background: 'var(--apple-card-gradient)' }} />
 
                     <div className="p-5 space-y-4">
                       {/* Header: title + status badge + dropdown */}
@@ -1190,7 +1185,7 @@ const [searchQuery, setSearchQuery] = useState('')
                 return (
                   <div
                     key={sprint._id}
-                    className="flex items-center gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px cursor-pointer"
+                    className="card-fade-in flex items-center gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px cursor-pointer"
                     onClick={() => canViewSprint && router.push(`/sprints/${sprint._id}`)}
                   >
                     {/* Status + name + project */}

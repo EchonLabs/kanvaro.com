@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -10,24 +10,21 @@ import { useOrganization } from '@/hooks/useOrganization'
 import {
   Building2, Upload, Save, X, Users, UserCheck, Crown,
   Globe, DollarSign, Languages, Briefcase, Clock, Bell,
-  ChevronRight, Shield, Timer, Loader2,
+  ChevronRight, Shield, Timer, Loader2, Palette,
 } from 'lucide-react'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useNotify } from '@/lib/notify'
+import { useAccentTheme, type AccentTheme } from '@/hooks/useAccentTheme'
 
 /* ── Section card wrapper ── */
 function SectionCard({
   icon: Icon,
-  gradient,
-  glow,
   title,
   description,
   children,
   action,
 }: {
   icon: React.ElementType
-  gradient: string
-  glow: string
   title: string
   description?: string
   children: React.ReactNode
@@ -38,10 +35,7 @@ function SectionCard({
       {/* Card header */}
       <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--apple-separator)]">
         <div className="flex items-center gap-3">
-          <div className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-            style={{ background: gradient, boxShadow: `0 3px 10px ${glow}` }}>
-            <Icon className="h-4.5 w-4.5 text-white h-[18px] w-[18px]" strokeWidth={1.8} />
-          </div>
+          <Icon className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
           <div>
             <p className="text-[15px] font-semibold text-[var(--apple-label)]">{title}</p>
             {description && <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">{description}</p>}
@@ -156,6 +150,14 @@ export function OrganizationSettings() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [currencySearchQuery, setCurrencySearchQuery] = useState('')
 
+  /* ── Saved-state snapshots for dirty-detection ── */
+  const savedOrgInfo = useRef<{ name: string; domain: string; timezone: string; currency: string; language: string; industry: string; size: string } | null>(null)
+  const savedRegistration = useRef<string | null>(null)
+  const savedTimeTracking = useRef<typeof formData.timeTracking | null>(null)
+  const savedNotifications = useRef<{ retentionDays: number; autoCleanup: boolean } | null>(null)
+
+  const { theme: accentTheme, updateTheme: updateAccentTheme } = useAccentTheme()
+
   const currentCurrencySymbol = useMemo(() => {
     const currency = getCurrencyByCode(formData.currency)
     return currency?.symbol || '$'
@@ -229,6 +231,23 @@ export function OrganizationSettings() {
 
   const isFormValid = formData.name.trim() !== '' && (!formData.domain || /^(https?:\/\/)?([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(\/.*)?$/.test(formData.domain))
 
+  /* Per-section dirty flags — save buttons are disabled until something changes */
+  const hasOrgInfoChanges = !savedOrgInfo.current || logo !== null || darkLogo !== null || (
+    formData.name !== savedOrgInfo.current.name ||
+    formData.domain !== savedOrgInfo.current.domain ||
+    formData.timezone !== savedOrgInfo.current.timezone ||
+    formData.currency !== savedOrgInfo.current.currency ||
+    formData.language !== savedOrgInfo.current.language ||
+    formData.industry !== savedOrgInfo.current.industry ||
+    formData.size !== savedOrgInfo.current.size
+  )
+  const hasRegistrationChanges = !savedRegistration.current || formData.defaultUserRole !== savedRegistration.current
+  const hasTimeTrackingChanges = !savedTimeTracking.current || JSON.stringify(formData.timeTracking) !== JSON.stringify(savedTimeTracking.current)
+  const hasNotificationChanges = !savedNotifications.current || (
+    notificationRetentionInput !== savedNotifications.current.retentionDays.toString() ||
+    (formData.notifications?.autoCleanup ?? true) !== savedNotifications.current.autoCleanup
+  )
+
   useEffect(() => {
     if (organization) {
       const retentionDaysFromOrg = organization.settings?.notifications?.retentionDays ?? 30
@@ -269,6 +288,19 @@ export function OrganizationSettings() {
       })
       setNotificationRetentionInput(retentionDaysFromOrg.toString())
 
+      /* Populate saved-state snapshots */
+      savedOrgInfo.current = {
+        name: organization.name || '',
+        domain: organization.domain || '',
+        timezone: organization.timezone || 'UTC',
+        currency: organization.currency || 'USD',
+        language: organization.language || 'en',
+        industry: organization.industry || '',
+        size: organization.size || 'small',
+      }
+      savedRegistration.current = organization.settings?.defaultUserRole || 'team_member'
+      savedNotifications.current = { retentionDays: retentionDaysFromOrg, autoCleanup: organization.settings?.notifications?.autoCleanup ?? true }
+
       const loadTimeTrackingSettings = async () => {
         try {
           const response = await fetch('/api/time-tracking/settings')
@@ -302,6 +334,7 @@ export function OrganizationSettings() {
               if (data.settings.roundingRules?.increment) {
                 setRoundingIncrementInput(data.settings.roundingRules.increment.toString())
               }
+              savedTimeTracking.current = data.settings
             }
           }
         } catch (error) {
@@ -337,6 +370,7 @@ export function OrganizationSettings() {
       }
       if (logo) setLogo(null)
       if (darkLogo) setDarkLogo(null)
+      savedOrgInfo.current = { name: formData.name, domain: formData.domain, timezone: formData.timezone, currency: formData.currency, language: formData.language, industry: formData.industry, size: formData.size }
       await refetch()
       setTimeout(() => invalidateOrganizationCache(), 100)
       notifySuccess({ title: 'Organization Updated', message: 'Organization settings have been updated successfully' })
@@ -357,6 +391,7 @@ export function OrganizationSettings() {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || 'Failed to update registration settings')
       }
+      savedRegistration.current = formData.defaultUserRole
       await refetch()
       setTimeout(() => invalidateOrganizationCache(), 100)
       notifySuccess({ title: 'Registration Settings Updated', message: 'User registration settings have been updated successfully' })
@@ -394,7 +429,10 @@ export function OrganizationSettings() {
         throw new Error(errorData.error || 'Failed to update time tracking settings')
       }
       const data = await response.json()
-      if (data.settings) setFormData(prev => ({ ...prev, timeTracking: data.settings }))
+      if (data.settings) {
+        setFormData(prev => ({ ...prev, timeTracking: data.settings }))
+        savedTimeTracking.current = data.settings
+      }
       await refetch()
       setTimeout(() => invalidateOrganizationCache(), 100)
       notifySuccess({ title: 'Time Tracking Settings Updated', message: 'Time tracking configuration has been updated successfully' })
@@ -425,6 +463,7 @@ export function OrganizationSettings() {
       }
       setFormData(prev => ({ ...prev, notifications: { ...prev.notifications, retentionDays: normalizedRetentionDays } }))
       setNotificationRetentionInput(normalizedRetentionDays.toString())
+      savedNotifications.current = { retentionDays: normalizedRetentionDays, autoCleanup: formData.notifications?.autoCleanup ?? true }
       await refetch()
       setTimeout(() => invalidateOrganizationCache(), 100)
       notifySuccess({ title: 'Notification Settings Updated', message: 'Notification retention settings have been updated successfully' })
@@ -455,11 +494,56 @@ export function OrganizationSettings() {
   return (
     <div className="space-y-5">
 
+      {/* ── Appearance ── */}
+      <SectionCard
+        icon={Palette}
+        title="Appearance"
+        description="Choose your accent color — applied across the entire app"
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {(
+            [
+              { id: 'blue',   label: 'Blue',   color: '#3D8EFF' },
+              { id: 'orange', label: 'Orange', color: '#FF7A00' },
+              { id: 'purple', label: 'Purple', color: '#9B5FE8' },
+              { id: 'red',    label: 'Red',    color: '#FF2D30' },
+            ] as { id: AccentTheme; label: string; color: string }[]
+          ).map(({ id, label, color }) => {
+            const active = accentTheme === id
+            return (
+              <button
+                key={id}
+                onClick={() => updateAccentTheme(id)}
+                className={`group relative flex flex-col items-center gap-2.5 p-3 rounded-[var(--apple-radius-md)] border apple-transition ${
+                  active
+                    ? 'border-transparent ring-2 ring-offset-2 ring-offset-card'
+                    : 'border-[var(--apple-separator)] hover:border-transparent hover:ring-2 hover:ring-offset-2 hover:ring-offset-card'
+                }`}
+                style={{ ['--tw-ring-color' as any]: color }}
+              >
+                {/* Colour swatch */}
+                <div
+                  className="h-10 w-full rounded-[var(--apple-radius-sm)] shadow-sm"
+                  style={{ backgroundColor: color }}
+                />
+                <span className={`text-[12px] font-semibold ${active ? 'text-[var(--apple-label)]' : 'text-[var(--apple-secondary-label)]'}`}>
+                  {label}
+                </span>
+                {active && (
+                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                )}
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-[11px] text-[var(--apple-tertiary-label)]">
+          Theme is saved in your browser and applied instantly — no save required.
+        </p>
+      </SectionCard>
+
       {/* ── Organization Information ── */}
       <SectionCard
         icon={Building2}
-        gradient="linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)"
-        glow="rgba(0,122,255,0.25)"
         title="Organization Information"
         description="Basic identity and locale settings"
       >
@@ -562,7 +646,7 @@ export function OrganizationSettings() {
                   <div className={`w-8 h-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0 ${
                     active ? 'bg-[var(--apple-system-blue)] text-white' : 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]'
                   }`}>
-                    <SizeIcon className="h-4 w-4" />
+                    <SizeIcon className="h-4 w-4" strokeWidth={1.5} />
                   </div>
                   <div className="min-w-0">
                     <p className={`text-[13px] font-semibold ${active ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-label)]'}`}>{label}</p>
@@ -615,15 +699,13 @@ export function OrganizationSettings() {
         </div>
 
         <div className="flex justify-end pt-2">
-          <SaveButton loading={saving} disabled={!isFormValid} onClick={handleSave} label="Save Organization" />
+          <SaveButton loading={saving} disabled={!isFormValid || !hasOrgInfoChanges} onClick={handleSave} label="Save Organization" />
         </div>
       </SectionCard>
 
       {/* ── User Registration ── */}
       <SectionCard
         icon={UserCheck}
-        gradient="linear-gradient(135deg,#34C759 0%,#30D158 100%)"
-        glow="rgba(52,199,89,0.25)"
         title="User Registration"
         description="Default role assigned to newly registered users"
       >
@@ -641,15 +723,13 @@ export function OrganizationSettings() {
         </Field>
 
         <div className="flex justify-end pt-2">
-          <SaveButton loading={savingRegistration} onClick={handleSaveRegistrationSettings} label="Save Registration" />
+          <SaveButton loading={savingRegistration} disabled={!hasRegistrationChanges} onClick={handleSaveRegistrationSettings} label="Save Registration" />
         </div>
       </SectionCard>
 
       {/* ── Time Tracking ── */}
       <SectionCard
         icon={Timer}
-        gradient="linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)"
-        glow="rgba(255,149,0,0.25)"
         title="Time Tracking"
         description="Global time tracking rules for your organization"
       >
@@ -819,15 +899,13 @@ export function OrganizationSettings() {
         )}
 
         <div className="flex justify-end pt-2">
-          <SaveButton loading={savingTimeTracking} onClick={handleSaveTimeTrackingSettings} label="Save Time Tracking" />
+          <SaveButton loading={savingTimeTracking} disabled={!hasTimeTrackingChanges} onClick={handleSaveTimeTrackingSettings} label="Save Time Tracking" />
         </div>
       </SectionCard>
 
       {/* ── Notifications ── */}
       <SectionCard
         icon={Bell}
-        gradient="linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)"
-        glow="rgba(191,90,242,0.25)"
         title="Notification Settings"
         description="Retention and cleanup rules for in-app notifications"
       >
@@ -864,7 +942,7 @@ export function OrganizationSettings() {
         </div>
 
         <div className="flex justify-end pt-2">
-          <SaveButton loading={savingNotifications} onClick={handleSaveNotificationSettings} label="Save Notifications" />
+          <SaveButton loading={savingNotifications} disabled={!hasNotificationChanges} onClick={handleSaveNotificationSettings} label="Save Notifications" />
         </div>
       </SectionCard>
 
@@ -891,12 +969,12 @@ function LogoUploadSlot({
           <img src={preview} alt={label} className={`h-16 w-16 object-contain rounded-[var(--apple-radius-sm)] border ${dark ? 'bg-gray-800 border-gray-700' : 'bg-white border-[var(--apple-separator)]'}`} />
           <button onClick={onRemove}
             className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-[var(--apple-system-red)] flex items-center justify-center shadow apple-transition hover:scale-110">
-            <X className="h-2.5 w-2.5 text-white" />
+            <X className="h-2.5 w-2.5 text-white" strokeWidth={1.5} />
           </button>
         </div>
       ) : (
         <div className={`h-16 w-16 border-2 border-dashed rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0 ${dark ? 'border-gray-600 bg-gray-800' : 'border-[var(--apple-separator)]'}`}>
-          <Upload className={`h-6 w-6 ${dark ? 'text-gray-500' : 'text-[var(--apple-tertiary-label)]'}`} />
+          <Upload className={`h-6 w-6 ${dark ? 'text-gray-500' : 'text-[var(--apple-tertiary-label)]'}`} strokeWidth={1.5} />
         </div>
       )}
       <div className="flex-1 min-w-0">
@@ -909,7 +987,7 @@ function LogoUploadSlot({
               ? 'border-gray-600 text-gray-200 bg-gray-800 hover:bg-gray-700'
               : 'border-[var(--apple-separator)] text-[var(--apple-secondary-label)] bg-[var(--apple-quaternary-fill)] hover:bg-[var(--apple-tertiary-fill)]'
           }`}>
-          <Upload className="h-3 w-3" /> Upload
+          <Upload className="h-3 w-3" strokeWidth={1.5} /> Upload
         </label>
         <p className={`text-[11px] mt-1.5 ${dark ? 'text-gray-500' : 'text-[var(--apple-tertiary-label)]'}`}>Max 5MB · PNG / JPG / SVG</p>
       </div>
@@ -929,9 +1007,9 @@ function SaveButton({ loading, disabled = false, onClick, label }: {
       onClick={onClick}
       disabled={loading || disabled}
       className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
-      style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+      style={{ background: 'var(--apple-card-gradient)' }}
     >
-      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <Save className="h-3.5 w-3.5" strokeWidth={1.5} />}
       {loading ? 'Saving…' : label}
     </Button>
   )

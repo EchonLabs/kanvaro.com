@@ -91,12 +91,12 @@ interface Project {
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 
 const PROJECT_PALETTE = [
-  { gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.25)' },
-  { gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.25)' },
-  { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.25)' },
-  { gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.25)' },
-  { gradient: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)', glow: 'rgba(48,176,199,0.25)' },
-  { gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)', glow: 'rgba(255,69,58,0.25)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
 ]
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; border: string }> = {
@@ -199,17 +199,18 @@ function GradientProgress({
     <div className="flex items-center gap-2 w-full">
       <div className="relative flex-1 h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
         <div
-          className="absolute inset-y-0 left-0 rounded-full overflow-hidden transition-all duration-700 ease-out"
+          className="absolute inset-y-0 left-0 rounded-full overflow-hidden progress-bar-animated"
           style={{
             width: `${pct}%`,
             background: gradient,
             boxShadow: pct > 2 ? `0 0 8px ${glow}, 0 1px 3px ${glow}` : 'none',
+            transformOrigin: 'left',
           }}
         >
           {pct > 2 && <span aria-hidden className="progress-shimmer absolute inset-0" />}
         </div>
       </div>
-      <span className="text-xs font-apple-mono font-semibold text-[var(--apple-secondary-label)] w-7 text-right flex-shrink-0 tabular-nums">
+      <span className="text-xs font-apple-mono font-semibold text-[var(--apple-secondary-label)] w-9 text-right flex-shrink-0 tabular-nums">
         {pct}%
       </span>
     </div>
@@ -282,7 +283,7 @@ function EmptyState({
     <div className="flex flex-col items-center justify-center py-24 gap-5 text-center">
       <div
         className="h-16 w-16 rounded-[var(--apple-radius-lg)] flex items-center justify-center shadow-sm"
-        style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+        style={{ background: 'var(--apple-card-gradient)' }}
       >
         <FolderOpen className="h-8 w-8 text-white" />
       </div>
@@ -420,7 +421,7 @@ function ProjectGridCard({
       onClick={() => onNavigate(`/projects/${project._id}`)}
       onKeyDown={(e) => e.key === 'Enter' && onNavigate(`/projects/${project._id}`)}
       className={cn(
-        'group rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
+        'card-fade-in group rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
         'shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none',
         'apple-transition cursor-pointer overflow-hidden flex flex-col',
         'hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)]',
@@ -827,27 +828,31 @@ export default function ProjectsPage() {
 
           {/* ─── Page Header ─────────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
-                Projects
-              </h1>
-              <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
-                {searching ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--apple-system-blue)] animate-pulse" />
-                    Searching...
-                  </span>
-                ) : totalCount > 0 ? (
-                  `${totalCount} project${totalCount !== 1 ? 's' : ''}`
-                ) : (
-                  'Manage and track your projects'
-                )}
-              </p>
+            <div className="flex items-center gap-3">
+              <FolderOpen className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+              <div>
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
+                  Projects
+                </h1>
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                  {searching ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--apple-system-blue)] animate-pulse" />
+                      Searching...
+                    </span>
+                  ) : totalCount > 0 ? (
+                    `${totalCount} project${totalCount !== 1 ? 's' : ''}`
+                  ) : (
+                    'Manage and track your projects'
+                  )}
+                </p>
+              </div>
             </div>
             <PermissionGate permission={Permission.PROJECT_CREATE}>
               <Button
                 onClick={() => router.push('/projects/create')}
-                className="flex items-center gap-2 text-sm font-medium apple-transition w-full sm:w-auto"
+                className="flex items-center gap-2 text-sm font-medium apple-transition w-full sm:w-auto text-white hover:opacity-90"
+                style={{ background: 'var(--apple-card-gradient)' }}
               >
                 <Plus className="h-4 w-4" />
                 New Project

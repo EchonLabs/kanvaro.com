@@ -9,7 +9,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-[var(--apple-system-blue)] text-white hover:opacity-90 rounded-[var(--apple-radius-pill)]",
+          "[background:var(--apple-card-gradient)] text-white hover:opacity-90 rounded-[var(--apple-radius-pill)]",
         destructive:
           "bg-[var(--apple-system-red)] text-white hover:opacity-90 rounded-[var(--apple-radius-pill)]",
         outline:

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -15,7 +15,7 @@ interface RevenueReportProps {
   filters: any
 }
 
-const APPLE_COLORS = ['#34C759','#007AFF','#FF9500','#BF5AF2','#30B0C7','#FF453A']
+const APPLE_COLORS = ['#34C759','var(--apple-chart-color)','#FF9500','#BF5AF2','#30B0C7','#FF453A']
 
 const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
   if (!active || !payload?.length) return null
@@ -106,9 +106,9 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
       {/* ── Stats Strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue', value: formatCurrency(totalRevenue), sub: 'Generated revenue', color: '#34C759' },
-          { label: 'Average / Source', value: formatCurrency(avgRevenue), sub: 'Per revenue source', color: '#007AFF' },
-          { label: 'Top Source', value: topSource ? topSource.source : 'N/A', sub: topSource ? `${topSource.percentage.toFixed(1)}% of total` : '—', color: '#FF9500' },
+          { label: 'Total Revenue',  value: formatCurrency(totalRevenue),  sub: 'Generated revenue',                                                                            color: '#34C759' },
+          { label: 'Average/Source', value: formatCurrency(avgRevenue),    sub: 'Per revenue source',                                                                           color: 'var(--apple-chart-color)' },
+          { label: 'Top Source',     value: topSource ? topSource.source : 'N/A', sub: topSource ? `${topSource.percentage.toFixed(1)}% of total` : '—',                       color: '#FF9500' },
           { label: 'Revenue Growth', value: `${revenueGrowth >= 0 ? '+' : ''}${revenueGrowth.toFixed(1)}%`, sub: 'Month over month', color: revenueGrowth >= 0 ? '#34C759' : '#FF453A' },
         ].map(s => (
           <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
@@ -140,7 +140,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Area — monthly revenue + profit */}
+        {/* Area — monthly revenue (green=semantic) + profit (theme) */}
         <ChartCard title="Monthly Revenue Trends" subtitle="Revenue and profit over time">
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -148,21 +148,18 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                 <linearGradient id="rev-revenue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#34C759" stopOpacity={0.25} /><stop offset="100%" stopColor="#34C759" stopOpacity={0} />
                 </linearGradient>
-                <linearGradient id="rev-profit" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.20} /><stop offset="100%" stopColor="#007AFF" stopOpacity={0} />
-                </linearGradient>
               </defs>
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
               <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
-              <Area type="monotone" dataKey="Revenue" stroke="#34C759" strokeWidth={2} fill="url(#rev-revenue)" dot={false} activeDot={{ r: 4 }} />
-              <Area type="monotone" dataKey="Profit" stroke="#007AFF" strokeWidth={2} fill="url(#rev-profit)" dot={false} activeDot={{ r: 4 }} />
+              <Area type="monotone" dataKey="Revenue" stroke="#34C759"                   strokeWidth={2} fill="url(#rev-revenue)"        dot={false} activeDot={{ r: 4 }} />
+              <Area type="monotone" dataKey="Profit"  stroke="var(--apple-chart-color)"  strokeWidth={2} fill="var(--apple-chart-color)" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Bar — revenue sources comparison */}
+        {/* Bar — revenue sources comparison (green = revenue = positive) */}
         <ChartCard title="Revenue Sources Comparison" subtitle="Revenue amount per source">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={barData} barCategoryGap="35%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -186,7 +183,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v.toFixed(0)}%`} />
               <Tooltip content={<AppleTooltip formatValue={(v: number) => `${Number(v).toFixed(1)}%`} />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
-              <Line type="monotone" dataKey="Margin %" stroke="#FF9500" strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: '#FF9500' }} strokeLinecap="round" />
+              <Line type="monotone" dataKey="Margin %" stroke="var(--apple-chart-color)" strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: 'var(--apple-chart-color)' }} strokeLinecap="round" />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </LineChart>
           </ResponsiveContainer>

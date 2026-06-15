@@ -152,15 +152,14 @@ export default function SortableTask({
       style={style}
       {...(isDraggable ? attributes : {})}
       {...(isDraggable ? listeners : {})}
-      className={`hover:shadow-md transition-shadow select-none hover:bg-muted/20 ${
+      className={`card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none select-none apple-transition ${
         isDraggable
-          ? 'cursor-grab active:cursor-grabbing'
+          ? 'cursor-grab active:cursor-grabbing hover:shadow-[0_8px_28px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.38)] hover:-translate-y-0.5'
           : 'cursor-not-allowed opacity-60'
       } ${
         isDragging ? 'opacity-50 shadow-lg scale-105' : ''
       } ${isDragOverlay ? 'shadow-2xl scale-105' : ''}`}
       onClick={(e) => {
-        // Only trigger click if not dragging and not clicking on interactive elements
         if (!isDragging && e.target === e.currentTarget) {
           onClick()
         }
@@ -250,10 +249,10 @@ export default function SortableTask({
             )}
           </div>
 
-          <div className="text-xs text-muted-foreground space-y-1 min-w-0">
+          <div className="text-xs text-[var(--apple-secondary-label)] space-y-1 min-w-0">
             {task.project && (
               <div className="flex items-center space-x-1 min-w-0">
-                <Target className="h-3 w-3 flex-shrink-0" />
+                <Target className="h-3 w-3 flex-shrink-0 text-[var(--apple-chart-color)]" />
                 <span 
                   className="truncate"
                   title={task.project.name && task.project.name.length > 10 ? task.project.name : undefined}
@@ -264,7 +263,7 @@ export default function SortableTask({
             )}
             {task.dueDate &&  (
               <div className="flex items-center space-x-1">
-                <Calendar className="h-3 w-3 flex-shrink-0" />
+                <Calendar className="h-3 w-3 flex-shrink-0 text-[var(--apple-chart-color)]" />
                 <span className="whitespace-nowrap">Due {formatDate(task.dueDate)}</span>
               </div>
             )}
@@ -298,7 +297,7 @@ export default function SortableTask({
 
                 return (
                   <div className="flex items-center space-x-1 min-w-0" title={`${displayName} (${email})`}>
-                    <div className="w-5 h-5 sm:w-6 sm:h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium flex-shrink-0">
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-white text-xs font-medium flex-shrink-0" style={{ background: 'var(--apple-card-gradient)' }}>
                       {initials}
                     </div>
                     <span className="text-xs text-muted-foreground truncate hidden sm:inline max-w-[80px]">

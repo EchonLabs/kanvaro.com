@@ -103,7 +103,7 @@ export function StandupScheduleDialog({ open, onOpenChange, members, onSubmit }:
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
                     {selectedDate ? format(selectedDate, 'PPP') : 'Pick a date'}
                   </Button>
                 </PopoverTrigger>
@@ -170,7 +170,7 @@ export function StandupScheduleDialog({ open, onOpenChange, members, onSubmit }:
             style={{ background: 'var(--apple-system-blue)', boxShadow: '0 2px 10px rgba(0,122,255,0.28)' }}
           >
             {submitting ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Scheduling…</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.5} />Scheduling…</>
             ) : (
               'Create Schedule'
             )}

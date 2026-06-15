@@ -34,7 +34,7 @@ interface TeamProductivityReportProps {
   filters: any
 }
 
-const APPLE_COLORS = ['#007AFF','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7','#FF375F','#FFD60A']
+const APPLE_COLORS = ['var(--apple-chart-color)','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7','#FF375F','#FFD60A']
 
 const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
   if (!active || !payload?.length) return null
@@ -104,9 +104,9 @@ export function TeamProductivityReport({ members, productivityTrends, filters }:
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Avg Productivity', value: `${avgProd.toFixed(1)}%`, sub: 'Team average', color: '#34C759' },
-          { label: 'Total Hours', value: `${totalHours.toFixed(0)}h`, sub: 'All sessions logged', color: '#007AFF' },
+          { label: 'Total Hours', value: `${totalHours.toFixed(0)}h`, sub: 'All sessions logged', color: 'var(--apple-chart-color)' },
           { label: 'Avg Session', value: `${avgSession.toFixed(1)}h`, sub: 'Per work session', color: '#FF9500' },
-          { label: 'Total Tasks', value: String(totalTasks), sub: 'Completed in period', color: '#BF5AF2' },
+          { label: 'Total Tasks', value: String(totalTasks), sub: 'Completed in period', color: 'var(--apple-chart-color)' },
         ].map(s => (
           <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
             <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
@@ -129,7 +129,7 @@ export function TeamProductivityReport({ members, productivityTrends, filters }:
                 <YAxis yAxisId="tasks" orientation="right" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={28} />
                 <Tooltip content={<AppleTooltip />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
                 <Line yAxisId="pct" type="monotone" dataKey="Productivity" stroke="#34C759" strokeWidth={2.5} dot={{ r: 3, fill: '#34C759' }} activeDot={{ r: 5 }} />
-                <Line yAxisId="tasks" type="monotone" dataKey="Tasks/Period" stroke="#007AFF" strokeWidth={2.5} dot={{ r: 3, fill: '#007AFF' }} activeDot={{ r: 5 }} strokeDasharray="5 3" />
+                <Line yAxisId="tasks" type="monotone" dataKey="Tasks/Period" stroke="var(--apple-chart-color)" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} strokeDasharray="5 3" />
                 <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
               </LineChart>
             </ResponsiveContainer>
@@ -145,15 +145,10 @@ export function TeamProductivityReport({ members, productivityTrends, filters }:
           {hoursTrendData.length > 0 ? (
             <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={hoursTrendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="prod-hours" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#BF5AF2" stopOpacity={0.25} /><stop offset="100%" stopColor="#BF5AF2" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
                 <XAxis dataKey="period" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}h`} />
                 <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}h`} />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
-                <Area type="monotone" dataKey="Hours" stroke="#BF5AF2" strokeWidth={2} fill="url(#prod-hours)" dot={false} activeDot={{ r: 4 }} />
+                <Area type="monotone" dataKey="Hours" stroke="var(--apple-chart-color)" strokeWidth={2} fill="var(--apple-chart-color)" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
@@ -167,15 +162,10 @@ export function TeamProductivityReport({ members, productivityTrends, filters }:
         <ChartCard title="Member Productivity" subtitle="Productivity score per team member (top 10)">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={memberData} barCategoryGap="35%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="prod-bar" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#34C759" stopOpacity={0.9} /><stop offset="100%" stopColor="#30B0C7" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, 100]} />
               <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Productivity" fill="url(#prod-bar)" radius={[5, 5, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="Productivity" fill="#34C759" radius={[5, 5, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

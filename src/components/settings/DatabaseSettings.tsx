@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -34,6 +34,7 @@ export function DatabaseSettings() {
     authSource: 'admin',
     ssl: false,
   })
+  const savedConfig = useRef<typeof formData | null>(null)
 
   useEffect(() => {
     const loadDatabaseConfig = async () => {
@@ -41,7 +42,7 @@ export function DatabaseSettings() {
         const response = await fetch('/api/settings/database')
         if (response.ok) {
           const config = await response.json()
-          setFormData({
+          const loaded = {
             host: config.host || 'localhost',
             port: config.port || 27017,
             database: config.database || 'kanvaro',
@@ -49,7 +50,9 @@ export function DatabaseSettings() {
             password: config.password || '',
             authSource: config.authSource || 'admin',
             ssl: config.ssl || false,
-          })
+          }
+          setFormData(loaded)
+          savedConfig.current = loaded
         }
       } catch (error) {
         console.error('Failed to load database configuration:', error)
@@ -59,6 +62,8 @@ export function DatabaseSettings() {
     }
     loadDatabaseConfig()
   }, [])
+
+  const hasChanges = !savedConfig.current || JSON.stringify(formData) !== JSON.stringify(savedConfig.current)
 
   const handleTest = async () => {
     setTesting(true)
@@ -86,6 +91,7 @@ export function DatabaseSettings() {
         body: JSON.stringify(formData),
       })
       if (!response.ok) throw new Error('Failed to update database settings')
+      savedConfig.current = { ...formData }
       notifySuccess({ title: 'Database Settings Updated', message: 'Database configuration has been updated successfully' })
     } catch (error) {
       notifyError({ title: 'Update Failed', message: error instanceof Error ? error.message : 'Failed to update database settings' })
@@ -109,12 +115,7 @@ export function DatabaseSettings() {
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
-          <div
-            className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 3px 10px rgba(52,199,89,0.25)' }}
-          >
-            <Database className="h-[18px] w-[18px] text-white" strokeWidth={1.8} />
-          </div>
+          <Database className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
           <div>
             <p className="text-[15px] font-semibold text-[var(--apple-label)]">Database Configuration</p>
             <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">Configure your MongoDB database connection settings</p>
@@ -188,17 +189,17 @@ export function DatabaseSettings() {
               disabled={testing || saving}
               className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px] border-[var(--apple-separator)]"
             >
-              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TestTube className="h-3.5 w-3.5" />}
+              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <TestTube className="h-3.5 w-3.5" strokeWidth={1.5} />}
               {testing ? 'Testing…' : 'Test Connection'}
             </Button>
 
             <Button
               onClick={handleSave}
-              disabled={saving || testing}
+              disabled={saving || testing || !hasChanges}
               className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
-              style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)' }}
+              style={{ background: hasChanges ? 'var(--apple-card-gradient)' : undefined }}
             >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <Save className="h-3.5 w-3.5" strokeWidth={1.5} />}
               {saving ? 'Saving…' : 'Save Configuration'}
             </Button>
           </div>

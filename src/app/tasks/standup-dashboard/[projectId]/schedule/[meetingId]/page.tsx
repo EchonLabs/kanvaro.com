@@ -24,13 +24,13 @@ import { StandupTimelogList } from '@/components/standup-dashboard/StandupTimelo
 import { ArrowLeft, CalendarDays, CalendarCheck, Clock3, Edit3, Loader2, MessageSquare, Sparkles, Trash2, Users } from 'lucide-react'
 import { formatToTitleCase } from '@/lib/utils'
 
-const HEADER_GRADIENT = 'linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%)'
-const HEADER_GLOW = 'rgba(0, 122, 255, 0.25)'
+const HEADER_GRADIENT = 'var(--apple-card-gradient)'
+const HEADER_GLOW = 'var(--apple-chart-glow)'
 
 const STATUS_CONFIG: Record<StandupMeetingStatus, { bg: string; text: string; dot: string; border: string; label: string }> = {
   scheduled:   { bg: 'bg-blue-50 dark:bg-blue-950/30',       text: 'text-blue-600 dark:text-blue-400',       dot: 'bg-blue-500',   border: 'border-blue-200 dark:border-blue-800',   label: 'Scheduled' },
   in_progress: { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'In Progress' },
-  completed:   { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',       dot: 'bg-gray-400',   border: 'border-gray-200 dark:border-gray-700',   label: 'Completed' },
+  completed:   { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'Completed' },
   missed:      { bg: 'bg-red-50 dark:bg-red-950/30',         text: 'text-red-600 dark:text-red-400',         dot: 'bg-red-500',    border: 'border-red-200 dark:border-red-800',     label: 'Missed' },
 }
 
@@ -159,7 +159,7 @@ export default function StandupScheduleDetailPage() {
       <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <div className="flex items-center justify-center gap-2.5 py-20 text-[13px] text-[var(--apple-secondary-label)]">
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} />
             Loading standup details…
           </div>
         </PageContent>
@@ -183,20 +183,15 @@ export default function StandupScheduleDetailPage() {
                 className="w-fit gap-1.5 px-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
                 onClick={() => router.push(`/tasks/standup-dashboard/${projectId}`)}
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
                 Back to project
               </Button>
 
-              <div className="flex items-center gap-4">
-                <div
-                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--apple-radius-md)] shadow-lg"
-                  style={{ background: HEADER_GRADIENT, boxShadow: `0 8px 24px ${HEADER_GLOW}` }}
-                >
-                  <CalendarCheck className="h-7 w-7 text-white" />
-                </div>
+              <div className="flex items-center gap-3">
+                <CalendarCheck className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
                 <div>
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight">{detail.meeting.title}</h1>
+                    <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">{detail.meeting.title}</h1>
                     <div
                       className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
                       style={{ animation: 'badge-border-pulse 3s ease-in-out infinite' }}
@@ -212,9 +207,9 @@ export default function StandupScheduleDetailPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-[13px] text-[var(--apple-secondary-label)]">
-                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" />{detail.meeting.participants.length} participants</span>
-                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{detail.meeting.time}</span>
-                <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4" />{detail.meeting.durationMinutes} mins</span>
+                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.participants.length} participants</span>
+                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.time}</span>
+                <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.durationMinutes} mins</span>
               </div>
             </div>
 
@@ -240,7 +235,7 @@ export default function StandupScheduleDetailPage() {
               )}
               {canManageStandup && (
                 <Button variant="outline" className="apple-transition" onClick={() => setEditOpen(true)}>
-                  <Edit3 className="mr-2 h-4 w-4" />
+                  <Edit3 className="mr-2 h-4 w-4" strokeWidth={1.5} />
                   Edit
                 </Button>
               )}
@@ -249,7 +244,7 @@ export default function StandupScheduleDetailPage() {
                 className="apple-transition"
                 onClick={handleViewSummary}
               >
-                <Sparkles className="mr-2 h-4 w-4 text-amber-500" />
+                <Sparkles className="mr-2 h-4 w-4" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
                 View Summary
               </Button>
               {detail.meeting.status === 'completed' && (
@@ -262,7 +257,7 @@ export default function StandupScheduleDetailPage() {
               )}
               {canManageStandup && (
                 <Button variant="destructive" className="apple-transition" onClick={() => setDeleteConfirmOpen(true)}>
-                  <Trash2 className="mr-2 h-4 w-4" />
+                  <Trash2 className="mr-2 h-4 w-4" strokeWidth={1.5} />
                   Delete
                 </Button>
               )}
@@ -318,7 +313,7 @@ export default function StandupScheduleDetailPage() {
                               onClick={() => setCommentTaskState({ memberId: member._id, taskId: task.taskId, taskTitle: task.taskTitle })}
                               className="apple-transition h-7 w-7 shrink-0 flex items-center justify-center rounded-full text-[var(--apple-tertiary-label)] hover:bg-[var(--apple-tertiary-fill)] hover:text-[var(--apple-system-blue)]"
                             >
-                              <MessageSquare className="h-3.5 w-3.5" />
+                              <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
                             </button>
                           </div>
                         ))
@@ -388,9 +383,7 @@ export default function StandupScheduleDetailPage() {
         <DialogContent className="sm:max-w-md pointer-events-auto">
           <DialogHeader>
             <div className="flex items-center gap-3 pb-3 border-b border-[var(--apple-separator)]">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--apple-radius-sm)]" style={{ background: HEADER_GRADIENT }}>
-                <MessageSquare className="h-4 w-4 text-white" />
-              </div>
+              <MessageSquare className="h-5 w-5 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <DialogTitle>Comment on Task</DialogTitle>
                 <DialogDescription className="text-[11px] mt-0.5">
@@ -442,7 +435,7 @@ export default function StandupScheduleDetailPage() {
               style={!addingComment && commentText.trim() ? { background: HEADER_GRADIENT } : undefined}
             >
               {addingComment ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.5} />Saving…</>
               ) : 'Add Comment'}
             </Button>
           </DialogFooter>

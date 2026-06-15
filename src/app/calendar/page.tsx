@@ -94,23 +94,16 @@ function StatCard({
   label,
   value,
   Icon,
-  gradient,
-  glow,
+  color,
 }: {
   label: string
   value: number
   Icon: React.ElementType
-  gradient: string
-  glow: string
+  color: string
 }) {
   return (
     <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4 flex items-center gap-3">
-      <div
-        className="flex-shrink-0 w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center shadow-sm"
-        style={{ background: gradient, boxShadow: `0 4px 12px ${glow}` }}
-      >
-        <Icon className="w-5 h-5 text-white" />
-      </div>
+      <Icon className="w-6 h-6 flex-shrink-0" style={{ color }} strokeWidth={1.5} />
       <div className="min-w-0">
         <p className="text-[22px] font-bold tracking-tight font-apple-mono tabular-nums leading-none">{value}</p>
         <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">{label}</p>
@@ -144,12 +137,7 @@ function EventCard({ event, onClick, detailed = false }: { event: CalendarEvent;
     >
       <div className="p-3.5">
         <div className="flex items-start gap-2.5">
-          <div
-            className="flex-shrink-0 w-7 h-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center mt-0.5"
-            style={{ background: cfg.bg }}
-          >
-            <Icon className="w-3.5 h-3.5" style={{ color: cfg.color }} />
-          </div>
+          <Icon className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: cfg.color }} strokeWidth={1.5} />
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-foreground truncate">{event.title}</p>
             {detailed && event.description && (
@@ -175,19 +163,19 @@ function EventCard({ event, onClick, detailed = false }: { event: CalendarEvent;
               <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-[var(--apple-tertiary-label)]">
                 {event.startDate && (
                   <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
+                    <Clock className="w-3 h-3" strokeWidth={1.5} />
                     {new Date(event.startDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
                 {event.project && (
                   <span className="flex items-center gap-1 truncate">
-                    <Target className="w-3 h-3 flex-shrink-0" />
+                    <Target className="w-3 h-3 flex-shrink-0" strokeWidth={1.5} />
                     <span className="truncate">{event.project.name}</span>
                   </span>
                 )}
                 {event.assignedTo && (
                   <span className="flex items-center gap-1 truncate">
-                    <User className="w-3 h-3 flex-shrink-0" />
+                    <User className="w-3 h-3 flex-shrink-0" strokeWidth={1.5} />
                     <span className="truncate">{event.assignedTo.firstName} {event.assignedTo.lastName}</span>
                   </span>
                 )}
@@ -212,12 +200,7 @@ function DayEventCard({ event, onClick }: { event: CalendarEvent; onClick: () =>
         <div className="w-1 flex-shrink-0 rounded-l-[var(--apple-radius-lg)]" style={{ background: cfg.color }} />
         <div className="flex-1 p-4 sm:p-5">
           <div className="flex items-start gap-3">
-            <div
-              className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center mt-0.5"
-              style={{ background: cfg.bg }}
-            >
-              <Icon className="w-4 h-4" style={{ color: cfg.color }} />
-            </div>
+            <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: cfg.color }} strokeWidth={1.5} />
             <div className="flex-1 min-w-0">
               <h4 className="text-[15px] font-semibold text-foreground">{event.title}</h4>
               {event.description && (
@@ -228,7 +211,7 @@ function DayEventCard({ event, onClick }: { event: CalendarEvent; onClick: () =>
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
                   style={{ background: cfg.bg, color: cfg.color }}
                 >
-                  <Icon className="w-3 h-3" />
+                  <Icon className="w-3 h-3" strokeWidth={1.5} />
                   {cfg.label}
                 </span>
                 <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${PRIORITY_BADGE[event.priority] ?? ''}`}>
@@ -243,19 +226,19 @@ function DayEventCard({ event, onClick }: { event: CalendarEvent; onClick: () =>
               <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 mt-3 pt-3 border-t border-[var(--apple-separator)] text-[12px] text-[var(--apple-secondary-label)]">
                 {event.startDate && (
                   <span className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
+                    <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />
                     {new Date(event.startDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
                 {event.project && (
                   <span className="flex items-center gap-1.5 min-w-0">
-                    <Target className="w-3.5 h-3.5 flex-shrink-0" />
+                    <Target className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
                     <span className="truncate">{event.project.name}</span>
                   </span>
                 )}
                 {event.assignedTo && (
                   <span className="flex items-center gap-1.5 min-w-0">
-                    <User className="w-3.5 h-3.5 flex-shrink-0" />
+                    <User className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
                     <span className="truncate">{event.assignedTo.firstName} {event.assignedTo.lastName}</span>
                   </span>
                 )}
@@ -271,12 +254,7 @@ function DayEventCard({ event, onClick }: { event: CalendarEvent; onClick: () =>
 function EmptyCalendar({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div
-        className="w-16 h-16 rounded-[var(--apple-radius-xl)] flex items-center justify-center mb-4"
-        style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 8px 24px rgba(0,122,255,0.25)' }}
-      >
-        <CalendarDays className="w-8 h-8 text-white" />
-      </div>
+      <CalendarDays className="w-10 h-10 mb-4 text-[var(--apple-system-blue)]" strokeWidth={1.5} />
       <p className="text-[15px] font-semibold text-foreground mb-1">No Events Found</p>
       <p className="text-[13px] text-[var(--apple-secondary-label)] max-w-xs">{message}</p>
     </div>
@@ -461,7 +439,7 @@ export default function CalendarPage() {
           <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] p-6">
             <div className="flex items-center justify-center py-24">
               <div className="text-center">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-[var(--apple-system-blue)]" />
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-[var(--apple-system-blue)]" strokeWidth={1.5} />
                 <p className="text-[13px] text-[var(--apple-secondary-label)]">Loading calendar…</p>
               </div>
             </div>
@@ -480,19 +458,11 @@ export default function CalendarPage() {
 
           {/* ── Page Header ─────────────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div
-                className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-lg)] flex items-center justify-center shadow-lg"
-                style={{
-                  background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
-                  boxShadow: '0 8px 24px rgba(0,122,255,0.30)',
-                }}
-              >
-                <Calendar className="w-7 h-7 text-white" />
-              </div>
+            <div className="flex items-center gap-3">
+              <Calendar className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight">Calendar</h1>
+                  <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Calendar</h1>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span
@@ -512,41 +482,25 @@ export default function CalendarPage() {
               onClick={() => router.push('/tasks/create-new-task')}
               className="w-full sm:w-auto h-10 px-4 text-[13px] font-medium rounded-[var(--apple-radius-sm)] bg-[var(--apple-system-blue)] hover:bg-[var(--apple-system-blue)]/90 text-white border-0 flex-shrink-0"
             >
-              <Plus className="w-4 h-4 mr-1.5" />
+              <Plus className="w-4 h-4 mr-1.5" strokeWidth={1.5} />
               New Task
             </Button>
           </div>
 
           {/* ── Stats Bar ───────────────────────────────────────────────────── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard
-              label="Total Events"
-              value={totalEvents}
-              Icon={CalendarDays}
-              gradient="linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)"
-              glow="rgba(0,122,255,0.25)"
-            />
-            <StatCard
-              label="Scheduled"
-              value={scheduledCount}
-              Icon={Circle}
-              gradient="linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)"
-              glow="rgba(48,176,199,0.25)"
-            />
-            <StatCard
-              label="In Progress"
-              value={inProgressCount}
-              Icon={PlayCircle}
-              gradient="linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)"
-              glow="rgba(255,149,0,0.25)"
-            />
-            <StatCard
-              label="Completed"
-              value={completedCount}
-              Icon={CheckCircle2}
-              gradient="linear-gradient(135deg,#34C759 0%,#30D158 100%)"
-              glow="rgba(52,199,89,0.25)"
-            />
+            <div className="card-fade-in card-fade-in-delay-1">
+              <StatCard label="Total Events" value={totalEvents} Icon={CalendarDays} color="var(--apple-chart-to)" />
+            </div>
+            <div className="card-fade-in card-fade-in-delay-2">
+              <StatCard label="Scheduled" value={scheduledCount} Icon={Circle} color="#30B0C7" />
+            </div>
+            <div className="card-fade-in card-fade-in-delay-3">
+              <StatCard label="In Progress" value={inProgressCount} Icon={PlayCircle} color="#FF9500" />
+            </div>
+            <div className="card-fade-in card-fade-in-delay-4">
+              <StatCard label="Completed" value={completedCount} Icon={CheckCircle2} color="#34C759" />
+            </div>
           </div>
 
           {/* ── Filter Toolbar ──────────────────────────────────────────────── */}
@@ -554,7 +508,7 @@ export default function CalendarPage() {
             <div className="flex items-center gap-2">
               {/* Search */}
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--apple-tertiary-label)] pointer-events-none" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--apple-tertiary-label)] pointer-events-none" strokeWidth={1.5} />
                 <Input
                   placeholder="Search events, projects…"
                   value={searchQuery}
@@ -569,7 +523,7 @@ export default function CalendarPage() {
                     onClick={() => setShowFilters(v => !v)}
                     className={`flex-shrink-0 h-9 w-9 rounded-[var(--apple-radius-sm)] border flex items-center justify-center apple-transition ${showFilters || hasActiveFilters ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)]' : 'border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)] hover:text-foreground'}`}
                   >
-                    <Filter className="w-4 h-4" />
+                    <Filter className="w-4 h-4" strokeWidth={1.5} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>Filters</TooltipContent>
@@ -582,7 +536,7 @@ export default function CalendarPage() {
                       onClick={resetFilters}
                       className="flex-shrink-0 h-9 w-9 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)] hover:text-foreground flex items-center justify-center apple-transition"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
+                      <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.5} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>Reset filters</TooltipContent>
@@ -652,7 +606,7 @@ export default function CalendarPage() {
                   onClick={() => navigate('prev')}
                   className="w-8 h-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-foreground apple-transition"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-4 h-4" strokeWidth={1.5} />
                 </button>
                 <span className="text-[15px] font-semibold text-foreground px-2 min-w-[200px] text-center">
                   {getViewTitle()}
@@ -661,7 +615,7 @@ export default function CalendarPage() {
                   onClick={() => navigate('next')}
                   className="w-8 h-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-foreground apple-transition"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-4 h-4" strokeWidth={1.5} />
                 </button>
               </div>
 

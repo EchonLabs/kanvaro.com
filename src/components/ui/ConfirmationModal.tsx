@@ -140,12 +140,8 @@ export function ConfirmationModal({
             ref={confirmButtonRef}
             onClick={e => { e.stopPropagation(); e.preventDefault(); onConfirm() }}
             disabled={isLoading}
-            className={`
-              flex-1 py-3.5 text-[17px] font-semibold
-              apple-transition hover:bg-[var(--apple-quaternary-fill)]
-              disabled:opacity-40
-              ${isDestructive ? 'text-[var(--apple-system-red)]' : 'text-[var(--apple-system-blue)]'}
-            `}
+            className="flex-1 py-3.5 text-[17px] font-semibold apple-transition hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
+            style={{ color: isDestructive ? 'var(--apple-system-red)' : 'var(--apple-system-blue)' }}
           >
             {isLoading ? (
               <span className="inline-flex items-center justify-center gap-2">

@@ -110,7 +110,7 @@ export function StandupAssignmentDialog({ open, onOpenChange, members, onSubmit 
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
                     {selectedDate ? format(selectedDate, 'PPP') : 'Pick a due date'}
                   </Button>
                 </PopoverTrigger>
@@ -129,7 +129,7 @@ export function StandupAssignmentDialog({ open, onOpenChange, members, onSubmit 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.5} /> : null}
             Save Assignment
           </Button>
         </DialogFooter>

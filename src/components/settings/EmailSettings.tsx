@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -16,24 +16,24 @@ const PROVIDERS = [
     label: 'SMTP Server',
     description: 'Use your own SMTP server',
     icon: Server,
-    gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
-    glow: 'rgba(0,122,255,0.25)',
+    gradient: 'var(--apple-card-gradient)',
+    glow: 'var(--apple-chart-glow)',
   },
   {
     id: 'azure',
     label: 'Azure App',
     description: 'Azure App with Exchange Online',
     icon: Cloud,
-    gradient: 'linear-gradient(135deg,#0078D4 0%,#50C0FF 100%)',
-    glow: 'rgba(0,120,212,0.25)',
+    gradient: 'var(--apple-card-gradient)',
+    glow: 'var(--apple-chart-glow)',
   },
   {
     id: 'skip',
     label: 'Skip Email',
     description: 'Disable email notifications',
     icon: Ban,
-    gradient: 'linear-gradient(135deg,#8E8E93 0%,#AEAEB2 100%)',
-    glow: 'rgba(142,142,147,0.20)',
+    gradient: 'var(--apple-card-gradient)',
+    glow: 'var(--apple-chart-glow)',
   },
 ] as const
 
@@ -50,6 +50,7 @@ export function EmailSettings() {
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const savedConfig = useRef<typeof formData | null>(null)
 
   useEffect(() => {
     const loadEmailConfig = async () => {
@@ -57,7 +58,7 @@ export function EmailSettings() {
         const response = await fetch('/api/settings/email')
         if (response.ok) {
           const config = await response.json()
-          setFormData({
+          const loaded = {
             provider: config.provider || 'smtp',
             smtp: {
               host: config.smtp?.host || '', port: config.smtp?.port || 587,
@@ -70,7 +71,9 @@ export function EmailSettings() {
               tenantId: config.azure?.tenantId || '', fromEmail: config.azure?.fromEmail || '',
               fromName: config.azure?.fromName || '',
             },
-          })
+          }
+          setFormData(loaded)
+          savedConfig.current = loaded
         }
       } catch (error) {
         console.error('Failed to load email configuration:', error)
@@ -78,6 +81,8 @@ export function EmailSettings() {
     }
     loadEmailConfig()
   }, [])
+
+  const hasChanges = !savedConfig.current || JSON.stringify(formData) !== JSON.stringify(savedConfig.current)
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -133,6 +138,7 @@ export function EmailSettings() {
         body: JSON.stringify(formData),
       })
       if (!response.ok) throw new Error('Failed to update email settings')
+      savedConfig.current = { ...formData }
       notifySuccess({ title: 'Email Settings Updated', message: 'Email configuration has been updated successfully' })
     } catch (error) {
       notifyError({ title: 'Update Failed', message: error instanceof Error ? error.message : 'Failed to update email settings' })
@@ -162,10 +168,7 @@ export function EmailSettings() {
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
-          <div className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 3px 10px rgba(0,122,255,0.25)' }}>
-            <Mail className="h-[18px] w-[18px] text-white" strokeWidth={1.8} />
-          </div>
+          <Mail className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
           <div>
             <p className="text-[15px] font-semibold text-[var(--apple-label)]">Email Configuration</p>
             <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">Configure your email provider for notifications and invitations</p>
@@ -186,16 +189,13 @@ export function EmailSettings() {
                     className={cn(
                       'flex flex-col items-center gap-2 p-4 rounded-[var(--apple-radius-md)] border apple-transition text-center',
                       active
-                        ? 'border-[var(--apple-system-blue)] bg-blue-50 dark:bg-blue-950/30'
+                        ? 'border-transparent bg-[var(--apple-tertiary-fill)]'
                         : 'border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] hover:bg-[var(--apple-tertiary-fill)]'
                     )}
                   >
-                    <div className="w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-                      style={{ background: gradient, boxShadow: active ? `0 4px 12px ${glow}` : undefined }}>
-                      <Icon className="h-5 w-5 text-white" strokeWidth={1.8} />
-                    </div>
+                    <Icon className="h-6 w-6 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                     <div>
-                      <p className={cn('text-[13px] font-semibold', active ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-label)]')}>{label}</p>
+                      <p className="text-[13px] font-semibold" style={{ color: active ? 'var(--apple-chart-color)' : 'var(--apple-label)' }}>{label}</p>
                       <p className="text-[11px] text-[var(--apple-tertiary-label)] mt-0.5">{description}</p>
                     </div>
                   </button>
@@ -208,7 +208,7 @@ export function EmailSettings() {
           {formData.provider === 'smtp' && (
             <div className="space-y-4 pt-1">
               <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-3 flex gap-2">
-                <Mail className="h-4 w-4 text-[var(--apple-system-blue)] flex-shrink-0 mt-0.5" />
+                <Mail className="h-4 w-4 text-[var(--apple-system-blue)] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
                 <p className="text-[12px] text-[var(--apple-secondary-label)]">
                   Common providers: Gmail (smtp.gmail.com:587), Outlook (smtp-mail.outlook.com:587).
                 </p>
@@ -267,7 +267,7 @@ export function EmailSettings() {
           {formData.provider === 'azure' && (
             <div className="space-y-4 pt-1">
               <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-3 flex gap-2">
-                <Cloud className="h-4 w-4 text-[var(--apple-system-blue)] flex-shrink-0 mt-0.5" />
+                <Cloud className="h-4 w-4 text-[var(--apple-system-blue)] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
                 <p className="text-[12px] text-[var(--apple-secondary-label)]">
                   Create an app in Azure Portal and grant it Mail.Send permissions.
                 </p>
@@ -315,9 +315,7 @@ export function EmailSettings() {
           {/* Skip state */}
           {formData.provider === 'skip' && (
             <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-5 flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-[var(--apple-tertiary-fill)] flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="h-4 w-4 text-[var(--apple-secondary-label)]" />
-              </div>
+              <AlertCircle className="h-5 w-5 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
               <div>
                 <p className="text-[13px] font-semibold text-[var(--apple-label)]">Email notifications disabled</p>
                 <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">Email functionality will be disabled for this organization.</p>
@@ -334,18 +332,18 @@ export function EmailSettings() {
                 disabled={testing || saving}
                 className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px] border-[var(--apple-separator)]"
               >
-                {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TestTube className="h-3.5 w-3.5" />}
+                {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <TestTube className="h-3.5 w-3.5" strokeWidth={1.5} />}
                 {testing ? 'Testing…' : 'Test Email'}
               </Button>
             ) : <div />}
 
             <Button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !hasChanges}
               className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
-              style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+              style={{ background: hasChanges ? 'var(--apple-card-gradient)' : undefined }}
             >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <Save className="h-3.5 w-3.5" strokeWidth={1.5} />}
               {saving ? 'Saving…' : 'Save Configuration'}
             </Button>
           </div>

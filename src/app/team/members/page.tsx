@@ -273,14 +273,14 @@ function MemberGridCard({
   const palette = getMemberPalette(member._id)
   return (
     <div className={cn(
-      'group rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
+      'card-fade-in group rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
       'shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden flex flex-col',
       'apple-transition',
       'hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)]',
       'hover:-translate-y-0.5',
     )}>
       {/* Gradient accent bar */}
-      <div className="h-[3px] w-full flex-shrink-0" style={{ background: palette.gradient }} />
+      <div className="h-[3px] w-full flex-shrink-0" style={{ background: 'var(--apple-card-gradient)' }} />
 
       <div className="p-5 flex flex-col items-center text-center gap-3 flex-1">
         {/* Avatar with status ring */}
@@ -360,15 +360,13 @@ function InviteGridCard({
 }) {
   return (
     <div className={cn(
-      'rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden flex flex-col',
+      'card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden flex flex-col',
       'shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none apple-transition',
       'hover:shadow-[0_8px_28px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.35)]',
     )}>
-      <div className="h-[3px] w-full flex-shrink-0 bg-gradient-to-r from-amber-400 to-yellow-300" />
+      <div className="h-[3px] w-full flex-shrink-0" style={{ background: 'var(--apple-card-gradient)' }} />
       <div className="p-5 flex flex-col items-center text-center gap-3 flex-1">
-        <div className="h-16 w-16 rounded-full bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-200 dark:border-amber-800 flex items-center justify-center mt-1">
-          <Mail className="h-7 w-7 text-amber-500" />
-        </div>
+        <Mail className="h-7 w-7 text-[var(--apple-chart-to)] mt-1" strokeWidth={1.5} />
         <div className="w-full space-y-0.5">
           <h3 className="text-[14px] font-semibold text-[var(--apple-label)] truncate" title={invitation.email}>
             {invitation.email}
@@ -378,15 +376,15 @@ function InviteGridCard({
           </p>
         </div>
         <RoleBadge role={invitation.role} customRole={invitation.customRole} />
-        <div className="flex items-center gap-1.5 text-[12px] text-amber-600 dark:text-amber-400">
-          <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+        <div className="flex items-center gap-1.5 text-[12px] text-[var(--apple-secondary-label)]">
+          <Clock className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
           <span>Expires {formatDate(invitation.expiresAt)}</span>
         </div>
         {canCancel && (
           <div className="w-full pt-3 mt-auto border-t border-[var(--apple-separator)]">
             <Button variant="outline" size="sm" onClick={() => onCancel(invitation)}
               className="w-full text-xs h-8 text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-red-950/30 border-destructive/20 apple-transition">
-              <XCircle className="h-3.5 w-3.5 mr-1.5" />
+              <XCircle className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
               Cancel Invitation
             </Button>
           </div>
@@ -435,9 +433,7 @@ function InviteListRow({
       'apple-transition hover:bg-[var(--apple-quaternary-fill)]',
       INVITE_LIST_COLS,
     )}>
-      <div className="h-9 w-9 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-center flex-shrink-0">
-        <Mail className="h-4 w-4 text-amber-500" />
-      </div>
+      <Mail className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
       <div className="min-w-0">
         <p className="text-[15px] font-semibold text-[var(--apple-label)] truncate">{invitation.email}</p>
         <p className="text-[12px] text-[var(--apple-tertiary-label)]">
@@ -447,8 +443,8 @@ function InviteListRow({
       <div className="flex-shrink-0">
         <RoleBadge role={invitation.role} customRole={invitation.customRole} />
       </div>
-      <div className="flex items-center gap-1.5 text-[13px] text-amber-600 dark:text-amber-400 flex-shrink-0 whitespace-nowrap">
-        <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+      <div className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)] flex-shrink-0 whitespace-nowrap">
+        <Clock className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
         {formatDate(invitation.expiresAt)}
       </div>
       <div className="flex items-center opacity-0 group-hover:opacity-100 apple-transition">
@@ -468,9 +464,7 @@ function InviteListRow({
 function EmptyMembers({ icon: Icon, title, subtitle }: { icon: any; title: string; subtitle: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-      <div className="h-14 w-14 rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)] flex items-center justify-center">
-        <Icon className="h-7 w-7 text-[var(--apple-tertiary-label)]" />
-      </div>
+      <Icon className="h-7 w-7 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
       <div className="space-y-1">
         <p className="text-[17px] font-semibold text-[var(--apple-label)]">{title}</p>
         <p className="text-[15px] text-[var(--apple-secondary-label)] max-w-[260px]">{subtitle}</p>
@@ -771,9 +765,7 @@ export default function MembersPage() {
       <MainLayout>
         <PageContent>
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="h-14 w-14 rounded-[var(--apple-radius-lg)] bg-red-50 dark:bg-red-950/30 flex items-center justify-center">
-              <UserCheck className="h-7 w-7 text-red-500" />
-            </div>
+            <UserCheck className="h-7 w-7 text-red-500" strokeWidth={1.5} />
             <div className="text-center space-y-1">
               <p className="text-[17px] font-semibold text-[var(--apple-label)]">Access restricted</p>
               <p className="text-[15px] text-[var(--apple-secondary-label)]">You do not have permission to view team members.</p>
@@ -795,22 +787,25 @@ export default function MembersPage() {
 
           {/* ─── Page Header ───────────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-[28px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
-                Team Members
-              </h1>
-              <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
-                {membersPagination.total > 0
-                  ? `${membersPagination.total} member${membersPagination.total !== 1 ? 's' : ''}`
-                  : 'Manage your team members and invitations'}
-              </p>
+            <div className="flex items-center gap-3">
+              <Users className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+              <div>
+                <h1 className="text-[28px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
+                  Team Members
+                </h1>
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                  {membersPagination.total > 0
+                    ? `${membersPagination.total} member${membersPagination.total !== 1 ? 's' : ''}`
+                    : 'Manage your team members and invitations'}
+                </p>
+              </div>
             </div>
             {canInviteMembers && (
               <Button
                 onClick={() => setShowInviteModal(true)}
                 className="flex items-center gap-2 text-sm font-medium apple-transition w-full sm:w-auto"
               >
-                <UserPlus className="h-4 w-4" />
+                <UserPlus className="h-4 w-4" strokeWidth={1.5} />
                 Invite Member
               </Button>
             )}
@@ -819,7 +814,7 @@ export default function MembersPage() {
           {/* ─── Tab bar ───────────────────────────────────────────────────── */}
           <div className="flex items-center gap-1 p-1 rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] border border-[var(--apple-separator)] w-fit">
             <button onClick={() => setActiveTab('members')} className={cn(tabBase, activeTab === 'members' ? tabActive : tabInactive)}>
-              <Users className="h-4 w-4" />
+              <Users className="h-4 w-4" strokeWidth={1.5} />
               Members
               <span className={cn(
                 'ml-0.5 text-[11px] px-1.5 py-0.5 rounded-full font-semibold',
@@ -829,7 +824,7 @@ export default function MembersPage() {
               </span>
             </button>
             <button onClick={() => setActiveTab('invitations')} className={cn(tabBase, activeTab === 'invitations' ? tabActive : tabInactive)}>
-              <Mail className="h-4 w-4" />
+              <Mail className="h-4 w-4" strokeWidth={1.5} />
               Invitations
               {pendingInvitations.length > 0 && (
                 <span className={cn(
@@ -905,7 +900,7 @@ export default function MembersPage() {
                           : 'text-[var(--apple-tertiary-label)] hover:text-[var(--apple-secondary-label)]',
                       )}
                     >
-                      {mode === 'grid' ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
+                      {mode === 'grid' ? <LayoutGrid className="h-4 w-4" strokeWidth={1.5} /> : <List className="h-4 w-4" strokeWidth={1.5} />}
                     </button>
                   ))}
                 </div>
@@ -914,7 +909,7 @@ export default function MembersPage() {
                 {hasActiveFilters && (
                   <Button variant="outline" size="sm" onClick={() => { setSearchQuery(''); setLocalSearch(''); setRoleFilter('all'); setStatusFilter('all') }}
                     className="h-10 px-3 text-sm apple-transition">
-                    <X className="h-3.5 w-3.5 mr-1.5" />
+                    <X className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                     Clear
                   </Button>
                 )}
@@ -988,7 +983,7 @@ export default function MembersPage() {
                           : 'text-[var(--apple-tertiary-label)] hover:text-[var(--apple-secondary-label)]',
                       )}
                     >
-                      {mode === 'grid' ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
+                      {mode === 'grid' ? <LayoutGrid className="h-4 w-4" strokeWidth={1.5} /> : <List className="h-4 w-4" strokeWidth={1.5} />}
                     </button>
                   ))}
                 </div>

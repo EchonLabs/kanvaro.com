@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import {
   BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
@@ -28,7 +28,7 @@ interface TeamOverviewReportProps {
   filters: any
 }
 
-const APPLE_COLORS = ['#007AFF','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7']
+const APPLE_COLORS = ['var(--apple-chart-color)','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7']
 
 const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
   if (!active || !payload?.length) return null
@@ -98,10 +98,10 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
       {/* ── Stats Strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Team Size', value: String(overview.totalMembers), sub: `${overview.activeMembers} active`, color: '#007AFF' },
-          { label: 'Avg Productivity', value: `${overview.averageProductivity.toFixed(1)}%`, sub: 'Team score', color: '#34C759' },
-          { label: 'Total Hours', value: `${overview.totalHoursLogged.toFixed(0)}h`, sub: 'Logged by team', color: '#BF5AF2' },
-          { label: 'Tasks Done', value: String(overview.totalTasksCompleted), sub: 'Total completed', color: '#FF9500' },
+          { label: 'Team Size',       value: String(overview.totalMembers),              sub: `${overview.activeMembers} active`, color: 'var(--apple-chart-color)' },
+          { label: 'Avg Productivity',value: `${overview.averageProductivity.toFixed(1)}%`, sub: 'Team score',       color: '#34C759' },
+          { label: 'Total Hours',     value: `${overview.totalHoursLogged.toFixed(0)}h`, sub: 'Logged by team',  color: 'var(--apple-chart-color)' },
+          { label: 'Tasks Done',      value: String(overview.totalTasksCompleted),       sub: 'Total completed', color: '#FF9500' },
         ].map(s => (
           <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
             <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
@@ -132,7 +132,7 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Bar — productivity + workload by dept */}
+        {/* Bar — productivity (green=semantic) + workload (theme) by dept */}
         <ChartCard title="Productivity by Department" subtitle="Average productivity and workload per dept">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={deptBarData} barCategoryGap="30%" barGap={4} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -140,15 +140,12 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
                 <linearGradient id="to-prod" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#34C759" stopOpacity={0.9} /><stop offset="100%" stopColor="#30D158" stopOpacity={0.7} />
                 </linearGradient>
-                <linearGradient id="to-work" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FF9500" stopOpacity={0.9} /><stop offset="100%" stopColor="#FFD60A" stopOpacity={0.7} />
-                </linearGradient>
               </defs>
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0,100]} />
               <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Productivity" fill="url(#to-prod)" radius={[5,5,0,0]} maxBarSize={32} />
-              <Bar dataKey="Workload" fill="url(#to-work)" radius={[5,5,0,0]} maxBarSize={32} />
+              <Bar dataKey="Productivity" fill="url(#to-prod)"              radius={[5,5,0,0]} maxBarSize={32} />
+              <Bar dataKey="Workload"     fill="var(--apple-chart-color)" fillOpacity={0.55} radius={[5,5,0,0]} maxBarSize={32} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </BarChart>
           </ResponsiveContainer>
@@ -170,7 +167,7 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Area — workload */}
+        {/* Area — workload (red = semantic high load warning) */}
         <ChartCard title="Workload Distribution" subtitle="Average workload across departments">
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={workloadData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>

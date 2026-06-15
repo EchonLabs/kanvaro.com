@@ -79,9 +79,7 @@ function RoleCard({
       {/* Header */}
       <div className="px-5 py-4 flex items-start gap-4">
         {/* Icon */}
-        <div className="h-9 w-9 rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] flex items-center justify-center flex-shrink-0 mt-0.5">
-          <Shield className="h-4 w-4 text-[var(--apple-secondary-label)]" />
-        </div>
+        <Shield className="h-5 w-5 flex-shrink-0 mt-0.5 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
 
         {/* Name + description */}
         <div className="flex-1 min-w-0">
@@ -100,7 +98,7 @@ function RoleCard({
           )}
           <div className="flex items-center gap-3 mt-2 text-[12px] text-[var(--apple-tertiary-label)]">
             <span className="flex items-center gap-1">
-              <Users className="h-3 w-3" />
+              <Users className="h-3 w-3" strokeWidth={1.5} />
               {role.userCount} member{role.userCount !== 1 ? 's' : ''}
             </span>
             <span>·</span>
@@ -115,7 +113,7 @@ function RoleCard({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="h-8 w-8 flex items-center justify-center text-[var(--apple-quaternary-label)]">
-                    <Lock className="h-3.5 w-3.5" />
+                    <Lock className="h-3.5 w-3.5" strokeWidth={1.5} />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent><p>System roles cannot be modified</p></TooltipContent>
@@ -128,7 +126,7 @@ function RoleCard({
                   <TooltipTrigger asChild>
                     <Button variant="ghost" size="sm" onClick={() => onEdit(role)}
                       className="h-8 w-8 p-0 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition">
-                      <Edit className="h-3.5 w-3.5" />
+                      <Edit className="h-3.5 w-3.5" strokeWidth={1.5} />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent><p>Edit</p></TooltipContent>
@@ -139,7 +137,7 @@ function RoleCard({
                   <TooltipTrigger asChild>
                     <Button variant="ghost" size="sm" onClick={() => onDelete(role)}
                       className="h-8 w-8 p-0 text-[var(--apple-tertiary-label)] hover:text-destructive hover:bg-[var(--apple-tertiary-fill)] apple-transition">
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent><p>Delete</p></TooltipContent>
@@ -180,7 +178,7 @@ function RoleCard({
             'apple-transition',
           )}
         >
-          {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          {expanded ? <ChevronUp className="h-3 w-3" strokeWidth={1.5} /> : <ChevronDown className="h-3 w-3" strokeWidth={1.5} />}
           {expanded ? 'Hide permissions' : `View ${permCount} permission${permCount !== 1 ? 's' : ''}`}
         </button>
       )}
@@ -321,19 +319,22 @@ export default function RolesPage() {
 
           {/* ─── Page Header ───────────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-[28px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
-                Roles &amp; Permissions
-              </h1>
-              <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
-                {roles.length} role{roles.length !== 1 ? 's' : ''} · {customRoles.length} custom
-              </p>
+            <div className="flex items-center gap-3">
+              <Shield className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+              <div>
+                <h1 className="text-[28px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
+                  Roles &amp; Permissions
+                </h1>
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                  {roles.length} role{roles.length !== 1 ? 's' : ''} · {customRoles.length} custom
+                </p>
+              </div>
             </div>
             <Button
               onClick={() => setShowCreateModal(true)}
               className="flex items-center gap-2 text-sm font-medium apple-transition w-full sm:w-auto"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" strokeWidth={1.5} />
               Create Role
             </Button>
           </div>
@@ -344,9 +345,7 @@ export default function RolesPage() {
               'rounded-[var(--apple-radius-lg)] border border-dashed border-[var(--apple-separator)]',
               'flex flex-col items-center justify-center py-20 gap-4 text-center',
             )}>
-              <div className="h-12 w-12 rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] flex items-center justify-center">
-                <Shield className="h-6 w-6 text-[var(--apple-tertiary-label)]" />
-              </div>
+              <Shield className="h-6 w-6 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
               <div className="space-y-1">
                 <p className="text-[15px] font-semibold text-[var(--apple-label)]">No roles yet</p>
                 <p className="text-[13px] text-[var(--apple-secondary-label)] max-w-[240px]">
@@ -354,7 +353,7 @@ export default function RolesPage() {
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => setShowCreateModal(true)} className="apple-transition">
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                <Plus className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                 Create Role
               </Button>
             </div>
@@ -401,7 +400,7 @@ export default function RolesPage() {
                 'hover:bg-[var(--apple-tertiary-fill)] apple-transition',
               )}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
               Create a custom role
             </button>
           )}

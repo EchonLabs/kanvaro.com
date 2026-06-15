@@ -30,6 +30,7 @@ export const TASK_STATUS_CONFIG: Record<string, {
   planning:    { bg: 'bg-sky-50 dark:bg-sky-950/30',        text: 'text-sky-600 dark:text-sky-400',      dot: 'bg-sky-500',    border: 'border-sky-200 dark:border-sky-800',    icon: <Clock className="h-3 w-3" />,      label: 'Planning' },
   active:      { bg: 'bg-emerald-50 dark:bg-emerald-950/30',text: 'text-emerald-600 dark:text-emerald-400',dot: 'bg-emerald-500',border: 'border-emerald-200 dark:border-emerald-800', icon: <Play className="h-3 w-3" />, label: 'Active' },
   completed:   { bg: 'bg-gray-50 dark:bg-gray-900/40',      text: 'text-gray-500 dark:text-gray-400',    dot: 'bg-gray-400',   border: 'border-gray-200 dark:border-gray-700',  icon: <CheckCircle className="h-3 w-3" />, label: 'Completed' },
+  scheduled:   { bg: 'bg-sky-50 dark:bg-sky-950/30',        text: 'text-sky-600 dark:text-sky-400',      dot: 'bg-sky-500',    border: 'border-sky-200 dark:border-sky-800',    icon: <Clock className="h-3 w-3" />,      label: 'Scheduled' },
 }
 
 // ─── Priority Config ────────────────────────────────────────────────────────────
@@ -151,15 +152,19 @@ const PROGRESS_GRADIENTS = [
 interface GradientProgressProps {
   pct: number
   colorIndex?: number
+  gradient?: string
+  glow?: string
   label?: string
   showPct?: boolean
   className?: string
 }
 
 export function GradientProgress({
-  pct, colorIndex = 0, label, showPct = true, className
+  pct, colorIndex = 0, gradient: gradientProp, glow: glowProp, label, showPct = true, className
 }: GradientProgressProps) {
-  const { gradient, glow } = PROGRESS_GRADIENTS[colorIndex % PROGRESS_GRADIENTS.length]
+  const fallback = PROGRESS_GRADIENTS[colorIndex % PROGRESS_GRADIENTS.length]
+  const gradient = gradientProp ?? fallback.gradient
+  const glow     = glowProp     ?? fallback.glow
   const safePct = Math.min(100, Math.max(0, pct))
 
   return (
@@ -196,19 +201,36 @@ interface PageHeaderProps {
   actions?: React.ReactNode
   meta?: React.ReactNode
   className?: string
+  icon?: React.ElementType
+  iconGradient?: string
+  iconGlow?: string
 }
 
-export function PageHeader({ title, subtitle, actions, meta, className }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions, meta, className, icon: Icon, iconGradient, iconGlow }: PageHeaderProps) {
   return (
     <div className={cn('flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4', className)}>
-      <div className="flex-1 min-w-0">
-        <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)] leading-tight">
-          {title}
-        </h1>
-        {subtitle && (
-          <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">{subtitle}</p>
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {Icon && (
+          iconGradient ? (
+            <div
+              className="h-11 w-11 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white"
+              style={{ background: iconGradient, boxShadow: iconGlow ? `0 2px 12px ${iconGlow}` : undefined }}
+            >
+              <Icon className="h-6 w-6" strokeWidth={1.5} />
+            </div>
+          ) : (
+            <Icon className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+          )
         )}
-        {meta && <div className="mt-1.5">{meta}</div>}
+        <div className="min-w-0">
+          <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)] leading-tight">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">{subtitle}</p>
+          )}
+          {meta && <div className="mt-1.5">{meta}</div>}
+        </div>
       </div>
       {actions && (
         <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">

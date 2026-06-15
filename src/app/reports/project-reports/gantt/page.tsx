@@ -19,26 +19,14 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 
-const STAT_ACCENTS = [
-  { gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.22)' },
-  { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.22)' },
-  { gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.22)' },
-  { gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)', glow: 'rgba(255,69,58,0.22)' },
-]
-
 function MiniStatCard({
-  label, value, icon: Icon, accent,
+  label, value, icon: Icon, colorClass = 'text-[var(--apple-chart-to)]',
 }: {
-  label: string; value: string | number; icon: React.ElementType; accent: typeof STAT_ACCENTS[0]
+  label: string; value: string | number; icon: React.ElementType; colorClass?: string
 }) {
   return (
     <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4 flex items-center gap-3 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.38)] hover:-translate-y-0.5">
-      <div
-        className="flex h-10 w-10 items-center justify-center rounded-[var(--apple-radius-sm)] flex-shrink-0"
-        style={{ background: accent.gradient, boxShadow: `0 4px 14px ${accent.glow}` }}
-      >
-        <Icon className="h-4.5 w-4.5 text-white" style={{ width: 18, height: 18 }} />
-      </div>
+      <Icon className={cn('h-5 w-5 flex-shrink-0', colorClass)} strokeWidth={1.5} />
       <div className="min-w-0">
         <p className="apple-section-label text-[var(--apple-secondary-label)]">{label}</p>
         <p className="text-[22px] font-bold tracking-tight leading-tight font-apple-mono">{value}</p>
@@ -244,12 +232,7 @@ export default function GanttReportPage() {
           {/* ── Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-[var(--apple-radius-md)] flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', boxShadow: '0 4px 14px rgba(255,149,0,0.30)' }}
-              >
-                <GitBranch className="h-5 w-5 text-white" />
-              </div>
+              <GitBranch className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight">Gantt Chart</h1>
                 <p className="text-[13px] text-[var(--apple-secondary-label)]">Visualize project timelines and task dependencies</p>
@@ -264,17 +247,17 @@ export default function GanttReportPage() {
                   showFilters && "bg-[var(--apple-tertiary-fill)]"
                 )}
               >
-                <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" />
+                <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                 Filters
                 {hasActiveFilters && (
                   <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-4 rounded-full text-[10px] font-bold text-white px-1"
-                    style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' }}>
+                    style={{ background: 'var(--apple-card-gradient)' }}>
                     {activeFilterCount}
                   </span>
                 )}
                 {showFilters
-                  ? <ChevronUp className="h-3 w-3 ml-1" />
-                  : <ChevronDown className="h-3 w-3 ml-1" />
+                  ? <ChevronUp className="h-3 w-3 ml-1" strokeWidth={1.5} />
+                  : <ChevronDown className="h-3 w-3 ml-1" strokeWidth={1.5} />
                 }
               </Button>
               <Button
@@ -282,25 +265,25 @@ export default function GanttReportPage() {
                 onClick={loadGanttData}
                 className="rounded-full h-8 px-3 border-[var(--apple-separator)] apple-transition"
               >
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
               </Button>
               <Button
                 size="sm"
                 onClick={handleExport}
                 className="rounded-full h-8 px-4 text-[13px] apple-transition"
-                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' }}
+                style={{ background: 'var(--apple-card-gradient)' }}
               >
-                <Download className="h-3.5 w-3.5 mr-1.5" />Export CSV
+                <Download className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />Export CSV
               </Button>
             </div>
           </div>
 
           {/* ── Stats Strip ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <MiniStatCard label="Total Tasks" value={stats.total} icon={Layers} accent={STAT_ACCENTS[0]} />
-            <MiniStatCard label="Completed" value={stats.done} icon={CheckCircle2} accent={STAT_ACCENTS[1]} />
-            <MiniStatCard label="In Progress" value={stats.inProgress} icon={Clock} accent={STAT_ACCENTS[2]} />
-            <MiniStatCard label="Overdue" value={stats.overdue} icon={AlertTriangle} accent={STAT_ACCENTS[3]} />
+            <MiniStatCard label="Total Tasks" value={stats.total} icon={Layers} />
+            <MiniStatCard label="Completed" value={stats.done} icon={CheckCircle2} />
+            <MiniStatCard label="In Progress" value={stats.inProgress} icon={Clock} />
+            <MiniStatCard label="Overdue" value={stats.overdue} icon={AlertTriangle} colorClass="text-red-500 dark:text-red-400" />
           </div>
 
           {/* ── Filter Panel ── */}
@@ -308,7 +291,7 @@ export default function GanttReportPage() {
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="h-3.5 w-3.5 text-[var(--apple-secondary-label)]" />
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                   <p className="text-[13px] font-semibold text-[var(--apple-secondary-label)] uppercase tracking-[0.06em]">Filters</p>
                 </div>
                 {hasActiveFilters && (
@@ -431,7 +414,7 @@ export default function GanttReportPage() {
                         !dateRange.from && "text-[var(--apple-tertiary-label)]"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-3.5 w-3.5 flex-shrink-0" />
+                      <CalendarIcon className="mr-2 h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
                       {dateRange.from ? format(dateRange.from, 'MMM d, yyyy') : 'From date'}
                     </Button>
                   </PopoverTrigger>
@@ -455,7 +438,7 @@ export default function GanttReportPage() {
                         !dateRange.to && "text-[var(--apple-tertiary-label)]"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-3.5 w-3.5 flex-shrink-0" />
+                      <CalendarIcon className="mr-2 h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
                       {dateRange.to ? format(dateRange.to, 'MMM d, yyyy') : 'To date'}
                     </Button>
                   </PopoverTrigger>
@@ -509,12 +492,7 @@ export default function GanttReportPage() {
             </div>
           ) : (
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-16 flex flex-col items-center gap-4">
-              <div
-                className="flex h-16 w-16 items-center justify-center rounded-[var(--apple-radius-lg)]"
-                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', boxShadow: '0 4px 20px rgba(255,149,0,0.28)' }}
-              >
-                <GitBranch className="h-7 w-7 text-white" />
-              </div>
+              <GitBranch className="h-10 w-10 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div className="text-center">
                 <p className="text-[17px] font-semibold mb-1">No tasks found</p>
                 <p className="text-[13px] text-[var(--apple-secondary-label)] max-w-xs">

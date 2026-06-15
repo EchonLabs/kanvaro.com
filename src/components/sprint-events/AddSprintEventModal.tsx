@@ -797,7 +797,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] flex flex-col max-h-[90vh] overflow-hidden rounded-[var(--apple-radius-xl)] border-[var(--apple-separator)] shadow-2xl bg-[var(--apple-bg-secondary)]">
+      <DialogContent className="sm:max-w-[700px] flex flex-col max-h-[90vh] overflow-hidden rounded-[var(--apple-radius-xl)] border-[var(--apple-separator)] shadow-2xl bg-[var(--apple-secondary-system-background)]">
         <DialogHeader className="border-b border-[var(--apple-separator)] px-6 py-4 bg-[var(--apple-bg-primary)]">
           <DialogTitle className="text-[17px] font-semibold text-[var(--apple-label)] tracking-tight">Create Sprint Event</DialogTitle>
           <DialogDescription className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">

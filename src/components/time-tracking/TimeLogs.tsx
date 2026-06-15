@@ -2154,12 +2154,7 @@ export function TimeLogs({
       {showManualLogButtons && canAddManualTimeLog && canViewEmployeeFilter && user?.role === 'human_resource' && (timeTrackingSettings?.allowPastTime ?? true) && (
         <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
           <div className="px-5 py-4 flex items-center gap-4">
-            <div
-              className="h-10 w-10 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 2px 12px rgba(52,199,89,0.25)' }}
-            >
-              <Plus className="h-5 w-5 text-white" />
-            </div>
+            <Plus className="h-6 w-6 flex-shrink-0 text-[var(--apple-system-green)]" strokeWidth={1.5} />
             <div className="flex-1 min-w-0">
               <p className="text-[15px] font-semibold text-[var(--apple-label)]">Manual Time Entry</p>
               <p className="text-[13px] text-[var(--apple-secondary-label)]">Log time for past work or specific intervals</p>
@@ -2169,7 +2164,7 @@ export function TimeLogs({
               className="inline-flex items-center gap-1.5 h-9 px-4 rounded-[var(--apple-radius-md)] text-[14px] font-semibold text-white apple-transition flex-shrink-0"
               style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 2px 8px rgba(52,199,89,0.25)' }}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" strokeWidth={1.5} />
               Add Log
             </button>
           </div>
@@ -2586,12 +2581,7 @@ export function TimeLogs({
           {/* Total Time Apple Card */}
           <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
             <div className="px-5 py-4 flex items-center gap-4">
-              <div
-                className="h-10 w-10 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 2px 12px rgba(0,122,255,0.25)' }}
-              >
-                <Clock className="h-5 w-5 text-white" />
-              </div>
+              <Clock className="h-6 w-6 flex-shrink-0 text-[var(--apple-system-blue)]" strokeWidth={1.5} />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Total Time Logged</p>
                 <p className="text-[22px] font-bold font-apple-mono tabular-nums text-[var(--apple-label)] leading-tight">
@@ -3268,7 +3258,7 @@ export function TimeLogs({
                     Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                    Total: {Math.round(calculatedDuration.totalMinutes / 60 * 10) / 10}h
                     {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
                       <span className="ml-1">
                         (Max: {timeTrackingSettings.maxSessionHours}h)
@@ -3644,7 +3634,7 @@ export function TimeLogs({
                     Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                    Total: {Math.round(calculatedDuration.totalMinutes / 60 * 10) / 10}h
                     {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
                       <span className="ml-1">
                         (Max: {timeTrackingSettings.maxSessionHours}h)

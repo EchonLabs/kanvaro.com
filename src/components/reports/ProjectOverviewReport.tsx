@@ -88,7 +88,7 @@ export function ProjectOverviewReport({ projects, summary, trends, filters }: Pr
 
   const statusData = [
     { name: 'Active', value: summary.activeProjects, fill: '#34C759' },
-    { name: 'Completed', value: summary.completedProjects, fill: '#007AFF' },
+    { name: 'Completed', value: summary.completedProjects, fill: 'var(--apple-chart-color)' },
     { name: 'On Hold', value: projects.filter(p => p.status === 'on-hold').length, fill: '#FF9500' },
     { name: 'Cancelled', value: projects.filter(p => p.status === 'cancelled').length, fill: '#FF453A' },
   ].filter(d => d.value > 0)
@@ -116,9 +116,9 @@ export function ProjectOverviewReport({ projects, summary, trends, filters }: Pr
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Active Projects', value: String(summary.activeProjects), sub: `${summary.completedProjects} completed`, color: '#34C759' },
-          { label: 'Budget Used', value: `${trends.budgetUtilization.toFixed(1)}%`, sub: `${formatCurrency(summary.totalSpent)} of ${formatCurrency(summary.totalBudget)}`, color: '#007AFF' },
+          { label: 'Budget Used', value: `${trends.budgetUtilization.toFixed(1)}%`, sub: `${formatCurrency(summary.totalSpent)} of ${formatCurrency(summary.totalBudget)}`, color: 'var(--apple-chart-color)' },
           { label: 'Avg Completion', value: `${summary.averageCompletionRate.toFixed(1)}%`, sub: 'Across all projects', color: '#FF9500' },
-          { label: 'Velocity', value: `${trends.projectVelocity.toFixed(1)}`, sub: 'Projects per month', color: '#BF5AF2' },
+          { label: 'Velocity', value: `${trends.projectVelocity.toFixed(1)}`, sub: 'Projects per month', color: 'var(--apple-chart-color)' },
         ].map(s => (
           <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
             <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
@@ -153,19 +153,11 @@ export function ProjectOverviewReport({ projects, summary, trends, filters }: Pr
         <ChartCard title="Budget Utilization by Project" subtitle="Budget vs spent across projects">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={budgetData} barCategoryGap="30%" barGap={4} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="pov-budget" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#007AFF" stopOpacity={0.9} /><stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.7} />
-                </linearGradient>
-                <linearGradient id="pov-spent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FF9500" stopOpacity={0.9} /><stop offset="100%" stopColor="#FFD60A" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
               <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Budget" fill="url(#pov-budget)" radius={[5,5,0,0]} maxBarSize={28} />
-              <Bar dataKey="Spent" fill="url(#pov-spent)" radius={[5,5,0,0]} maxBarSize={28} />
+              <Bar dataKey="Budget" fill="var(--apple-chart-color)" radius={[5,5,0,0]} maxBarSize={28} />
+              <Bar dataKey="Spent"  fill="#FF9500"                  radius={[5,5,0,0]} maxBarSize={28} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </BarChart>
           </ResponsiveContainer>
@@ -175,15 +167,10 @@ export function ProjectOverviewReport({ projects, summary, trends, filters }: Pr
         <ChartCard title="Task Completion Rates" subtitle="Completion percentage by project">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={completionData} barCategoryGap="40%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="pov-comp" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#34C759" stopOpacity={0.9} /><stop offset="100%" stopColor="#30D158" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0,100]} />
               <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Completion %" fill="url(#pov-comp)" radius={[5,5,0,0]} maxBarSize={40} />
+              <Bar dataKey="Completion %" fill="#34C759" radius={[5,5,0,0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -192,15 +179,10 @@ export function ProjectOverviewReport({ projects, summary, trends, filters }: Pr
         <ChartCard title="Time Tracking by Project" subtitle="Hours logged per project">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={hoursData} barCategoryGap="40%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="pov-hours" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#BF5AF2" stopOpacity={0.9} /><stop offset="100%" stopColor="#FF375F" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}h`} />
               <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}h`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Hours" fill="url(#pov-hours)" radius={[5,5,0,0]} maxBarSize={40} />
+              <Bar dataKey="Hours" fill="var(--apple-chart-color)" radius={[5,5,0,0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -249,10 +231,10 @@ export function ProjectOverviewReport({ projects, summary, trends, filters }: Pr
                       <div>
                         <div className="flex items-center justify-between text-[12px] mb-1">
                           <span className="text-[var(--apple-secondary-label)]">Budget</span>
-                          <span className="font-semibold font-apple-mono" style={{ color: budPct > 85 ? '#FF453A' : budPct > 65 ? '#FF9F0A' : '#007AFF' }}>{budPct.toFixed(0)}%</span>
+                          <span className="font-semibold font-apple-mono" style={{ color: budPct > 85 ? '#FF453A' : budPct > 65 ? '#FF9F0A' : 'var(--apple-chart-color)' }}>{budPct.toFixed(0)}%</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${budPct}%`, backgroundColor: budPct > 85 ? '#FF453A' : budPct > 65 ? '#FF9F0A' : '#007AFF' }} />
+                          <div className="h-full rounded-full" style={{ width: `${budPct}%`, backgroundColor: budPct > 85 ? '#FF453A' : budPct > 65 ? '#FF9F0A' : 'var(--apple-chart-color)' }} />
                         </div>
                       </div>
                     </div>

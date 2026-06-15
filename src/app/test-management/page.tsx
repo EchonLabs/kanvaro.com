@@ -64,11 +64,11 @@ const EXEC_STATUS_CONFIG = {
 } as const
 
 const QUICK_LINKS = [
-  { label: 'Test Suites', icon: Folder, href: '/test-management/suites', gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.20)', description: 'Organize cases into suites' },
-  { label: 'Test Cases', icon: FileText, href: '/test-management/cases', gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.20)', description: 'Manage individual test cases' },
-  { label: 'Test Plans', icon: ListChecks, href: '/test-management/plans', gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.20)', description: 'Plan and schedule test runs' },
-  { label: 'Executions', icon: Play, href: '/test-management/executions', gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.20)', description: 'Track execution results' },
-  { label: 'Reports', icon: BarChart3, href: '/test-management/reports', gradient: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)', glow: 'rgba(48,176,199,0.20)', description: 'Analytics and insights' },
+  { label: 'Test Suites', icon: Folder, href: '/test-management/suites', gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', description: 'Organize cases into suites' },
+  { label: 'Test Cases', icon: FileText, href: '/test-management/cases', gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', description: 'Manage individual test cases' },
+  { label: 'Test Plans', icon: ListChecks, href: '/test-management/plans', gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', description: 'Plan and schedule test runs' },
+  { label: 'Executions', icon: Play, href: '/test-management/executions', gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', description: 'Track execution results' },
+  { label: 'Reports', icon: BarChart3, href: '/test-management/reports', gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', description: 'Analytics and insights' },
 ]
 
 export default function TestManagementPage() {
@@ -190,10 +190,10 @@ export default function TestManagementPage() {
   }
 
   const STATS = [
-    { label: 'Test Suites', value: suiteCount, icon: Folder, gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', glow: 'rgba(0,122,255,0.25)', loading: !selectedProject },
-    { label: 'Test Cases', value: caseCount, icon: FileText, gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.25)', loading: !selectedProject },
-    { label: 'Executions', value: executionsTotal, icon: Play, gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.25)', loading: executionsLoading },
-    { label: 'Pass Rate', value: selectedProject ? `${passRate}%` : '—', icon: TrendingUp, gradient: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)', glow: 'rgba(48,176,199,0.25)', loading: executionsLoading },
+    { label: 'Test Suites', value: suiteCount, icon: Folder, gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', loading: !selectedProject },
+    { label: 'Test Cases', value: caseCount, icon: FileText, gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', loading: !selectedProject },
+    { label: 'Executions', value: executionsTotal, icon: Play, gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', loading: executionsLoading },
+    { label: 'Pass Rate', value: selectedProject ? `${passRate}%` : '—', icon: TrendingUp, gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', loading: executionsLoading },
   ]
 
   if (loading) {
@@ -225,13 +225,8 @@ export default function TestManagementPage() {
 
           {/* ── Page Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div
-                className="flex-shrink-0 w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center shadow-lg"
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 16px rgba(0,122,255,0.35)' }}
-              >
-                <FlaskConical className="h-7 w-7 text-white" strokeWidth={1.8} />
-              </div>
+            <div className="flex items-center gap-3">
+              <FlaskConical className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Dashboard</h1>
                 <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
@@ -245,16 +240,16 @@ export default function TestManagementPage() {
                 onClick={() => router.push('/test-management/reports')}
                 className="flex-1 sm:flex-none h-9 gap-1.5 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] apple-transition"
               >
-                <BarChart3 className="h-4 w-4" />
+                <BarChart3 className="h-4 w-4" strokeWidth={1.5} />
                 <span className="text-[13px]">Reports</span>
               </Button>
               <Button
                 onClick={() => { const qs = selectedProject ? `?projectId=${encodeURIComponent(selectedProject)}` : ''; router.push(`/test-management/plans/new${qs}`) }}
                 className="flex-1 sm:flex-none h-9 gap-1.5 rounded-[var(--apple-radius-sm)] apple-transition"
                 disabled={!selectedProject}
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+                style={{ background: 'var(--apple-card-gradient)' }}
               >
-                <TestTube className="h-4 w-4" />
+                <TestTube className="h-4 w-4" strokeWidth={1.5} />
                 <span className="text-[13px]">New Test Plan</span>
               </Button>
             </div>
@@ -263,16 +258,13 @@ export default function TestManagementPage() {
           {projects.length === 0 ? (
             /* ── Empty state ── */
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-12 text-center">
-              <div className="mx-auto w-16 h-16 rounded-[var(--apple-radius-md)] flex items-center justify-center mb-4"
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 4px 16px rgba(0,122,255,0.30)' }}>
-                <TestTube className="h-8 w-8 text-white" strokeWidth={1.8} />
-              </div>
+              <TestTube className="h-10 w-10 mx-auto mb-4 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <h3 className="text-[17px] font-semibold text-[var(--apple-label)] mb-2">No Projects Found</h3>
               <p className="text-[15px] text-[var(--apple-secondary-label)] mb-6 max-w-xs mx-auto">
                 You need to be assigned to a project to access test management features.
               </p>
               <Button onClick={() => router.push('/projects/create')} className="rounded-[var(--apple-radius-sm)]"
-                style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}>
+                style={{ background: 'var(--apple-card-gradient)' }}>
                 Create Project
               </Button>
             </div>
@@ -301,7 +293,7 @@ export default function TestManagementPage() {
                 /* ── Quick-link hub (no project selected) ── */
                 <div className="space-y-6">
                   <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-8 text-center">
-                    <TestTube className="h-10 w-10 mx-auto mb-3 text-[var(--apple-tertiary-label)]" />
+                    <TestTube className="h-10 w-10 mx-auto mb-3 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                     <h3 className="text-[17px] font-semibold text-[var(--apple-label)] mb-1">Select a Project</h3>
                     <p className="text-[15px] text-[var(--apple-secondary-label)]">Choose a project above to view its test data.</p>
                   </div>
@@ -312,15 +304,12 @@ export default function TestManagementPage() {
                         <button
                           key={link.href}
                           onClick={() => router.push(link.href)}
-                          className="group relative rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-left apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] hover:-translate-y-0.5 dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] focus:outline-none"
+                          className="card-fade-in group relative rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-left apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] hover:-translate-y-0.5 dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] focus:outline-none"
                         >
-                          <div className="w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center mb-3"
-                            style={{ background: link.gradient, boxShadow: `0 4px 12px ${link.glow}` }}>
-                            <link.icon className="h-5 w-5 text-white" strokeWidth={1.8} />
-                          </div>
+                          <link.icon className="h-6 w-6 mb-3 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                           <p className="text-[15px] font-semibold text-[var(--apple-label)]">{link.label}</p>
                           <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{link.description}</p>
-                          <ArrowRight className="absolute top-4 right-4 h-4 w-4 text-[var(--apple-tertiary-label)] opacity-0 group-hover:opacity-100 apple-transition" />
+                          <ArrowRight className="absolute top-4 right-4 h-4 w-4 text-[var(--apple-tertiary-label)] opacity-0 group-hover:opacity-100 apple-transition" strokeWidth={1.5} />
                         </button>
                       ))}
                     </div>
@@ -334,11 +323,8 @@ export default function TestManagementPage() {
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {STATS.map((stat) => (
                       <div key={stat.label}
-                        className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 flex items-center gap-3 apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
-                        <div className="flex-shrink-0 w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-                          style={{ background: stat.gradient, boxShadow: `0 4px 12px ${stat.glow}` }}>
-                          <stat.icon className="h-5 w-5 text-white" strokeWidth={1.8} />
-                        </div>
+                        className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 flex items-center gap-3 apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
+                        <stat.icon className="h-6 w-6 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                         <div>
                           {stat.loading ? (
                             <div className="h-6 w-10 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
@@ -353,25 +339,23 @@ export default function TestManagementPage() {
 
                   {/* Apple-style Tabs */}
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
-                    <div className="flex items-center">
-                      <TabsList className="h-9 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] p-0.5 gap-0.5">
-                        {[
-                          { value: 'overview', label: 'Overview', icon: Activity },
-                          { value: 'suites', label: 'Suites', icon: Layers },
-                          { value: 'cases', label: 'Cases', icon: FileText },
-                          { value: 'executions', label: 'Executions', icon: Play },
-                        ].map((tab) => (
-                          <TabsTrigger
-                            key={tab.value}
-                            value={tab.value}
-                            className="h-8 px-3 gap-1.5 text-[13px] rounded-[8px] data-[state=active]:bg-card data-[state=active]:shadow-sm apple-transition"
-                          >
-                            <tab.icon className="h-3.5 w-3.5" />
-                            {tab.label}
-                          </TabsTrigger>
-                        ))}
-                      </TabsList>
-                    </div>
+                    <TabsList className="w-full h-10 rounded-full bg-[var(--apple-tertiary-fill)] border border-[var(--apple-separator)] p-1 gap-0.5">
+                      {[
+                        { value: 'overview', label: 'Overview', icon: Activity },
+                        { value: 'suites', label: 'Suites', icon: Layers },
+                        { value: 'cases', label: 'Cases', icon: FileText },
+                        { value: 'executions', label: 'Executions', icon: Play },
+                      ].map((tab) => (
+                        <TabsTrigger
+                          key={tab.value}
+                          value={tab.value}
+                          className="flex-1 h-8 px-2 gap-1.5 text-[13px] rounded-full data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-[var(--apple-chart-color)] apple-transition"
+                        >
+                          <tab.icon className="h-3.5 w-3.5 flex-shrink-0" />
+                          <span className="hidden sm:inline">{tab.label}</span>
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
 
                     {/* Overview Tab */}
                     <TabsContent value="overview" className="space-y-5 mt-0">
@@ -467,13 +451,13 @@ export default function TestManagementPage() {
                                   </div>
                                   {total > 0 && (
                                     <div className="relative h-[5px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                                      <div className="absolute inset-y-0 left-0 rounded-full" style={{
+                                      <div className="progress-bar-animated absolute inset-y-0 left-0 rounded-full" style={{
                                         width: `${pct}%`,
                                         background: key === 'passed' ? 'linear-gradient(90deg,#34C759,#30D158)' :
                                                     key === 'failed' ? 'linear-gradient(90deg,#FF3B30,#FF453A)' :
                                                     key === 'blocked' ? 'linear-gradient(90deg,#FF9500,#FFD60A)' :
                                                     'linear-gradient(90deg,#8E8E93,#AEAEB2)',
-                                        transition: 'width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+                                        transformOrigin: 'left'
                                       }} />
                                     </div>
                                   )}
@@ -539,7 +523,7 @@ export default function TestManagementPage() {
                             </Button>
                             <Button size="sm"
                               className="h-8 text-[12px] rounded-[var(--apple-radius-sm)] gap-1"
-                              style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' }}
+                              style={{ background: 'var(--apple-card-gradient)' }}
                               onClick={() => router.push(`/test-management/executions/new?projectId=${encodeURIComponent(selectedProject)}`)}>
                               <Play className="h-3 w-3" /> Record
                             </Button>
