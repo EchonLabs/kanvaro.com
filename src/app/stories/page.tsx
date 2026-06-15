@@ -534,12 +534,12 @@ export default function StoriesPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'backlog': return <List className="h-4 w-4" />
-      case 'todo': return <Target className="h-4 w-4" />
-      case 'inprogress': return <Play className="h-4 w-4" />
-      case 'done': return <CheckCircle className="h-4 w-4" />
-      case 'cancelled': return <XCircle className="h-4 w-4" />
-      default: return <Target className="h-4 w-4" />
+      case 'backlog': return <List className="h-4 w-4" strokeWidth={1.5} />
+      case 'todo': return <Target className="h-4 w-4" strokeWidth={1.5} />
+      case 'inprogress': return <Play className="h-4 w-4" strokeWidth={1.5} />
+      case 'done': return <CheckCircle className="h-4 w-4" strokeWidth={1.5} />
+      case 'cancelled': return <XCircle className="h-4 w-4" strokeWidth={1.5} />
+      default: return <Target className="h-4 w-4" strokeWidth={1.5} />
     }
   }
 
@@ -630,7 +630,7 @@ export default function StoriesPage() {
                 onClick={() => router.push('/stories/create-story')}
                 className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 mr-2" strokeWidth={1.5} />
                 New Story
               </Button>
             </PermissionGate>
@@ -643,7 +643,7 @@ export default function StoriesPage() {
           <div className="flex flex-col sm:flex-row gap-2">
             {/* Search bar — takes ~65% */}
             <div className="relative flex-[2]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
               <Input
                 placeholder="Search stories..."
                 value={searchQuery}
@@ -825,7 +825,7 @@ export default function StoriesPage() {
             <TabsContent value="list" className="mt-0">
               {filteredStories.length === 0 ? (
                 <TasksEmptyState
-                  icon={<BookOpen className="h-10 w-10" />}
+                  icon={<BookOpen className="h-10 w-10" strokeWidth={1.5} />}
                   title="No stories found"
                   description="Create your first user story or adjust filters."
                 />
@@ -838,9 +838,7 @@ export default function StoriesPage() {
                       onClick={() => story.project && router.push(`/stories/${story._id}`)}
                     >
                       {/* Left icon area */}
-                      <div className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-md)] flex items-center justify-center mt-0.5" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 6px var(--apple-chart-glow)' }}>
-                        <BookOpen className="h-4 w-4 text-white" />
-                      </div>
+                      <BookOpen className="h-5 w-5 flex-shrink-0 mt-0.5 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
 
                       {/* Main content */}
                       <div className="flex-1 min-w-0 space-y-1.5">
@@ -866,13 +864,13 @@ export default function StoriesPage() {
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                           {story.project?.name ? (
                             <MetaChip
-                              icon={<Target className="h-3 w-3" />}
+                              icon={<Target className="h-3 w-3" strokeWidth={1.5} />}
                               label={story.project.name}
                               title={story.project.name}
                             />
                           ) : (
                             <MetaChip
-                              icon={<Target className="h-3 w-3" />}
+                              icon={<Target className="h-3 w-3" strokeWidth={1.5} />}
                               label="No project"
                             />
                           )}
@@ -880,7 +878,7 @@ export default function StoriesPage() {
                             const epicName = (story.epic as any).name || (story.epic as any).title || ''
                             return epicName ? (
                               <MetaChip
-                                icon={<Layers className="h-3 w-3" />}
+                                icon={<Layers className="h-3 w-3" strokeWidth={1.5} />}
                                 label={epicName}
                                 title={epicName}
                               />
@@ -888,26 +886,26 @@ export default function StoriesPage() {
                           })()}
                           {story.sprint && (
                             <MetaChip
-                              icon={<Zap className="h-3 w-3" />}
+                              icon={<Zap className="h-3 w-3" strokeWidth={1.5} />}
                               label={story.sprint.name}
                               title={story.sprint.name}
                             />
                           )}
                           {story.dueDate && (
                             <MetaChip
-                              icon={<Calendar className="h-3 w-3" />}
+                              icon={<Calendar className="h-3 w-3" strokeWidth={1.5} />}
                               label={`Due ${formatDate(story.dueDate)}`}
                             />
                           )}
                           {story.storyPoints ? (
                             <MetaChip
-                              icon={<BarChart3 className="h-3 w-3" />}
+                              icon={<BarChart3 className="h-3 w-3" strokeWidth={1.5} />}
                               label={`${story.storyPoints} pts`}
                             />
                           ) : null}
                           {story.estimatedHours ? (
                             <MetaChip
-                              icon={<Clock className="h-3 w-3" />}
+                              icon={<Clock className="h-3 w-3" strokeWidth={1.5} />}
                               label={`${story.estimatedHours}h est.`}
                             />
                           ) : null}
@@ -936,7 +934,7 @@ export default function StoriesPage() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-[var(--apple-radius-sm)] opacity-0 group-hover:opacity-100 apple-transition">
-                              <MoreHorizontal className="h-4 w-4" />
+                              <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]">
@@ -944,7 +942,7 @@ export default function StoriesPage() {
                               onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}`); }}
                               className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
                             >
-                              <Eye className="h-4 w-4 mr-2" />
+                              <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
                               <span>View Story</span>
                             </DropdownMenuItem>
 
@@ -956,7 +954,7 @@ export default function StoriesPage() {
                                 }}
                                 className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
                               >
-                                <Edit className="h-4 w-4 mr-2" />
+                                <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                                 <span>Edit Story</span>
                               </DropdownMenuItem>
                             )}
@@ -971,7 +969,7 @@ export default function StoriesPage() {
                                   }}
                                   className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
                                 >
-                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  <Trash2 className="h-4 w-4 mr-2" strokeWidth={1.5} />
                                   <span>Delete Story</span>
                                 </DropdownMenuItem>
                               </>
@@ -1058,7 +1056,7 @@ export default function StoriesPage() {
                                   <h3 className="text-[13px] font-semibold text-[var(--apple-label)] line-clamp-2 flex-1 min-w-0">
                                     {story.title}
                                   </h3>
-                                  <GripVertical className="h-4 w-4 text-[var(--apple-tertiary-label)] flex-shrink-0" />
+                                  <GripVertical className="h-4 w-4 text-[var(--apple-tertiary-label)] flex-shrink-0" strokeWidth={1.5} />
                                 </div>
                                 <div className="flex flex-wrap gap-1">
                                   <PriorityBadge priority={story.priority} />

@@ -160,7 +160,7 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
             : { background: THEME_GRADIENT, boxShadow: `0 2px 12px ${THEME_GLOW}` }
         }
       >
-        <Sparkles className="h-4 w-4" style={{ color: existingSummary ? 'var(--apple-card-gradient)' : 'white' }} />
+        <Sparkles className="h-4 w-4" strokeWidth={1.5} style={{ color: existingSummary ? 'var(--apple-card-gradient)' : 'white' }} />
         {detail.meeting.summary || existingSummary ? 'Regenerate Summary' : 'Generate Summary'}
       </Button>
 
@@ -168,12 +168,7 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
         <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col pointer-events-auto rounded-[var(--apple-radius-xl)]">
           <DialogHeader className="flex-shrink-0 border-b border-[var(--apple-separator)] pb-4">
             <div className="flex items-center gap-3">
-              <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--apple-radius-sm)]"
-                style={{ background: THEME_GRADIENT, boxShadow: `0 4px 12px ${THEME_GLOW}` }}
-              >
-                <Sparkles className="h-5 w-5 text-white" />
-              </div>
+              <Sparkles className="h-6 w-6 shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <DialogTitle>PM Standup Summary</DialogTitle>
                 <DialogDescription className="text-[12px] mt-0.5">
@@ -186,7 +181,7 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
           <DialogBody className="flex-1 overflow-y-auto space-y-4 py-4 min-h-[300px]">
             {loading ? (
               <div className="flex flex-col items-center justify-center gap-2.5 py-20 text-[13px] text-[var(--apple-secondary-label)]">
-                <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'var(--apple-card-gradient)' }} />
+                <Loader2 className="h-6 w-6 animate-spin" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
                 Retrieving standup report…
               </div>
             ) : (
@@ -272,9 +267,9 @@ export function StandupSummaryDialog({ projectId, meetingId, detail, onGenerated
               style={{ background: THEME_GRADIENT, boxShadow: `0 2px 8px ${THEME_GLOW}` }}
             >
               {saving ? (
-                <><Loader2 className="h-4 w-4 animate-spin" />{existingSummary ? 'Regenerating…' : 'Generating…'}</>
+                <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />{existingSummary ? 'Regenerating…' : 'Generating…'}</>
               ) : (
-                <><Sparkles className="h-4 w-4 shrink-0" />{existingSummary ? 'Regenerate Summary' : 'Generate Summary'}</>
+                <><Sparkles className="h-4 w-4 shrink-0" strokeWidth={1.5} />{existingSummary ? 'Regenerate Summary' : 'Generate Summary'}</>
               )}
             </Button>
             <Button

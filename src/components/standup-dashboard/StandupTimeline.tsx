@@ -10,12 +10,12 @@ interface StandupTimelineProps {
   items: StandupTimelineItem[]
 }
 
-const TONE_MAP: Record<StandupTimelineItem['type'], { gradient: string; glow: string; badge: string; text: string }> = {
-  update:     { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)',   badge: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800',   text: 'Update' },
-  assignment: { gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.2)',  badge: 'bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800', text: 'Assignment' },
-  blocker:    { gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)', glow: 'rgba(255,69,58,0.2)',   badge: 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800',       text: 'Blocker' },
-  progress:   { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.2)',   badge: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800', text: 'Progress' },
-  note:       { gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.2)',   badge: 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800', text: 'Note' },
+const TONE_MAP: Record<StandupTimelineItem['type'], { gradient: string; glow: string; badge: string; text: string; iconColor: string }> = {
+  update:     { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)',   badge: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800',   text: 'Update',     iconColor: 'var(--apple-system-blue)' },
+  assignment: { gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)', glow: 'rgba(191,90,242,0.2)',  badge: 'bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800', text: 'Assignment', iconColor: '#BF5AF2' },
+  blocker:    { gradient: 'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)', glow: 'rgba(255,69,58,0.2)',   badge: 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800',       text: 'Blocker',    iconColor: 'var(--apple-system-red)' },
+  progress:   { gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', glow: 'rgba(52,199,89,0.2)',   badge: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800', text: 'Progress',  iconColor: 'var(--apple-system-green)' },
+  note:       { gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.2)',   badge: 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800', text: 'Note',       iconColor: '#FF9500' },
 }
 
 const ICON_MAP = {
@@ -54,11 +54,8 @@ export function StandupTimeline({ items }: StandupTimelineProps) {
               return (
                 <div key={item._id} className="flex gap-4 apple-transition group">
                   {/* Icon badge */}
-                  <div
-                    className="relative z-10 flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[var(--apple-radius-sm)] shadow-sm"
-                    style={{ background: tone.gradient, boxShadow: `0 4px 12px ${tone.glow}` }}
-                  >
-                    <Icon className="h-4 w-4 text-white" />
+                  <div className="relative z-10 flex h-[38px] w-[38px] shrink-0 items-center justify-center">
+                    <Icon className="h-5 w-5" style={{ color: tone.iconColor }} strokeWidth={1.5} />
                   </div>
 
                   {/* Content */}

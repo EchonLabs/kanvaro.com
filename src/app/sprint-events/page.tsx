@@ -112,16 +112,16 @@ interface Project {
 }
 
 const EVENT_ICONS: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-  planning:      { icon: <Target className="h-5 w-5" />,    color: 'text-blue-600 dark:text-blue-400',     bg: 'bg-blue-50 dark:bg-blue-950/30' },
-  review:        { icon: <Eye className="h-5 w-5" />,       color: 'text-amber-600 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-950/30' },
-  retrospective: { icon: <RotateCcw className="h-5 w-5" />, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/30' },
-  standup:       { icon: <Users className="h-5 w-5" />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-  daily_standup: { icon: <Users className="h-5 w-5" />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-  grooming:      { icon: <List className="h-5 w-5" />,      color: 'text-sky-600 dark:text-sky-400',       bg: 'bg-sky-50 dark:bg-sky-950/30' },
-  demo:          { icon: <Zap className="h-5 w-5" />,       color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/30' },
+  planning:      { icon: <Target className="h-5 w-5" strokeWidth={1.5} />,    color: 'text-blue-600 dark:text-blue-400',     bg: 'bg-blue-50 dark:bg-blue-950/30' },
+  review:        { icon: <Eye className="h-5 w-5" strokeWidth={1.5} />,       color: 'text-amber-600 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-950/30' },
+  retrospective: { icon: <RotateCcw className="h-5 w-5" strokeWidth={1.5} />, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/30' },
+  standup:       { icon: <Users className="h-5 w-5" strokeWidth={1.5} />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  daily_standup: { icon: <Users className="h-5 w-5" strokeWidth={1.5} />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  grooming:      { icon: <List className="h-5 w-5" strokeWidth={1.5} />,      color: 'text-sky-600 dark:text-sky-400',       bg: 'bg-sky-50 dark:bg-sky-950/30' },
+  demo:          { icon: <Zap className="h-5 w-5" strokeWidth={1.5} />,       color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/30' },
 }
 const defaultEventStyle = {
-  icon: <Calendar className="h-5 w-5" />,
+  icon: <Calendar className="h-5 w-5" strokeWidth={1.5} />,
   color: 'text-gray-600 dark:text-gray-400',
   bg: 'bg-gray-50 dark:bg-gray-900/40',
 }
@@ -360,17 +360,17 @@ export default function SprintEventsPage() {
   const getEventTypeIcon = (eventType: string) => {
     switch (eventType) {
       case 'planning':
-        return <Calendar className="h-4 w-4" />
+        return <Calendar className="h-4 w-4" strokeWidth={1.5} />
       case 'review':
-        return <Eye className="h-4 w-4" />
+        return <Eye className="h-4 w-4" strokeWidth={1.5} />
       case 'retrospective':
-        return <Users className="h-4 w-4" />
+        return <Users className="h-4 w-4" strokeWidth={1.5} />
       case 'daily_standup':
-        return <Clock className="h-4 w-4" />
+        return <Clock className="h-4 w-4" strokeWidth={1.5} />
       case 'demo':
-        return <Zap className="h-4 w-4" />
+        return <Zap className="h-4 w-4" strokeWidth={1.5} />
       default:
-        return <Calendar className="h-4 w-4" />
+        return <Calendar className="h-4 w-4" strokeWidth={1.5} />
     }
   }
 
@@ -426,7 +426,7 @@ export default function SprintEventsPage() {
     return (
       <MainLayout>
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-          <Calendar className="h-12 w-12 text-[var(--apple-tertiary-label)]" />
+          <Calendar className="h-12 w-12 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
           <h2 className="text-[22px] font-semibold text-[var(--apple-label)]">Authentication Required</h2>
           <p className="text-[15px] text-[var(--apple-secondary-label)]">Please log in to access sprint events.</p>
           <Button
@@ -465,7 +465,7 @@ export default function SprintEventsPage() {
                 onClick={() => setShowAddModal(true)}
                 className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 mr-2" strokeWidth={1.5} />
                 Add Event
               </Button>
             </PermissionGate>
@@ -491,7 +491,7 @@ export default function SprintEventsPage() {
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
                         aria-label="Clear search"
                     >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4" strokeWidth={1.5} />
                     </button>
                 )}
             </div>
@@ -542,7 +542,7 @@ export default function SprintEventsPage() {
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
                         aria-label="Clear search"
                     >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4" strokeWidth={1.5} />
                     </button>
                 )}
             </div>
@@ -638,25 +638,25 @@ export default function SprintEventsPage() {
                     {searchTerm && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Search: {searchTerm}
-                            <button onClick={() => setSearchTerm('')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setSearchTerm('')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                     {filterType !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Type: {formatToTitleCase(filterType)}
-                            <button onClick={() => setFilterType('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setFilterType('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                     {filterStatus !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Status: {formatToTitleCase(filterStatus)}
-                            <button onClick={() => setFilterStatus('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setFilterStatus('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                     {filterProject !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Project: {projects.find(p => p._id === filterProject)?.name || 'Selected'}
-                            <button onClick={() => setFilterProject('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" /></button>
+                            <button onClick={() => setFilterProject('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
                 </div>
@@ -688,7 +688,7 @@ export default function SprintEventsPage() {
         {/* Events Display */}
         {filteredEvents.length === 0 ? (
           <TasksEmptyState
-            icon={<Calendar className="h-10 w-10" />}
+            icon={<Calendar className="h-10 w-10" strokeWidth={1.5} />}
             title="No sprint events found"
             description={hasActiveFilters ? 'Try adjusting your filters to find what you are looking for.' : 'Schedule your first sprint ceremony.'}
             action={
@@ -697,7 +697,7 @@ export default function SprintEventsPage() {
                   onClick={() => setShowAddModal(true)}
                   className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-4 w-4 mr-2" strokeWidth={1.5} />
                   Add Event
                 </Button>
               </PermissionGate>
@@ -727,12 +727,9 @@ export default function SprintEventsPage() {
                       <div className="p-5 space-y-4">
                         {/* Header: icon + title + status + menu */}
                         <div className="flex items-start gap-3">
-                          <div
-                            className="h-10 w-10 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white"
-                            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}
-                          >
+                          <span className={cn('flex-shrink-0', style.color)}>
                             {style.icon}
-                          </div>
+                          </span>
                           <div className="flex-1 min-w-0">
                             <h3 className="text-[16px] font-semibold text-[var(--apple-label)] truncate leading-snug">{event.title}</h3>
                             <span className={cn('inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md mt-0.5', style.bg, style.color)}>
@@ -749,7 +746,7 @@ export default function SprintEventsPage() {
                                   className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition"
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <MoreVertical className="h-4 w-4" />
+                                  <MoreVertical className="h-4 w-4" strokeWidth={1.5} />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
@@ -757,7 +754,7 @@ export default function SprintEventsPage() {
                                   e.stopPropagation()
                                   router.push(`/sprint-events/view-sprint-event/${event._id}`)
                                 }}>
-                                  <Eye className="h-4 w-4 mr-2" />
+                                  <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
                                   View Event
                                 </DropdownMenuItem>
                                 {hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id) ? (
@@ -767,7 +764,7 @@ export default function SprintEventsPage() {
                                       const currentEvent = events.find(ev => ev._id === event._id)
                                       setEditingEvent(currentEvent || event)
                                     }}>
-                                      <Edit className="h-4 w-4 mr-2" />
+                                      <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                                       Edit Event
                                     </DropdownMenuItem>
                                     {false && <>
@@ -779,7 +776,7 @@ export default function SprintEventsPage() {
                                         }}
                                         className="text-destructive"
                                       >
-                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        <Trash2 className="h-4 w-4 mr-2" strokeWidth={1.5} />
                                         Delete
                                       </DropdownMenuItem>
                                     </>}
@@ -797,12 +794,12 @@ export default function SprintEventsPage() {
 
                         {/* Meta info */}
                         <div className="space-y-1.5">
-                          <MetaChip icon={<Calendar className="h-3.5 w-3.5" />} label={formatDate(event.scheduledDate)} />
+                          <MetaChip icon={<Calendar className="h-3.5 w-3.5" strokeWidth={1.5} />} label={formatDate(event.scheduledDate)} />
                           {event.startTime && event.endTime && (
-                            <MetaChip icon={<Clock className="h-3.5 w-3.5" />} label={`${formatTime(event.startTime)} → ${formatTime(event.endTime)}`} />
+                            <MetaChip icon={<Clock className="h-3.5 w-3.5" strokeWidth={1.5} />} label={`${formatTime(event.startTime)} → ${formatTime(event.endTime)}`} />
                           )}
                           {event.duration > 0 && (
-                            <MetaChip icon={<Clock className="h-3.5 w-3.5" />} label={`${event.duration} min`} />
+                            <MetaChip icon={<Clock className="h-3.5 w-3.5" strokeWidth={1.5} />} label={`${event.duration} min`} />
                           )}
                         </div>
 
@@ -823,7 +820,7 @@ export default function SprintEventsPage() {
                         {/* Attendees */}
                         {event.attendees?.length > 0 && (
                           <div className="flex items-center gap-1.5 text-[12px] text-[var(--apple-secondary-label)]">
-                            <Users className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" />
+                            <Users className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                             <span>{event.attendees.length} attendee{event.attendees.length !== 1 ? 's' : ''}</span>
                           </div>
                         )}
@@ -847,31 +844,28 @@ export default function SprintEventsPage() {
                     >
                       {/* Theme-color left accent strip */}
                       <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: 'var(--apple-card-gradient)' }} />
-                      <div
-                        className="h-9 w-9 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white"
-                        style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 6px var(--apple-chart-glow)' }}
-                      >
+                      <span className={cn('flex-shrink-0', style.color)}>
                         {style.icon}
-                      </div>
+                      </span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[15px] font-semibold text-[var(--apple-label)] truncate">{event.title}</span>
                           <StatusBadge status={event.status} size="sm" />
                         </div>
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
-                          <MetaChip icon={<Calendar className="h-3 w-3" />} label={formatDate(event.scheduledDate)} />
+                          <MetaChip icon={<Calendar className="h-3 w-3" strokeWidth={1.5} />} label={formatDate(event.scheduledDate)} />
                           {event.duration > 0 && (
-                            <MetaChip icon={<Clock className="h-3 w-3" />} label={`${event.duration}m`} />
+                            <MetaChip icon={<Clock className="h-3 w-3" strokeWidth={1.5} />} label={`${event.duration}m`} />
                           )}
                           {event.sprint?.name && (
-                            <MetaChip icon={<Zap className="h-3 w-3" />} label={event.sprint.name} />
+                            <MetaChip icon={<Zap className="h-3 w-3" strokeWidth={1.5} />} label={event.sprint.name} />
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {event.attendees?.length > 0 && (
                           <span className="text-[12px] text-[var(--apple-secondary-label)] hidden md:flex items-center gap-1">
-                            <Users className="h-3.5 w-3.5" /> {event.attendees.length}
+                            <Users className="h-3.5 w-3.5" strokeWidth={1.5} /> {event.attendees.length}
                           </span>
                         )}
                         <DropdownMenu>
@@ -882,7 +876,7 @@ export default function SprintEventsPage() {
                               className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <MoreVertical className="h-4 w-4" />
+                              <MoreVertical className="h-4 w-4" strokeWidth={1.5} />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -890,7 +884,7 @@ export default function SprintEventsPage() {
                               e.stopPropagation()
                               router.push(`/sprint-events/view-sprint-event/${event._id}`)
                             }}>
-                              <Eye className="h-4 w-4 mr-2" />
+                              <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
                               View Event
                             </DropdownMenuItem>
                             {hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id) ? (
@@ -900,7 +894,7 @@ export default function SprintEventsPage() {
                                   const currentEvent = events.find(ev => ev._id === event._id)
                                   setEditingEvent(currentEvent || event)
                                 }}>
-                                  <Edit className="h-4 w-4 mr-2" />
+                                  <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                                   Edit Event
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
@@ -911,7 +905,7 @@ export default function SprintEventsPage() {
                                   }}
                                   className="text-destructive"
                                 >
-                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  <Trash2 className="h-4 w-4 mr-2" strokeWidth={1.5} />
                                   Delete
                                 </DropdownMenuItem>
                               </>

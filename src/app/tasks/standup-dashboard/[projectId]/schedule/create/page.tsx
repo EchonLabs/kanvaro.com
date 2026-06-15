@@ -216,7 +216,7 @@ export default function CreateStandupSchedulePage() {
       <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <div className="flex items-center justify-center gap-2.5 py-20 text-[13px] text-[var(--apple-secondary-label)]">
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} />
             Loading schedule form…
           </div>
         </PageContent>
@@ -252,7 +252,7 @@ export default function CreateStandupSchedulePage() {
                 className="w-fit gap-1.5 px-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
                 onClick={() => router.push(`/tasks/standup-dashboard/${projectId}`)}
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
                 Back to project
               </Button>
 
@@ -268,7 +268,7 @@ export default function CreateStandupSchedulePage() {
             </div>
 
             <div className="flex items-center gap-2 text-[13px] text-[var(--apple-secondary-label)]">
-              <Users className="h-4 w-4" />
+              <Users className="h-4 w-4" strokeWidth={1.5} />
               {project.teamMembers.length} members
             </div>
           </div>
@@ -300,7 +300,7 @@ export default function CreateStandupSchedulePage() {
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start text-left font-normal rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] hover:bg-card">
-                        <CalendarIcon className="mr-2 h-4 w-4 text-[var(--apple-secondary-label)]" />
+                        <CalendarIcon className="mr-2 h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                         <span className="text-[13px]">{selectedDate ? format(selectedDate, 'PPP') : 'Pick a date'}</span>
                       </Button>
                     </PopoverTrigger>
@@ -354,7 +354,7 @@ export default function CreateStandupSchedulePage() {
                             : 'border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[var(--apple-secondary-label)] hover:bg-[var(--apple-tertiary-fill)]'
                         }`}
                       >
-                        {checked && <Check className="h-3 w-3" />}
+                        {checked && <Check className="h-3 w-3" strokeWidth={1.5} />}
                         {member.firstName} {member.lastName}
                       </button>
                     )
@@ -442,7 +442,7 @@ export default function CreateStandupSchedulePage() {
                                     onClick={() => handleRemoveTaskRow(member._id, row.id)}
                                     className="apple-transition h-7 w-7 shrink-0 flex items-center justify-center rounded-full text-[var(--apple-tertiary-label)] hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30"
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                                   </button>
                                 </div>
                               )
@@ -453,7 +453,7 @@ export default function CreateStandupSchedulePage() {
                               onClick={() => handleAddTaskRow(member._id)}
                               className="apple-transition flex items-center gap-1.5 text-[11px] font-medium text-[var(--apple-system-blue)] hover:opacity-70 mt-1"
                             >
-                              <Plus className="h-3.5 w-3.5" />
+                              <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
                               Add task
                             </button>
                           </div>
@@ -495,7 +495,7 @@ export default function CreateStandupSchedulePage() {
                   className="text-white apple-transition"
                   style={{ background: HEADER_GRADIENT, boxShadow: `0 2px 12px ${HEADER_GLOW}` }}
                 >
-                  {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.5} /> : null}
                   Create Schedule
                 </Button>
               </div>

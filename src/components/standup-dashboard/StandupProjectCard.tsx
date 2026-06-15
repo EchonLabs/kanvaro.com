@@ -84,11 +84,11 @@ export function StandupProjectCard({ project, index, onOpen }: StandupProjectCar
         {/* Meta row */}
         <div className="flex flex-wrap items-center gap-3 text-[12px] text-[var(--apple-secondary-label)]">
           <span className="flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5" />
+            <Users className="h-3.5 w-3.5" strokeWidth={1.5} />
             {project.teamMembers.length} member{project.teamMembers.length !== 1 ? 's' : ''}
           </span>
           <span className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5" />
+            <Calendar className="h-3.5 w-3.5" strokeWidth={1.5} />
             {formatDate(project.lastStandupAt)}
           </span>
         </div>
@@ -119,7 +119,7 @@ export function StandupProjectCard({ project, index, onOpen }: StandupProjectCar
           style={{ background: palette.gradient, boxShadow: `0 2px 12px ${palette.glow}` }}
         >
           Open Dashboard
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
         </button>
       </div>
     </div>

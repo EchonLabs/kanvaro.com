@@ -159,7 +159,7 @@ export default function StandupScheduleDetailPage() {
       <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <div className="flex items-center justify-center gap-2.5 py-20 text-[13px] text-[var(--apple-secondary-label)]">
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} />
             Loading standup details…
           </div>
         </PageContent>
@@ -183,7 +183,7 @@ export default function StandupScheduleDetailPage() {
                 className="w-fit gap-1.5 px-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
                 onClick={() => router.push(`/tasks/standup-dashboard/${projectId}`)}
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
                 Back to project
               </Button>
 
@@ -207,9 +207,9 @@ export default function StandupScheduleDetailPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-[13px] text-[var(--apple-secondary-label)]">
-                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" />{detail.meeting.participants.length} participants</span>
-                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{detail.meeting.time}</span>
-                <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4" />{detail.meeting.durationMinutes} mins</span>
+                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.participants.length} participants</span>
+                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.time}</span>
+                <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.durationMinutes} mins</span>
               </div>
             </div>
 
@@ -235,7 +235,7 @@ export default function StandupScheduleDetailPage() {
               )}
               {canManageStandup && (
                 <Button variant="outline" className="apple-transition" onClick={() => setEditOpen(true)}>
-                  <Edit3 className="mr-2 h-4 w-4" />
+                  <Edit3 className="mr-2 h-4 w-4" strokeWidth={1.5} />
                   Edit
                 </Button>
               )}
@@ -244,7 +244,7 @@ export default function StandupScheduleDetailPage() {
                 className="apple-transition"
                 onClick={handleViewSummary}
               >
-                <Sparkles className="mr-2 h-4 w-4" style={{ color: 'var(--apple-card-gradient)' }} />
+                <Sparkles className="mr-2 h-4 w-4" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
                 View Summary
               </Button>
               {detail.meeting.status === 'completed' && (
@@ -257,7 +257,7 @@ export default function StandupScheduleDetailPage() {
               )}
               {canManageStandup && (
                 <Button variant="destructive" className="apple-transition" onClick={() => setDeleteConfirmOpen(true)}>
-                  <Trash2 className="mr-2 h-4 w-4" />
+                  <Trash2 className="mr-2 h-4 w-4" strokeWidth={1.5} />
                   Delete
                 </Button>
               )}
@@ -313,7 +313,7 @@ export default function StandupScheduleDetailPage() {
                               onClick={() => setCommentTaskState({ memberId: member._id, taskId: task.taskId, taskTitle: task.taskTitle })}
                               className="apple-transition h-7 w-7 shrink-0 flex items-center justify-center rounded-full text-[var(--apple-tertiary-label)] hover:bg-[var(--apple-tertiary-fill)] hover:text-[var(--apple-system-blue)]"
                             >
-                              <MessageSquare className="h-3.5 w-3.5" />
+                              <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
                             </button>
                           </div>
                         ))
@@ -383,9 +383,7 @@ export default function StandupScheduleDetailPage() {
         <DialogContent className="sm:max-w-md pointer-events-auto">
           <DialogHeader>
             <div className="flex items-center gap-3 pb-3 border-b border-[var(--apple-separator)]">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--apple-radius-sm)]" style={{ background: HEADER_GRADIENT }}>
-                <MessageSquare className="h-4 w-4 text-white" />
-              </div>
+              <MessageSquare className="h-5 w-5 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <DialogTitle>Comment on Task</DialogTitle>
                 <DialogDescription className="text-[11px] mt-0.5">
@@ -437,7 +435,7 @@ export default function StandupScheduleDetailPage() {
               style={!addingComment && commentText.trim() ? { background: HEADER_GRADIENT } : undefined}
             >
               {addingComment ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.5} />Saving…</>
               ) : 'Add Comment'}
             </Button>
           </DialogFooter>

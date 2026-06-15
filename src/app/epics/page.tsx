@@ -353,17 +353,17 @@ export default function EpicsPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "backlog":
-        return <Layers className="h-4 w-4" />;
+        return <Layers className="h-4 w-4" strokeWidth={1.5} />;
       case "todo":
-        return <Target className="h-4 w-4" />;
+        return <Target className="h-4 w-4" strokeWidth={1.5} />;
       case "inprogress":
-        return <Play className="h-4 w-4" />;
+        return <Play className="h-4 w-4" strokeWidth={1.5} />;
       case "done":
-        return <CheckCircle className="h-4 w-4" />;
+        return <CheckCircle className="h-4 w-4" strokeWidth={1.5} />;
       case "cancelled":
-        return <XCircle className="h-4 w-4" />;
+        return <XCircle className="h-4 w-4" strokeWidth={1.5} />;
       default:
-        return <Target className="h-4 w-4" />;
+        return <Target className="h-4 w-4" strokeWidth={1.5} />;
     }
   };
 
@@ -476,7 +476,7 @@ export default function EpicsPage() {
                 }
                 className="h-9 px-5 rounded-full bg-[var(--apple-system-blue)] text-white hover:opacity-90 apple-transition text-[14px] font-medium"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 mr-2" strokeWidth={1.5} />
                 New Epic
               </Button>
             </PermissionGate>
@@ -714,7 +714,7 @@ export default function EpicsPage() {
         {/* Epics Content */}
         {displayedEpics.length === 0 ? (
           <TasksEmptyState
-            icon={<Layers className="h-10 w-10" />}
+            icon={<Layers className="h-10 w-10" strokeWidth={1.5} />}
             title="No epics found"
             description="Create your first epic to track large-scale features."
           />
@@ -757,9 +757,7 @@ export default function EpicsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="h-8 w-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
-                            <Layers className="h-4 w-4 text-white" />
-                          </div>
+                          <Layers className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                           <h3
                             className="text-[16px] font-semibold text-[var(--apple-label)] truncate"
                             title={epic.title}
@@ -782,7 +780,7 @@ export default function EpicsPage() {
                             onClick={(e) => e.stopPropagation()}
                             className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition flex-shrink-0"
                           >
-                            <MoreHorizontal className="h-4 w-4" />
+                            <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -794,7 +792,7 @@ export default function EpicsPage() {
                               router.push(`/epics/${epic._id}`);
                             }}
                           >
-                            <Eye className="h-4 w-4 mr-2" />
+                            <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
                             View Epic
                           </DropdownMenuItem>
                           {editAllowed && (
@@ -804,7 +802,7 @@ export default function EpicsPage() {
                                 router.push(`/epics/${epic._id}/edit`);
                               }}
                             >
-                              <Edit className="h-4 w-4 mr-2" />
+                              <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                               Edit Epic
                             </DropdownMenuItem>
                           )}
@@ -854,12 +852,12 @@ export default function EpicsPage() {
                     {/* Meta info */}
                     <div className="flex flex-wrap gap-x-3 gap-y-1.5">
                       <MetaChip
-                        icon={<Target className="h-3.5 w-3.5" />}
+                        icon={<Target className="h-3.5 w-3.5" strokeWidth={1.5} />}
                         label={epic.project?.name || "—"}
                       />
                       {epic.dueDate && (
                         <MetaChip
-                          icon={<Calendar className="h-3.5 w-3.5" />}
+                          icon={<Calendar className="h-3.5 w-3.5" strokeWidth={1.5} />}
                           label={`Due ${formatDate(epic.dueDate)}`}
                         />
                       )}
@@ -871,7 +869,7 @@ export default function EpicsPage() {
                       )}
                       {epic.assignedTo && (
                         <MetaChip
-                          icon={<User className="h-3.5 w-3.5" />}
+                          icon={<User className="h-3.5 w-3.5" strokeWidth={1.5} />}
                           label={`${epic.assignedTo.firstName} ${epic.assignedTo.lastName}`}
                         />
                       )}
@@ -900,9 +898,7 @@ export default function EpicsPage() {
                   onClick={() => viewAllowed && router.push(`/epics/${epic._id}`)}
                 >
                   {/* Icon */}
-                  <div className="h-10 w-10 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
-                    <Layers className="h-5 w-5 text-white" />
-                  </div>
+                  <Layers className="h-6 w-6 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
@@ -920,12 +916,12 @@ export default function EpicsPage() {
                     )}
                     <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
                       <MetaChip
-                        icon={<Target className="h-3.5 w-3.5" />}
+                        icon={<Target className="h-3.5 w-3.5" strokeWidth={1.5} />}
                         label={epic.project?.name || "—"}
                       />
                       {epic.dueDate && (
                         <MetaChip
-                          icon={<Calendar className="h-3.5 w-3.5" />}
+                          icon={<Calendar className="h-3.5 w-3.5" strokeWidth={1.5} />}
                           label={formatDate(epic.dueDate)}
                         />
                       )}
@@ -953,7 +949,7 @@ export default function EpicsPage() {
                         onClick={(e) => e.stopPropagation()}
                         className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition flex-shrink-0"
                       >
-                        <MoreHorizontal className="h-4 w-4" />
+                        <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -965,7 +961,7 @@ export default function EpicsPage() {
                           router.push(`/epics/${epic._id}`);
                         }}
                       >
-                        <Eye className="h-4 w-4 mr-2" />
+                        <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
                         View Epic
                       </DropdownMenuItem>
                       {editAllowed && (
@@ -975,7 +971,7 @@ export default function EpicsPage() {
                             router.push(`/epics/${epic._id}/edit`);
                           }}
                         >
-                          <Edit className="h-4 w-4 mr-2" />
+                          <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                           Edit Epic
                         </DropdownMenuItem>
                       )}

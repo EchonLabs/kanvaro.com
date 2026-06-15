@@ -140,7 +140,7 @@ export default function StandupProjectPage() {
       <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
           <div className="flex items-center justify-center gap-2.5 py-20 text-[13px] text-[var(--apple-secondary-label)]">
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} />
             Loading standup project…
           </div>
         </PageContent>
@@ -155,7 +155,7 @@ export default function StandupProjectPage() {
           <div className="rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card p-12 text-center space-y-4">
             <p className="text-[15px] font-semibold">Standup project not found</p>
             <Button variant="outline" onClick={() => router.push('/tasks/standup-dashboard')}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="mr-2 h-4 w-4" strokeWidth={1.5} />
               Back to Standup Dashboard
             </Button>
           </div>
@@ -183,7 +183,7 @@ export default function StandupProjectPage() {
                 className="w-fit gap-1.5 px-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
                 onClick={() => router.push('/tasks/standup-dashboard')}
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
                 Standup Dashboard
               </Button>
 
@@ -205,9 +205,9 @@ export default function StandupProjectPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-[13px] text-[var(--apple-secondary-label)]">
-                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" />{project.teamMembers.length} team members</span>
-                {project.sprintName && <span className="flex items-center gap-1.5"><Activity className="h-4 w-4" />{project.sprintName}</span>}
-                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" />Last standup {formatDateTimeSafe(project.lastStandupAt)}</span>
+                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" strokeWidth={1.5} />{project.teamMembers.length} team members</span>
+                {project.sprintName && <span className="flex items-center gap-1.5"><Activity className="h-4 w-4" strokeWidth={1.5} />{project.sprintName}</span>}
+                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" strokeWidth={1.5} />Last standup {formatDateTimeSafe(project.lastStandupAt)}</span>
               </div>
             </div>
 
@@ -218,7 +218,7 @@ export default function StandupProjectPage() {
                 style={{ background: HEADER_GRADIENT }}
                 className="text-white hover:opacity-90"
               >
-                <CalendarDays className="mr-2 h-4 w-4" />
+                <CalendarDays className="mr-2 h-4 w-4" strokeWidth={1.5} />
                 Create Standup
               </Button>
             </div>
@@ -235,7 +235,7 @@ export default function StandupProjectPage() {
               <div key={label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="apple-section-label text-[var(--apple-secondary-label)]">{label}</p>
-                  <Icon className="h-4 w-4" style={{ color }} />
+                  <Icon className="h-4 w-4" style={{ color }} strokeWidth={1.5} />
                 </div>
                 <p className="text-[24px] font-bold tracking-tight font-apple-mono tabular-nums" style={{ color }}>{value}</p>
               </div>
@@ -298,7 +298,7 @@ export default function StandupProjectPage() {
                   />
                 </div>
                 <Button variant="outline" size="sm" onClick={() => setStandupDateFilter('')} className="apple-transition">
-                  <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                  <RefreshCw className="mr-2 h-3.5 w-3.5" strokeWidth={1.5} />
                   Clear
                 </Button>
               </div>
@@ -484,12 +484,12 @@ function MeetingCard({ meeting, canManage, formatDate, onView, onDelete, showSta
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 pt-1">
           <Button variant="outline" size="sm" onClick={onView} className="h-8 text-[12px] apple-transition">
-            <Eye className="mr-1.5 h-3.5 w-3.5" />
+            <Eye className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.5} />
             View Details
           </Button>
           {canManage && (
             <Button variant="destructive" size="sm" onClick={onDelete} className="h-8 text-[12px] apple-transition">
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Button>
           )}
         </div>

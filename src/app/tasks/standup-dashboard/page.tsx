@@ -93,9 +93,7 @@ export default function StandupDashboardPage() {
         <PageContent>
           <div className="flex min-h-[45vh] items-center justify-center px-4 py-12">
             <div className="max-w-lg w-full rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-8 text-center space-y-5">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10">
-                <ShieldAlert className="h-7 w-7 text-[var(--apple-system-red)]" />
-              </div>
+              <ShieldAlert className="h-8 w-8 text-[var(--apple-system-red)]" strokeWidth={1.5} />
               <div className="space-y-1">
                 <h2 className="text-[17px] font-semibold">Access Restricted</h2>
                 <p className="text-[13px] text-[var(--apple-secondary-label)]">
@@ -142,7 +140,7 @@ export default function StandupDashboardPage() {
               >
                 <div className="flex items-center justify-between">
                   <p className="apple-section-label text-[var(--apple-secondary-label)]">{label}</p>
-                  <Icon className="h-4 w-4" style={{ color }} />
+                  <Icon className="h-4 w-4" style={{ color }} strokeWidth={1.5} />
                 </div>
                 <p className="text-[26px] font-bold tracking-tight font-apple-mono tabular-nums" style={{ color }}>
                   {loading ? '—' : value}
@@ -154,7 +152,7 @@ export default function StandupDashboardPage() {
           {/* Toolbar */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--apple-tertiary-label)]" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -178,7 +176,7 @@ export default function StandupDashboardPage() {
 
           {/* Count label */}
           <div className="flex items-center gap-2 text-[13px] text-[var(--apple-secondary-label)]">
-            <LayoutGrid className="h-3.5 w-3.5" />
+            <LayoutGrid className="h-3.5 w-3.5" strokeWidth={1.5} />
             <span>{filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}</span>
             {status !== 'all' && (
               <span className="rounded-full bg-[var(--apple-tertiary-fill)] px-2 py-0.5 text-[11px] font-medium">
@@ -190,7 +188,7 @@ export default function StandupDashboardPage() {
           {/* Loading state */}
           {loading && (
             <div className="flex items-center justify-center gap-2.5 py-16 text-[13px] text-[var(--apple-secondary-label)]">
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} />
               Loading projects…
             </div>
           )}

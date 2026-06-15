@@ -32,12 +32,7 @@ export function StandupTimelogList({ timelogs, members, standupDate }: StandupTi
       {/* Header */}
       <div className="flex flex-col gap-3 border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--apple-radius-sm)]"
-            style={{ background: 'linear-gradient(135deg,#AF52DE 0%,#BF5AF2 100%)', boxShadow: '0 4px 12px rgba(175,82,222,0.25)' }}
-          >
-            <Clock className="h-4 w-4 text-white" />
-          </div>
+          <Clock className="h-5 w-5 shrink-0" style={{ color: '#BF5AF2' }} strokeWidth={1.5} />
           <div>
             <p className="text-[15px] font-semibold">Task Timelogs</p>
             <p className="text-[11px] text-[var(--apple-secondary-label)] mt-0.5">
