@@ -195,10 +195,7 @@ export function DocumentationSettings() {
         {stats.map(({ label, value, icon: Icon }) => (
           <div key={label}
             className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 flex items-center gap-3 apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
-            <div className="flex-shrink-0 w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 12px var(--apple-chart-glow)' }}>
-              <Icon className="h-5 w-5 text-white" strokeWidth={1.8} />
-            </div>
+            <Icon className="h-6 w-6 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
             <div>
               <p className="text-[22px] font-bold tracking-tight text-[var(--apple-label)] font-apple-mono tabular-nums leading-none">{value}</p>
               <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{label}</p>
@@ -213,10 +210,7 @@ export function DocumentationSettings() {
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
           <div className="flex items-center gap-3">
-            <div className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 3px 10px var(--apple-chart-glow)' }}>
-              <BookOpen className="h-[18px] w-[18px] text-white" strokeWidth={1.8} />
-            </div>
+            <BookOpen className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
             <div>
               <p className="text-[15px] font-semibold text-[var(--apple-label)]">Documentation Articles</p>
               <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">Create and manage articles for your users</p>
@@ -227,7 +221,7 @@ export function DocumentationSettings() {
             className="w-full sm:w-auto h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
             style={{ background: 'var(--apple-card-gradient)' }}
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
             New Article
           </Button>
         </div>
@@ -236,7 +230,7 @@ export function DocumentationSettings() {
         <div className="px-5 py-3 border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]">
           {/* Search — always full width */}
           <div className="relative mb-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
             <Input
               placeholder="Search articles…"
               value={searchQuery}
@@ -281,10 +275,7 @@ export function DocumentationSettings() {
         <div className="divide-y divide-[var(--apple-separator)]">
           {filteredArticles.length === 0 ? (
             <div className="py-16 text-center">
-              <div className="w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center mx-auto mb-4"
-                style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 16px var(--apple-chart-glow)' }}>
-                <BookOpen className="h-7 w-7 text-white" strokeWidth={1.8} />
-              </div>
+              <BookOpen className="h-10 w-10 text-[var(--apple-chart-to)] mx-auto mb-4" strokeWidth={1.5} />
               <p className="text-[17px] font-semibold text-[var(--apple-label)] mb-1">
                 {articles.length === 0 ? 'No articles yet' : 'No articles match filters'}
               </p>
@@ -297,7 +288,7 @@ export function DocumentationSettings() {
                   className="h-9 gap-2 px-5 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
                   style={{ background: 'var(--apple-card-gradient)' }}
                 >
-                  <Plus className="h-3.5 w-3.5" /> Create First Article
+                  <Plus className="h-3.5 w-3.5" strokeWidth={1.5} /> Create First Article
                 </Button>
               )}
             </div>
@@ -308,17 +299,10 @@ export function DocumentationSettings() {
                 className="flex items-start gap-3 px-5 py-4 apple-transition hover:bg-[var(--apple-quaternary-fill)] group"
               >
                 {/* Visibility indicator */}
-                <div className={cn(
-                  'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-0.5',
-                  article.visibility === 'public'
-                    ? 'bg-green-100 dark:bg-green-950/40'
-                    : 'bg-purple-100 dark:bg-purple-950/40'
-                )}>
-                  {article.visibility === 'public'
-                    ? <Globe className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                    : <Lock className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                  }
-                </div>
+                {article.visibility === 'public'
+                  ? <Globe className="h-4 w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" strokeWidth={1.5} />
+                  : <Lock className="h-4 w-4 flex-shrink-0 mt-0.5 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
+                }
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
@@ -335,13 +319,13 @@ export function DocumentationSettings() {
                         onClick={() => handleEditArticle(article)}
                         className="w-7 h-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-tertiary-fill)] hover:text-[var(--apple-system-blue)] apple-transition"
                       >
-                        <Edit className="h-3.5 w-3.5" />
+                        <Edit className="h-3.5 w-3.5" strokeWidth={1.5} />
                       </button>
                       <button
                         onClick={() => handleDeleteArticle(article)}
                         className="w-7 h-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-[var(--apple-system-red)] apple-transition"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                       </button>
                     </div>
                   </div>
@@ -360,7 +344,7 @@ export function DocumentationSettings() {
                       <span className="text-[11px] text-[var(--apple-tertiary-label)]">+{article.audiences.length - 3}</span>
                     )}
                     <span className="ml-auto flex items-center gap-1 text-[11px] text-[var(--apple-tertiary-label)]">
-                      <Calendar className="h-3 w-3" />
+                      <Calendar className="h-3 w-3" strokeWidth={1.5} />
                       {formatDate(article.updated)}
                     </span>
                   </div>
@@ -414,7 +398,7 @@ export function DocumentationSettings() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-[var(--apple-system-red)]" />
+              <AlertCircle className="h-5 w-5 text-[var(--apple-system-red)]" strokeWidth={1.5} />
               Delete Article
             </DialogTitle>
             <DialogDescription>
@@ -577,7 +561,7 @@ function ArticleForm({ formData, setFormData, toggleAudience, onSave, onCancel, 
         <Button onClick={onSave} disabled={saving || !isValid}
           className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] text-[13px]"
           style={{ background: 'var(--apple-card-gradient)' }}>
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <CheckCircle className="h-3.5 w-3.5" strokeWidth={1.5} />}
           {saving ? 'Saving…' : isEdit ? 'Update Article' : 'Create Article'}
         </Button>
       </div>

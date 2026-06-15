@@ -48,10 +48,7 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="w-12 h-12 rounded-[var(--apple-radius-md)] flex items-center justify-center mx-auto mb-4"
-            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 16px var(--apple-chart-glow)' }}>
-            <Loader2 className="h-6 w-6 text-white animate-spin" />
-          </div>
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--apple-chart-to)] mx-auto mb-4" strokeWidth={1.5} />
           <p className="text-[13px] text-[var(--apple-secondary-label)]">Loading settings…</p>
         </div>
       </div>
@@ -74,10 +71,7 @@ export default function SettingsPage() {
       <MainLayout>
         <div className="min-h-[50vh] flex items-center justify-center px-4">
           <div className="text-center max-w-sm space-y-4">
-            <div className="w-14 h-14 rounded-[var(--apple-radius-md)] flex items-center justify-center mx-auto"
-              style={{ background: 'linear-gradient(135deg,#FF3B30 0%,#FF9500 100%)', boxShadow: '0 4px 16px rgba(255,59,48,0.30)' }}>
-              <ShieldOff className="h-7 w-7 text-white" strokeWidth={1.8} />
-            </div>
+            <ShieldOff className="h-10 w-10 text-[var(--apple-system-red)] mx-auto" strokeWidth={1.5} />
             <div>
               <p className="text-[17px] font-semibold text-[var(--apple-label)]">Access Restricted</p>
               <p className="text-[13px] text-[var(--apple-secondary-label)] mt-1">
@@ -98,7 +92,7 @@ export default function SettingsPage() {
 
         {/* ── Page Header ── */}
         <div className="flex items-center gap-3">
-          <SettingsIcon className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+          <SettingsIcon className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
           <div>
             <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
               Settings
@@ -125,7 +119,7 @@ export default function SettingsPage() {
                       : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]'
                   )}
                 >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
                   <span className="hidden sm:inline truncate">{tab.label}</span>
                 </button>
               )

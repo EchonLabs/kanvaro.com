@@ -19,16 +19,12 @@ import { useAccentTheme, type AccentTheme } from '@/hooks/useAccentTheme'
 /* ── Section card wrapper ── */
 function SectionCard({
   icon: Icon,
-  gradient,
-  glow,
   title,
   description,
   children,
   action,
 }: {
   icon: React.ElementType
-  gradient: string
-  glow: string
   title: string
   description?: string
   children: React.ReactNode
@@ -39,10 +35,7 @@ function SectionCard({
       {/* Card header */}
       <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--apple-separator)]">
         <div className="flex items-center gap-3">
-          <div className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-            style={{ background: gradient, boxShadow: `0 3px 10px ${glow}` }}>
-            <Icon className="h-4.5 w-4.5 text-white h-[18px] w-[18px]" strokeWidth={1.8} />
-          </div>
+          <Icon className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
           <div>
             <p className="text-[15px] font-semibold text-[var(--apple-label)]">{title}</p>
             {description && <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">{description}</p>}
@@ -504,8 +497,6 @@ export function OrganizationSettings() {
       {/* ── Appearance ── */}
       <SectionCard
         icon={Palette}
-        gradient="var(--apple-card-gradient)"
-        glow="var(--apple-chart-glow)"
         title="Appearance"
         description="Choose your accent color — applied across the entire app"
       >
@@ -553,8 +544,6 @@ export function OrganizationSettings() {
       {/* ── Organization Information ── */}
       <SectionCard
         icon={Building2}
-        gradient="var(--apple-card-gradient)"
-        glow="var(--apple-chart-glow)"
         title="Organization Information"
         description="Basic identity and locale settings"
       >
@@ -657,7 +646,7 @@ export function OrganizationSettings() {
                   <div className={`w-8 h-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0 ${
                     active ? 'bg-[var(--apple-system-blue)] text-white' : 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]'
                   }`}>
-                    <SizeIcon className="h-4 w-4" />
+                    <SizeIcon className="h-4 w-4" strokeWidth={1.5} />
                   </div>
                   <div className="min-w-0">
                     <p className={`text-[13px] font-semibold ${active ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-label)]'}`}>{label}</p>
@@ -717,8 +706,6 @@ export function OrganizationSettings() {
       {/* ── User Registration ── */}
       <SectionCard
         icon={UserCheck}
-        gradient="var(--apple-card-gradient)"
-        glow="var(--apple-chart-glow)"
         title="User Registration"
         description="Default role assigned to newly registered users"
       >
@@ -743,8 +730,6 @@ export function OrganizationSettings() {
       {/* ── Time Tracking ── */}
       <SectionCard
         icon={Timer}
-        gradient="var(--apple-card-gradient)"
-        glow="var(--apple-chart-glow)"
         title="Time Tracking"
         description="Global time tracking rules for your organization"
       >
@@ -921,8 +906,6 @@ export function OrganizationSettings() {
       {/* ── Notifications ── */}
       <SectionCard
         icon={Bell}
-        gradient="var(--apple-card-gradient)"
-        glow="var(--apple-chart-glow)"
         title="Notification Settings"
         description="Retention and cleanup rules for in-app notifications"
       >
@@ -986,12 +969,12 @@ function LogoUploadSlot({
           <img src={preview} alt={label} className={`h-16 w-16 object-contain rounded-[var(--apple-radius-sm)] border ${dark ? 'bg-gray-800 border-gray-700' : 'bg-white border-[var(--apple-separator)]'}`} />
           <button onClick={onRemove}
             className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-[var(--apple-system-red)] flex items-center justify-center shadow apple-transition hover:scale-110">
-            <X className="h-2.5 w-2.5 text-white" />
+            <X className="h-2.5 w-2.5 text-white" strokeWidth={1.5} />
           </button>
         </div>
       ) : (
         <div className={`h-16 w-16 border-2 border-dashed rounded-[var(--apple-radius-sm)] flex items-center justify-center flex-shrink-0 ${dark ? 'border-gray-600 bg-gray-800' : 'border-[var(--apple-separator)]'}`}>
-          <Upload className={`h-6 w-6 ${dark ? 'text-gray-500' : 'text-[var(--apple-tertiary-label)]'}`} />
+          <Upload className={`h-6 w-6 ${dark ? 'text-gray-500' : 'text-[var(--apple-tertiary-label)]'}`} strokeWidth={1.5} />
         </div>
       )}
       <div className="flex-1 min-w-0">
@@ -1004,7 +987,7 @@ function LogoUploadSlot({
               ? 'border-gray-600 text-gray-200 bg-gray-800 hover:bg-gray-700'
               : 'border-[var(--apple-separator)] text-[var(--apple-secondary-label)] bg-[var(--apple-quaternary-fill)] hover:bg-[var(--apple-tertiary-fill)]'
           }`}>
-          <Upload className="h-3 w-3" /> Upload
+          <Upload className="h-3 w-3" strokeWidth={1.5} /> Upload
         </label>
         <p className={`text-[11px] mt-1.5 ${dark ? 'text-gray-500' : 'text-[var(--apple-tertiary-label)]'}`}>Max 5MB · PNG / JPG / SVG</p>
       </div>
@@ -1026,7 +1009,7 @@ function SaveButton({ loading, disabled = false, onClick, label }: {
       className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
       style={{ background: 'var(--apple-card-gradient)' }}
     >
-      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <Save className="h-3.5 w-3.5" strokeWidth={1.5} />}
       {loading ? 'Saving…' : label}
     </Button>
   )

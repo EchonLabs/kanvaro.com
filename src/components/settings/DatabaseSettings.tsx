@@ -115,12 +115,7 @@ export function DatabaseSettings() {
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
-          <div
-            className="flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 3px 10px var(--apple-chart-glow)' }}
-          >
-            <Database className="h-[18px] w-[18px] text-white" strokeWidth={1.8} />
-          </div>
+          <Database className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
           <div>
             <p className="text-[15px] font-semibold text-[var(--apple-label)]">Database Configuration</p>
             <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">Configure your MongoDB database connection settings</p>
@@ -194,7 +189,7 @@ export function DatabaseSettings() {
               disabled={testing || saving}
               className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px] border-[var(--apple-separator)]"
             >
-              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TestTube className="h-3.5 w-3.5" />}
+              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <TestTube className="h-3.5 w-3.5" strokeWidth={1.5} />}
               {testing ? 'Testing…' : 'Test Connection'}
             </Button>
 
@@ -204,7 +199,7 @@ export function DatabaseSettings() {
               className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
               style={{ background: hasChanges ? 'var(--apple-card-gradient)' : undefined }}
             >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <Save className="h-3.5 w-3.5" strokeWidth={1.5} />}
               {saving ? 'Saving…' : 'Save Configuration'}
             </Button>
           </div>
