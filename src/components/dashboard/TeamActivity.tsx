@@ -64,12 +64,7 @@ export function TeamActivity({ activities, isLoading }: TeamActivityProps) {
   const HeaderBlock = (
     <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
       <div className="flex items-center gap-3">
-        <div
-          className="h-8 w-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center shrink-0"
-          style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 3px 10px var(--apple-chart-glow)' }}
-        >
-          <Activity className="h-[15px] w-[15px] text-white" strokeWidth={1.8} />
-        </div>
+        <Activity className="h-5 w-5 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
         <p className="text-[15px] font-semibold text-[var(--apple-label)]">Recent Activity</p>
       </div>
       <button
@@ -77,7 +72,7 @@ export function TeamActivity({ activities, isLoading }: TeamActivityProps) {
         className="flex items-center gap-1 text-[12px] font-medium apple-transition hover:opacity-70"
         style={{ color: 'var(--apple-chart-to)' }}
       >
-        View all <ArrowRight className="h-3.5 w-3.5" />
+        View all <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
       </button>
     </div>
   )
@@ -87,9 +82,7 @@ export function TeamActivity({ activities, isLoading }: TeamActivityProps) {
       <div className="rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
         {HeaderBlock}
         <div className="flex flex-col items-center gap-3 py-12 px-6 text-center">
-          <div className="h-12 w-12 rounded-2xl bg-[var(--apple-quaternary-fill)] flex items-center justify-center">
-            <Activity className="h-6 w-6 text-[var(--apple-tertiary-label)]" strokeWidth={1.3} />
-          </div>
+          <Activity className="h-6 w-6 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
           <div className="space-y-0.5">
             <p className="text-[14px] font-semibold text-[var(--apple-label)]">No recent activity</p>
             <p className="text-[12px] text-[var(--apple-secondary-label)]">
@@ -118,12 +111,11 @@ export function TeamActivity({ activities, isLoading }: TeamActivityProps) {
               {/* Avatar with action badge */}
               <div className="relative shrink-0 mt-0.5">
                 <GravatarAvatar user={activity.user} size={32} className="rounded-full" />
-                <div
-                  className="absolute -bottom-0.5 -right-0.5 h-[15px] w-[15px] rounded-full border-[1.5px] border-card flex items-center justify-center"
-                  style={{ background: `color-mix(in srgb, ${cfg.color} 20%, var(--card))` }}
-                >
-                  <ActionIcon className="h-[9px] w-[9px]" style={{ color: cfg.color }} strokeWidth={2.2} />
-                </div>
+                <ActionIcon
+                  className="absolute -bottom-0.5 -right-0.5 h-[9px] w-[9px]"
+                  style={{ color: cfg.color }}
+                  strokeWidth={1.5}
+                />
               </div>
 
               {/* Activity text */}

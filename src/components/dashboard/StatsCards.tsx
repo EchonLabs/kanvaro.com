@@ -121,7 +121,7 @@ function StatCardItem({ stat, index, sparklineData }: StatCardItemProps) {
         {/* Change indicator */}
         {hasChange && (
           <div className="flex items-center gap-1 flex-wrap">
-            <ChangeIcon className={`h-3 w-3 flex-shrink-0 ${changeColorClass}`} />
+            <ChangeIcon className={`h-3 w-3 flex-shrink-0 ${changeColorClass}`} strokeWidth={1.5} />
             <span className={`text-xs font-medium ${changeColorClass}`}>{stat.change}</span>
             {stat.changePercentage && (
               <span className={`text-xs ${changeColorClass}`}>({stat.changePercentage})</span>

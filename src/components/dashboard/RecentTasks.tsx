@@ -87,12 +87,7 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
   const HeaderBlock = (
     <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
       <div className="flex items-center gap-3">
-        <div
-          className="h-8 w-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center shrink-0"
-          style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 3px 10px var(--apple-chart-glow)' }}
-        >
-          <CheckSquare className="h-[15px] w-[15px] text-white" strokeWidth={1.8} />
-        </div>
+        <CheckSquare className="h-5 w-5 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
         <p className="text-[15px] font-semibold text-[var(--apple-label)]">Recent Tasks</p>
       </div>
       <button
@@ -100,7 +95,7 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
         className="flex items-center gap-1 text-[12px] font-medium apple-transition hover:opacity-70"
         style={{ color: 'var(--apple-chart-to)' }}
       >
-        View all <ArrowRight className="h-3.5 w-3.5" />
+        View all <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
       </button>
     </div>
   )
@@ -110,9 +105,7 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
       <div className="rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
         {HeaderBlock}
         <div className="flex flex-col items-center gap-3 py-12 px-6 text-center">
-          <div className="h-12 w-12 rounded-2xl bg-[var(--apple-quaternary-fill)] flex items-center justify-center">
-            <CheckSquare className="h-6 w-6 text-[var(--apple-tertiary-label)]" strokeWidth={1.3} />
-          </div>
+          <CheckSquare className="h-6 w-6 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
           <div className="space-y-0.5">
             <p className="text-[14px] font-semibold text-[var(--apple-label)]">No tasks yet</p>
             <p className="text-[12px] text-[var(--apple-secondary-label)]">Tasks assigned to you will appear here.</p>
@@ -171,13 +164,13 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
                   )}
                   {task.assignedTo && (
                     <span className="flex items-center gap-1 text-[11px] text-[var(--apple-tertiary-label)]">
-                      <User className="h-2.5 w-2.5" />
+                      <User className="h-2.5 w-2.5" strokeWidth={1.5} />
                       {task.assignedTo.firstName} {task.assignedTo.lastName}
                     </span>
                   )}
                   {task.dueDate && (
                     <span className="flex items-center gap-1 text-[11px] text-[var(--apple-tertiary-label)]">
-                      <Calendar className="h-2.5 w-2.5" />
+                      <Calendar className="h-2.5 w-2.5" strokeWidth={1.5} />
                       {formatDate(task.dueDate)}
                     </span>
                   )}

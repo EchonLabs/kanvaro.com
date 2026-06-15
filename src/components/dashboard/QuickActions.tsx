@@ -98,16 +98,11 @@ export function QuickActions() {
             className={useFullWidth ? 'contents sm:block' : 'contents sm:block sm:flex-shrink-0'}
           >
             <div className={`group flex flex-col items-center justify-center gap-2 h-[88px] px-2 py-3 rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card hover:bg-[var(--apple-quaternary-fill)] hover:border-[var(--apple-chart-to)]/30 apple-transition cursor-pointer active:scale-[0.97]${useFullWidth ? '' : ' sm:w-[100px]'}`}>
-              <div
-                className="h-9 w-9 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 apple-transition"
-                style={{ background: 'color-mix(in srgb, var(--apple-chart-to) 12%, transparent)' }}
-              >
-                <Icon
-                  className="h-[18px] w-[18px] apple-transition"
-                  style={{ color: 'var(--apple-chart-to)' }}
-                  strokeWidth={1.6}
-                />
-              </div>
+              <Icon
+                className="h-[22px] w-[22px] apple-transition"
+                style={{ color: 'var(--apple-chart-to)' }}
+                strokeWidth={1.5}
+              />
               <span className="text-[12px] font-medium text-[var(--apple-secondary-label)] group-hover:text-[var(--apple-label)] text-center leading-tight apple-transition">
                 {action.title}
               </span>

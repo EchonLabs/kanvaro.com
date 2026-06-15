@@ -145,6 +145,7 @@ function HoursCell({ minutes }: { minutes?: number }) {
         <TrendingUp
           className="h-3.5 w-3.5 flex-shrink-0 text-[var(--apple-system-green)]"
           style={{ animation: 'status-pulse 2s ease-in-out infinite' }}
+          strokeWidth={1.5}
         />
         
       )}
@@ -197,15 +198,13 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
           <div className="flex items-center justify-between">
             <CardTitle>Projects Overview</CardTitle>
             <Button variant="ghost" size="sm" onClick={() => router.push('/projects')}>
-              View All <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              View All <ArrowRight className="h-3.5 w-3.5 ml-1" strokeWidth={1.5} />
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <div className="h-14 w-14 rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)] flex items-center justify-center">
-              <FolderOpen className="h-7 w-7 text-[var(--apple-secondary-label)]" />
-            </div>
+            <FolderOpen className="h-8 w-8 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
             <p className="text-[15px] font-medium text-[var(--apple-secondary-label)]">No projects yet</p>
             <Button size="sm" onClick={() => router.push('/projects/create')}>
               Create Your First Project
@@ -226,7 +225,7 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
             onClick={() => router.push('/projects')}
             className="flex items-center gap-1 text-[15px] text-[var(--apple-system-blue)] hover:opacity-75 apple-transition font-medium"
           >
-            View all <ArrowRight className="h-3.5 w-3.5" />
+            View all <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
         </div>
       </CardHeader>

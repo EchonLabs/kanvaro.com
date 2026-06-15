@@ -30,7 +30,7 @@ const HEADER_GLOW = 'var(--apple-chart-glow)'
 const STATUS_CONFIG: Record<StandupMeetingStatus, { bg: string; text: string; dot: string; border: string; label: string }> = {
   scheduled:   { bg: 'bg-blue-50 dark:bg-blue-950/30',       text: 'text-blue-600 dark:text-blue-400',       dot: 'bg-blue-500',   border: 'border-blue-200 dark:border-blue-800',   label: 'Scheduled' },
   in_progress: { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'In Progress' },
-  completed:   { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',       dot: 'bg-gray-400',   border: 'border-gray-200 dark:border-gray-700',   label: 'Completed' },
+  completed:   { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'Completed' },
   missed:      { bg: 'bg-red-50 dark:bg-red-950/30',         text: 'text-red-600 dark:text-red-400',         dot: 'bg-red-500',    border: 'border-red-200 dark:border-red-800',     label: 'Missed' },
 }
 
@@ -244,7 +244,7 @@ export default function StandupScheduleDetailPage() {
                 className="apple-transition"
                 onClick={handleViewSummary}
               >
-                <Sparkles className="mr-2 h-4 w-4 text-amber-500" />
+                <Sparkles className="mr-2 h-4 w-4" style={{ color: 'var(--apple-card-gradient)' }} />
                 View Summary
               </Button>
               {detail.meeting.status === 'completed' && (

@@ -34,12 +34,7 @@ export function NotificationsWidget() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
         <div className="flex items-center gap-3">
-          <div
-            className="h-8 w-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center shrink-0"
-            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 3px 10px var(--apple-chart-glow)' }}
-          >
-            <Bell className="h-[15px] w-[15px] text-white" strokeWidth={1.8} />
-          </div>
+          <Bell className="h-5 w-5 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
           <div className="flex items-center gap-2">
             <p className="text-[15px] font-semibold text-[var(--apple-label)]">Notifications</p>
             {unreadCount > 0 && (
@@ -55,7 +50,7 @@ export function NotificationsWidget() {
             className="flex items-center gap-1 text-[12px] font-medium apple-transition hover:opacity-70"
             style={{ color: 'var(--apple-chart-to)' }}
           >
-            <Check className="h-3 w-3" />
+            <Check className="h-3 w-3" strokeWidth={1.5} />
             Mark all read
           </button>
         )}
@@ -64,13 +59,11 @@ export function NotificationsWidget() {
       {/* Body */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-5 w-5 animate-spin text-[var(--apple-tertiary-label)]" />
+          <Loader2 className="h-5 w-5 animate-spin text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
         </div>
       ) : notifications.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12 px-6 text-center">
-          <div className="h-12 w-12 rounded-2xl bg-[var(--apple-quaternary-fill)] flex items-center justify-center">
-            <Bell className="h-6 w-6 text-[var(--apple-tertiary-label)]" strokeWidth={1.3} />
-          </div>
+          <Bell className="h-6 w-6 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
           <div className="space-y-0.5">
             <p className="text-[14px] font-semibold text-[var(--apple-label)]">All caught up</p>
             <p className="text-[12px] text-[var(--apple-secondary-label)]">No notifications right now</p>
@@ -102,13 +95,8 @@ export function NotificationsWidget() {
                   />
                 )}
 
-                {/* Type icon badge */}
-                <div
-                  className="h-8 w-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center shrink-0 mt-0.5"
-                  style={{ background: cfg.bg }}
-                >
-                  <TypeIcon className="h-3.5 w-3.5" style={{ color: cfg.color }} strokeWidth={1.6} />
-                </div>
+                {/* Type icon */}
+                <TypeIcon className="h-4 w-4 mt-0.5 shrink-0" style={{ color: cfg.color }} strokeWidth={1.5} />
 
                 {/* Text content */}
                 <div className="flex-1 min-w-0">
@@ -138,7 +126,7 @@ export function NotificationsWidget() {
                   onClick={(e) => { e.stopPropagation(); deleteNotification(id) }}
                   className="h-6 w-6 flex items-center justify-center rounded-full shrink-0 opacity-0 group-hover:opacity-100 apple-transition hover:bg-[var(--apple-secondary-fill)] mt-0.5"
                 >
-                  <X className="h-3 w-3 text-[var(--apple-secondary-label)]" />
+                  <X className="h-3 w-3 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                 </button>
               </div>
             )
@@ -155,7 +143,7 @@ export function NotificationsWidget() {
             style={{ color: 'var(--apple-chart-to)' }}
           >
             View all notifications
-            <ArrowRight className="h-3.5 w-3.5" />
+            <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
         </div>
       )}

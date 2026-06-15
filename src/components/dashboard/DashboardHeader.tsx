@@ -26,10 +26,10 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
         <span style={{ color: 'var(--apple-chart-color)' }}>{user?.firstName || 'User'}!</span>
       </h1>
       <div className="flex items-center gap-2 mt-0.5 text-[15px] text-[var(--apple-secondary-label)]">
-        <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+        <Calendar className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
         <span>{currentDate}</span>
         <span className="text-[var(--apple-tertiary-label)]">•</span>
-        <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+        <Clock className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
         <span className="font-apple-mono">{currentTime}</span>
       </div>
     </div>
