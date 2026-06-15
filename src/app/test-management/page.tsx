@@ -226,7 +226,7 @@ export default function TestManagementPage() {
           {/* ── Page Header ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <FlaskConical className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+              <FlaskConical className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <div>
                 <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Dashboard</h1>
                 <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
@@ -240,7 +240,7 @@ export default function TestManagementPage() {
                 onClick={() => router.push('/test-management/reports')}
                 className="flex-1 sm:flex-none h-9 gap-1.5 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] apple-transition"
               >
-                <BarChart3 className="h-4 w-4" />
+                <BarChart3 className="h-4 w-4" strokeWidth={1.5} />
                 <span className="text-[13px]">Reports</span>
               </Button>
               <Button
@@ -249,7 +249,7 @@ export default function TestManagementPage() {
                 disabled={!selectedProject}
                 style={{ background: 'var(--apple-card-gradient)' }}
               >
-                <TestTube className="h-4 w-4" />
+                <TestTube className="h-4 w-4" strokeWidth={1.5} />
                 <span className="text-[13px]">New Test Plan</span>
               </Button>
             </div>
@@ -258,10 +258,7 @@ export default function TestManagementPage() {
           {projects.length === 0 ? (
             /* ── Empty state ── */
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-12 text-center">
-              <div className="mx-auto w-16 h-16 rounded-[var(--apple-radius-md)] flex items-center justify-center mb-4"
-                style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 4px 16px var(--apple-chart-glow)' }}>
-                <TestTube className="h-8 w-8 text-white" strokeWidth={1.8} />
-              </div>
+              <TestTube className="h-10 w-10 mx-auto mb-4 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
               <h3 className="text-[17px] font-semibold text-[var(--apple-label)] mb-2">No Projects Found</h3>
               <p className="text-[15px] text-[var(--apple-secondary-label)] mb-6 max-w-xs mx-auto">
                 You need to be assigned to a project to access test management features.
@@ -296,7 +293,7 @@ export default function TestManagementPage() {
                 /* ── Quick-link hub (no project selected) ── */
                 <div className="space-y-6">
                   <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-8 text-center">
-                    <TestTube className="h-10 w-10 mx-auto mb-3 text-[var(--apple-tertiary-label)]" />
+                    <TestTube className="h-10 w-10 mx-auto mb-3 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                     <h3 className="text-[17px] font-semibold text-[var(--apple-label)] mb-1">Select a Project</h3>
                     <p className="text-[15px] text-[var(--apple-secondary-label)]">Choose a project above to view its test data.</p>
                   </div>
@@ -309,13 +306,10 @@ export default function TestManagementPage() {
                           onClick={() => router.push(link.href)}
                           className="card-fade-in group relative rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-left apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] hover:-translate-y-0.5 dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] focus:outline-none"
                         >
-                          <div className="w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center mb-3"
-                            style={{ background: link.gradient, boxShadow: `0 4px 12px ${link.glow}` }}>
-                            <link.icon className="h-5 w-5 text-white" strokeWidth={1.8} />
-                          </div>
+                          <link.icon className="h-6 w-6 mb-3 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                           <p className="text-[15px] font-semibold text-[var(--apple-label)]">{link.label}</p>
                           <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{link.description}</p>
-                          <ArrowRight className="absolute top-4 right-4 h-4 w-4 text-[var(--apple-tertiary-label)] opacity-0 group-hover:opacity-100 apple-transition" />
+                          <ArrowRight className="absolute top-4 right-4 h-4 w-4 text-[var(--apple-tertiary-label)] opacity-0 group-hover:opacity-100 apple-transition" strokeWidth={1.5} />
                         </button>
                       ))}
                     </div>
@@ -330,10 +324,7 @@ export default function TestManagementPage() {
                     {STATS.map((stat) => (
                       <div key={stat.label}
                         className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 flex items-center gap-3 apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
-                        <div className="flex-shrink-0 w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center"
-                          style={{ background: stat.gradient, boxShadow: `0 4px 12px ${stat.glow}` }}>
-                          <stat.icon className="h-5 w-5 text-white" strokeWidth={1.8} />
-                        </div>
+                        <stat.icon className="h-6 w-6 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
                         <div>
                           {stat.loading ? (
                             <div className="h-6 w-10 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />

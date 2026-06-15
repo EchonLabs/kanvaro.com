@@ -440,7 +440,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Pause className="h-5 w-5 text-yellow-600 dark:text-yellow-400" strokeWidth={1.5} />
+              <Pause className="h-5 w-5 text-yellow-600 dark:text-yellow-400" strokeWidth={1.5} fill="none" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">To Do</p>
                 <p className="text-2xl font-bold text-foreground">{stats.todoTasks}</p>
@@ -452,7 +452,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Play className="h-5 w-5 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
+              <Play className="h-5 w-5 text-blue-600 dark:text-blue-400" strokeWidth={1.5} fill="none" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">In Progress</p>
                 <p className="text-2xl font-bold text-foreground">{stats.inProgressTasks}</p>
