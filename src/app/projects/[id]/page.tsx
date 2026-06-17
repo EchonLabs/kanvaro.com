@@ -883,80 +883,89 @@ export default function ProjectDetailPage() {
           {/* Project Stats */}
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-6">
             {/* Progress */}
-            <div className="card-fade-in card-fade-in-delay-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2.5 rounded-[var(--apple-radius-md)] flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
-                  <Target className="h-5 w-5 text-white" />
+            <div className="card-fade-in card-fade-in-delay-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+              <div className="px-3 pt-3 pb-3">
+                <div className="mb-2">
+                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Progress</span>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[13px] text-[var(--apple-secondary-label)]">Progress</p>
-                  <p className="text-[26px] font-bold font-apple-mono tabular-nums leading-tight" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                    {project.progress?.completionPercentage || 0}%
-                  </p>
+                <div className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-none mb-2" style={{ background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                  {project.progress?.completionPercentage || 0}%
                 </div>
+                <div className="h-[4px] w-full rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden mb-1.5">
+                  <div
+                    className="h-full rounded-full progress-bar-animated relative overflow-hidden"
+                    style={{
+                      width: `${project.progress?.completionPercentage || 0}%`,
+                      background: 'var(--apple-chart-gradient)',
+                      boxShadow: (project.progress?.completionPercentage || 0) > 2 ? '0 0 6px var(--apple-chart-glow)' : 'none',
+                    }}
+                  >
+                    {(project.progress?.completionPercentage || 0) > 2 && <span className="progress-shimmer absolute inset-0" />}
+                  </div>
+                </div>
+                <span className="text-[11px] text-[var(--apple-tertiary-label)]">
+                  {project.progress?.tasksCompleted || 0} of {project.progress?.totalTasks || 0} tasks
+                </span>
               </div>
-              <div className="h-[5px] w-full rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                <div
-                  className="h-full rounded-full progress-bar-animated relative overflow-hidden"
-                  style={{
-                    width: `${project.progress?.completionPercentage || 0}%`,
-                    background: 'var(--apple-chart-gradient)',
-                    boxShadow: (project.progress?.completionPercentage || 0) > 2 ? '0 0 6px var(--apple-chart-glow)' : 'none',
-                  }}
-                >
-                  {(project.progress?.completionPercentage || 0) > 2 && <span className="progress-shimmer absolute inset-0" />}
-                </div>
-              </div>
-              <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
-                {project.progress?.tasksCompleted || 0} of {project.progress?.totalTasks || 0} tasks
-              </p>
             </div>
 
             {/* Team Members */}
-            <div className="card-fade-in card-fade-in-delay-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-[var(--apple-radius-md)] flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
-                  <Users className="h-5 w-5 text-white" />
+            <div className="card-fade-in card-fade-in-delay-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+              <div className="px-3 pt-3 pb-3">
+                <div className="mb-2">
+                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Team Members</span>
                 </div>
-                <div>
-                  <p className="text-[13px] text-[var(--apple-secondary-label)]">Team Members</p>
-                  <p className="text-[26px] font-bold font-apple-mono tabular-nums leading-tight" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                    {project.teamMembers.length}
-                  </p>
+                <div className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-none mb-1.5" style={{ background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                  {project.teamMembers.length}
                 </div>
+                <span className="text-[11px] text-[var(--apple-tertiary-label)]">
+                  {project.teamMembers.length === 1 ? 'member' : 'members'} assigned
+                </span>
               </div>
             </div>
 
             {/* Duration */}
-            <div className="card-fade-in card-fade-in-delay-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-[var(--apple-radius-md)] flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
-                  <Clock className="h-5 w-5 text-white" />
+            <div className="card-fade-in card-fade-in-delay-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+              <div className="px-3 pt-3 pb-3">
+                <div className="mb-2">
+                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Duration</span>
                 </div>
-                <div>
-                  <p className="text-[13px] text-[var(--apple-secondary-label)]">Duration</p>
-                  <p className="text-[26px] font-bold font-apple-mono tabular-nums leading-tight" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                    {project.startDate && project.endDate
-                      ? Math.ceil((new Date(project.endDate).getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24))
-                      : '—'}
-                  </p>
-                  <p className="text-[12px] text-[var(--apple-secondary-label)]">days</p>
-                </div>
+                {project.startDate && project.endDate ? (
+                  <>
+                    <div className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-none mb-1.5" style={{ background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                      {Math.ceil((new Date(project.endDate).getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24))}
+                    </div>
+                    <span className="text-[11px] text-[var(--apple-tertiary-label)]">days total</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-[18px] sm:text-[20px] font-bold tracking-tight leading-none mb-1.5" style={{ color: 'var(--apple-secondary-label)' }}>
+                      No due date
+                    </div>
+                    <span className="text-[11px] text-[var(--apple-tertiary-label)]">End date not set</span>
+                  </>
+                )}
               </div>
             </div>
 
             {/* Budget */}
-            <div className="card-fade-in card-fade-in-delay-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-[var(--apple-radius-md)] flex-shrink-0" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
-                  <DollarSign className="h-5 w-5 text-white" />
+            <div className="card-fade-in card-fade-in-delay-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+              <div className="px-3 pt-3 pb-3">
+                <div className="mb-2">
+                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Budget</span>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[13px] text-[var(--apple-secondary-label)]">Budget</p>
-                  <p className="text-[22px] font-bold font-apple-mono tabular-nums leading-tight truncate" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                    {project.budget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total) : '—'}
-                  </p>
+                <div
+                  className="text-[18px] sm:text-[22px] font-bold tracking-tight leading-none mb-1.5 truncate"
+                  style={project.budget
+                    ? { background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
+                    : { color: 'var(--apple-secondary-label)' }
+                  }
+                >
+                  {project.budget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total) : 'No budget'}
                 </div>
+                <span className="text-[11px] text-[var(--apple-tertiary-label)]">
+                  {project.budget ? 'total budget' : 'Budget not set'}
+                </span>
               </div>
             </div>
           </div>
