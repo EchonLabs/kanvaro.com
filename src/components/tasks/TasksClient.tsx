@@ -1019,7 +1019,7 @@ export default function TasksClient({
                     canCreateTask ? (
                         <Button
                             onClick={() => setShowCreateTaskModal(true)}
-                            className="rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] text-white px-4 py-2 text-[15px] font-semibold hover:opacity-90 apple-transition"
+                            className="rounded-full bg-[var(--apple-system-blue)] text-white px-4 py-2 text-[15px] font-semibold hover:opacity-90 apple-transition"
                         >
                             <Plus className="h-4 w-4 mr-2" />
                             New Task
@@ -1029,6 +1029,7 @@ export default function TasksClient({
             />
 
             {/* ── Filter Toolbar ───────────────────────────────────────────────── */}
+            <div className="rounded-[var(--apple-radius-lg)] bg-[var(--apple-quaternary-fill)] border border-[var(--apple-separator)] p-3 sm:p-4 space-y-2 sm:space-y-3">
 
             {/* Row 1: Search (50%) + Status (25%) + Priority (25%) — Desktop */}
             <div className="hidden sm:flex items-center gap-2">
@@ -1038,7 +1039,7 @@ export default function TasksClient({
                         placeholder="Search tasks..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-9 h-10 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                        className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
                     />
                     {searchQuery && (
                         <button
@@ -1052,7 +1053,7 @@ export default function TasksClient({
                     )}
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="h-10 w-1/4 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                    <SelectTrigger className="h-10 w-1/4 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                         <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1065,7 +1066,7 @@ export default function TasksClient({
                     </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="h-10 w-1/4 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                    <SelectTrigger className="h-10 w-1/4 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                         <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1086,7 +1087,7 @@ export default function TasksClient({
                         placeholder="Search tasks..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-9 h-10 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                        className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
                     />
                     {searchQuery && (
                         <button
@@ -1101,7 +1102,7 @@ export default function TasksClient({
                 </div>
                 <div className="flex gap-2">
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="h-10 flex-1 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                        <SelectTrigger className="h-10 flex-1 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1114,7 +1115,7 @@ export default function TasksClient({
                         </SelectContent>
                     </Select>
                     <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                        <SelectTrigger className="h-10 flex-1 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                        <SelectTrigger className="h-10 flex-1 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                             <SelectValue placeholder="Priority" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1134,7 +1135,7 @@ export default function TasksClient({
                 <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
                     if (open) focusSearchInput(projectFilterInputRef.current)
                 }}>
-                    <SelectTrigger className="h-10 w-full rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                    <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                         <SelectValue placeholder="All Projects" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -1183,7 +1184,7 @@ export default function TasksClient({
 
                 {/* Type filter */}
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger className="h-10 w-full rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                    <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                         <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1201,7 +1202,7 @@ export default function TasksClient({
                         <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
                             if (open) focusSearchInput(assignedToFilterInputRef.current)
                         }}>
-                            <SelectTrigger className="h-10 w-full rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                            <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                                 <SelectValue placeholder="All Assignees" />
                             </SelectTrigger>
                             <SelectContent className="z-[10050] p-0">
@@ -1251,7 +1252,7 @@ export default function TasksClient({
                         <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
                             if (open) focusSearchInput(createdByFilterInputRef.current)
                         }}>
-                            <SelectTrigger className="h-10 w-full rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                            <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                                 <SelectValue placeholder="All Creators" />
                             </SelectTrigger>
                             <SelectContent className="z-[10050] p-0">
@@ -1304,7 +1305,7 @@ export default function TasksClient({
                                 <button
                                     type="button"
                                     className={cn(
-                                        'inline-flex items-center gap-1.5 h-10 px-3 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium apple-transition',
+                                        'inline-flex items-center gap-1.5 h-10 px-3 w-full rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium apple-transition',
                                         dateRangeFilter?.from
                                             ? 'text-[var(--apple-label)]'
                                             : 'text-[var(--apple-secondary-label)]'
@@ -1354,7 +1355,7 @@ export default function TasksClient({
                                 <button
                                     type="button"
                                     className={cn(
-                                        'inline-flex items-center gap-1.5 h-9 px-3 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium apple-transition',
+                                        'inline-flex items-center gap-1.5 h-9 px-3 w-full rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium apple-transition',
                                         dateRangeFilter?.from
                                             ? 'text-[var(--apple-label)]'
                                             : 'text-[var(--apple-secondary-label)]'
@@ -1402,7 +1403,7 @@ export default function TasksClient({
                 <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
                     if (open) focusSearchInput(projectFilterInputRef.current)
                 }}>
-                    <SelectTrigger className="h-9 w-full rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                    <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                         <SelectValue placeholder="All Projects" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -1450,7 +1451,7 @@ export default function TasksClient({
                 </Select>
 
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger className="h-9 w-full rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                    <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                         <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1467,7 +1468,7 @@ export default function TasksClient({
                         <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
                             if (open) focusSearchInput(assignedToFilterInputRef.current)
                         }}>
-                            <SelectTrigger className="h-9 w-full rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                            <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                                 <SelectValue placeholder="All Assignees" />
                             </SelectTrigger>
                             <SelectContent className="z-[10050] p-0">
@@ -1517,7 +1518,7 @@ export default function TasksClient({
                         <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
                             if (open) focusSearchInput(createdByFilterInputRef.current)
                         }}>
-                            <SelectTrigger className="h-9 w-full rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                            <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                                 <SelectValue placeholder="All Creators" />
                             </SelectTrigger>
                             <SelectContent className="z-[10050] p-0">
@@ -1572,7 +1573,7 @@ export default function TasksClient({
                         <button
                             type="button"
                             className={cn(
-                                'inline-flex items-center gap-1.5 h-9 px-3 w-full col-span-2 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium apple-transition',
+                                'inline-flex items-center gap-1.5 h-9 px-3 w-full col-span-2 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium apple-transition',
                                 dateRangeFilter?.from
                                     ? 'text-[var(--apple-label)]'
                                     : 'text-[var(--apple-secondary-label)]'
@@ -1675,6 +1676,8 @@ export default function TasksClient({
                     </button>
                 </div>
             )}
+
+            </div>
 
             {/* ── View Controls bar ─────────────────────────────────────────────── */}
             <div className="flex items-center justify-between gap-3">
@@ -2116,7 +2119,7 @@ export default function TasksClient({
                                                     {/* Description (1 line clamp) */}
                                                     {task.description && (
                                                         <p className="text-[13px] text-[var(--apple-secondary-label)] line-clamp-1">
-                                                            {task.description}
+                                                            {task.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim()}
                                                         </p>
                                                     )}
 

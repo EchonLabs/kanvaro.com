@@ -1610,6 +1610,7 @@ export default function BacklogPage() {
 
 
         {/* ── Filter Toolbar ───────────────────────────────────────────────── */}
+        <div className="rounded-[var(--apple-radius-lg)] bg-[var(--apple-quaternary-fill)] border border-[var(--apple-separator)] p-3 sm:p-4 space-y-2 sm:space-y-3">
 
         {/* Row 1: Search (50%) + Status (25%) + Priority (25%) — Desktop */}
         <div className="hidden sm:flex items-center gap-2">
@@ -1711,7 +1712,7 @@ export default function BacklogPage() {
         </div>
 
         {/* Row 2: Secondary Filters (Grid 20% each on Desktop, 2 cols on mobile) */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {/* 1. Projects */}
             <Select value={projectFilterValue} onValueChange={setProjectFilterValue} onOpenChange={(open) => {
               if (open) focusSearchInput(projectFilterInputRef.current)
@@ -1887,7 +1888,7 @@ export default function BacklogPage() {
         </div>
 
         {/* Row 2.5: Additional Sorting options that didn't fit in 5 cols (Optional, keeping it flex wrap) */}
-        <div className="flex flex-wrap items-center justify-end gap-2 mt-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="text-[12px] text-[var(--apple-secondary-label)]">Sort by:</span>
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="h-8 w-32 rounded-full border-[var(--apple-separator)] bg-transparent text-[12px]">
@@ -1922,7 +1923,7 @@ export default function BacklogPage() {
 
         {/* Row 3: Active Filters & Clear */}
         {hasActiveFilters && (
-            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t border-[var(--apple-separator)]">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[var(--apple-separator)]">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[12px] font-medium text-[var(--apple-secondary-label)] uppercase tracking-wider mr-1">
                         Active Filters:
@@ -1985,6 +1986,8 @@ export default function BacklogPage() {
                 </Button>
             </div>
         )}
+
+        </div>
 
         {/* Select / Bulk Actions Row */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">

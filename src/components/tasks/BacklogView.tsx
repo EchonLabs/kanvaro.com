@@ -507,19 +507,19 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
       </Card>
 
       {/* Filters and Search */}
-      <div className="flex flex-col gap-2 sm:gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" strokeWidth={1.5} />
+      <div className="rounded-[var(--apple-radius-lg)] bg-[var(--apple-quaternary-fill)] border border-[var(--apple-separator)] p-3 sm:p-4 space-y-2 sm:space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
           <Input
             placeholder="Search backlog items..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 w-full"
+            className="pl-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:border-[var(--apple-system-blue)]"
           />
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
           <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="h-10 w-full sm:w-40 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
             <SelectContent>
@@ -531,7 +531,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="h-10 w-full sm:w-40 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
@@ -543,7 +543,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
             </SelectContent>
           </Select>
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="h-10 w-full sm:w-40 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
