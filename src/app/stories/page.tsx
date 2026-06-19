@@ -36,7 +36,8 @@ import {
   Edit,
   GripVertical,
   X,
-  Layers
+  Layers,
+  RotateCcw
 } from 'lucide-react'
 import { Permission } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
@@ -617,7 +618,7 @@ export default function StoriesPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
+      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300 min-h-full">
 
         {/* Page Header */}
         <PageHeader
@@ -638,166 +639,221 @@ export default function StoriesPage() {
         />
 
         {/* Filter Toolbar */}
-        <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]/40 p-3 space-y-3">
+        <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3 sm:p-4 space-y-2 sm:space-y-3">
           {/* Row 1: Search + Status + Priority */}
           <div className="flex flex-col sm:flex-row gap-2">
-            {/* Search bar — takes ~65% */}
+            {/* Search */}
             <div className="relative flex-[2]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
-              <Input
+              <input
                 placeholder="Search stories..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-10 rounded-full border-[var(--apple-separator)] bg-background text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition"
+                className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
             {/* Status */}
-            <div className="flex-1">
-              <Select value={statusFilter} onValueChange={setStatusFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(statusSearchInputRef.current)
-              }}>
-                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <Input
-                    ref={statusSearchInputRef}
-                    placeholder="Search status..."
-                    className="m-2"
-                    value={statusSearch}
-                    onChange={e => {
-                      setStatusSearch(e.target.value.toLowerCase());
-                    }}
-                    onClick={e => e.stopPropagation()}
-                    onKeyDown={e => e.stopPropagation()}
-                  />
-                  {statusOptions.filter(opt => opt.label.toLowerCase().includes(statusSearch)).map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="flex-1 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="max-h-56 overflow-y-auto">
+                    {statusOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
             {/* Priority */}
-            <div className="flex-1">
-              <Select value={priorityFilter} onValueChange={setPriorityFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(prioritySearchInputRef.current)
-              }}>
-                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <Input
-                    ref={prioritySearchInputRef}
-                    placeholder="Search priority..."
-                    className="m-2"
-                    value={prioritySearch}
-                    onChange={e => {
-                      setPrioritySearch(e.target.value.toLowerCase());
-                    }}
-                    onClick={e => e.stopPropagation()}
-                    onKeyDown={e => e.stopPropagation()}
-                  />
-                  {priorityOptions.filter(opt => opt.label.toLowerCase().includes(prioritySearch)).map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="flex-1 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="max-h-56 overflow-y-auto">
+                    {priorityOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Row 2: Project + Epic + Sprint */}
           <div className="flex flex-col sm:flex-row gap-2">
             {/* Project */}
-            <div className="flex-1">
-              <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(projectSearchInputRef.current)
-              }}>
-                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
-                  <SelectValue placeholder="Project" />
-                </SelectTrigger>
-                <SelectContent>
-                  <Input
-                    ref={projectSearchInputRef}
-                    placeholder="Search project..."
-                    className="m-2"
-                    value={projectSearch}
-                    onChange={e => setProjectSearch(e.target.value.toLowerCase())}
-                    onClick={e => e.stopPropagation()}
-                    onKeyDown={e => e.stopPropagation()}
-                  />
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projectOptions.filter(project => project.name.toLowerCase().includes(projectSearch)).map((project) => (
-                    <SelectItem key={project._id} value={project._id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(projectSearchInputRef.current)
+            }}>
+              <SelectTrigger className="flex-1 h-9 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px]">
+                <SelectValue placeholder="All Projects" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="relative mb-2">
+                    <Input
+                      ref={projectSearchInputRef}
+                      value={projectSearch}
+                      onChange={(e) => setProjectSearch(e.target.value.toLowerCase())}
+                      placeholder="Search projects"
+                      className="pr-10 text-[13px]"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    {projectSearch && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setProjectSearch(''); setProjectFilter('all') }}
+                        className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
+                        aria-label="Clear project filter"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {projectOptions.filter(p => p.name.toLowerCase().includes(projectSearch)).length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No matching projects</div>
+                    ) : (
+                      projectOptions.filter(p => p.name.toLowerCase().includes(projectSearch)).map((project) => (
+                        <SelectItem key={project._id} value={project._id}>{project.name}</SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
             {/* Epic */}
-            <div className="flex-1">
-              <Select value={epicFilter} onValueChange={setEpicFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(epicSearchInputRef.current)
-              }}>
-                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
-                  <SelectValue placeholder="Epic" />
-                </SelectTrigger>
-                <SelectContent>
-                  <Input
-                    ref={epicSearchInputRef}
-                    placeholder="Search epic..."
-                    className="m-2"
-                    value={epicSearch}
-                    onChange={e => setEpicSearch(e.target.value.toLowerCase())}
-                    onClick={e => e.stopPropagation()}
-                    onKeyDown={e => e.stopPropagation()}
-                  />
-                  <SelectItem value="all">All Epics</SelectItem>
-                  {epicOptions.filter(epic => epic.name.toLowerCase().includes(epicSearch)).map((epic) => (
-                    <SelectItem key={epic._id} value={epic._id}>
-                      {epic.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={epicFilter} onValueChange={setEpicFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(epicSearchInputRef.current)
+            }}>
+              <SelectTrigger className="flex-1 h-9 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px]">
+                <SelectValue placeholder="All Epics" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="relative mb-2">
+                    <Input
+                      ref={epicSearchInputRef}
+                      value={epicSearch}
+                      onChange={(e) => setEpicSearch(e.target.value.toLowerCase())}
+                      placeholder="Search epics"
+                      className="pr-10 text-[13px]"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    {epicSearch && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEpicSearch(''); setEpicFilter('all') }}
+                        className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
+                        aria-label="Clear epic filter"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Epics</SelectItem>
+                    {epicOptions.filter(e => e.name.toLowerCase().includes(epicSearch)).length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No matching epics</div>
+                    ) : (
+                      epicOptions.filter(e => e.name.toLowerCase().includes(epicSearch)).map((epic) => (
+                        <SelectItem key={epic._id} value={epic._id}>{epic.name}</SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
             {/* Sprint */}
-            <div className="flex-1">
-              <Select value={sprintFilter} onValueChange={setSprintFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(sprintSearchInputRef.current)
-              }}>
-                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px] font-medium w-full">
-                  <SelectValue placeholder="Sprint" />
-                </SelectTrigger>
-                <SelectContent>
-                  <Input
-                    ref={sprintSearchInputRef}
-                    placeholder="Search sprint..."
-                    className="m-2"
-                    value={sprintSearch}
-                    onChange={e => setSprintSearch(e.target.value.toLowerCase())}
-                    onClick={e => e.stopPropagation()}
-                    onKeyDown={e => e.stopPropagation()}
-                  />
-                  <SelectItem value="all">All Sprints</SelectItem>
-                  {sprintOptions.filter(sprint => sprint.name.toLowerCase().includes(sprintSearch)).map((sprint) => (
-                    <SelectItem key={sprint._id} value={sprint._id}>
-                      {sprint.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={sprintFilter} onValueChange={setSprintFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(sprintSearchInputRef.current)
+            }}>
+              <SelectTrigger className="flex-1 h-9 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px]">
+                <SelectValue placeholder="All Sprints" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="relative mb-2">
+                    <Input
+                      ref={sprintSearchInputRef}
+                      value={sprintSearch}
+                      onChange={(e) => setSprintSearch(e.target.value.toLowerCase())}
+                      placeholder="Search sprints"
+                      className="pr-10 text-[13px]"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    {sprintSearch && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSprintSearch(''); setSprintFilter('all') }}
+                        className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
+                        aria-label="Clear sprint filter"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Sprints</SelectItem>
+                    {sprintOptions.filter(s => s.name.toLowerCase().includes(sprintSearch)).length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No matching sprints</div>
+                    ) : (
+                      sprintOptions.filter(s => s.name.toLowerCase().includes(sprintSearch)).map((sprint) => (
+                        <SelectItem key={sprint._id} value={sprint._id}>{sprint.name}</SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Count + isFetching spinner */}
-          <div className="flex items-center gap-2 px-0.5">
-            {isFetching && (
-              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--apple-system-blue)] border-t-transparent" />
-            )}
-            <p className="text-[13px] text-[var(--apple-secondary-label)] font-apple-mono">
-              {totalCount} stor{totalCount !== 1 ? 'ies' : 'y'} found
+          {/* Count + Reset */}
+          <div className="flex items-center justify-between">
+            <p className="text-[13px] text-[var(--apple-secondary-label)] flex items-center gap-2">
+              {isFetching && (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--apple-system-blue)] border-t-transparent" />
+              )}
+              <span className="font-apple-mono">{totalCount}</span>
+              {' '}stor{totalCount !== 1 ? 'ies' : 'y'} found
             </p>
+            {(statusFilter !== 'all' || priorityFilter !== 'all' || projectFilter !== 'all' || epicFilter !== 'all' || sprintFilter !== 'all' || searchQuery) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('')
+                  setStatusFilter('all')
+                  setPriorityFilter('all')
+                  setProjectFilter('all')
+                  setEpicFilter('all')
+                  setSprintFilter('all')
+                }}
+                className="h-7 text-[12px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] rounded-full"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset Filters
+              </Button>
+            )}
           </div>
         </div>
 

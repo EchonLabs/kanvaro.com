@@ -1558,20 +1558,6 @@ export default function BacklogPage() {
           icon={List}
           actions={
             <div className="flex flex-wrap items-center gap-2 w-full sm:contents">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearchQuery('')
-                  setDebouncedSearchQuery('')
-                  fetchBacklogItems()
-                }}
-                disabled={searching}
-                className="rounded-full h-9 w-9 p-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
-                title="Refresh backlog items"
-              >
-                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" strokeWidth={1.5} />}
-              </Button>
               <PermissionGate permission={Permission.EPIC_CREATE}>
                 <Button
                   variant="outline"

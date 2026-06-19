@@ -112,7 +112,7 @@ export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
           </div>
 
           {/* Page Content */}
-          <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6 min-h-0">
+          <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6 min-h-0" style={{ scrollbarGutter: 'stable' }}>
             <div className="mx-auto max-w-7xl">
               {children}
             </div>

@@ -484,6 +484,7 @@ export default function EpicsPage() {
         />
 
         {/* ── Filter Toolbar ───────────────────────────────────────────────── */}
+        <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3 sm:p-4 space-y-2 sm:space-y-3">
 
         {/* Row 1: Search (50%) + Status (25%) + Priority (25%) — Desktop */}
         <div className="hidden sm:flex items-center gap-2">
@@ -586,7 +587,7 @@ export default function EpicsPage() {
         </div>
 
         {/* Row 2: Secondary Filters (Grid 20% each on Desktop, 2 cols on mobile) */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             <Select
               value={projectFilter}
               onValueChange={setProjectFilter}
@@ -646,7 +647,7 @@ export default function EpicsPage() {
 
         {/* Row 3: Active Filters & Clear */}
         {(statusFilter !== 'all' || priorityFilter !== 'all' || projectFilter !== 'all' || localSearch) && (
-            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t border-[var(--apple-separator)]">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--apple-separator)]">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[12px] font-medium text-[var(--apple-secondary-label)] uppercase tracking-wider mr-1">
                         Active Filters:
@@ -690,6 +691,7 @@ export default function EpicsPage() {
                 </Button>
             </div>
         )}
+        </div>
 
         {/* Count + View Switcher */}
         <div className="flex items-center justify-between gap-3">
