@@ -450,7 +450,7 @@ export default function SprintEventsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
+      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300 min-h-full">
 
         {/* Page Header */}
         <PageHeader
@@ -707,121 +707,104 @@ export default function SprintEventsPage() {
           <div className="space-y-4">
             {/* Grid View */}
             {viewMode === 'grid' && (
-              <div className="grid gap-4 sm:gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {paginatedEvents.map((event) => {
                   const style = EVENT_ICONS[event.eventType?.toLowerCase()] ?? defaultEventStyle
+                  const canManage = hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id)
                   return (
                     <div
                       key={event._id}
-                      className={cn(
-                        'card-fade-in group rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] bg-card overflow-hidden',
-                        'shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none',
-                        'hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)]',
-                        'hover:-translate-y-0.5 apple-transition cursor-pointer'
-                      )}
+                      className="card-fade-in group rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-none hover:shadow-[0_6px_24px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_6px_24px_rgba(0,0,0,0.36)] hover:-translate-y-0.5 apple-transition cursor-pointer"
                       onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                     >
-                      {/* Theme-color accent strip */}
-                      <div className="h-[3px] w-full flex-shrink-0" style={{ background: 'var(--apple-card-gradient)' }} />
+                      {/* Top accent strip */}
+                      <div className="h-[3px] w-full" style={{ background: 'var(--apple-card-gradient)' }} />
 
-                      <div className="p-5 space-y-4">
-                        {/* Header: icon + title + status + menu */}
-                        <div className="flex items-start gap-3">
-                          <span className={cn('flex-shrink-0', style.color)}>
-                            {style.icon}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-[16px] font-semibold text-[var(--apple-label)] truncate leading-snug">{event.title}</h3>
-                            <span className={cn('inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md mt-0.5', style.bg, style.color)}>
-                              {formatToTitleCase(event.eventType)}
-                            </span>
+                      <div className="p-4 sm:p-5">
+                        {/* Header row */}
+                        <div className="flex items-start gap-3 mb-3">
+                          {/* Event type icon */}
+                          <div className={cn('flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center', style.bg)}>
+                            <span className={style.color}>{style.icon}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
+
+                          {/* Title + type label */}
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <h3 className="text-[15px] font-semibold text-[var(--apple-label)] truncate leading-tight">{event.title}</h3>
+                            <span className="text-[11px] font-medium text-[var(--apple-secondary-label)]">{formatToTitleCase(event.eventType)}</span>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 flex-shrink-0 -mt-0.5">
                             <StatusBadge status={event.status} size="sm" />
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <MoreVertical className="h-4 w-4" strokeWidth={1.5} />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/sprint-events/view-sprint-event/${event._id}`)
-                                }}>
-                                  <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                                  View Event
-                                </DropdownMenuItem>
-                                {hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id) ? (
-                                  <>
-                                    <DropdownMenuItem onClick={(e) => {
-                                      e.stopPropagation()
-                                      const currentEvent = events.find(ev => ev._id === event._id)
-                                      setEditingEvent(currentEvent || event)
-                                    }}>
-                                      <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                                      Edit Event
-                                    </DropdownMenuItem>
-                                    {false && <>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleDeleteClick(event)
-                                        }}
-                                        className="text-destructive"
-                                      >
-                                        <Trash2 className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </>}
-                                  </>
-                                ) : null}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            {canManage && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreVertical className="h-4 w-4" strokeWidth={1.5} />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/sprint-events/view-sprint-event/${event._id}`) }}>
+                                    <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                    View Event
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingEvent(events.find(ev => ev._id === event._id) || event) }}>
+                                    <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                    Edit Event
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </div>
 
-                        {/* Description */}
-                        {event.description && (
-                          <p className="text-[13px] text-[var(--apple-secondary-label)] line-clamp-2">{event.description}</p>
-                        )}
+                        {/* Divider */}
+                        <div className="h-px bg-[var(--apple-separator)] mb-3" />
 
-                        {/* Meta info */}
-                        <div className="space-y-1.5">
-                          <MetaChip icon={<Calendar className="h-3.5 w-3.5" strokeWidth={1.5} />} label={formatDate(event.scheduledDate)} />
-                          {event.startTime && event.endTime && (
-                            <MetaChip icon={<Clock className="h-3.5 w-3.5" strokeWidth={1.5} />} label={`${formatTime(event.startTime)} → ${formatTime(event.endTime)}`} />
-                          )}
-                          {event.duration > 0 && (
-                            <MetaChip icon={<Clock className="h-3.5 w-3.5" strokeWidth={1.5} />} label={`${event.duration} min`} />
+                        {/* Meta row */}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] text-[var(--apple-secondary-label)]">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                            {formatDate(event.scheduledDate)}
+                          </span>
+                          {event.startTime && event.endTime ? (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                              {formatTime(event.startTime)} – {formatTime(event.endTime)}
+                            </span>
+                          ) : event.duration > 0 ? (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                              {event.duration} min
+                            </span>
+                          ) : null}
+                          {event.attendees?.length > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                              {event.attendees.length}
+                            </span>
                           )}
                         </div>
 
-                        {/* Sprint & Project tags */}
-                        <div className="flex flex-wrap gap-1.5">
-                          {event.sprint?.name && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-[var(--apple-separator)] text-[11px] text-[var(--apple-secondary-label)]">
-                              {event.sprint.name}
-                            </span>
-                          )}
-                          {event.project?.name && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-[var(--apple-separator)] text-[11px] text-[var(--apple-tertiary-label)]">
-                              {event.project.name}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Attendees */}
-                        {event.attendees?.length > 0 && (
-                          <div className="flex items-center gap-1.5 text-[12px] text-[var(--apple-secondary-label)]">
-                            <Users className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
-                            <span>{event.attendees.length} attendee{event.attendees.length !== 1 ? 's' : ''}</span>
+                        {/* Sprint / Project tags */}
+                        {(event.sprint?.name || event.project?.name) && (
+                          <div className="flex flex-wrap gap-1.5 mt-3">
+                            {event.sprint?.name && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--apple-quaternary-fill)] text-[11px] text-[var(--apple-secondary-label)]">
+                                {event.sprint.name}
+                              </span>
+                            )}
+                            {event.project?.name && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--apple-quaternary-fill)] text-[11px] text-[var(--apple-tertiary-label)]">
+                                {event.project.name}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -833,85 +816,87 @@ export default function SprintEventsPage() {
 
             {/* List View */}
             {viewMode === 'list' && (
-              <div className="space-y-2">
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] overflow-hidden divide-y divide-[var(--apple-separator)]">
                 {paginatedEvents.map((event) => {
                   const style = EVENT_ICONS[event.eventType?.toLowerCase()] ?? defaultEventStyle
+                  const canManage = hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id)
                   return (
                     <div
                       key={event._id}
-                      className="card-fade-in group relative flex items-center gap-4 pl-5 pr-4 py-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px cursor-pointer overflow-hidden"
+                      className="card-fade-in group relative flex items-center gap-3 sm:gap-4 pl-4 sm:pl-5 pr-3 sm:pr-4 py-3 sm:py-3.5 bg-card apple-transition hover:bg-[var(--apple-quaternary-fill)] cursor-pointer"
                       onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                     >
-                      {/* Theme-color left accent strip */}
+                      {/* Left accent bar */}
                       <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: 'var(--apple-card-gradient)' }} />
-                      <span className={cn('flex-shrink-0', style.color)}>
-                        {style.icon}
-                      </span>
+
+                      {/* Icon */}
+                      <div className={cn('flex-shrink-0 w-8 h-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center', style.bg)}>
+                        <span className={style.color}>{style.icon}</span>
+                      </div>
+
+                      {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[15px] font-semibold text-[var(--apple-label)] truncate">{event.title}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[14px] sm:text-[15px] font-semibold text-[var(--apple-label)] truncate">{event.title}</span>
                           <StatusBadge status={event.status} size="sm" />
                         </div>
-                        <div className="flex items-center gap-3 mt-1 flex-wrap">
-                          <MetaChip icon={<Calendar className="h-3 w-3" strokeWidth={1.5} />} label={formatDate(event.scheduledDate)} />
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-[12px] text-[var(--apple-secondary-label)]">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                            {formatDate(event.scheduledDate)}
+                          </span>
                           {event.duration > 0 && (
-                            <MetaChip icon={<Clock className="h-3 w-3" strokeWidth={1.5} />} label={`${event.duration}m`} />
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                              {event.duration}m
+                            </span>
                           )}
                           {event.sprint?.name && (
-                            <MetaChip icon={<Zap className="h-3 w-3" strokeWidth={1.5} />} label={event.sprint.name} />
+                            <span className="hidden sm:flex items-center gap-1">
+                              <Zap className="h-3 w-3 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                              {event.sprint.name}
+                            </span>
                           )}
                         </div>
                       </div>
+
+                      {/* Right side */}
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {event.attendees?.length > 0 && (
-                          <span className="text-[12px] text-[var(--apple-secondary-label)] hidden md:flex items-center gap-1">
-                            <Users className="h-3.5 w-3.5" strokeWidth={1.5} /> {event.attendees.length}
+                          <span className="hidden md:flex items-center gap-1 text-[12px] text-[var(--apple-tertiary-label)]">
+                            <Users className="h-3.5 w-3.5" strokeWidth={1.5} />
+                            {event.attendees.length}
                           </span>
                         )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="h-4 w-4" strokeWidth={1.5} />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation()
-                              router.push(`/sprint-events/view-sprint-event/${event._id}`)
-                            }}>
-                              <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                              View Event
-                            </DropdownMenuItem>
-                            {hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id) ? (
-                              <>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  const currentEvent = events.find(ev => ev._id === event._id)
-                                  setEditingEvent(currentEvent || event)
-                                }}>
-                                  <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                                  Edit Event
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDeleteClick(event)
-                                  }}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                                  Delete
-                                </DropdownMenuItem>
-                              </>
-                            ) : null}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {canManage && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="h-4 w-4" strokeWidth={1.5} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/sprint-events/view-sprint-event/${event._id}`) }}>
+                                <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                View Event
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingEvent(events.find(ev => ev._id === event._id) || event) }}>
+                                <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                Edit Event
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeleteClick(event) }} className="text-destructive">
+                                <Trash2 className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </div>
                   )
