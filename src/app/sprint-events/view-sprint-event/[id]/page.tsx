@@ -34,12 +34,14 @@ interface SprintEvent {
     firstName: string
     lastName: string
     email: string
+    avatar?: string
   }
   attendees: Array<{
     _id: string
     firstName: string
     lastName: string
     email: string
+    avatar?: string
   }>
   outcomes?: {
     decisions: string[]
@@ -95,21 +97,34 @@ const defaultEventStyle = {
   bg: 'bg-gray-50 dark:bg-gray-900/40',
 }
 
-// ─── Avatar gradient (stable per name) ───────────────────────────────────────
+// ─── Avatar ───────────────────────────────────────────────────────────────────
 
-const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
-  'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)',
-  'linear-gradient(135deg,#34C759 0%,#30D158 100%)',
-  'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)',
-  'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)',
-  'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)',
-]
-
-function avatarGradient(name: string): string {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length]
+function UserAvatar({ firstName, lastName, avatar, size = 8 }: {
+  firstName: string
+  lastName: string
+  avatar?: string
+  size?: number
+}) {
+  const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase()
+  const sizeClass = `h-${size} w-${size}`
+  if (avatar) {
+    return (
+      <img
+        src={avatar}
+        alt={`${firstName} ${lastName}`}
+        className={cn(sizeClass, 'rounded-full object-cover flex-shrink-0 select-none')}
+      />
+    )
+  }
+  return (
+    <div className={cn(
+      sizeClass,
+      'rounded-full flex items-center justify-center flex-shrink-0 select-none',
+      'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)] font-semibold',
+    )} style={{ fontSize: size <= 8 ? '11px' : '13px' }}>
+      {initials}
+    </div>
+  )
 }
 
 // ─── InfoRow ──────────────────────────────────────────────────────────────────
@@ -562,57 +577,60 @@ export default function SprintEventDetailsPage() {
           <div className="space-y-5">
 
             {/* Participants */}
-            <SectionCard>
-              <SectionHeader label="Participants" />
-              <div className="divide-y divide-[var(--apple-separator)]">
+            {(() => {
+              const otherAttendees = event.attendees.filter(a => a._id !== event.facilitator._id)
+              return (
+                <SectionCard>
+                  <SectionHeader label={`Participants (${1 + otherAttendees.length})`} />
+                  <div className="divide-y divide-[var(--apple-separator)]">
 
-                {/* Facilitator */}
-                <div className="px-5 py-4">
-                  <p className="apple-section-label text-[var(--apple-tertiary-label)] mb-3">Facilitator</p>
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[13px] font-bold select-none"
-                      style={{ background: avatarGradient(`${event.facilitator.firstName}${event.facilitator.lastName}`) }}
-                    >
-                      {event.facilitator.firstName[0]}{event.facilitator.lastName[0]}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">
-                        {event.facilitator.firstName} {event.facilitator.lastName}
-                      </p>
-                      <p className="text-[12px] text-[var(--apple-secondary-label)] truncate">{event.facilitator.email}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Attendees */}
-                {event.attendees.length > 0 && (
-                  <div className="px-5 py-4">
-                    <p className="apple-section-label text-[var(--apple-tertiary-label)] mb-3">
-                      Attendees ({event.attendees.length})
-                    </p>
-                    <div className="space-y-3">
-                      {event.attendees.map((attendee) => (
-                        <div key={attendee._id} className="flex items-center gap-3">
-                          <div
-                            className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[13px] font-bold select-none"
-                            style={{ background: avatarGradient(`${attendee.firstName}${attendee.lastName}`) }}
-                          >
-                            {attendee.firstName[0]}{attendee.lastName[0]}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">
-                              {attendee.firstName} {attendee.lastName}
-                            </p>
-                            <p className="text-[12px] text-[var(--apple-secondary-label)] truncate">{attendee.email}</p>
-                          </div>
+                    {/* Facilitator */}
+                    <div className="px-4 sm:px-5 py-3.5">
+                      <p className="apple-section-label text-[var(--apple-secondary-label)] mb-2.5">Facilitator</p>
+                      <div className="flex items-center gap-2.5">
+                        <UserAvatar
+                          firstName={event.facilitator.firstName}
+                          lastName={event.facilitator.lastName}
+                          avatar={event.facilitator.avatar}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-[var(--apple-label)] truncate">
+                            {event.facilitator.firstName} {event.facilitator.lastName}
+                          </p>
+                          <p className="text-[11px] text-[var(--apple-secondary-label)] truncate">{event.facilitator.email}</p>
                         </div>
-                      ))}
+                      </div>
                     </div>
+
+                    {/* Attendees (excluding facilitator) */}
+                    {otherAttendees.length > 0 && (
+                      <div className="px-4 sm:px-5 py-3.5">
+                        <p className="apple-section-label text-[var(--apple-secondary-label)] mb-2.5">
+                          Attendees ({otherAttendees.length})
+                        </p>
+                        <div className="space-y-2.5">
+                          {otherAttendees.map((attendee) => (
+                            <div key={attendee._id} className="flex items-center gap-2.5">
+                              <UserAvatar
+                                firstName={attendee.firstName}
+                                lastName={attendee.lastName}
+                                avatar={attendee.avatar}
+                              />
+                              <div className="min-w-0">
+                                <p className="text-[13px] font-semibold text-[var(--apple-label)] truncate">
+                                  {attendee.firstName} {attendee.lastName}
+                                </p>
+                                <p className="text-[11px] text-[var(--apple-secondary-label)] truncate">{attendee.email}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </SectionCard>
+                </SectionCard>
+              )
+            })()}
           </div>
         </div>
 

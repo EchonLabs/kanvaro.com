@@ -116,9 +116,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const sprintEvent = await SprintEvent.findById(params.id)
       .populate('sprint', 'name status')
       .populate('project', 'name')
-      .populate('facilitator', 'firstName lastName email')
-      .populate('attendees', 'firstName lastName email')
-      .populate('outcomes.actionItems.assignedTo', 'firstName lastName email')
+      .populate('facilitator', 'firstName lastName email avatar')
+      .populate('attendees', 'firstName lastName email avatar')
+      .populate('outcomes.actionItems.assignedTo', 'firstName lastName email avatar')
 
     console.log('Final Populated Sprint Event:', sprintEvent ? {
       _id: sprintEvent._id,
@@ -248,8 +248,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const updatedEvent = await SprintEvent.findById(params.id)
       .populate('sprint', 'name status')
       .populate('project', 'name')
-      .populate('facilitator', 'firstName lastName email')
-      .populate('attendees', 'firstName lastName email')
+      .populate('facilitator', 'firstName lastName email avatar')
+      .populate('attendees', 'firstName lastName email avatar')
 
     console.log('Update - After populate, attendees count:', updatedEvent?.attendees?.length || 0)
     console.log('Update - Populated attendees:', updatedEvent?.attendees?.map((a: any) => ({
@@ -323,8 +323,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const updatedEvent = await SprintEvent.findById(params.id)
       .populate('sprint', 'name status')
       .populate('project', 'name')
-      .populate('facilitator', 'firstName lastName email')
-      .populate('attendees', 'firstName lastName email')
+      .populate('facilitator', 'firstName lastName email avatar')
+      .populate('attendees', 'firstName lastName email avatar')
 
     console.log('PATCH - After populate, attendees count:', updatedEvent?.attendees?.length || 0)
     console.log('PATCH - Populated attendees:', updatedEvent?.attendees?.map((a: any) => ({
