@@ -109,7 +109,7 @@ const SprintEventSchema = new Schema<ISprintEvent>({
     type: Number,
     required: true,
     min: 15, // Minimum 15 minutes
-    max: 480 // Maximum 8 hours
+    max: 2880 // Maximum 48 hours
   },
   attendees: [{
     type: Schema.Types.ObjectId,
