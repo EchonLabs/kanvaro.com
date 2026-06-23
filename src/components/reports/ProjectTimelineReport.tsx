@@ -1,13 +1,12 @@
 'use client'
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
-import { Calendar, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
+import { Calendar, CheckCircle2, AlertCircle } from 'lucide-react'
 
 interface Project {
   _id: string; name: string; status: string; startDate: string; endDate?: string
-  description?: string; team?: any[]
+  description?: string; teamMembers?: any[]
   stats: {
     tasks: { total: number; completed: number; completionRate: number }
     sprints: { total: number; active: number }
@@ -26,6 +25,8 @@ const STATUS_PALETTE: Record<string, { color: string; bg: string; label: string 
   planning:  { color: '#BF5AF2', bg: 'rgba(191,90,242,0.12)', label: 'Planning' },
 }
 const getStatus = (s: string) => STATUS_PALETTE[s] || { color: '#8E8E93', bg: 'rgba(142,142,147,0.12)', label: s }
+
+const BAR_COLORS = ['#007AFF', '#34C759', '#FF9500', '#BF5AF2', '#FF453A', '#5AC8FA', '#FFD60A', '#30D158', '#FF6B6B', '#5E5CE6']
 
 const AppleTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
@@ -101,7 +102,11 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
             <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}d`} />
             <Tooltip content={<AppleTooltip />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-            <Bar dataKey="Duration" fill="var(--apple-chart-color)" radius={[5,5,0,0]} maxBarSize={44} />
+            <Bar dataKey="Duration" radius={[5,5,0,0]} maxBarSize={44}>
+              {durationData.map((_, i) => (
+                <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -110,43 +115,110 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
       <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
         <div className="px-5 pt-5 pb-4 border-b border-[var(--apple-separator)]">
           <p className="text-[17px] font-semibold">Project Timeline</p>
-          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Visual schedule for all projects</p>
+          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Schedule and progress for all projects</p>
         </div>
+
+        {/* Column headers */}
+        <div className="hidden md:grid grid-cols-[1fr_180px_90px_90px_80px] gap-4 px-5 py-2 border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)]">Project</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)]">Date Range</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Duration</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Tasks</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Schedule</p>
+        </div>
+
         <div className="divide-y divide-[var(--apple-separator)]">
           {timelineProjects.map(p => {
             const st = getStatus(p.status)
             const progress = Math.min(100, (p.elapsed / p.duration) * 100)
+            const taskColor = p.stats.tasks.completionRate >= 75 ? '#34C759' : p.stats.tasks.completionRate >= 40 ? '#FF9F0A' : 'var(--apple-chart-color)'
+            const scheduleColor = p.status === 'completed' ? '#007AFF' : p.isOverdue ? '#FF453A' : p.daysLeft !== null && p.daysLeft <= 7 ? '#FF9F0A' : '#34C759'
+            const scheduleLabel = p.status === 'completed'
+              ? 'Done'
+              : p.daysLeft === null
+              ? '—'
+              : p.isOverdue
+              ? `${Math.abs(p.daysLeft)}d over`
+              : `${p.daysLeft}d left`
             return (
-              <div key={p._id} className="px-5 py-4 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
-                <div className="flex items-center justify-between gap-3 mb-2.5">
-                  <div className="flex items-center gap-2.5 flex-wrap min-w-0 flex-1">
-                    <p className="text-[15px] font-semibold truncate">{p.name}</p>
-                    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: st.bg, color: st.color }}>{st.label}</span>
+              <div key={p._id} className="apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                {/* Desktop row */}
+                <div className="hidden md:grid grid-cols-[1fr_180px_90px_90px_80px] gap-4 items-center px-5 py-3.5">
+                  {/* Name + status */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: st.color }} />
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-semibold truncate">{p.name}</p>
+                      <span className="text-[11px] font-medium" style={{ color: st.color }}>{st.label}</span>
+                    </div>
                     {p.isOverdue && (
-                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-red-50 dark:bg-red-950/30 text-red-500 flex-shrink-0">
-                        <AlertCircle className="h-3 w-3" />Overdue
+                      <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-50 dark:bg-red-950/30 text-red-500 flex-shrink-0">
+                        <AlertCircle className="h-2.5 w-2.5" />Overdue
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-[12px] flex-shrink-0 font-apple-mono">
-                    {p.daysLeft !== null && p.status !== 'completed' && (
-                      <span className={p.isOverdue ? 'text-red-500 font-semibold' : 'text-[var(--apple-secondary-label)]'}>
-                        {p.isOverdue ? `${Math.abs(p.daysLeft)}d overdue` : `${p.daysLeft}d left`}
-                      </span>
+
+                  {/* Date range */}
+                  <div className="flex items-center gap-1.5 text-[12px] text-[var(--apple-secondary-label)]">
+                    <Calendar className="h-3 w-3 flex-shrink-0 text-[var(--apple-tertiary-label)]" />
+                    <span className="font-apple-mono">{formatDate(p.startDate)}</span>
+                    {p.endDate && (
+                      <>
+                        <span className="text-[var(--apple-tertiary-label)]">→</span>
+                        <span className="font-apple-mono">{formatDate(p.endDate)}</span>
+                      </>
                     )}
-                    <span className="text-[var(--apple-tertiary-label)]">{p.duration}d total</span>
+                  </div>
+
+                  {/* Duration */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono text-[var(--apple-label)]">{p.duration}d</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">{Math.round(progress)}% elapsed</p>
+                  </div>
+
+                  {/* Tasks */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono" style={{ color: taskColor }}>{p.stats.tasks.completionRate.toFixed(0)}%</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">{p.stats.tasks.completed}/{p.stats.tasks.total}</p>
+                  </div>
+
+                  {/* Schedule status */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono" style={{ color: scheduleColor }}>{scheduleLabel}</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">{p.duration}d total</p>
                   </div>
                 </div>
-                <div className="h-2 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${progress}%`, backgroundColor: p.isOverdue ? '#FF453A' : st.color }}
-                  />
-                </div>
-                <div className="flex items-center justify-between mt-1.5 text-[11px] text-[var(--apple-tertiary-label)]">
-                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />Start: {formatDate(p.startDate)}</span>
-                  {p.endDate && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />End: {formatDate(p.endDate)}</span>}
-                  <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{p.stats.tasks.completionRate.toFixed(0)}% done</span>
+
+                {/* Mobile card */}
+                <div className="md:hidden px-5 py-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: st.color }} />
+                      <p className="text-[14px] font-semibold truncate">{p.name}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="text-[11px] font-semibold rounded-full px-2 py-0.5" style={{ backgroundColor: st.bg, color: st.color }}>{st.label}</span>
+                      {p.isOverdue && <AlertCircle className="h-3.5 w-3.5 text-red-500" />}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[12px] text-[var(--apple-secondary-label)]">
+                    <Calendar className="h-3 w-3 text-[var(--apple-tertiary-label)]" />
+                    <span className="font-apple-mono">{formatDate(p.startDate)}{p.endDate ? ` → ${formatDate(p.endDate)}` : ''}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-[8px] bg-[var(--apple-quaternary-fill)] p-2 text-center">
+                      <p className="text-[13px] font-semibold font-apple-mono text-[var(--apple-label)]">{p.duration}d</p>
+                      <p className="text-[10px] text-[var(--apple-tertiary-label)]">Duration</p>
+                    </div>
+                    <div className="rounded-[8px] bg-[var(--apple-quaternary-fill)] p-2 text-center">
+                      <p className="text-[13px] font-semibold font-apple-mono" style={{ color: taskColor }}>{p.stats.tasks.completionRate.toFixed(0)}%</p>
+                      <p className="text-[10px] text-[var(--apple-tertiary-label)]">Tasks</p>
+                    </div>
+                    <div className="rounded-[8px] bg-[var(--apple-quaternary-fill)] p-2 text-center">
+                      <p className="text-[13px] font-semibold font-apple-mono" style={{ color: scheduleColor }}>{scheduleLabel}</p>
+                      <p className="text-[10px] text-[var(--apple-tertiary-label)]">Schedule</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )

@@ -2139,111 +2139,128 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* ── Stat cards ── */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  {/* Task completion */}
                   <div className="card-fade-in card-fade-in-delay-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-2 mb-3">
                       <Target className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
-                      <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Project Progress</p>
+                      <p className="text-[12px] font-semibold tracking-[0.05em] uppercase text-[var(--apple-secondary-label)]">Task Completion</p>
                     </div>
-                    <p className="text-[28px] font-bold font-apple-mono tabular-nums" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                      {project?.stats?.tasks?.completionRate ?? 0}%
+                    <p className="text-[30px] font-bold font-apple-mono tabular-nums leading-none" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                      {Math.round(project?.stats?.tasks?.completionRate ?? 0)}%
                     </p>
-                    <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
-                      {project?.stats?.tasks?.completed ?? 0} of {project?.stats?.tasks?.total ?? 0} tasks completed
+                    <p className="text-[12px] text-[var(--apple-secondary-label)] mt-2">
+                      {project?.stats?.tasks?.completed ?? 0} of {project?.stats?.tasks?.total ?? 0} tasks done
                     </p>
                   </div>
 
-                  <div className="card-fade-in card-fade-in-delay-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="p-2.5 rounded-[var(--apple-radius-md)]" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
-                        <DollarSign className="h-4 w-4 text-white" />
+                  {/* Budget */}
+                  {(() => {
+                    const utilizationRate = Math.round(project?.stats?.budget?.utilizationRate ?? 0)
+                    const rateColor = utilizationRate > 85 ? '#FF453A' : utilizationRate > 65 ? '#FF9F0A' : undefined
+                    return (
+                      <div className="card-fade-in card-fade-in-delay-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <DollarSign className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+                          <p className="text-[12px] font-semibold tracking-[0.05em] uppercase text-[var(--apple-secondary-label)]">Budget Used</p>
+                        </div>
+                        <p
+                          className="text-[30px] font-bold font-apple-mono tabular-nums leading-none"
+                          style={rateColor ? { color: rateColor } : { background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+                        >
+                          {utilizationRate}%
+                        </p>
+                        <p className="text-[12px] text-[var(--apple-secondary-label)] mt-2">
+                          {formatCurrency(project?.stats?.budget?.spent ?? 0)} of {formatCurrency(project?.stats?.budget?.total ?? 0)}
+                        </p>
                       </div>
-                      <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Budget Utilization</p>
-                    </div>
-                    <p className="text-[28px] font-bold font-apple-mono tabular-nums" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                      {project?.stats?.budget?.utilizationRate ?? 0}%
-                    </p>
-                    <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
-                      ${(project?.stats?.budget?.spent ?? 0).toLocaleString()} of ${(project?.stats?.budget?.total ?? 0).toLocaleString()} spent
-                    </p>
-                  </div>
+                    )
+                  })()}
 
+                  {/* Time */}
                   <div className="card-fade-in card-fade-in-delay-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="p-2.5 rounded-[var(--apple-radius-md)]" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
-                        <Clock className="h-4 w-4 text-white" />
-                      </div>
-                      <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Time Tracking</p>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Clock className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+                      <p className="text-[12px] font-semibold tracking-[0.05em] uppercase text-[var(--apple-secondary-label)]">Time Logged</p>
                     </div>
-                    <p className="text-[28px] font-bold font-apple-mono tabular-nums" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    <p className="text-[30px] font-bold font-apple-mono tabular-nums leading-none" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                       {(project?.stats?.timeTracking?.totalHours ?? 0).toFixed(1)}h
                     </p>
-                    <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
-                      {project?.stats?.timeTracking?.entries ?? 0} time entries
+                    <p className="text-[12px] text-[var(--apple-secondary-label)] mt-2">
+                      {project?.stats?.timeTracking?.entries ?? 0} {project?.stats?.timeTracking?.entries === 1 ? 'entry' : 'entries'}
                     </p>
                   </div>
                 </div>
 
-                <div className="grid gap-8 lg:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Recent Activity</CardTitle>
-                      <CardDescription>Latest project activities and updates</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <div className="flex-1 space-y-1">
-                            <p className="text-sm font-medium">Project created</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDate(project?.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <div className="flex-1 space-y-1">
-                            <p className="text-sm font-medium">First task completed</p>
-                            <p className="text-xs text-muted-foreground">2 days ago</p>
-                          </div>
-                        </div>
+                {/* ── Project info grid ── */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Timeline */}
+                  <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                    <p className="text-[12px] font-semibold tracking-[0.05em] uppercase text-[var(--apple-secondary-label)] mb-4">Timeline</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-[var(--apple-secondary-label)]">Start date</span>
+                        <span className="text-[13px] font-medium text-[var(--apple-label)]">{project.startDate ? formatDate(project.startDate) : '—'}</span>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-[var(--apple-secondary-label)]">End date</span>
+                        <span className="text-[13px] font-medium text-[var(--apple-label)]">{project.endDate ? formatDate(project.endDate) : 'Not set'}</span>
+                      </div>
+                      {project.startDate && project.endDate && (() => {
+                        const today = new Date()
+                        const end = new Date(project.endDate)
+                        const daysLeft = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                        const isOverdue = daysLeft < 0
+                        return (
+                          <div className="flex items-center justify-between">
+                            <span className="text-[13px] text-[var(--apple-secondary-label)]">{isOverdue ? 'Overdue by' : 'Days remaining'}</span>
+                            <span className="text-[13px] font-semibold font-apple-mono" style={{ color: isOverdue ? '#FF453A' : daysLeft <= 7 ? '#FF9F0A' : '#34C759' }}>
+                              {Math.abs(daysLeft)}d
+                            </span>
+                          </div>
+                        )
+                      })()}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-[var(--apple-secondary-label)]">Created</span>
+                        <span className="text-[13px] font-medium text-[var(--apple-label)]">{formatDate(project.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Team Performance</CardTitle>
-                      <CardDescription>Team member productivity and workload</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {project?.teamMembers?.slice(0, 3).map((member: Project['teamMembers'][number], index: number) => {
-                          const user = member.memberId;
-                          return (
-                            <div key={member._id || index} className="flex items-center space-x-4">
-                              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                                {user?.firstName?.[0]}{user?.lastName?.[0]}
-                              </div>
-                              <div className="flex-1 space-y-1">
-                                <p className="text-sm font-medium">
-                                  {user?.firstName} {user?.lastName}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{user?.role ? formatToTitleCase(user.role.replace(/_/g, ' ')) : ''}</p>
-                                {member.hourlyRate && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {member.hourlyRate}/hr
-                                  </p>
-                                )}
-                              </div>
-                              <Badge variant="secondary" className="hover:bg-secondary dark:hover:bg-secondary">Active</Badge>
+                  {/* Team */}
+                  <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[12px] font-semibold tracking-[0.05em] uppercase text-[var(--apple-secondary-label)]">Team</p>
+                      <span className="text-[12px] font-semibold font-apple-mono text-[var(--apple-secondary-label)]">{project.teamMembers.length} {project.teamMembers.length === 1 ? 'member' : 'members'}</span>
+                    </div>
+                    <div className="space-y-3">
+                      {project.teamMembers.slice(0, 4).map((member, index) => {
+                        const user = member.memberId
+                        const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`
+                        return (
+                          <div key={member._id || index} className="flex items-center gap-3">
+                            <div className="h-7 w-7 rounded-full bg-[var(--apple-tertiary-fill)] flex items-center justify-center text-[11px] font-semibold text-[var(--apple-label)] flex-shrink-0">
+                              {initials}
                             </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[13px] font-medium text-[var(--apple-label)] truncate">{user?.firstName} {user?.lastName}</p>
+                              {user?.role && <p className="text-[11px] text-[var(--apple-tertiary-label)] truncate">{formatToTitleCase(user.role.replace(/_/g, ' '))}</p>}
+                            </div>
+                            {member.hourlyRate && (
+                              <span className="text-[11px] font-apple-mono text-[var(--apple-tertiary-label)] flex-shrink-0">{formatCurrency(member.hourlyRate)}/hr</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {project.teamMembers.length > 4 && (
+                        <p className="text-[12px] text-[var(--apple-tertiary-label)] pt-1">+{project.teamMembers.length - 4} more</p>
+                      )}
+                      {project.teamMembers.length === 0 && (
+                        <p className="text-[13px] text-[var(--apple-tertiary-label)]">No team members assigned</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </TabsContent>

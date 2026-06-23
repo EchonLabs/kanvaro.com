@@ -1,15 +1,16 @@
 ﻿'use client'
 
 import {
-  BarChart, Bar, AreaChart, Area,
+  BarChart, Bar, Cell, AreaChart, Area,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { CheckCircle2, Clock, Users, Zap } from 'lucide-react'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface Project {
   _id: string; name: string; status: string; startDate: string; endDate?: string
-  description?: string; team?: any[]
+  description?: string; teamMembers?: any[]
   stats: {
     tasks: { total: number; completed: number; completionRate: number }
     sprints: { total: number; active: number }
@@ -66,15 +67,17 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle?: st
 
 export function ProjectProgressReport({ projects, filters }: ProjectProgressReportProps) {
   const { formatDate } = useDateTime()
+  const { formatCurrency } = useOrgCurrency()
 
-  const avgCompletion = projects.length > 0
-    ? projects.reduce((s, p) => s + p.stats.tasks.completionRate, 0) / projects.length
+  const projectsWithTasks = projects.filter(p => p.stats.tasks.total > 0)
+  const avgCompletion = projectsWithTasks.length > 0
+    ? projectsWithTasks.reduce((s, p) => s + p.stats.tasks.completionRate, 0) / projectsWithTasks.length
     : 0
 
   const progressData = projects.map(p => ({
     name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name,
     'Completion %': p.stats.tasks.completionRate,
-    'Budget %': p.stats.budget.utilizationRate,
+    'Budget %': Math.min(100, p.stats.budget.utilizationRate),
   }))
 
   const taskData = projects.map(p => ({
@@ -139,7 +142,7 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
               <Tooltip content={<AppleTooltip />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
               <Bar dataKey="Count" radius={[6,6,0,0]} maxBarSize={48}>
                 {statusData.map((entry, i) => (
-                  <rect key={i} />
+                  <Cell key={i} fill={entry.fill} />
                 ))}
               </Bar>
             </BarChart>
@@ -162,25 +165,29 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
 
         {/* Sprint activity */}
         <ChartCard title="Sprint Overview" subtitle="Active and total sprints per project">
-          <div className="space-y-3 mt-1">
-            {projects.map(p => (
-              <div key={p._id} className="flex items-center gap-3">
-                <p className="text-[13px] font-medium w-28 truncate flex-shrink-0">{p.name}</p>
-                <div className="flex-1 h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${p.stats.sprints.total > 0 ? (p.stats.sprints.active / p.stats.sprints.total) * 100 : 0}%`,
-                      backgroundColor: 'var(--apple-chart-color)',
-                    }}
-                  />
+          <div className="space-y-2 mt-1 max-h-[220px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-[var(--apple-tertiary-fill)] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--apple-separator)]">
+            {projects.map(p => {
+              return (
+                <div key={p._id} className="flex items-center justify-between gap-3 py-1.5 px-2 rounded-[8px] hover:bg-[var(--apple-quaternary-fill)] transition-colors">
+                  <p className="text-[13px] font-medium truncate flex-shrink-0 max-w-[120px]">{p.name}</p>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex gap-0.5">
+                      {Array.from({ length: Math.min(p.stats.sprints.total, 8) }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-4 w-1.5 rounded-full"
+                          style={{ backgroundColor: i < p.stats.sprints.active ? 'var(--apple-chart-color)' : 'var(--apple-tertiary-fill)' }}
+                        />
+                      ))}
+                      {p.stats.sprints.total > 8 && <span className="text-[10px] text-[var(--apple-tertiary-label)] ml-0.5">+{p.stats.sprints.total - 8}</span>}
+                    </div>
+                    <span className="text-[12px] font-apple-mono text-[var(--apple-tertiary-label)] w-10 text-right">
+                      <span className="font-semibold" style={{ color: 'var(--apple-chart-color)' }}>{p.stats.sprints.active}</span>/{p.stats.sprints.total}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-[12px] font-apple-mono flex-shrink-0">
-                  <span className="font-semibold" style={{ color: 'var(--apple-chart-color)' }}>{p.stats.sprints.active}</span>
-                  <span className="text-[var(--apple-tertiary-label)]">/ {p.stats.sprints.total}</span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </ChartCard>
       </div>
@@ -191,46 +198,92 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
           <p className="text-[17px] font-semibold">Project Progress Details</p>
           <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Detailed progress tracking for each project</p>
         </div>
+
+        {/* Column headers */}
+        <div className="hidden sm:grid grid-cols-[1fr_100px_120px_80px_90px_80px] gap-2 px-5 py-2 border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)]">Project</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Tasks</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Budget Used</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Sprints</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Hours</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Team</p>
+        </div>
+
         <div className="divide-y divide-[var(--apple-separator)]">
           {projects.map(project => {
             const st = getStatus(project.status)
             const compPct = project.stats.tasks.completionRate
             const budPct = Math.min(100, project.stats.budget.utilizationRate)
-            const budColor = budPct > 85 ? '#FF453A' : budPct > 65 ? '#FF9F0A' : 'var(--apple-chart-color)'
+            const budColor = budPct > 85 ? '#FF453A' : budPct > 65 ? '#FF9F0A' : '#34C759'
+            const compColor = compPct >= 75 ? '#34C759' : compPct >= 40 ? '#FF9F0A' : '#FF453A'
             return (
-              <div key={project._id} className="px-5 py-4 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
-                <div className="flex items-center gap-2.5 flex-wrap mb-3">
-                  <p className="text-[15px] font-semibold">{project.name}</p>
-                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: st.bg, color: st.color }}>{st.label}</span>
-                  {project.endDate && (
-                    <span className="text-[12px] text-[var(--apple-tertiary-label)]">Due {formatDate(project.endDate)}</span>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="flex items-center justify-between text-[12px] mb-1">
-                      <span className="flex items-center gap-1 text-[var(--apple-secondary-label)]"><CheckCircle2 className="h-3 w-3" />Tasks</span>
-                      <span className="font-semibold font-apple-mono" style={{ color: '#34C759' }}>{compPct.toFixed(1)}%</span>
+              <div key={project._id} className="px-5 py-3.5 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                {/* Desktop row */}
+                <div className="hidden sm:grid grid-cols-[1fr_100px_120px_80px_90px_80px] gap-2 items-center">
+                  {/* Name + status */}
+                  <div className="min-w-0 flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: st.color }} />
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-semibold truncate">{project.name}</p>
+                      {project.endDate && (
+                        <p className="text-[11px] text-[var(--apple-tertiary-label)]">Due {formatDate(project.endDate)}</p>
+                      )}
                     </div>
-                    <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${compPct}%`, backgroundColor: '#34C759' }} />
-                    </div>
-                    <p className="text-[11px] text-[var(--apple-tertiary-label)] mt-0.5">{project.stats.tasks.completed} of {project.stats.tasks.total} tasks</p>
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold flex-shrink-0" style={{ backgroundColor: st.bg, color: st.color }}>{st.label}</span>
                   </div>
-                  <div>
-                    <div className="flex items-center justify-between text-[12px] mb-1">
-                      <span className="text-[var(--apple-secondary-label)]">Budget</span>
-                      <span className="font-semibold font-apple-mono" style={{ color: budColor }}>{budPct.toFixed(1)}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${budPct}%`, backgroundColor: budColor }} />
-                    </div>
+
+                  {/* Tasks */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono" style={{ color: compColor }}>{compPct.toFixed(0)}%</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">{project.stats.tasks.completed}/{project.stats.tasks.total}</p>
+                  </div>
+
+                  {/* Budget */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono" style={{ color: budColor }}>{budPct.toFixed(0)}%</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">{formatCurrency(project.stats.budget.spent)}</p>
+                  </div>
+
+                  {/* Sprints */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono" style={{ color: 'var(--apple-chart-color)' }}>{project.stats.sprints.active}</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">of {project.stats.sprints.total}</p>
+                  </div>
+
+                  {/* Hours */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono text-[var(--apple-label)]">{project.stats.timeTracking.totalHours.toFixed(0)}h</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">{project.stats.timeTracking.entries} entries</p>
+                  </div>
+
+                  {/* Team */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono text-[var(--apple-label)]">{project.teamMembers?.length ?? 0}</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">members</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 mt-2.5 text-[12px] text-[var(--apple-tertiary-label)]">
-                  <span className="flex items-center gap-1"><Zap className="h-3 w-3" />{project.stats.sprints.active} active sprint{project.stats.sprints.active !== 1 ? 's' : ''}</span>
-                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{project.stats.timeTracking.totalHours.toFixed(0)}h logged</span>
-                  {project.team && <span className="flex items-center gap-1"><Users className="h-3 w-3" />{project.team.length} members</span>}
+
+                {/* Mobile card */}
+                <div className="sm:hidden space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: st.color }} />
+                    <p className="text-[14px] font-semibold">{project.name}</p>
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: st.bg, color: st.color }}>{st.label}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-[8px] bg-[var(--apple-quaternary-fill)] p-2 text-center">
+                      <p className="text-[13px] font-semibold font-apple-mono" style={{ color: compColor }}>{compPct.toFixed(0)}%</p>
+                      <p className="text-[10px] text-[var(--apple-tertiary-label)]">Tasks</p>
+                    </div>
+                    <div className="rounded-[8px] bg-[var(--apple-quaternary-fill)] p-2 text-center">
+                      <p className="text-[13px] font-semibold font-apple-mono" style={{ color: budColor }}>{budPct.toFixed(0)}%</p>
+                      <p className="text-[10px] text-[var(--apple-tertiary-label)]">Budget</p>
+                    </div>
+                    <div className="rounded-[8px] bg-[var(--apple-quaternary-fill)] p-2 text-center">
+                      <p className="text-[13px] font-semibold font-apple-mono text-[var(--apple-label)]">{project.stats.timeTracking.totalHours.toFixed(0)}h</p>
+                      <p className="text-[10px] text-[var(--apple-tertiary-label)]">Logged</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )

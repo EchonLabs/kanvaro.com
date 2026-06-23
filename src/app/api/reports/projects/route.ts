@@ -72,9 +72,9 @@ export async function GET(req: NextRequest) {
       projects.map(async (project) => {
         // Get task statistics
         const totalTasks = await Task.countDocuments({ project: project._id })
-        const completedTasks = await Task.countDocuments({ 
-          project: project._id, 
-          status: 'completed' 
+        const completedTasks = await Task.countDocuments({
+          project: project._id,
+          status: 'done'
         })
         const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
 
