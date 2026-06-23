@@ -2142,19 +2142,14 @@ export default function ProjectDetailPage() {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <div className="card-fade-in card-fade-in-delay-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="p-2.5 rounded-[var(--apple-radius-md)]" style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 8px var(--apple-chart-glow)' }}>
-                        <Target className="h-4 w-4 text-white" />
-                      </div>
+                      <Target className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                       <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Project Progress</p>
                     </div>
                     <p className="text-[28px] font-bold font-apple-mono tabular-nums" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                      {project?.stats?.tasks?.completionRate || 0}%
+                      {project?.stats?.tasks?.completionRate ?? 0}%
                     </p>
-                    <div className="mt-2 h-[5px] w-full rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                      <div className="h-full rounded-full progress-bar-animated" style={{ width: `${project?.stats?.tasks?.completionRate || 0}%`, background: 'var(--apple-chart-gradient)' }} />
-                    </div>
                     <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
-                      {project?.stats?.tasks?.completed || 0} of {project?.stats?.tasks?.total || 0} tasks
+                      {project?.stats?.tasks?.completed ?? 0} of {project?.stats?.tasks?.total ?? 0} tasks completed
                     </p>
                   </div>
 
@@ -2166,13 +2161,10 @@ export default function ProjectDetailPage() {
                       <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Budget Utilization</p>
                     </div>
                     <p className="text-[28px] font-bold font-apple-mono tabular-nums" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                      {project?.stats?.budget?.utilizationRate || 0}%
+                      {project?.stats?.budget?.utilizationRate ?? 0}%
                     </p>
-                    <div className="mt-2 h-[5px] w-full rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                      <div className="h-full rounded-full progress-bar-animated" style={{ width: `${project?.stats?.budget?.utilizationRate || 0}%`, background: 'var(--apple-chart-gradient)' }} />
-                    </div>
                     <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
-                      Budget spent vs total
+                      ${(project?.stats?.budget?.spent ?? 0).toLocaleString()} of ${(project?.stats?.budget?.total ?? 0).toLocaleString()} spent
                     </p>
                   </div>
 
@@ -2184,10 +2176,10 @@ export default function ProjectDetailPage() {
                       <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Time Tracking</p>
                     </div>
                     <p className="text-[28px] font-bold font-apple-mono tabular-nums" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                      {project?.stats?.timeTracking?.totalHours || 0}h
+                      {(project?.stats?.timeTracking?.totalHours ?? 0).toFixed(1)}h
                     </p>
                     <p className="text-[12px] text-[var(--apple-secondary-label)] mt-1.5">
-                      {project?.stats?.timeTracking?.entries || 0} time entries
+                      {project?.stats?.timeTracking?.entries ?? 0} time entries
                     </p>
                   </div>
                 </div>

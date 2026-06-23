@@ -4,7 +4,6 @@ import { Project } from '@/models/Project'
 import { Task } from '@/models/Task'
 import { Sprint } from '@/models/Sprint'
 import { TimeEntry } from '@/models/TimeEntry'
-import { BudgetEntry } from '@/models/BudgetEntry'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -46,22 +45,26 @@ export async function GET(req: NextRequest) {
       query.status = status
     }
     
-    if (startDate && endDate) {
-      query.startDate = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      }
+    if (startDate || endDate) {
+      query.startDate = {}
+      if (startDate) query.startDate.$gte = new Date(startDate)
+      if (endDate) query.startDate.$lte = new Date(endDate)
     }
 
-    // Build sort object
-    const sort: any = {}
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1
+    // Build sort for DB-sortable fields; computed fields (completion, budget) sorted in memory after stats
+    const dbSortableFields = ['name', 'status', 'startDate', 'endDate', 'createdAt']
+    const dbSort: any = {}
+    if (dbSortableFields.includes(sortBy)) {
+      dbSort[sortBy] = sortOrder === 'asc' ? 1 : -1
+    } else {
+      dbSort.name = 1
+    }
 
     // Get projects with populated data
     const projects = await Project.find(query)
       .populate('teamMembers', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
-      .sort(sort)
+      .sort(dbSort)
       .lean()
 
     // Get additional data for each project
@@ -82,16 +85,12 @@ export async function GET(req: NextRequest) {
           status: 'active' 
         })
 
-        // Get time tracking statistics
+        // Get time tracking statistics (duration is stored in minutes)
         const timeEntries = await TimeEntry.find({ project: project._id })
         const totalTimeLogged = timeEntries.reduce((sum, entry) => sum + entry.duration, 0)
 
-        // Get budget statistics
-        const budgetEntries = await BudgetEntry.find({ 
-          project: project._id, 
-          status: 'active' 
-        })
-        const totalBudget = budgetEntries.reduce((sum, entry) => sum + entry.amount, 0)
+        // Get budget statistics — use project.budget for both total and spent for consistency
+        const totalBudget = project.budget?.total || 0
         const spent = project.budget?.spent || 0
         const remaining = totalBudget - spent
         const utilizationRate = totalBudget > 0 ? (spent / totalBudget) * 100 : 0
@@ -110,7 +109,7 @@ export async function GET(req: NextRequest) {
               active: activeSprints
             },
             timeTracking: {
-              totalHours: totalTimeLogged / 3600,
+              totalHours: totalTimeLogged / 60,
               entries: timeEntries.length
             },
             budget: {
@@ -124,15 +123,28 @@ export async function GET(req: NextRequest) {
       })
     )
 
+    // Sort in memory for computed fields that can't be sorted in the DB query
+    if (sortBy === 'completion') {
+      projectsWithStats.sort((a, b) => sortOrder === 'asc'
+        ? a.stats.tasks.completionRate - b.stats.tasks.completionRate
+        : b.stats.tasks.completionRate - a.stats.tasks.completionRate)
+    } else if (sortBy === 'budget') {
+      projectsWithStats.sort((a, b) => sortOrder === 'asc'
+        ? a.stats.budget.total - b.stats.budget.total
+        : b.stats.budget.total - a.stats.budget.total)
+    }
+
     // Calculate summary statistics
+    // Exclude zero-task projects from completion average to avoid skewing the metric
+    const projectsWithTasks = projectsWithStats.filter(p => p.stats.tasks.total > 0)
     const summary = {
       totalProjects: projectsWithStats.length,
       activeProjects: projectsWithStats.filter(p => p.status === 'active').length,
       completedProjects: projectsWithStats.filter(p => p.status === 'completed').length,
       totalBudget: projectsWithStats.reduce((sum, p) => sum + p.stats.budget.total, 0),
       totalSpent: projectsWithStats.reduce((sum, p) => sum + p.stats.budget.spent, 0),
-      averageCompletionRate: projectsWithStats.length > 0 
-        ? projectsWithStats.reduce((sum, p) => sum + p.stats.tasks.completionRate, 0) / projectsWithStats.length 
+      averageCompletionRate: projectsWithTasks.length > 0
+        ? projectsWithTasks.reduce((sum, p) => sum + p.stats.tasks.completionRate, 0) / projectsWithTasks.length
         : 0
     }
 
