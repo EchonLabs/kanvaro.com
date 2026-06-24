@@ -1,3 +1,19 @@
+## [1.40.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.40.0...v1.40.1) (2026-06-24)
+
+
+### Bug Fixes
+
+* application error due to sprint event duration exceeding ([daa2510](https://github.com/EchonLabs/kanvaro.com/commit/daa251072754dfd4033e5442b626e621bb1e835c))
+* calender page formatting and layout issues ([854360f](https://github.com/EchonLabs/kanvaro.com/commit/854360fd84b4245f9e620b235a2266672a9fa6fc))
+* fixed the scrollbar popup in sprint events page. ([5017987](https://github.com/EchonLabs/kanvaro.com/commit/5017987ff95f218f00887ee7f970703623e48e44))
+* fixed vertical scrollbar in Toast Notifications and added new info for Info cards in Project view page ([5c0c37b](https://github.com/EchonLabs/kanvaro.com/commit/5c0c37bbaee63e4646634bd150a209350ab5e5f4))
+* handled the duplicate toast notifications and fixed the UI issue in the sprint event view page ([c07d856](https://github.com/EchonLabs/kanvaro.com/commit/c07d856c9a0291ae74b5e47e05c3bd1052ab7f54))
+* layout and spacing issues in the Sprint page List View ([fbb49f0](https://github.com/EchonLabs/kanvaro.com/commit/fbb49f03480a732b020e3bf1a913d68e5def62f3))
+* reworked the logic in the reports tab in the project view page. ([fff765a](https://github.com/EchonLabs/kanvaro.com/commit/fff765ab6b23d1a7cc9cc8a107a0abe48b03fe22))
+* reworked the logic on all four sub pages of the Project Reports page ([0f4e7c1](https://github.com/EchonLabs/kanvaro.com/commit/0f4e7c1a4a4e9154769c2a2a1d8b71070cb95a60))
+* scrollbar popup issue when no results were found ([e126c3f](https://github.com/EchonLabs/kanvaro.com/commit/e126c3f18bf8e2dfdb864c697044ea103eb2f025))
+* showing unformatted task descriptions in the Tasks page List view ([8c11d6d](https://github.com/EchonLabs/kanvaro.com/commit/8c11d6d62ef55a334489876b3e63f6b842681c91))
+
 # [1.40.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.39.1...v1.40.0) (2026-06-15)
 
 
