@@ -16,7 +16,7 @@ import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { EditSprintEventModal } from '@/components/sprint-events/EditSprintEventModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { cn, formatToTitleCase } from '@/lib/utils'
-import { StatusBadge } from '@/components/tasks/TasksShared'
+import { StatusBadge, FullPageLoader } from '@/components/tasks/TasksShared'
 
 interface SprintEvent {
   _id: string
@@ -34,12 +34,14 @@ interface SprintEvent {
     firstName: string
     lastName: string
     email: string
+    avatar?: string
   }
   attendees: Array<{
     _id: string
     firstName: string
     lastName: string
     email: string
+    avatar?: string
   }>
   outcomes?: {
     decisions: string[]
@@ -82,35 +84,47 @@ interface SprintEvent {
 // ─── Event type styles ────────────────────────────────────────────────────────
 
 const EVENT_STYLE: Record<string, { icon: ReactNode; color: string; bg: string }> = {
-  planning:      { icon: <Target className="h-5 w-5" />,    color: 'text-blue-600 dark:text-blue-400',     bg: 'bg-blue-50 dark:bg-blue-950/30' },
-  review:        { icon: <Eye className="h-5 w-5" />,       color: 'text-amber-600 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-950/30' },
-  retrospective: { icon: <RotateCcw className="h-5 w-5" />, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/30' },
-  standup:       { icon: <Users className="h-5 w-5" />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-  daily_standup: { icon: <Users className="h-5 w-5" />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-  grooming:      { icon: <List className="h-5 w-5" />,      color: 'text-sky-600 dark:text-sky-400',       bg: 'bg-sky-50 dark:bg-sky-950/30' },
-  demo:          { icon: <Zap className="h-5 w-5" />,       color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/30' },
+  planning:      { icon: <Target className="h-5 w-5" strokeWidth={1.5} />,    color: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-950/30' },
+  review:        { icon: <Eye className="h-5 w-5" strokeWidth={1.5} />,       color: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-950/30' },
+  retrospective: { icon: <RotateCcw className="h-5 w-5" strokeWidth={1.5} />, color: 'text-purple-600 dark:text-purple-400',   bg: 'bg-purple-50 dark:bg-purple-950/30' },
+  daily_standup: { icon: <Users className="h-5 w-5" strokeWidth={1.5} />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  demo:          { icon: <Zap className="h-5 w-5" strokeWidth={1.5} />,       color: 'text-orange-600 dark:text-orange-400',   bg: 'bg-orange-50 dark:bg-orange-950/30' },
+  other:         { icon: <List className="h-5 w-5" strokeWidth={1.5} />,      color: 'text-sky-600 dark:text-sky-400',         bg: 'bg-sky-50 dark:bg-sky-950/30' },
 }
 const defaultEventStyle = {
-  icon: <Calendar className="h-5 w-5" />,
+  icon: <Calendar className="h-5 w-5" strokeWidth={1.5} />,
   color: 'text-gray-600 dark:text-gray-400',
   bg: 'bg-gray-50 dark:bg-gray-900/40',
 }
 
-// ─── Avatar gradient (stable per name) ───────────────────────────────────────
+// ─── Avatar ───────────────────────────────────────────────────────────────────
 
-const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
-  'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)',
-  'linear-gradient(135deg,#34C759 0%,#30D158 100%)',
-  'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)',
-  'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)',
-  'linear-gradient(135deg,#FF453A 0%,#FF9F0A 100%)',
-]
-
-function avatarGradient(name: string): string {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length]
+function UserAvatar({ firstName, lastName, avatar, size = 8 }: {
+  firstName: string
+  lastName: string
+  avatar?: string
+  size?: number
+}) {
+  const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase()
+  const sizeClass = `h-${size} w-${size}`
+  if (avatar) {
+    return (
+      <img
+        src={avatar}
+        alt={`${firstName} ${lastName}`}
+        className={cn(sizeClass, 'rounded-full object-cover flex-shrink-0 select-none')}
+      />
+    )
+  }
+  return (
+    <div className={cn(
+      sizeClass,
+      'rounded-full flex items-center justify-center flex-shrink-0 select-none',
+      'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)] font-semibold',
+    )} style={{ fontSize: size <= 8 ? '11px' : '13px' }}>
+      {initials}
+    </div>
+  )
 }
 
 // ─── InfoRow ──────────────────────────────────────────────────────────────────
@@ -208,6 +222,14 @@ export default function SprintEventDetailsPage() {
   const formatMeetingLink = (link: string) =>
     link.match(/^https?:\/\//i) ? link : `https://${link}`
 
+  const formatDuration = (minutes: number) => {
+    const h = Math.floor(minutes / 60)
+    const m = minutes % 60
+    if (h > 0 && m > 0) return `${h}h ${m}m`
+    if (h > 0) return `${h} hour${h !== 1 ? 's' : ''}`
+    return `${m} min`
+  }
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -221,9 +243,7 @@ export default function SprintEventDetailsPage() {
   if (authLoading || loading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--apple-system-blue)]" />
-        </div>
+        <FullPageLoader label="Loading event..." />
       </MainLayout>
     )
   }
@@ -270,63 +290,32 @@ export default function SprintEventDetailsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-5 animate-in fade-in-0 duration-300 overflow-x-hidden">
+      <div className="space-y-5 animate-in fade-in-0 duration-300 overflow-x-hidden min-h-full">
 
         {/* ── Page Header ───────────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            {/* Back */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/sprint-events')}
-              className="rounded-full h-9 px-3 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition flex-shrink-0 mt-1"
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
-            </Button>
 
-            {/* Theme-color icon */}
-            <div
-              className="h-12 w-12 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white"
-              style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 12px var(--apple-chart-glow)' }}
-            >
-              {eventStyle.icon}
-            </div>
+        {/* Back button row */}
+        <div className="flex items-center justify-between gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/sprint-events')}
+            className="rounded-full h-9 px-3 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" strokeWidth={1.5} />
+            Back
+          </Button>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)] leading-tight">
-                  {event.title}
-                </h1>
-                <StatusBadge status={event.status} />
-              </div>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className={cn('inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md', eventStyle.bg, eventStyle.color)}>
-                  {formatToTitleCase(event.eventType)}
-                </span>
-                <span className="text-[var(--apple-tertiary-label)] text-[13px]">•</span>
-                <span className="text-[14px] text-[var(--apple-secondary-label)]">{event.project?.name}</span>
-                {event.sprint?.name && (
-                  <>
-                    <span className="text-[var(--apple-tertiary-label)] text-[13px]">•</span>
-                    <span className="text-[14px] text-[var(--apple-secondary-label)]">{event.sprint.name}</span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
+          {/* Actions — shown here on mobile so they don't stack below the title */}
           {canEdit && (
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setEditingEvent(event)}
-                className="h-9 px-4 rounded-full border-[var(--apple-separator)] text-[14px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+                className="h-9 px-4 rounded-full border-[var(--apple-separator)] text-[13px] sm:text-[14px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
               >
-                <Edit className="h-3.5 w-3.5 mr-1.5" />
+                <Edit className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                 Edit
               </Button>
               <DropdownMenu>
@@ -334,28 +323,28 @@ export default function SprintEventDetailsPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-9 px-4 rounded-full border-[var(--apple-separator)] text-[14px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+                    className="h-9 px-4 rounded-full border-[var(--apple-separator)] text-[13px] sm:text-[14px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
                   >
                     Actions
-                    <MoreVertical className="h-3.5 w-3.5 ml-1.5" />
+                    <MoreVertical className="h-3.5 w-3.5 ml-1.5" strokeWidth={1.5} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {event.status !== 'completed' && (
                     <DropdownMenuItem onClick={() => updateStatus('completed')}>
-                      <CheckCircle className="h-4 w-4 mr-2" />
+                      <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
                       Mark as Completed
                     </DropdownMenuItem>
                   )}
                   {event.status !== 'in_progress' && event.status !== 'completed' && (
                     <DropdownMenuItem onClick={() => updateStatus('in_progress')}>
-                      <Play className="h-4 w-4 mr-2" />
+                      <Play className="h-4 w-4 mr-2" strokeWidth={1.5} />
                       Mark as In Progress
                     </DropdownMenuItem>
                   )}
                   {event.status !== 'cancelled' && (
                     <DropdownMenuItem onClick={() => updateStatus('cancelled')}>
-                      <Square className="h-4 w-4 mr-2" />
+                      <Square className="h-4 w-4 mr-2" strokeWidth={1.5} />
                       Cancel Event
                     </DropdownMenuItem>
                   )}
@@ -363,6 +352,39 @@ export default function SprintEventDetailsPage() {
               </DropdownMenu>
             </div>
           )}
+        </div>
+
+        {/* Title row */}
+        <div className="flex items-start gap-3 sm:gap-4">
+          {/* Event type icon badge */}
+          <div
+            className="h-11 w-11 sm:h-12 sm:w-12 rounded-[var(--apple-radius-md)] flex items-center justify-center flex-shrink-0 text-white mt-0.5"
+            style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 2px 12px var(--apple-chart-glow)' }}
+          >
+            {eventStyle.icon}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start gap-2.5 flex-wrap">
+              <h1 className="text-[24px] sm:text-[28px] lg:text-[30px] font-bold tracking-tight text-[var(--apple-label)] leading-tight">
+                {event.title}
+              </h1>
+              <StatusBadge status={event.status} />
+            </div>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span className={cn('inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md', eventStyle.bg, eventStyle.color)}>
+                {formatToTitleCase(event.eventType)}
+              </span>
+              <span className="text-[var(--apple-tertiary-label)] text-[12px]">·</span>
+              <span className="text-[13px] sm:text-[14px] text-[var(--apple-secondary-label)]">{event.project?.name}</span>
+              {event.sprint?.name && (
+                <>
+                  <span className="text-[var(--apple-tertiary-label)] text-[12px]">·</span>
+                  <span className="text-[13px] sm:text-[14px] text-[var(--apple-secondary-label)]">{event.sprint.name}</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ── Content grid ──────────────────────────────────────────────────── */}
@@ -376,23 +398,25 @@ export default function SprintEventDetailsPage() {
               <div className="h-[3px] w-full" style={{ background: 'var(--apple-card-gradient)' }} />
               <SectionHeader label="Event Details" />
               <div className="divide-y divide-[var(--apple-separator)]">
-                <InfoRow icon={<Calendar className="h-4 w-4" />} label="Date" value={formatDate(event.scheduledDate)} />
+                <InfoRow icon={<Calendar className="h-4 w-4" strokeWidth={1.5} />} label="Date" value={formatDate(event.scheduledDate)} />
                 <InfoRow
-                  icon={<Clock className="h-4 w-4" />}
+                  icon={<Clock className="h-4 w-4" strokeWidth={1.5} />}
                   label="Time"
                   value={
                     event.startTime && event.endTime
-                      ? `${event.startTime} → ${event.endTime}`
-                      : event.startTime ?? '—'
+                      ? `${formatTime(event.startTime)} – ${formatTime(event.endTime)}`
+                      : event.startTime
+                        ? formatTime(event.startTime)
+                        : '—'
                   }
                 />
-                <InfoRow icon={<Clock className="h-4 w-4" />} label="Duration" value={`${event.duration} min`} />
+                <InfoRow icon={<Clock className="h-4 w-4" strokeWidth={1.5} />} label="Duration" value={formatDuration(event.duration)} />
                 {event.location && (
-                  <InfoRow icon={<MapPin className="h-4 w-4" />} label="Location" value={event.location} />
+                  <InfoRow icon={<MapPin className="h-4 w-4" strokeWidth={1.5} />} label="Location" value={event.location} />
                 )}
                 {event.meetingLink && (
                   <InfoRow
-                    icon={<LinkIcon className="h-4 w-4" />}
+                    icon={<LinkIcon className="h-4 w-4" strokeWidth={1.5} />}
                     label="Meeting Link"
                     value={
                       <a
@@ -407,17 +431,17 @@ export default function SprintEventDetailsPage() {
                     }
                   />
                 )}
-                <InfoRow icon={<Target className="h-4 w-4" />} label="Project" value={event.project.name} />
+                <InfoRow icon={<Target className="h-4 w-4" strokeWidth={1.5} />} label="Project" value={event.project.name} />
                 {event.sprint?.name && (
-                  <InfoRow icon={<Zap className="h-4 w-4" />} label="Sprint" value={event.sprint.name} />
+                  <InfoRow icon={<Zap className="h-4 w-4" strokeWidth={1.5} />} label="Sprint" value={event.sprint.name} />
                 )}
                 <InfoRow
-                  icon={<User className="h-4 w-4" />}
+                  icon={<User className="h-4 w-4" strokeWidth={1.5} />}
                   label="Facilitator"
                   value={`${event.facilitator.firstName} ${event.facilitator.lastName}`}
                 />
                 <InfoRow
-                  icon={<Calendar className="h-4 w-4" />}
+                  icon={<Calendar className="h-4 w-4" strokeWidth={1.5} />}
                   label="Created"
                   value={`${formatDate(event.createdAt)} at ${formatTime(event.createdAt)}`}
                 />
@@ -553,57 +577,60 @@ export default function SprintEventDetailsPage() {
           <div className="space-y-5">
 
             {/* Participants */}
-            <SectionCard>
-              <SectionHeader label="Participants" />
-              <div className="divide-y divide-[var(--apple-separator)]">
+            {(() => {
+              const otherAttendees = event.attendees.filter(a => a._id !== event.facilitator._id)
+              return (
+                <SectionCard>
+                  <SectionHeader label={`Participants (${1 + otherAttendees.length})`} />
+                  <div className="divide-y divide-[var(--apple-separator)]">
 
-                {/* Facilitator */}
-                <div className="px-5 py-4">
-                  <p className="apple-section-label text-[var(--apple-tertiary-label)] mb-3">Facilitator</p>
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[13px] font-bold select-none"
-                      style={{ background: avatarGradient(`${event.facilitator.firstName}${event.facilitator.lastName}`) }}
-                    >
-                      {event.facilitator.firstName[0]}{event.facilitator.lastName[0]}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">
-                        {event.facilitator.firstName} {event.facilitator.lastName}
-                      </p>
-                      <p className="text-[12px] text-[var(--apple-secondary-label)] truncate">{event.facilitator.email}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Attendees */}
-                {event.attendees.length > 0 && (
-                  <div className="px-5 py-4">
-                    <p className="apple-section-label text-[var(--apple-tertiary-label)] mb-3">
-                      Attendees ({event.attendees.length})
-                    </p>
-                    <div className="space-y-3">
-                      {event.attendees.map((attendee) => (
-                        <div key={attendee._id} className="flex items-center gap-3">
-                          <div
-                            className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[13px] font-bold select-none"
-                            style={{ background: avatarGradient(`${attendee.firstName}${attendee.lastName}`) }}
-                          >
-                            {attendee.firstName[0]}{attendee.lastName[0]}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">
-                              {attendee.firstName} {attendee.lastName}
-                            </p>
-                            <p className="text-[12px] text-[var(--apple-secondary-label)] truncate">{attendee.email}</p>
-                          </div>
+                    {/* Facilitator */}
+                    <div className="px-4 sm:px-5 py-3.5">
+                      <p className="apple-section-label text-[var(--apple-secondary-label)] mb-2.5">Facilitator</p>
+                      <div className="flex items-center gap-2.5">
+                        <UserAvatar
+                          firstName={event.facilitator.firstName}
+                          lastName={event.facilitator.lastName}
+                          avatar={event.facilitator.avatar}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-[var(--apple-label)] truncate">
+                            {event.facilitator.firstName} {event.facilitator.lastName}
+                          </p>
+                          <p className="text-[11px] text-[var(--apple-secondary-label)] truncate">{event.facilitator.email}</p>
                         </div>
-                      ))}
+                      </div>
                     </div>
+
+                    {/* Attendees (excluding facilitator) */}
+                    {otherAttendees.length > 0 && (
+                      <div className="px-4 sm:px-5 py-3.5">
+                        <p className="apple-section-label text-[var(--apple-secondary-label)] mb-2.5">
+                          Attendees ({otherAttendees.length})
+                        </p>
+                        <div className="space-y-2.5">
+                          {otherAttendees.map((attendee) => (
+                            <div key={attendee._id} className="flex items-center gap-2.5">
+                              <UserAvatar
+                                firstName={attendee.firstName}
+                                lastName={attendee.lastName}
+                                avatar={attendee.avatar}
+                              />
+                              <div className="min-w-0">
+                                <p className="text-[13px] font-semibold text-[var(--apple-label)] truncate">
+                                  {attendee.firstName} {attendee.lastName}
+                                </p>
+                                <p className="text-[11px] text-[var(--apple-secondary-label)] truncate">{attendee.email}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </SectionCard>
+                </SectionCard>
+              )
+            })()}
           </div>
         </div>
 

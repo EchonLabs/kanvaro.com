@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
 import {
   Plus,
   Search,
@@ -141,7 +142,10 @@ function EventCard({ event, onClick, detailed = false }: { event: CalendarEvent;
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-foreground truncate">{event.title}</p>
             {detailed && event.description && (
-              <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5 line-clamp-2">{event.description}</p>
+              <div
+                className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5 line-clamp-2 [&_p]:inline [&_p:empty]:hidden"
+                dangerouslySetInnerHTML={{ __html: sanitizeTaskDescriptionHtml(event.description) || '' }}
+              />
             )}
             <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
               <span
@@ -204,7 +208,10 @@ function DayEventCard({ event, onClick }: { event: CalendarEvent; onClick: () =>
             <div className="flex-1 min-w-0">
               <h4 className="text-[15px] font-semibold text-foreground">{event.title}</h4>
               {event.description && (
-                <p className="text-[13px] text-[var(--apple-secondary-label)] mt-1 line-clamp-3">{event.description}</p>
+                <div
+                  className="text-[13px] text-[var(--apple-secondary-label)] mt-1 line-clamp-3 [&_p]:inline [&_p:empty]:hidden"
+                  dangerouslySetInnerHTML={{ __html: sanitizeTaskDescriptionHtml(event.description) || '' }}
+                />
               )}
               <div className="flex flex-wrap gap-1.5 mt-2.5">
                 <span
@@ -349,8 +356,12 @@ export default function CalendarPage() {
   })
 
   const getEventsForDate = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0]
-    return filteredEvents.filter(e => new Date(e.startDate).toISOString().split('T')[0] === dateStr)
+    return filteredEvents.filter(e => {
+      const evDate = new Date(e.startDate)
+      return evDate.getFullYear() === date.getFullYear() &&
+        evDate.getMonth() === date.getMonth() &&
+        evDate.getDate() === date.getDate()
+    })
   }
 
   const getDaysInMonth = (date: Date) => {
@@ -396,7 +407,12 @@ export default function CalendarPage() {
     return currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   }
 
-  const isToday = (date: Date) => date.toDateString() === new Date().toDateString()
+  const isToday = (date: Date) => {
+    const t = new Date()
+    return date.getFullYear() === t.getFullYear() &&
+      date.getMonth() === t.getMonth() &&
+      date.getDate() === t.getDate()
+  }
 
   const handleEventClick = (event: CalendarEvent) => {
     if (event.type === 'sprint') router.push(`/sprints/${event._id}`)
@@ -480,7 +496,7 @@ export default function CalendarPage() {
             </div>
             <Button
               onClick={() => router.push('/tasks/create-new-task')}
-              className="w-full sm:w-auto h-10 px-4 text-[13px] font-medium rounded-[var(--apple-radius-sm)] bg-[var(--apple-system-blue)] hover:bg-[var(--apple-system-blue)]/90 text-white border-0 flex-shrink-0"
+              className="w-full sm:w-auto h-10 px-4 text-[13px] font-medium rounded-full bg-[var(--apple-system-blue)] hover:bg-[var(--apple-system-blue)]/90 text-white border-0 flex-shrink-0"
             >
               <Plus className="w-4 h-4 mr-1.5" strokeWidth={1.5} />
               New Task
@@ -622,12 +638,25 @@ export default function CalendarPage() {
               {/* Right controls */}
               <div className="flex items-center gap-2">
                 {/* Today button */}
-                <button
-                  onClick={() => setCurrentDate(new Date())}
-                  className="h-8 px-3 text-[12px] font-medium rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background text-foreground hover:bg-[var(--apple-quaternary-fill)] apple-transition"
-                >
-                  Today
-                </button>
+                {(() => {
+                  const t = new Date()
+                  const active =
+                    viewMode === 'day' ? isToday(currentDate) :
+                    viewMode === 'week' ? getDaysInWeek(currentDate).some(d => isToday(d)) :
+                    currentDate.getMonth() === t.getMonth() && currentDate.getFullYear() === t.getFullYear()
+                  return (
+                    <button
+                      onClick={() => setCurrentDate(new Date())}
+                      className={`h-8 px-3 text-[12px] font-medium rounded-[var(--apple-radius-sm)] border apple-transition ${
+                        active
+                          ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)] text-white'
+                          : 'border-[var(--apple-separator)] bg-background text-foreground hover:bg-[var(--apple-quaternary-fill)]'
+                      }`}
+                    >
+                      Today
+                    </button>
+                  )
+                })()}
 
                 {/* Segmented view mode control */}
                 <div className="flex items-center p-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] border border-[var(--apple-separator)]">

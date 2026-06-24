@@ -60,7 +60,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast: (id: string) => void }) {
   if (toasts.length === 0) return null
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-2 w-full max-w-sm px-4 pointer-events-none">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-2 w-full max-w-sm px-4 pointer-events-none overflow-hidden">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
       ))}

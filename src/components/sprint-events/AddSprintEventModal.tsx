@@ -57,6 +57,7 @@ interface AddSprintEventModalProps {
 }
 
 const MIN_DURATION_MINUTES = 15
+const MAX_DURATION_MINUTES = 480 // 8 hours
 
 export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprintEventModalProps) {
   const router = useRouter()
@@ -546,10 +547,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       const start = startHours * 60 + startMinutes
       const end = endHours * 60 + endMinutes
       const duration = end - start
-      const clampedDuration = duration > 0 ? Math.max(duration, MIN_DURATION_MINUTES) : MIN_DURATION_MINUTES
-      setFormData(prev => ({ ...prev, duration: clampedDuration }))
+      setFormData(prev => ({ ...prev, duration: duration > 0 ? duration : MIN_DURATION_MINUTES }))
     } else {
-      // When times are missing or invalid, keep the duration at backend minimum to avoid validation errors
       setFormData(prev => ({ ...prev, duration: MIN_DURATION_MINUTES }))
     }
   }
@@ -621,12 +620,13 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     // If both times are provided, they must be valid (no timeError) and duration must be > 0
     const hasValidTime =
       (!formData.startTime && !formData.endTime) || // Both empty is OK (optional)
-      (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration >= MIN_DURATION_MINUTES) // Both filled and valid
+      (formData.startTime && formData.endTime && !startTimeError && !endTimeError &&
+        formData.duration >= MIN_DURATION_MINUTES && formData.duration <= MAX_DURATION_MINUTES)
 
     // Check date validation - date must be valid if selected
     const hasValidDate = !dateError || (selectedDate && (!selectedSprint || validateDate(selectedDate)))
 
-    return hasRequiredFields && hasValidTime && hasValidDate && formData.duration >= MIN_DURATION_MINUTES
+    return !!(hasRequiredFields && hasValidTime && hasValidDate)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -689,11 +689,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
         })
         setLoading(false)
         onSuccess()
-        // Close modal and redirect after showing success notification
-        setTimeout(() => {
-          onClose()
-          router.push('/sprint-events?success=created')
-        }, 1000)
+        onClose()
       } else {
         const errorData = await response.json()
         const errorMessage = errorData.error || 'Failed to create event'
@@ -1034,6 +1030,14 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   className="h-10 rounded-[var(--apple-radius-pill)] bg-[var(--apple-tertiary-fill)] text-[14px] opacity-60"
                   placeholder="Enter start and end time to calculate"
                 />
+                {formData.duration > MAX_DURATION_MINUTES && formData.startTime && formData.endTime && !startTimeError && !endTimeError && (
+                  <div className="flex items-start gap-2 mt-2 px-3 py-2.5 rounded-[var(--apple-radius-md)] bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                    <AlertCircle className="h-4 w-4 text-[var(--apple-system-red)] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                    <p className="text-[12px] text-red-700 dark:text-red-300 leading-snug">
+                      Duration exceeds the 8-hour limit. Please adjust your start or end time.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

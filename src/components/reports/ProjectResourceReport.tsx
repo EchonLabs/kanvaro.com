@@ -9,7 +9,7 @@ import { Users, Clock, DollarSign } from 'lucide-react'
 
 interface Project {
   _id: string; name: string; status: string; startDate: string; endDate?: string
-  description?: string; team?: any[]
+  description?: string; teamMembers?: any[]
   stats: {
     tasks: { total: number; completed: number; completionRate: number }
     sprints: { total: number; active: number }
@@ -71,14 +71,14 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle?: st
 export function ProjectResourceReport({ projects, filters }: ProjectResourceReportProps) {
   const { formatCurrency } = useOrgCurrency()
 
-  const totalTeamSize = projects.reduce((s, p) => s + (p.team?.length || 0), 0)
+  const totalTeamSize = projects.reduce((s, p) => s + (p.teamMembers?.length || 0), 0)
   const totalHours = projects.reduce((s, p) => s + p.stats.timeTracking.totalHours, 0)
   const totalBudget = projects.reduce((s, p) => s + p.stats.budget.total, 0)
   const totalSpent = projects.reduce((s, p) => s + p.stats.budget.spent, 0)
 
   const teamData = projects.map((p, i) => ({
     name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name,
-    Members: p.team?.length || 0,
+    Members: p.teamMembers?.length || 0,
     fill: APPLE_COLORS[i % APPLE_COLORS.length],
   }))
 
@@ -160,28 +160,40 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
 
         {/* Resource efficiency */}
         <ChartCard title="Resource Efficiency" subtitle="Hours per team member per project">
-          <div className="space-y-3 mt-1">
-            {projects.map((p, i) => {
-              const members = p.team?.length || 0
-              const hpm = members > 0 ? p.stats.timeTracking.totalHours / members : p.stats.timeTracking.totalHours
-              const maxHpm = Math.max(...projects.map(pr => {
-                const m = pr.team?.length || 0
-                return m > 0 ? pr.stats.timeTracking.totalHours / m : pr.stats.timeTracking.totalHours
-              }))
-              const pct = maxHpm > 0 ? (hpm / maxHpm) * 100 : 0
-              return (
-                <div key={p._id} className="space-y-1">
-                  <div className="flex items-center justify-between text-[13px]">
-                    <p className="font-medium truncate w-36">{p.name}</p>
-                    <span className="font-semibold font-apple-mono text-[var(--apple-secondary-label)]">{hpm.toFixed(1)}h/member</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: APPLE_COLORS[i % APPLE_COLORS.length] }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          {(() => {
+            const hpmValues = projects.map(p => {
+              const members = p.teamMembers?.length || 0
+              return members > 0 ? p.stats.timeTracking.totalHours / members : null
+            })
+            const maxHpm = Math.max(0, ...hpmValues.filter((v): v is number => v !== null))
+            return (
+              <div className="space-y-2 mt-1 max-h-[220px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-[var(--apple-tertiary-fill)] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--apple-separator)]">
+                {projects.map((p, i) => {
+                  const members = p.teamMembers?.length || 0
+                  const hpm = hpmValues[i]
+                  const pct = hpm !== null && maxHpm > 0 ? (hpm / maxHpm) * 100 : 0
+                  return (
+                    <div key={p._id} className="space-y-1 py-1">
+                      <div className="flex items-center justify-between text-[13px]">
+                        <p className="font-medium truncate w-36">{p.name}</p>
+                        {hpm !== null
+                          ? <span className="font-semibold font-apple-mono text-[var(--apple-secondary-label)]">{hpm.toFixed(1)}h/member</span>
+                          : <span className="text-[12px] text-[var(--apple-tertiary-label)]">No members</span>
+                        }
+                      </div>
+                      {hpm !== null ? (
+                        <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: APPLE_COLORS[i % APPLE_COLORS.length] }} />
+                        </div>
+                      ) : (
+                        <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)]" />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
         </ChartCard>
       </div>
 
@@ -200,7 +212,7 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-semibold truncate">{p.name}</p>
                 <div className="flex items-center gap-3 mt-0.5 text-[12px] text-[var(--apple-tertiary-label)]">
-                  <span className="flex items-center gap-0.5"><Users className="h-3 w-3" />{p.team?.length || 0} members</span>
+                  <span className="flex items-center gap-0.5"><Users className="h-3 w-3" />{p.teamMembers?.length || 0} members</span>
                   <span className="flex items-center gap-0.5"><Clock className="h-3 w-3" />{p.stats.timeTracking.totalHours.toFixed(0)}h</span>
                 </div>
               </div>
