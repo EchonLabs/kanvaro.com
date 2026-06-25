@@ -369,7 +369,7 @@ export default function TeamReportsPage() {
             </TabsList>
 
             <TabsContent value="overview" className="mt-0">
-              <TeamOverviewReport overview={reportData.overview} departmentBreakdown={reportData.departmentBreakdown} topPerformers={reportData.topPerformers} filters={filters} />
+              <TeamOverviewReport overview={reportData.overview} departmentBreakdown={reportData.departmentBreakdown} topPerformers={reportData.topPerformers} members={reportData.members} filters={filters} />
             </TabsContent>
             <TabsContent value="performance" className="mt-0">
               <TeamPerformanceReport members={reportData.members} productivityTrends={reportData.productivityTrends} filters={filters} />

@@ -22,6 +22,8 @@ interface PerformanceTrend {
   productivity?: number
   workload?: number
   hours?: number
+  completionRate?: number
+  tasksCompleted?: number
   // alt shape
   period?: string
   averageProductivity?: number
@@ -82,11 +84,10 @@ export function TeamPerformanceReport({ members, performanceTrends, productivity
   const avgScore = members.length > 0 ? members.reduce((s, m) => s + m.stats.productivityScore, 0) / members.length : 0
   const avgCompletion = members.length > 0 ? members.reduce((s, m) => s + m.stats.completionRate, 0) / members.length : 0
   const topCount = members.filter(m => m.stats.productivityScore >= 75).length
-  const totalTasks = members.reduce((s, m) => s + m.stats.tasksCompleted, 0)
+  const topScore = members.length > 0 ? Math.max(...members.map(m => m.stats.productivityScore)) : 0
 
   const memberBarData = [...members]
     .sort((a, b) => b.stats.productivityScore - a.stats.productivityScore)
-    .slice(0, 10)
     .map(m => ({
       name: `${m.firstName} ${m.lastName.charAt(0)}.`,
       Score: m.stats.productivityScore,
@@ -96,12 +97,12 @@ export function TeamPerformanceReport({ members, performanceTrends, productivity
   const trendData = resolvedTrends.map(t => ({
     period: t.period ?? t.date ?? '',
     'Productivity': t.averageProductivity ?? t.productivity ?? 0,
-    'Completion Rate': t.averageCompletionRate ?? 0,
+    'Completion Rate': t.averageCompletionRate ?? t.completionRate ?? 0,
   }))
 
   const tasksData = resolvedTrends.map(t => ({
     period: t.period ?? t.date ?? '',
-    'Tasks Done': t.totalTasksCompleted ?? 0,
+    'Tasks Done': t.totalTasksCompleted ?? t.tasksCompleted ?? 0,
     'Hours': t.totalHoursLogged ?? t.hours ?? 0,
   }))
 
@@ -114,7 +115,7 @@ export function TeamPerformanceReport({ members, performanceTrends, productivity
           { label: 'Avg Score', value: `${avgScore.toFixed(1)}%`, sub: 'Team productivity', color: 'var(--apple-chart-color)' },
           { label: 'Avg Completion', value: `${avgCompletion.toFixed(1)}%`, sub: 'Task completion rate', color: '#34C759' },
           { label: 'High Performers', value: String(topCount), sub: 'Score ≥ 75%', color: '#FF9500' },
-          { label: 'Tasks Completed', value: String(totalTasks), sub: 'Total by team', color: 'var(--apple-chart-color)' },
+          { label: 'Top Score', value: `${topScore.toFixed(1)}%`, sub: 'Best individual score', color: '#BF5AF2' },
         ].map(s => (
           <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
             <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
@@ -153,22 +154,26 @@ export function TeamPerformanceReport({ members, performanceTrends, productivity
         </ChartCard>
 
         {/* Horizontal bar — top members by score */}
-        <ChartCard title="Member Performance Ranking" subtitle="Top 10 members by productivity score">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={memberBarData} layout="vertical" barCategoryGap="30%" margin={{ top: 4, right: 8, left: 40, bottom: 0 }}>
-              <defs>
-                <linearGradient id="tp-compl" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#34C759" stopOpacity={0.9} /><stop offset="100%" stopColor="#30D158" stopOpacity={0.8} />
-                </linearGradient>
-              </defs>
-              <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={40} />
-              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Score" fill="var(--apple-chart-color)" radius={[0, 5, 5, 0]} maxBarSize={10} />
-              <Bar dataKey="Completion" fill="url(#tp-compl)" radius={[0, 5, 5, 0]} maxBarSize={10} />
-              <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
-            </BarChart>
-          </ResponsiveContainer>
+        <ChartCard title="Member Performance Ranking" subtitle="All members by productivity score">
+          <div className="overflow-y-auto" style={{ maxHeight: 240 }}>
+            <div style={{ height: Math.max(240, memberBarData.length * 28) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={memberBarData} layout="vertical" barCategoryGap="30%" margin={{ top: 4, right: 8, left: 40, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="tp-compl" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#34C759" stopOpacity={0.9} /><stop offset="100%" stopColor="#30D158" stopOpacity={0.8} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={40} />
+                  <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+                  <Bar dataKey="Score" fill="var(--apple-chart-color)" radius={[0, 5, 5, 0]} maxBarSize={10} />
+                  <Bar dataKey="Completion" fill="url(#tp-compl)" radius={[0, 5, 5, 0]} maxBarSize={10} />
+                  <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </ChartCard>
 
         {/* Line — tasks + hours over time */}

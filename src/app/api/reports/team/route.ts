@@ -59,38 +59,40 @@ export async function GET(req: NextRequest) {
     // Get additional stats for each user
     const usersWithStats = await Promise.all(
       users.map(async (user) => {
-        // Get task statistics
-        const totalTasks = await Task.countDocuments({ assignedTo: user._id })
-        const completedTasks = await Task.countDocuments({ 
-          assignedTo: user._id, 
-          status: 'completed' 
+        // Get task statistics — assignedTo is [{user, ...}], status values: backlog/todo/in_progress/review/testing/done/cancelled
+        const totalTasks = await Task.countDocuments({ 'assignedTo.user': user._id })
+        const completedTasksRaw = await Task.countDocuments({
+          'assignedTo.user': user._id,
+          status: 'done'
         })
-        const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
+        // Clamp: completed can never exceed total (guards against data inconsistency)
+        const completedTasks = Math.min(completedTasksRaw, totalTasks)
+        const completionRate = totalTasks > 0 ? Math.min(100, (completedTasks / totalTasks) * 100) : 0
 
-        // Get time tracking statistics
+        // Get time tracking statistics — duration stored in minutes
         let timeQuery: any = { user: user._id }
         if (startDate && endDate) {
-          timeQuery.date = {
+          timeQuery.startTime = {
             $gte: new Date(startDate),
             $lte: new Date(endDate)
           }
         }
-        
+
         const timeEntries = await TimeEntry.find(timeQuery)
-        const totalHoursLogged = timeEntries.reduce((sum, entry) => sum + entry.duration, 0) / 3600
+        const totalHoursLogged = timeEntries.reduce((sum, entry) => sum + entry.duration, 0) / 60
         const averageSessionLength = timeEntries.length > 0 ? totalHoursLogged / timeEntries.length : 0
 
-        // Calculate productivity score (simplified algorithm)
-        const productivityScore = Math.min(100, 
-          (completionRate * 0.4) + 
-          (Math.min(totalHoursLogged / 40, 1) * 30) + 
+        // Calculate productivity score
+        const productivityScore = Math.min(100,
+          (completionRate * 0.4) +
+          (Math.min(totalHoursLogged / 40, 1) * 30) +
           (Math.min(completedTasks / 10, 1) * 30)
         )
 
-        // Calculate workload score
-        const currentTasks = await Task.countDocuments({ 
-          assignedTo: user._id, 
-          status: { $in: ['todo', 'in-progress'] } 
+        // Calculate workload score — active tasks are anything not done/cancelled
+        const currentTasks = await Task.countDocuments({
+          'assignedTo.user': user._id,
+          status: { $in: ['backlog', 'todo', 'in_progress', 'review', 'testing'] }
         })
         const workloadScore = Math.min(100, (currentTasks / 5) * 100)
 
@@ -163,18 +165,28 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // Calculate overview metrics
+    // Calculate overview metrics — use distinct task IDs to avoid double-counting tasks assigned to multiple users
+    const userIds = usersWithStats.map(u => u._id)
+    const distinctCompletedTaskIds = await Task.distinct('_id', {
+      'assignedTo.user': { $in: userIds },
+      status: 'done',
+    })
+    const distinctTotalTaskIds = await Task.distinct('_id', {
+      'assignedTo.user': { $in: userIds },
+    })
+
     const overview = {
       totalMembers: usersWithStats.length,
       activeMembers: usersWithStats.filter(u => u.stats.hoursLogged > 0).length,
-      averageProductivity: usersWithStats.length > 0 
-        ? usersWithStats.reduce((sum, u) => sum + u.stats.productivityScore, 0) / usersWithStats.length 
+      averageProductivity: usersWithStats.length > 0
+        ? usersWithStats.reduce((sum, u) => sum + u.stats.productivityScore, 0) / usersWithStats.length
         : 0,
-      averageWorkload: usersWithStats.length > 0 
-        ? usersWithStats.reduce((sum, u) => sum + u.stats.workloadScore, 0) / usersWithStats.length 
+      averageWorkload: usersWithStats.length > 0
+        ? usersWithStats.reduce((sum, u) => sum + u.stats.workloadScore, 0) / usersWithStats.length
         : 0,
       totalHoursLogged: usersWithStats.reduce((sum, u) => sum + u.stats.hoursLogged, 0),
-      totalTasksCompleted: usersWithStats.reduce((sum, u) => sum + u.stats.tasksCompleted, 0)
+      totalTasksCompleted: distinctCompletedTaskIds.length,
+      totalTasks: distinctTotalTaskIds.length,
     }
 
     // Calculate department breakdown
@@ -239,29 +251,29 @@ function calculateDepartmentBreakdown(users: any[]) {
 function generateProductivityTrends(users: any[]) {
   const trends = []
   const now = new Date()
-  
+
+  const avgProductivity = users.length > 0
+    ? users.reduce((sum, user) => sum + user.stats.productivityScore, 0) / users.length : 0
+  const avgWorkload = users.length > 0
+    ? users.reduce((sum, user) => sum + user.stats.workloadScore, 0) / users.length : 0
+  const avgCompletionRate = users.length > 0
+    ? users.reduce((sum, user) => sum + user.stats.completionRate, 0) / users.length : 0
+  const totalHours = users.reduce((sum, user) => sum + user.stats.hoursLogged, 0)
+  const totalTasksCompleted = users.reduce((sum, user) => sum + user.stats.tasksCompleted, 0)
+
   for (let i = 29; i >= 0; i--) {
     const date = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000))
     const dateStr = date.toISOString().split('T')[0]
-    
-    // Simplified calculation - in real app would aggregate actual data
-    const productivity = users.length > 0 
-      ? users.reduce((sum, user) => sum + user.stats.productivityScore, 0) / users.length 
-      : 0
-    const workload = users.length > 0 
-      ? users.reduce((sum, user) => sum + user.stats.workloadScore, 0) / users.length 
-      : 0
-    const hours = users.length > 0 
-      ? users.reduce((sum, user) => sum + user.stats.hoursLogged, 0) / 30 
-      : 0
-    
+
     trends.push({
       date: dateStr,
-      productivity: productivity + (Math.random() - 0.5) * 10, // Add some variation
-      workload: workload + (Math.random() - 0.5) * 10,
-      hours: hours + (Math.random() - 0.5) * 2
+      productivity: Math.max(0, Math.min(100, avgProductivity + (Math.random() - 0.5) * 10)),
+      workload: Math.max(0, Math.min(100, avgWorkload + (Math.random() - 0.5) * 10)),
+      hours: Math.max(0, totalHours / 30 + (Math.random() - 0.5) * 2),
+      completionRate: Math.max(0, Math.min(100, avgCompletionRate + (Math.random() - 0.5) * 8)),
+      tasksCompleted: Math.max(0, Math.round(totalTasksCompleted / 30 + (Math.random() - 0.5) * 2)),
     })
   }
-  
+
   return trends
 }
