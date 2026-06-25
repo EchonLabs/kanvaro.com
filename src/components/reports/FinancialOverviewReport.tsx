@@ -102,8 +102,10 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
     Utilization: item.utilizationRate,
   }))
 
-  const budgetHealth = overview.budgetUtilization > 85
+  const budgetHealth = overview.budgetUtilization > 100
     ? { label: 'Over budget',       icon: AlertCircle,  color: '#FF453A' }
+    : overview.budgetUtilization > 85
+    ? { label: 'High utilization',  icon: AlertCircle,  color: '#FF9F0A' }
     : overview.budgetUtilization > 65
     ? { label: 'Approaching limit', icon: AlertCircle,  color: '#FF9F0A' }
     : { label: 'Healthy',           icon: CheckCircle2, color: '#34C759' }
@@ -141,7 +143,7 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
           {
             label: 'Remaining Budget',
             value: formatCurrency(overview.totalBudget - overview.totalSpent),
-            sub: `${(100 - overview.budgetUtilization).toFixed(1)}% available`,
+            sub: overview.totalBudget > 0 ? `${(100 - overview.budgetUtilization).toFixed(1)}% available` : 'No budget set',
             color: 'var(--apple-chart-color)',
             bar: null,
             barColor: null,
@@ -224,8 +226,8 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50}
                 tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
               <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Budgeted" fill="var(--apple-chart-color)"              radius={[6,6,0,0]} maxBarSize={32} />
-              <Bar dataKey="Spent"    fill="var(--apple-chart-color)" fillOpacity={0.45} radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Budgeted" fill="var(--apple-chart-color)" radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Spent"    fill="#FF453A"                  radius={[6,6,0,0]} maxBarSize={32} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </BarChart>
           </ResponsiveContainer>
@@ -236,8 +238,8 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={utilizationData} barCategoryGap="35%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, 100]} />
-              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, (dataMax: number) => Math.max(100, Math.ceil(dataMax / 10) * 10)]} />
+              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${Number(v).toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
               <Bar dataKey="Utilization" fill="var(--apple-chart-color)" radius={[6,6,0,0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>

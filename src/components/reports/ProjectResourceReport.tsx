@@ -87,12 +87,13 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
     Hours: p.stats.timeTracking.totalHours,
   }))
 
-  const budgetPieData = projects.map((p, i) => ({
-    name: p.name.length > 16 ? p.name.slice(0, 16) + '…' : p.name,
-    value: p.stats.budget.total,
-    fill: APPLE_COLORS[i % APPLE_COLORS.length],
-    percent: 0,
-  }))
+  const budgetPieData = projects
+    .map((p, i) => ({
+      name: p.name.length > 16 ? p.name.slice(0, 16) + '…' : p.name,
+      value: p.stats.budget.total,
+      fill: APPLE_COLORS[i % APPLE_COLORS.length],
+    }))
+    .filter(d => d.value > 0)
 
   return (
     <div className="space-y-6">

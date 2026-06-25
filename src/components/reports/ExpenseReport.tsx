@@ -15,6 +15,7 @@ interface ExpenseReportProps {
   budgetBreakdown: {
     category: string; budgeted: number; spent: number; remaining: number; utilizationRate: number
   }[]
+  totalSpent: number
   filters: any
 }
 
@@ -67,12 +68,12 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle?: st
   )
 }
 
-export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: ExpenseReportProps) {
+export function ExpenseReport({ topExpenses, budgetBreakdown, totalSpent, filters }: ExpenseReportProps) {
   const { formatCurrency } = useOrgCurrency()
   const { formatDate } = useDateTime()
 
-  const totalExpenses = topExpenses.reduce((s, e) => s + e.amount, 0)
-  const avgExpense = topExpenses.length > 0 ? totalExpenses / topExpenses.length : 0
+  const topExpensesTotal = topExpenses.reduce((s, e) => s + e.amount, 0)
+  const avgExpense = topExpenses.length > 0 ? topExpensesTotal / topExpenses.length : 0
   const highestExpense = topExpenses.length > 0 ? Math.max(...topExpenses.map(e => e.amount)) : 0
 
   const pieData = budgetBreakdown.map((item, i) => ({
@@ -99,7 +100,7 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
       {/* ── Stats Strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Expenses',    value: formatCurrency(totalExpenses),  sub: 'Across all categories', color: '#FF453A' },
+          { label: 'Total Expenses',    value: formatCurrency(totalSpent),      sub: 'Across all categories', color: '#FF453A' },
           { label: 'Average Expense',   value: formatCurrency(avgExpense),     sub: 'Per transaction',       color: '#FF9500' },
           { label: 'Highest Expense',   value: formatCurrency(highestExpense), sub: 'Single transaction',    color: 'var(--apple-chart-color)' },
           { label: 'Total Transactions',value: String(topExpenses.length),     sub: 'Expense entries',       color: 'var(--apple-chart-color)' },
@@ -163,10 +164,10 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
 
         {/* Utilization heatmap-style bars */}
         <ChartCard title="Budget Utilization" subtitle="Percentage of budget used per category">
-          <div className="space-y-3 mt-1">
+          <div className="space-y-3 mt-1 max-h-[220px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-[var(--apple-tertiary-fill)] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--apple-separator)]">
             {budgetBreakdown.map((cat, i) => {
-              const pct = Math.min(100, cat.utilizationRate)
-              const color = pct > 85 ? '#FF453A' : pct > 65 ? '#FF9F0A' : '#34C759'
+              const barPct = Math.min(100, cat.utilizationRate)
+              const color = cat.utilizationRate > 100 ? '#FF453A' : cat.utilizationRate > 85 ? '#FF9F0A' : cat.utilizationRate > 65 ? '#FF9F0A' : '#34C759'
               return (
                 <div key={cat.category} className="space-y-1">
                   <div className="flex items-center justify-between text-[13px]">
@@ -174,10 +175,10 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
                       <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: APPLE_COLORS[i % APPLE_COLORS.length] }} />
                       <span className="font-medium">{cat.category}</span>
                     </div>
-                    <span className="font-semibold font-apple-mono" style={{ color }}>{pct.toFixed(0)}%</span>
+                    <span className="font-semibold font-apple-mono" style={{ color }}>{cat.utilizationRate.toFixed(0)}%</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${barPct}%`, backgroundColor: color }} />
                   </div>
                 </div>
               )
