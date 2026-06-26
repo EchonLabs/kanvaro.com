@@ -168,13 +168,6 @@ function ActivityRow({ activity, formatTimestamp }: { activity: ActivityItem; fo
             <Activity className="h-4 w-4 text-[var(--apple-tertiary-label)]" />
           </div>
         )}
-        {/* Action icon badge */}
-        <div
-          className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center border-[1.5px] border-card"
-          style={{ background: config.bg, color: config.color }}
-        >
-          <ActionIcon className="h-2.5 w-2.5" />
-        </div>
       </div>
 
       {/* Content */}
