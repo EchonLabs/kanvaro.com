@@ -139,7 +139,7 @@ export function TeamWorkloadReport({ members, departmentBreakdown = [], workload
                   <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, 100]} />
                   <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-                  <Bar dataKey="Workload" fill="var(--apple-chart-color)" radius={[5, 5, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="Workload" fill="#007AFF" radius={[5, 5, 0, 0]} maxBarSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -156,8 +156,8 @@ export function TeamWorkloadReport({ members, departmentBreakdown = [], workload
                     <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} allowDecimals={false} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={44} />
                     <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v} tasks`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-                    <Bar dataKey="Done"      stackId="tasks" fill="#34C759"                  fillOpacity={0.85} radius={[0, 0, 0, 0]} maxBarSize={14} />
-                    <Bar dataKey="Remaining" stackId="tasks" fill="var(--apple-chart-color)" fillOpacity={0.45} radius={[0, 4, 4, 0]} maxBarSize={14} />
+                    <Bar dataKey="Done"      stackId="tasks" fill="#34C759" radius={[0, 0, 0, 0]} maxBarSize={14} />
+                    <Bar dataKey="Remaining" stackId="tasks" fill="#FF9500" radius={[0, 4, 4, 0]} maxBarSize={14} />
                     <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -204,7 +204,7 @@ export function TeamWorkloadReport({ members, departmentBreakdown = [], workload
                       </div>
                     </div>
                     <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: 'var(--apple-chart-color)' }} />
+                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: tier.color }} />
                     </div>
                   </div>
                 )
@@ -228,7 +228,7 @@ export function TeamWorkloadReport({ members, departmentBreakdown = [], workload
                   </Avatar>
                   <p className="text-[12px] font-medium w-24 truncate flex-shrink-0">{m.firstName} {m.lastName.charAt(0)}.</p>
                   <div className="flex-1 h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: 'var(--apple-chart-color)' }} />
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: '#BF5AF2' }} />
                   </div>
                   <span className="text-[11px] font-semibold font-apple-mono text-[var(--apple-secondary-label)] w-10 text-right flex-shrink-0">
                     {m.stats.totalTasks}
