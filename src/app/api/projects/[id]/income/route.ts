@@ -104,6 +104,8 @@ export async function POST(
       utilizableBudget,
       approvedDate,
       actualStartDate,
+      paidStatus,
+      receivedBy,
       attachments
     } = body || {}
 
@@ -172,6 +174,15 @@ export async function POST(
       }
     }
 
+    const normalizedPaidStatus = paidStatus === 'paid' ? 'paid' : 'unpaid'
+    const normalizedReceivedBy = normalizedPaidStatus === 'paid' && typeof receivedBy === 'string' && receivedBy.trim()
+      ? receivedBy.trim()
+      : undefined
+
+    if (normalizedPaidStatus === 'paid' && !normalizedReceivedBy) {
+      return NextResponse.json({ error: 'Received By is required when status is Paid' }, { status: 400 })
+    }
+
     const income = new ProjectIncome({
       project: params.id,
       organization: user.organization,
@@ -182,6 +193,8 @@ export async function POST(
       utilizableBudget: numericBudget,
       approvedDate: parsedApprovedDate,
       actualStartDate: parsedActualStartDate,
+      paidStatus: normalizedPaidStatus,
+      receivedBy: normalizedReceivedBy,
       attachments: processedAttachments,
       addedBy: user.id
     })
@@ -240,6 +253,8 @@ export async function PUT(
       utilizableBudget,
       approvedDate,
       actualStartDate,
+      paidStatus,
+      receivedBy,
       attachments
     } = body || {}
 
@@ -320,6 +335,15 @@ export async function PUT(
       return NextResponse.json({ error: 'Access denied to income' }, { status: 403 })
     }
 
+    const normalizedPaidStatus = paidStatus === 'paid' ? 'paid' : 'unpaid'
+    const normalizedReceivedBy = normalizedPaidStatus === 'paid' && typeof receivedBy === 'string' && receivedBy.trim()
+      ? receivedBy.trim()
+      : undefined
+
+    if (normalizedPaidStatus === 'paid' && !normalizedReceivedBy) {
+      return NextResponse.json({ error: 'Received By is required when status is Paid' }, { status: 400 })
+    }
+
     income.invoiceNumber = String(invoiceNumber).trim()
     income.category = normalizedCategory
     income.subCategory = normalizedCategory === 'invoice' ? normalizedSubCategory : undefined
@@ -327,6 +351,8 @@ export async function PUT(
     income.utilizableBudget = numericBudget
     income.approvedDate = parsedApprovedDate
     income.actualStartDate = parsedActualStartDate
+    income.paidStatus = normalizedPaidStatus
+    income.receivedBy = normalizedReceivedBy
     income.attachments = processedAttachments
 
     await income.save()
@@ -334,6 +360,64 @@ export async function PUT(
     return NextResponse.json({ success: true, data: income })
   } catch (error) {
     console.error('Update project income error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectDB()
+
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    }
+
+    const { user } = authResult
+    const userId = user.id
+
+    const project = await Project.findById(params.id).select('organization')
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    if (project.organization?.toString() !== user.organization?.toString()) {
+      return NextResponse.json({ error: 'Access denied to project' }, { status: 403 })
+    }
+
+    const hasProjectAccess = await PermissionService.canAccessProject(userId, params.id)
+    if (!hasProjectAccess) {
+      return NextResponse.json({ error: 'Insufficient access to project' }, { status: 403 })
+    }
+
+    const canDeleteIncome = await PermissionService.hasPermission(userId, Permission.FINANCIAL_CREATE_INCOME, params.id)
+    if (!canDeleteIncome) {
+      return NextResponse.json({ error: 'Insufficient permissions to delete income' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const incomeId = searchParams.get('incomeId')
+    if (!incomeId) {
+      return NextResponse.json({ error: 'Income ID is required' }, { status: 400 })
+    }
+
+    const income = await ProjectIncome.findOne({ _id: incomeId, project: params.id })
+    if (!income) {
+      return NextResponse.json({ error: 'Income not found' }, { status: 404 })
+    }
+
+    if (income.organization?.toString() !== user.organization?.toString()) {
+      return NextResponse.json({ error: 'Access denied to income' }, { status: 403 })
+    }
+
+    await income.deleteOne()
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Delete project income error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
