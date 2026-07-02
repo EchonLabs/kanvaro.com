@@ -138,6 +138,22 @@ function truncateText(value: string, maxLength = 20): string {
   return `${value.slice(0, maxLength - 1)}…`
 }
 
+// Module-level store: survives client-side navigation, resets on full page reload
+const _backlogFilters = {
+  searchQuery: '',
+  typeFilter: 'all',
+  priorityFilter: 'all',
+  statusFilter: 'all',
+  sortBy: 'created',
+  sortOrder: 'desc' as 'asc' | 'desc',
+  projectFilterValue: 'all',
+  assignedToFilter: 'all',
+  assignedByFilter: 'all',
+  createdByFilter: 'all',
+  dateRangeFilter: undefined as DateRange | undefined,
+  createdDateRange: { from: undefined, to: undefined } as { from: Date | undefined; to: Date | undefined },
+}
+
 export default function BacklogPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
 
@@ -181,8 +197,8 @@ export default function BacklogPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [selectedForDelete, setSelectedForDelete] = useState<{ id: string; type: BacklogItem['type']; title: string } | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(_backlogFilters.searchQuery)
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(_backlogFilters.searchQuery)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Helper function to focus filter search inputs
@@ -211,11 +227,11 @@ export default function BacklogPage() {
   const assignedByFilterInputRef = useRef<HTMLInputElement | null>(null)
   const createdByFilterInputRef = useRef<HTMLInputElement | null>(null)
 
-  const [typeFilter, setTypeFilter] = useState('all')
-  const [priorityFilter, setPriorityFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('created')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [typeFilter, setTypeFilter] = useState(_backlogFilters.typeFilter)
+  const [priorityFilter, setPriorityFilter] = useState(_backlogFilters.priorityFilter)
+  const [statusFilter, setStatusFilter] = useState(_backlogFilters.statusFilter)
+  const [sortBy, setSortBy] = useState(_backlogFilters.sortBy)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(_backlogFilters.sortOrder)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
   const [selectedStoryIds, setSelectedStoryIds] = useState<string[]>([])
@@ -244,16 +260,13 @@ export default function BacklogPage() {
   const [assignedByOptions, setAssignedByOptions] = useState<UserSummary[]>([])
   const [createdByOptions, setCreatedByOptions] = useState<UserSummary[]>([])
   const [epicMap, setEpicMap] = useState<Map<string, { _id: string; title: string }>>(new Map())
-  const [projectFilterValue, setProjectFilterValue] = useState('all')
-  const [assignedToFilter, setAssignedToFilter] = useState('all')
-  const [assignedByFilter, setAssignedByFilter] = useState('all')
-  const [createdByFilter, setCreatedByFilter] = useState('all')
+  const [projectFilterValue, setProjectFilterValue] = useState(_backlogFilters.projectFilterValue)
+  const [assignedToFilter, setAssignedToFilter] = useState(_backlogFilters.assignedToFilter)
+  const [assignedByFilter, setAssignedByFilter] = useState(_backlogFilters.assignedByFilter)
+  const [createdByFilter, setCreatedByFilter] = useState(_backlogFilters.createdByFilter)
   const [createdByFilterQuery, setCreatedByFilterQuery] = useState('')
-  const [createdDateRange, setCreatedDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
-    from: undefined,
-    to: undefined
-  })
-  const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>()
+  const [createdDateRange, setCreatedDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>(_backlogFilters.createdDateRange)
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>(_backlogFilters.dateRangeFilter)
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -311,6 +324,22 @@ export default function BacklogPage() {
     setCreatedByFilterQuery('')
   }
 
+
+  // Sync filter state back to module-level store so it survives navigation
+  useEffect(() => {
+    _backlogFilters.searchQuery = searchQuery
+    _backlogFilters.typeFilter = typeFilter
+    _backlogFilters.priorityFilter = priorityFilter
+    _backlogFilters.statusFilter = statusFilter
+    _backlogFilters.sortBy = sortBy
+    _backlogFilters.sortOrder = sortOrder
+    _backlogFilters.projectFilterValue = projectFilterValue
+    _backlogFilters.assignedToFilter = assignedToFilter
+    _backlogFilters.assignedByFilter = assignedByFilter
+    _backlogFilters.createdByFilter = createdByFilter
+    _backlogFilters.dateRangeFilter = dateRangeFilter
+    _backlogFilters.createdDateRange = createdDateRange
+  }, [searchQuery, typeFilter, priorityFilter, statusFilter, sortBy, sortOrder, projectFilterValue, assignedToFilter, assignedByFilter, createdByFilter, dateRangeFilter, createdDateRange])
 
   // Auth initialization - trigger data loading
   useEffect(() => {
@@ -580,12 +609,27 @@ export default function BacklogPage() {
     })
   }
 
+  // Project shared by whatever is currently selected in Select Mode (null if nothing selected yet)
+  const getSelectedProjectId = useCallback(() => {
+    const selectedItem = backlogItems.find(
+      (item) =>
+        (item.type === 'task' && selectedTaskIds.includes(item._id)) ||
+        (item.type === 'story' && selectedStoryIds.includes(item._id))
+    )
+    return selectedItem?.project?._id ?? null
+  }, [backlogItems, selectedTaskIds, selectedStoryIds])
+
   const setTaskSelected = (taskId: string, shouldSelect: boolean) => {
     // Prevent selecting tasks that are already in a sprint
     if (shouldSelect) {
       const task = backlogItems.find(item => item.type === 'task' && item._id === taskId)
       if (task && task.sprint) {
         return // Don't allow selection if task is already in a sprint
+      }
+      const selectedProjectId = getSelectedProjectId()
+      if (selectedProjectId && task?.project?._id !== selectedProjectId) {
+        notifyError({ title: 'Different Project', message: 'Select items from one project only.' })
+        return
       }
     }
     setSelectedTaskIds((prev) => {
@@ -605,6 +649,11 @@ export default function BacklogPage() {
       const story = backlogItems.find(item => item.type === 'story' && item._id === storyId)
       if (story && story.sprint) {
         return // Don't allow selection if story is already in a sprint
+      }
+      const selectedProjectId = getSelectedProjectId()
+      if (selectedProjectId && story?.project?._id !== selectedProjectId) {
+        notifyError({ title: 'Different Project', message: 'Select items from one project only.' })
+        return
       }
     }
     setSelectedStoryIds((prev) => {
@@ -1088,6 +1137,24 @@ export default function BacklogPage() {
       return
     }
 
+    // Defense in depth: ensure every item being assigned belongs to the sprint's project
+    const involvedProjectIds = new Set<string>()
+    taskIdsForSprint.forEach((taskId) => {
+      const task = backlogItems.find((item) => item.type === 'task' && item._id === taskId)
+      if (task?.project?._id) involvedProjectIds.add(task.project._id)
+    })
+    storyIdsForSprint.forEach((storyId) => {
+      const story = backlogItems.find((item) => item.type === 'story' && item._id === storyId)
+      if (story?.project?._id) involvedProjectIds.add(story.project._id)
+    })
+    tasksFromStories.forEach((task) => {
+      if (task.project?._id) involvedProjectIds.add(task.project._id)
+    })
+    if (involvedProjectIds.size > 1 || (sprint.project?._id && involvedProjectIds.size === 1 && !involvedProjectIds.has(sprint.project._id))) {
+      setSprintsError('Selected items must all belong to the sprint\'s project.')
+      return
+    }
+
     setAssigningSprint(true)
     setSprintsError('')
 
@@ -1498,9 +1565,21 @@ export default function BacklogPage() {
     const newTaskIds: string[] = [...selectedTaskIds]
     const newStoryIds: string[] = [...selectedStoryIds]
 
+    // Lock to a single project: whatever is already selected, or the first
+    // selectable item on the page if nothing is selected yet.
+    let lockedProjectId = getSelectedProjectId()
+    let skippedOtherProject = false
+
     // displayedItems is already the current page only (from API pagination)
     displayedItems.forEach((item) => {
       if ((item.type === 'task' || item.type === 'story') && !item.sprint) {
+        if (!lockedProjectId) {
+          lockedProjectId = item.project?._id ?? null
+        }
+        if (lockedProjectId && item.project?._id !== lockedProjectId) {
+          skippedOtherProject = true
+          return
+        }
         if (item.type === 'task' && !newTaskIds.includes(item._id)) {
           newTaskIds.push(item._id)
         } else if (item.type === 'story' && !newStoryIds.includes(item._id)) {
@@ -1511,6 +1590,10 @@ export default function BacklogPage() {
 
     setSelectedTaskIds(newTaskIds)
     setSelectedStoryIds(newStoryIds)
+
+    if (skippedOtherProject) {
+      notifyError({ title: 'Different Project', message: 'Other-project items were skipped.' })
+    }
   }
 
   const deselectAll = () => {
