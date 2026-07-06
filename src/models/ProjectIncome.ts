@@ -5,7 +5,8 @@ export interface IProjectIncome extends Document {
   organization: mongoose.Types.ObjectId
   invoiceNumber: string
   category: 'invoice' | 'consulting' | 'other'
-  subCategory?: 'amc' | 'cr'
+  subCategory?: 'amc' | 'cr' | 'other'
+  customSubCategory?: string
   description: string
   utilizableBudget: number
   approvedDate?: Date
@@ -49,7 +50,12 @@ const ProjectIncomeSchema = new Schema<IProjectIncome>({
   },
   subCategory: {
     type: String,
-    enum: ['amc', 'cr']
+    enum: ['amc', 'cr', 'other']
+  },
+  customSubCategory: {
+    type: String,
+    trim: true,
+    maxlength: 200
   },
   description: {
     type: String,

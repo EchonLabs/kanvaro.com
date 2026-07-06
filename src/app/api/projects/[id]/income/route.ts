@@ -100,6 +100,7 @@ export async function POST(
       invoiceNumber,
       category,
       subCategory,
+      customSubCategory,
       description,
       utilizableBudget,
       approvedDate,
@@ -120,9 +121,17 @@ export async function POST(
 
     const normalizedSubCategory = typeof subCategory === 'string' ? subCategory.toLowerCase() : undefined
     if (normalizedCategory === 'invoice') {
-      if (!normalizedSubCategory || !['amc', 'cr'].includes(normalizedSubCategory)) {
+      if (!normalizedSubCategory || !['amc', 'cr', 'other'].includes(normalizedSubCategory)) {
         return NextResponse.json({ error: 'Sub Category is required for Invoice category' }, { status: 400 })
       }
+    }
+
+    const normalizedCustomSubCategory = typeof customSubCategory === 'string'
+      ? customSubCategory.trim()
+      : ''
+
+    if (normalizedCategory === 'invoice' && normalizedSubCategory === 'other' && !normalizedCustomSubCategory) {
+      return NextResponse.json({ error: 'Custom sub category is required when Sub Category is Other' }, { status: 400 })
     }
 
     const numericBudget = Number(utilizableBudget)
@@ -189,6 +198,10 @@ export async function POST(
       invoiceNumber: String(invoiceNumber).trim(),
       category: normalizedCategory,
       subCategory: normalizedCategory === 'invoice' ? normalizedSubCategory : undefined,
+      customSubCategory:
+        normalizedCategory === 'invoice' && normalizedSubCategory === 'other'
+          ? normalizedCustomSubCategory
+          : undefined,
       description: String(description).trim(),
       utilizableBudget: numericBudget,
       approvedDate: parsedApprovedDate,
@@ -249,6 +262,7 @@ export async function PUT(
       invoiceNumber,
       category,
       subCategory,
+      customSubCategory,
       description,
       utilizableBudget,
       approvedDate,
@@ -273,9 +287,17 @@ export async function PUT(
 
     const normalizedSubCategory = typeof subCategory === 'string' ? subCategory.toLowerCase() : undefined
     if (normalizedCategory === 'invoice') {
-      if (!normalizedSubCategory || !['amc', 'cr'].includes(normalizedSubCategory)) {
+      if (!normalizedSubCategory || !['amc', 'cr', 'other'].includes(normalizedSubCategory)) {
         return NextResponse.json({ error: 'Sub Category is required for Invoice category' }, { status: 400 })
       }
+    }
+
+    const normalizedCustomSubCategory = typeof customSubCategory === 'string'
+      ? customSubCategory.trim()
+      : ''
+
+    if (normalizedCategory === 'invoice' && normalizedSubCategory === 'other' && !normalizedCustomSubCategory) {
+      return NextResponse.json({ error: 'Custom sub category is required when Sub Category is Other' }, { status: 400 })
     }
 
     const numericBudget = Number(utilizableBudget)
@@ -347,6 +369,9 @@ export async function PUT(
     income.invoiceNumber = String(invoiceNumber).trim()
     income.category = normalizedCategory
     income.subCategory = normalizedCategory === 'invoice' ? normalizedSubCategory : undefined
+    income.customSubCategory = normalizedCategory === 'invoice' && normalizedSubCategory === 'other'
+      ? normalizedCustomSubCategory
+      : undefined
     income.description = String(description).trim()
     income.utilizableBudget = numericBudget
     income.approvedDate = parsedApprovedDate

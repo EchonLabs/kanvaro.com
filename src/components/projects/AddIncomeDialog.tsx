@@ -13,7 +13,7 @@ import { useNotify } from '@/lib/notify'
 import { MemberPickerDialog } from './MemberPickerDialog'
 
 type IncomeCategory = 'invoice' | 'consulting' | 'other'
-type IncomeSubCategory = 'amc' | 'cr'
+type IncomeSubCategory = 'amc' | 'cr' | 'other'
 type IncomePaidStatus = 'paid' | 'unpaid'
 
 type IncomeInput = {
@@ -21,6 +21,7 @@ type IncomeInput = {
   invoiceNumber?: string
   category?: IncomeCategory
   subCategory?: IncomeSubCategory
+  customSubCategory?: string
   description?: string
   utilizableBudget?: number
   approvedDate?: string | Date
@@ -66,6 +67,7 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
     invoiceNumber: '',
     category: '' as IncomeCategory | '',
     subCategory: '' as IncomeSubCategory | '',
+    customSubCategory: '',
     description: '',
     utilizableBudget: '',
     approvedDate: '',
@@ -93,6 +95,7 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
       invoiceNumber: isEditing ? String(income?.invoiceNumber || '') : '',
       category: isEditing ? (income?.category || '') : '',
       subCategory: isEditing ? (income?.subCategory || '') : '',
+      customSubCategory: isEditing ? String(income?.customSubCategory || '') : '',
       description: isEditing ? String(income?.description || '') : '',
       utilizableBudget:
         isEditing && income?.utilizableBudget !== undefined && income?.utilizableBudget !== null
@@ -138,6 +141,7 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
     formData.utilizableBudget !== '' &&
     formData.approvedDate !== '' &&
     (!isInvoiceCategory || formData.subCategory !== '') &&
+    (formData.subCategory !== 'other' || formData.customSubCategory.trim() !== '') &&
     (formData.paidStatus !== 'paid' || formData.receivedBy.trim() !== '')
 
   const handleFileUpload = async (files: FileList) => {
@@ -226,6 +230,9 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
           invoiceNumber: formData.invoiceNumber.trim(),
           category: formData.category,
           subCategory: isInvoiceCategory ? formData.subCategory : undefined,
+          customSubCategory: isInvoiceCategory && formData.subCategory === 'other'
+            ? formData.customSubCategory.trim()
+            : undefined,
           description: formData.description,
           utilizableBudget: parseFloat(formData.utilizableBudget),
           approvedDate: formData.approvedDate,
@@ -313,7 +320,8 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
                   setFormData(prev => ({
                     ...prev,
                     category: value,
-                    subCategory: value === 'invoice' ? prev.subCategory : ''
+                      subCategory: value === 'invoice' ? prev.subCategory : '',
+                      customSubCategory: value === 'invoice' ? prev.customSubCategory : ''
                   }))
                 }}
               >
@@ -334,7 +342,11 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
               <Label htmlFor="subCategory">Sub Category <span className="text-destructive">*</span></Label>
               <Select
                 value={formData.subCategory}
-                onValueChange={(value: IncomeSubCategory) => setFormData(prev => ({ ...prev, subCategory: value }))}
+                onValueChange={(value: IncomeSubCategory) => setFormData(prev => ({
+                  ...prev,
+                  subCategory: value,
+                  customSubCategory: value === 'other' ? prev.customSubCategory : ''
+                }))}
               >
                 <SelectTrigger id="subCategory">
                   <SelectValue placeholder="Select sub category" />
@@ -342,8 +354,22 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
                 <SelectContent>
                   <SelectItem value="amc">AMC (Annual Maintenance Cost)</SelectItem>
                   <SelectItem value="cr">CR</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {isInvoiceCategory && formData.subCategory === 'other' && (
+            <div className="space-y-2">
+              <Label htmlFor="customSubCategory">Custom Sub Category <span className="text-destructive">*</span></Label>
+              <Input
+                id="customSubCategory"
+                value={formData.customSubCategory}
+                onChange={(e) => setFormData(prev => ({ ...prev, customSubCategory: e.target.value }))}
+                placeholder="Enter custom sub category"
+                required
+              />
             </div>
           )}
 

@@ -184,7 +184,7 @@ type ProjectTask = {
 }
 
 type IncomeCategory = 'invoice' | 'consulting' | 'other'
-type IncomeSubCategory = 'amc' | 'cr'
+type IncomeSubCategory = 'amc' | 'cr' | 'other'
 
 type IncomeAttachment = {
   name: string
@@ -200,6 +200,7 @@ type Income = {
   invoiceNumber?: string
   category?: IncomeCategory
   subCategory?: IncomeSubCategory
+  customSubCategory?: string
   description?: string
   utilizableBudget?: number
   approvedDate?: string | Date
@@ -1706,7 +1707,9 @@ export default function ProjectDetailPage() {
                             ? 'AMC (Annual Maintenance Cost)'
                             : income.subCategory === 'cr'
                               ? 'CR'
-                              : undefined
+                              : income.subCategory === 'other'
+                                ? (income.customSubCategory?.trim() || 'Other')
+                                : undefined
 
                           return (
                             <Card key={income._id} className="hover:shadow-md transition-shadow flex flex-col">
