@@ -477,7 +477,8 @@ export default function TimerPage() {
         assignedTo: user.id,
         limit: '10',
         page: String(page),
-        minimal: 'true'
+        minimal: 'true',
+        excludeStatus: 'backlog,done,cancelled'
       })
       if (search && search.trim()) {
         params.set('search', search.trim())
