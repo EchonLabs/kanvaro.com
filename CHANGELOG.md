@@ -1,3 +1,25 @@
+# [1.41.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.40.1...v1.41.0) (2026-07-07)
+
+
+### Bug Fixes
+
+* add excludeStatus filter to task retrieval and update TimerPage parameters ([c44e87a](https://github.com/EchonLabs/kanvaro.com/commit/c44e87a988b26698cec12cad925d573a5b59d2ea))
+* enhance income handling by adding custom subcategory support and validation ([51d8c04](https://github.com/EchonLabs/kanvaro.com/commit/51d8c04b35136ac325c0a957c12d182b8b9d14fd))
+* income and expenses logic in project budget tab ([2fb29aa](https://github.com/EchonLabs/kanvaro.com/commit/2fb29aa5580f5801324099d4214ab438d3ea47a8))
+* logic related to financial reports and related sub pages ([5f55bfc](https://github.com/EchonLabs/kanvaro.com/commit/5f55bfcee34837fabfff7a833be0a42854a2cd6d))
+* persistent data in filters and incorrect Backlog sprint task addition ([835da7c](https://github.com/EchonLabs/kanvaro.com/commit/835da7c993acd6893105b52ee1c9c4f800fc9cbe))
+* project backlog incorrect stat and info cards ([2446e15](https://github.com/EchonLabs/kanvaro.com/commit/2446e155ccf64693fc8f945bce79b2f29cd42bd9))
+* reworked logic on all four sub pages of Team Reports page ([621d5bc](https://github.com/EchonLabs/kanvaro.com/commit/621d5bc016aeb82e5a4c2c0594c41817c87a3117))
+* reworked the logic of the team tab to restrict Team members and QAs from removing members from the project ([d254674](https://github.com/EchonLabs/kanvaro.com/commit/d2546747aff5b749359f0a3ac8c12e14665bec8b))
+* sprint completion and task transfer logic ([d0ba516](https://github.com/EchonLabs/kanvaro.com/commit/d0ba516a09893e5ebb2c946790f5d41514b4b9a3))
+* update excludeStatus filter in TimerPage to remove backlog status ([4c5e4de](https://github.com/EchonLabs/kanvaro.com/commit/4c5e4de7407e684fab6679d4d8006987f20c464d))
+
+
+### Features
+
+* add example configuration file and remove existing config ([fbcabf2](https://github.com/EchonLabs/kanvaro.com/commit/fbcabf27ac13acd71e693df526b9a6076c8ca834))
+* enhance configuration management with environment variables support ([fe438e8](https://github.com/EchonLabs/kanvaro.com/commit/fe438e888a9641aaaef3adaed2e8499bdefc705a))
+
 ## [1.40.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.40.0...v1.40.1) (2026-06-24)
 
 
