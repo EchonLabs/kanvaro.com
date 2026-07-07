@@ -259,7 +259,7 @@ export function EditStandupScheduleModal({
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
                     {selectedDate ? format(selectedDate, 'PPP') : 'Pick a date'}
                   </Button>
                 </PopoverTrigger>
@@ -416,7 +416,7 @@ export function EditStandupScheduleModal({
                                 onClick={() => handleRemoveTaskRow(member._id, row.id)}
                                 className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" strokeWidth={1.5} />
                               </Button>
                             </div>
                           )
@@ -429,7 +429,7 @@ export function EditStandupScheduleModal({
                         onClick={() => handleAddTaskRow(member._id)}
                         className="w-full sm:w-fit py-1.5 h-auto text-sm flex items-center justify-center gap-1.5 mt-2"
                       >
-                        <Plus className="h-3.5 w-3.5" />
+                        <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
                         Add Task Card
                       </Button>
                     </div>
@@ -461,7 +461,7 @@ export function EditStandupScheduleModal({
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={submitting} className="min-w-28">
-            {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Save Changes'}
+            {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.5} /> : 'Save Changes'}
           </Button>
         </DialogFooter>
       </DialogContent>

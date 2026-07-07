@@ -36,7 +36,8 @@ import {
   Edit,
   GripVertical,
   X,
-  Layers
+  Layers,
+  RotateCcw
 } from 'lucide-react'
 import { Permission } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
@@ -46,6 +47,13 @@ import { usePermissions } from '@/lib/permissions/permission-context'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import { extractUserId } from '@/lib/auth/user-utils'
 import { useNotify } from '@/lib/notify'
+import { cn } from '@/lib/utils'
+import {
+  StatusBadge, PriorityBadge, TypeBadge,
+  PageHeader, TasksEmptyState, TasksLoadingSkeleton,
+  PaginationBar, MetaChip, InlineLoader, FullPageLoader,
+  cardShell, cardHover
+} from '@/components/tasks/TasksShared'
 
 interface UserSummary {
   _id?: string
@@ -527,12 +535,12 @@ export default function StoriesPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'backlog': return <List className="h-4 w-4" />
-      case 'todo': return <Target className="h-4 w-4" />
-      case 'inprogress': return <Play className="h-4 w-4" />
-      case 'done': return <CheckCircle className="h-4 w-4" />
-      case 'cancelled': return <XCircle className="h-4 w-4" />
-      default: return <Target className="h-4 w-4" />
+      case 'backlog': return <List className="h-4 w-4" strokeWidth={1.5} />
+      case 'todo': return <Target className="h-4 w-4" strokeWidth={1.5} />
+      case 'inprogress': return <Play className="h-4 w-4" strokeWidth={1.5} />
+      case 'done': return <CheckCircle className="h-4 w-4" strokeWidth={1.5} />
+      case 'cancelled': return <XCircle className="h-4 w-4" strokeWidth={1.5} />
+      default: return <Target className="h-4 w-4" strokeWidth={1.5} />
     }
   }
 
@@ -603,367 +611,444 @@ export default function StoriesPage() {
   if (loading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading stories...</p>
-          </div>
-        </div>
+        <FullPageLoader label="Loading stories..." />
       </MainLayout>
     )
   }
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden ">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">User Stories</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">Manage your user stories and requirements</p>
-          </div>
-          <PermissionGate permission={Permission.STORY_CREATE}>
-            <Button onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Story
-            </Button>
-          </PermissionGate>
-        </div>
+      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300 min-h-full">
 
+        {/* Page Header */}
+        <PageHeader
+          title="User Stories"
+          subtitle="Manage your user stories and requirements"
+          icon={BookOpen}
+          actions={
+            <PermissionGate permission={Permission.STORY_CREATE}>
+              <Button
+                onClick={() => router.push('/stories/create-story')}
+                className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
+              >
+                <Plus className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                New Story
+              </Button>
+            </PermissionGate>
+          }
+        />
 
-        {/* Search and Filters */}
-        <div className="space-y-3">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search stories..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-full"
-            />
-          </div>
-          {/* Filter options - responsive grid layout 3-4 filters per line */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            <Select value={statusFilter} onValueChange={setStatusFilter} onOpenChange={(open) => {
-              if (open) focusSearchInput(statusSearchInputRef.current)
-            }}>
-              <SelectTrigger className="w-full">
+        {/* Filter Toolbar */}
+        <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3 sm:p-4 space-y-2 sm:space-y-3">
+          {/* Row 1: Search + Status + Priority */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            {/* Search */}
+            <div className="relative flex-[2]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+              <input
+                placeholder="Search stories..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {/* Status */}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="flex-1 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent>
-                <Input
-                  ref={statusSearchInputRef}
-                  placeholder="Search status..."
-                  className="m-2"
-                  value={statusSearch}
-                  onChange={e => {
-                    setStatusSearch(e.target.value.toLowerCase());
-                  }}
-                  onClick={e => e.stopPropagation()}
-                  onKeyDown={e => e.stopPropagation()}
-                />
-                {statusOptions.filter(opt => opt.label.toLowerCase().includes(statusSearch)).map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="max-h-56 overflow-y-auto">
+                    {statusOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </div>
+                </div>
               </SelectContent>
             </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter} onOpenChange={(open) => {
-              if (open) focusSearchInput(prioritySearchInputRef.current)
-            }}>
-              <SelectTrigger className="w-full">
+            {/* Priority */}
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="flex-1 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
-              <SelectContent>
-                <Input
-                  ref={prioritySearchInputRef}
-                  placeholder="Search priority..."
-                  className="m-2"
-                  value={prioritySearch}
-                  onChange={e => {
-                    setPrioritySearch(e.target.value.toLowerCase());
-                  }}
-                  onClick={e => e.stopPropagation()}
-                  onKeyDown={e => e.stopPropagation()}
-                />
-                {priorityOptions.filter(opt => opt.label.toLowerCase().includes(prioritySearch)).map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="max-h-56 overflow-y-auto">
+                    {priorityOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </div>
+                </div>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Row 2: Project + Epic + Sprint */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            {/* Project */}
             <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
               if (open) focusSearchInput(projectSearchInputRef.current)
             }}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Project" />
+              <SelectTrigger className="flex-1 h-9 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px]">
+                <SelectValue placeholder="All Projects" />
               </SelectTrigger>
-              <SelectContent>
-                <Input
-                  ref={projectSearchInputRef}
-                  placeholder="Search project..."
-                  className="m-2"
-                  value={projectSearch}
-                  onChange={e => setProjectSearch(e.target.value.toLowerCase())}
-                  onClick={e => e.stopPropagation()}
-                  onKeyDown={e => e.stopPropagation()}
-                />
-                <SelectItem value="all">All Projects</SelectItem>
-                {projectOptions.filter(project => project.name.toLowerCase().includes(projectSearch)).map((project) => (
-                  <SelectItem key={project._id} value={project._id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="relative mb-2">
+                    <Input
+                      ref={projectSearchInputRef}
+                      value={projectSearch}
+                      onChange={(e) => setProjectSearch(e.target.value.toLowerCase())}
+                      placeholder="Search projects"
+                      className="pr-10 text-[13px]"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    {projectSearch && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setProjectSearch(''); setProjectFilter('all') }}
+                        className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
+                        aria-label="Clear project filter"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {projectOptions.filter(p => p.name.toLowerCase().includes(projectSearch)).length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No matching projects</div>
+                    ) : (
+                      projectOptions.filter(p => p.name.toLowerCase().includes(projectSearch)).map((project) => (
+                        <SelectItem key={project._id} value={project._id}>{project.name}</SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
               </SelectContent>
             </Select>
+            {/* Epic */}
             <Select value={epicFilter} onValueChange={setEpicFilter} onOpenChange={(open) => {
               if (open) focusSearchInput(epicSearchInputRef.current)
             }}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Epic" />
+              <SelectTrigger className="flex-1 h-9 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px]">
+                <SelectValue placeholder="All Epics" />
               </SelectTrigger>
-              <SelectContent>
-                <Input
-                  ref={epicSearchInputRef}
-                  placeholder="Search epic..."
-                  className="m-2"
-                  value={epicSearch}
-                  onChange={e => setEpicSearch(e.target.value.toLowerCase())}
-                  onClick={e => e.stopPropagation()}
-                  onKeyDown={e => e.stopPropagation()}
-                />
-                <SelectItem value="all">All Epics</SelectItem>
-                {epicOptions.filter(epic => epic.name.toLowerCase().includes(epicSearch)).map((epic) => (
-                  <SelectItem key={epic._id} value={epic._id}>
-                    {epic.name}
-                  </SelectItem>
-                ))}
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="relative mb-2">
+                    <Input
+                      ref={epicSearchInputRef}
+                      value={epicSearch}
+                      onChange={(e) => setEpicSearch(e.target.value.toLowerCase())}
+                      placeholder="Search epics"
+                      className="pr-10 text-[13px]"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    {epicSearch && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEpicSearch(''); setEpicFilter('all') }}
+                        className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
+                        aria-label="Clear epic filter"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Epics</SelectItem>
+                    {epicOptions.filter(e => e.name.toLowerCase().includes(epicSearch)).length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No matching epics</div>
+                    ) : (
+                      epicOptions.filter(e => e.name.toLowerCase().includes(epicSearch)).map((epic) => (
+                        <SelectItem key={epic._id} value={epic._id}>{epic.name}</SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
               </SelectContent>
             </Select>
+            {/* Sprint */}
             <Select value={sprintFilter} onValueChange={setSprintFilter} onOpenChange={(open) => {
               if (open) focusSearchInput(sprintSearchInputRef.current)
             }}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sprint" />
+              <SelectTrigger className="flex-1 h-9 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px]">
+                <SelectValue placeholder="All Sprints" />
               </SelectTrigger>
-              <SelectContent>
-                <Input
-                  ref={sprintSearchInputRef}
-                  placeholder="Search sprint..."
-                  className="m-2"
-                  value={sprintSearch}
-                  onChange={e => setSprintSearch(e.target.value.toLowerCase())}
-                  onClick={e => e.stopPropagation()}
-                  onKeyDown={e => e.stopPropagation()}
-                />
-                <SelectItem value="all">All Sprints</SelectItem>
-                {sprintOptions.filter(sprint => sprint.name.toLowerCase().includes(sprintSearch)).map((sprint) => (
-                  <SelectItem key={sprint._id} value={sprint._id}>
-                    {sprint.name}
-                  </SelectItem>
-                ))}
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="relative mb-2">
+                    <Input
+                      ref={sprintSearchInputRef}
+                      value={sprintSearch}
+                      onChange={(e) => setSprintSearch(e.target.value.toLowerCase())}
+                      placeholder="Search sprints"
+                      className="pr-10 text-[13px]"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    {sprintSearch && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSprintSearch(''); setSprintFilter('all') }}
+                        className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
+                        aria-label="Clear sprint filter"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Sprints</SelectItem>
+                    {sprintOptions.filter(s => s.name.toLowerCase().includes(sprintSearch)).length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No matching sprints</div>
+                    ) : (
+                      sprintOptions.filter(s => s.name.toLowerCase().includes(sprintSearch)).map((sprint) => (
+                        <SelectItem key={sprint._id} value={sprint._id}>{sprint.name}</SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
               </SelectContent>
             </Select>
           </div>
-          {/* Story count */}
+
+          {/* Count + Reset */}
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground flex items-center gap-2">
-              {isFetching && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
-              {totalCount} stor{totalCount !== 1 ? 'ies' : 'y'} found
+            <p className="text-[13px] text-[var(--apple-secondary-label)] flex items-center gap-2">
+              {isFetching && (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--apple-system-blue)] border-t-transparent" />
+              )}
+              <span className="font-apple-mono">{totalCount}</span>
+              {' '}stor{totalCount !== 1 ? 'ies' : 'y'} found
             </p>
+            {(statusFilter !== 'all' || priorityFilter !== 'all' || projectFilter !== 'all' || epicFilter !== 'all' || sprintFilter !== 'all' || searchQuery) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('')
+                  setStatusFilter('all')
+                  setPriorityFilter('all')
+                  setProjectFilter('all')
+                  setEpicFilter('all')
+                  setSprintFilter('all')
+                }}
+                className="h-7 text-[12px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] rounded-full"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset Filters
+              </Button>
+            )}
           </div>
         </div>
 
         {/* Stories View */}
         <div>
           <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'list' | 'kanban')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="list">List View</TabsTrigger>
-              <TabsTrigger value="kanban">Kanban View</TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between mb-4">
+              <TabsList className="h-9 p-0.5 rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)]">
+                <TabsTrigger
+                  value="list"
+                  className="rounded-[10px] text-[13px] data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-[var(--apple-label)] px-4"
+                >
+                  List
+                </TabsTrigger>
+                <TabsTrigger
+                  value="kanban"
+                  className="rounded-[10px] text-[13px] data-[state=active]:bg-background data-[state=active]:shadow-sm px-4"
+                >
+                  Board
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            <TabsContent value="list" className="space-y-4">
-              <div className="space-y-4">
-                {filteredStories.map((story) => (
-                  <Card
-                    key={story._id}
-                    className={`hover:shadow-md transition-shadow ${story.project ? 'cursor-pointer' : 'cursor-pointer'}`}
-                    onClick={() => { if (story.project) router.push(`/stories/${story._id}`); }}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4 min-w-0">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center mb-2 min-w-0">
-                              <BookOpen className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                              <div className="flex-1 min-w-0 ml-2">
-                                <h3 className="font-medium text-foreground text-sm sm:text-base truncate min-w-0">{story.title}</h3>
-                              </div>
-                              <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
-                                <Badge className={getStatusColor(story.status)}>
-                                  {getStatusIcon(story.status)}
-                                  <span className="ml-1">{formatToTitleCase(story.status)}</span>
-                                </Badge>
-                                <Badge className={getPriorityColor(story.priority)}>
-                                  {formatToTitleCase(story.priority)}
-                                </Badge>
-                              </div>
-                            </div>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <p className="text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
-                                    {story.description || 'No description'}
-                                  </p>
-                                </TooltipTrigger>
-                                {(story.description && story.description.length > 0) && (
-                                  <TooltipContent>
-                                    <p className="max-w-xs break-words">{story.description}</p>
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                            </TooltipProvider>
-                            <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0 flex-wrap">
-                              <div className="flex items-center space-x-1">
-                                <Target className="h-4 w-4" />
-                                {story.project?.name ? (
-                                  <span
-                                    className="truncate"
-                                    title={story.project.name && story.project.name.length > 10 ? story.project.name : undefined}
-                                  >
-                                    {story.project.name && story.project.name.length > 10 ? `${story.project.name.slice(0, 10)}…` : story.project.name}
-                                  </span>
-                                ) : (
-                                  <span className="truncate italic text-muted-foreground">Project deleted or unavailable</span>
-                                )}
-                              </div>
-                              {story.epic && (
-                                <div className="flex items-center space-x-1 min-w-0">
-                                  <Layers className="h-4 w-4 flex-shrink-0" />
-                                  {(() => {
-                                    const epicName = (story.epic as any).name || (story.epic as any).title || ''
-                                    if (!epicName) return null
-                                    const isLong = epicName.length > 10
-                                    const display = isLong ? `${epicName.slice(0, 10)}…` : epicName
-                                    return (
-                                      <span
-                                        className="truncate"
-                                        title={isLong ? epicName : undefined}
-                                      >
-                                        {display}
-                                      </span>
-                                    )
-                                  })()}
-                                </div>
-                              )}
-                              {story.sprint && (
-                                <div className="flex items-center space-x-1 min-w-0">
-                                  <Zap className="h-4 w-4 flex-shrink-0" />
-                                  <span
-                                    className="truncate"
-                                    title={story.sprint.name && story.sprint.name.length > 10 ? story.sprint.name : undefined}
-                                  >
-                                    {story.sprint.name && story.sprint.name.length > 10 ? `${story.sprint.name.slice(0, 10)}…` : story.sprint.name}
-                                  </span>
-                                </div>
-                              )}
-                              {story.dueDate && (
-                                <div className="flex items-center space-x-1">
-                                  <Calendar className="h-4 w-4" />
-                                  <span>Due {formatDate(story.dueDate)}</span>
-                                </div>
-                              )}
-                              {story.storyPoints && (
-                                <div className="flex items-center space-x-1">
-                                  <BarChart3 className="h-4 w-4" />
-                                  <span>{story.storyPoints} points</span>
-                                </div>
-                              )}
-                              {story.estimatedHours && (
-                                <div className="flex items-center space-x-1">
-                                  <Clock className="h-4 w-4" />
-                                  <span>{story.estimatedHours}h estimated</span>
-                                </div>
-                              )}
-                            </div>
+            {/* ── List View ── */}
+            <TabsContent value="list" className="mt-0">
+              {filteredStories.length === 0 ? (
+                <TasksEmptyState
+                  icon={<BookOpen className="h-10 w-10" strokeWidth={1.5} />}
+                  title="No stories found"
+                  description="Create your first user story or adjust filters."
+                />
+              ) : (
+                <div>
+                  {filteredStories.map((story) => (
+                    <div
+                      key={story._id}
+                      className="card-fade-in group flex items-start gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card mb-2.5 apple-transition hover:shadow-[0_6px_20px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_6px_20px_rgba(0,0,0,0.35)] hover:-translate-y-px cursor-pointer"
+                      onClick={() => story.project && router.push(`/stories/${story._id}`)}
+                    >
+                      {/* Left icon area */}
+                      <BookOpen className="h-5 w-5 flex-shrink-0 mt-0.5 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+
+                      {/* Main content */}
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        {/* Row 1: Title + Badges */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <h3 className="text-[15px] font-semibold text-[var(--apple-label)] truncate flex-1 min-w-0">
+                            {story.title}
+                          </h3>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <StatusBadge status={story.status} />
+                            <PriorityBadge priority={story.priority} />
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="text-right">
-                            {story.assignedTo && (
-                              <div className="text-sm text-muted-foreground truncate max-w-[120px]" title={`${story.assignedTo.firstName} ${story.assignedTo.lastName}`}>
-                                {story.assignedTo.firstName} {story.assignedTo.lastName}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" onClick={e => e.stopPropagation()}>
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]">
-                                <DropdownMenuItem
-                                  onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}`); }}
-                                  className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  <span>View Story</span>
-                                </DropdownMenuItem>
 
-                                {canEditStory(story) && (
-                                  <DropdownMenuItem
-                                    onClick={e => {
-                                      e.stopPropagation()
-                                      router.push(`/stories/${story._id}/edit`)
-                                    }}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    <span>Edit Story</span>
-                                  </DropdownMenuItem>
-                                )}
+                        {/* Row 2: Description */}
+                        {story.description && (
+                          <p className="text-[13px] text-[var(--apple-secondary-label)] line-clamp-1">
+                            {story.description}
+                          </p>
+                        )}
 
-                                {canDeleteStory(story) && (
-                                  <>
-                                    <DropdownMenuSeparator className="my-1" />
-                                    <DropdownMenuItem
-                                      onClick={e => {
-                                        e.stopPropagation()
-                                        handleDeleteClick(story)
-                                      }}
-                                      className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      <span>Delete Story</span>
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                        {/* Row 3: Meta chips */}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          {story.project?.name ? (
+                            <MetaChip
+                              icon={<Target className="h-3 w-3" strokeWidth={1.5} />}
+                              label={story.project.name}
+                              title={story.project.name}
+                            />
+                          ) : (
+                            <MetaChip
+                              icon={<Target className="h-3 w-3" strokeWidth={1.5} />}
+                              label="No project"
+                            />
+                          )}
+                          {story.epic && (() => {
+                            const epicName = (story.epic as any).name || (story.epic as any).title || ''
+                            return epicName ? (
+                              <MetaChip
+                                icon={<Layers className="h-3 w-3" strokeWidth={1.5} />}
+                                label={epicName}
+                                title={epicName}
+                              />
+                            ) : null
+                          })()}
+                          {story.sprint && (
+                            <MetaChip
+                              icon={<Zap className="h-3 w-3" strokeWidth={1.5} />}
+                              label={story.sprint.name}
+                              title={story.sprint.name}
+                            />
+                          )}
+                          {story.dueDate && (
+                            <MetaChip
+                              icon={<Calendar className="h-3 w-3" strokeWidth={1.5} />}
+                              label={`Due ${formatDate(story.dueDate)}`}
+                            />
+                          )}
+                          {story.storyPoints ? (
+                            <MetaChip
+                              icon={<BarChart3 className="h-3 w-3" strokeWidth={1.5} />}
+                              label={`${story.storyPoints} pts`}
+                            />
+                          ) : null}
+                          {story.estimatedHours ? (
+                            <MetaChip
+                              icon={<Clock className="h-3 w-3" strokeWidth={1.5} />}
+                              label={`${story.estimatedHours}h est.`}
+                            />
+                          ) : null}
                         </div>
+
+                        {/* Row 4: Acceptance criteria badge */}
+                        {story.acceptanceCriteria?.length > 0 && (
+                          <div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[11px] font-medium">
+                              ✓ {story.acceptanceCriteria.length} criteria
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+
+                      {/* Right: assignee + dropdown */}
+                      <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                        {story.assignedTo && (
+                          <div
+                            className="text-[12px] text-[var(--apple-secondary-label)] truncate max-w-[100px] hidden sm:block"
+                            title={`${story.assignedTo.firstName ?? ''} ${story.assignedTo.lastName ?? ''}`.trim()}
+                          >
+                            {`${story.assignedTo.firstName ?? ''} ${story.assignedTo.lastName ?? ''}`.trim()}
+                          </div>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-[var(--apple-radius-sm)] opacity-0 group-hover:opacity-100 apple-transition">
+                              <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]">
+                            <DropdownMenuItem
+                              onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}`); }}
+                              className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                            >
+                              <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                              <span>View Story</span>
+                            </DropdownMenuItem>
+
+                            {canEditStory(story) && (
+                              <DropdownMenuItem
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  router.push(`/stories/${story._id}/edit`)
+                                }}
+                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                              >
+                                <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                <span>Edit Story</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            {canDeleteStory(story) && (
+                              <>
+                                <DropdownMenuSeparator className="my-1" />
+                                <DropdownMenuItem
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    handleDeleteClick(story)
+                                  }}
+                                  className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                  <span>Delete Story</span>
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
-            <TabsContent value="kanban" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* ── Kanban / Board View ── */}
+            <TabsContent value="kanban" className="mt-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 {kanbanStatuses.map((statusKey) => {
                   const columnStories = filteredStories.filter((story) => story.status === statusKey)
-                  const label =
-                    statusKey === 'inprogress'
-                      ? 'In Progress'
-                      : statusKey === 'done'
-                        ? 'Done'
-                        : formatToTitleCase(statusKey)
 
                   return (
                     <div
                       key={statusKey}
-                      className="bg-muted/40 rounded-lg border border-border flex flex-col max-h-[70vh]"
+                      className="flex flex-col rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]/50 min-h-[400px]"
                       onDragOver={(e) => {
                         e.preventDefault()
                       }}
@@ -980,20 +1065,18 @@ export default function StoriesPage() {
                         setDraggedStoryId(null)
                       }}
                     >
-                      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor(statusKey)}>
-                            {getStatusIcon(statusKey)}
-                            <span className="ml-1 text-xs">{label}</span>
-                          </Badge>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
+                      {/* Column header */}
+                      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--apple-separator)]">
+                        <StatusBadge status={statusKey} animated={false} />
+                        <span className="text-[11px] font-apple-mono text-[var(--apple-tertiary-label)]">
                           {columnStories.length}
                         </span>
                       </div>
-                      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+
+                      {/* Cards */}
+                      <div className="flex-1 p-2 space-y-2 overflow-y-auto">
                         {columnStories.length === 0 ? (
-                          <p className="text-xs text-muted-foreground text-center py-4">
+                          <p className="text-[11px] text-[var(--apple-tertiary-label)] text-center py-6">
                             No stories
                           </p>
                         ) : (
@@ -1010,10 +1093,14 @@ export default function StoriesPage() {
                             const assigneeName = story.assignedTo
                               ? `${story.assignedTo.firstName ?? ''} ${story.assignedTo.lastName ?? ''}`.trim() || story.assignedTo.email || ''
                               : ''
+
                             return (
-                              <Card
+                              <div
                                 key={story._id}
-                                className={`hover:shadow-sm transition-shadow ${isDraggable ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
+                                className={cn(
+                                  cardShell, "p-3 space-y-2",
+                                  isDraggable ? "cursor-grab hover:shadow-md apple-transition" : "opacity-60 cursor-not-allowed"
+                                )}
                                 draggable={isDraggable}
                                 onDragStart={() => {
                                   if (!isDraggable) return
@@ -1021,70 +1108,48 @@ export default function StoriesPage() {
                                 }}
                                 onClick={() => router.push(`/stories/${story._id}`)}
                               >
-                                <CardContent className="p-3 space-y-2">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <h3 className="font-medium text-xs sm:text-sm text-foreground truncate">
-                                        {story.title}
-                                      </h3>
-                                      <p className="text-[11px] sm:text-xs text-muted-foreground line-clamp-2 mt-1">
-                                        {story.description || 'No description'}
-                                      </p>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      className="text-muted-foreground hover:text-foreground cursor-grab flex-shrink-0"
-                                      onMouseDown={(e) => {
-                                        // Prevent opening the story when starting a drag
-                                        e.stopPropagation()
-                                      }}
-                                    >
-                                      <GripVertical className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-1 mt-1">
-                                    <Badge className={getPriorityColor(story.priority)}>
-                                      {formatToTitleCase(story.priority)}
-                                    </Badge>
-                                    {story.project?.name && (
-                                      <Badge variant="outline" className="text-[10px] max-w-[80px] truncate hover:bg-transparent dark:hover:bg-transparent" title={story.project.name}>
-                                        {story.project.name}
-                                      </Badge>
+                                <div className="flex items-start justify-between gap-2">
+                                  <h3 className="text-[13px] font-semibold text-[var(--apple-label)] line-clamp-2 flex-1 min-w-0">
+                                    {story.title}
+                                  </h3>
+                                  <GripVertical className="h-4 w-4 text-[var(--apple-tertiary-label)] flex-shrink-0" strokeWidth={1.5} />
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  <PriorityBadge priority={story.priority} />
+                                  {story.project?.name && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-[var(--apple-separator)] text-[var(--apple-secondary-label)]">
+                                      {story.project.name.slice(0, 12)}
+                                    </span>
+                                  )}
+                                </div>
+                                {/* Assignee + creator info */}
+                                <div className="flex flex-col gap-1">
+                                  {assigneeName && (
+                                    <span className="text-[11px] text-[var(--apple-secondary-label)] truncate">
+                                      {assigneeName}
+                                    </span>
+                                  )}
+                                  <div
+                                    className="flex items-center gap-1 min-w-0"
+                                    title={creatorTitle}
+                                  >
+                                    {creatorDetails?.avatar ? (
+                                      <img
+                                        src={creatorDetails.avatar}
+                                        alt={creatorName}
+                                        className="w-5 h-5 rounded-full object-cover flex-shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="w-5 h-5 rounded-full bg-[var(--apple-system-blue)]/80 text-white text-[10px] font-medium flex items-center justify-center flex-shrink-0">
+                                        {creatorInitials}
+                                      </div>
                                     )}
-                                    {story.epic?.name && (
-                                      <Badge variant="outline" className="text-[10px] max-w-[80px] truncate hover:bg-transparent dark:hover:bg-transparent" title={story.epic.name}>
-                                        {story.epic.name}
-                                      </Badge>
-                                    )}
+                                    <span className="text-[11px] text-[var(--apple-tertiary-label)] truncate">
+                                      {creatorName}
+                                    </span>
                                   </div>
-                                  <div className="flex flex-col gap-1 mt-2">
-                                    {assigneeName && (
-                                      <span className="text-[11px] text-muted-foreground truncate">
-                                        {assigneeName}
-                                      </span>
-                                    )}
-                                    <div
-                                      className="flex items-center gap-1 min-w-0"
-                                      title={creatorTitle}
-                                    >
-                                      {creatorDetails?.avatar ? (
-                                        <img
-                                          src={creatorDetails.avatar}
-                                          alt={creatorName}
-                                          className="w-5 h-5 rounded-full object-cover flex-shrink-0"
-                                        />
-                                      ) : (
-                                        <div className="w-5 h-5 rounded-full bg-primary/80 text-primary-foreground text-[10px] font-medium flex items-center justify-center flex-shrink-0">
-                                          {creatorInitials}
-                                        </div>
-                                      )}
-                                      <span className="text-[11px] text-muted-foreground truncate">
-                                        {creatorName}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
+                                </div>
+                              </div>
                             )
                           })
                         )}
@@ -1096,54 +1161,25 @@ export default function StoriesPage() {
             </TabsContent>
           </Tabs>
 
-          {/* Pagination Controls */}
+          {/* Pagination */}
           {totalCount > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Items per page:</span>
-                <Select value={pageSize.toString()} onValueChange={(value) => {
-                  setPageSize(parseInt(value))
-                  setCurrentPage(1)
-                }}>
-                  <SelectTrigger className="w-20 h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span>
-                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={currentPage === 1 || isFetching}
-                  variant="outline"
-                  size="sm"
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground px-2">
-                  Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}
-                </span>
-                <Button
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage >= Math.ceil(totalCount / pageSize) || isFetching}
-                  variant="outline"
-                  size="sm"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={Math.ceil(totalCount / pageSize) || 1}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size)
+                setCurrentPage(1)
+              }}
+              loading={isFetching}
+              className="mt-6"
+            />
           )}
         </div>
       </div>
+
       <ConfirmationModal
         isOpen={showDeleteConfirmModal}
         onClose={() => { setShowDeleteConfirmModal(false); setSelectedStory(null); }}

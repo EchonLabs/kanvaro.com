@@ -189,48 +189,48 @@ export default function CreateEpicPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <Button variant="ghost" onClick={handleBackNavigation} className="w-full sm:w-auto">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" onClick={handleBackNavigation} className="rounded-full h-9 w-9 p-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]">
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0">
-              <Layers className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 flex-shrink-0" />
-              <span className="truncate">Create New Epic</span>
+            <h1 className="text-[22px] font-semibold text-[var(--apple-label)] tracking-tight flex items-center gap-2">
+              <Layers className="h-5 w-5 text-purple-500 flex-shrink-0" />
+              Create New Epic
             </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">Create a new epic for your project</p>
+            <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Create a new epic for your project</p>
           </div>
         </div>
 
-        <Card className="overflow-x-hidden">
-          <CardHeader>
-            <CardTitle>Epic Details</CardTitle>
-            <CardDescription>Fill in the details for your new epic</CardDescription>
+        <Card className="overflow-x-hidden rounded-[var(--apple-radius-xl)] border-[var(--apple-separator)] shadow-sm">
+          <CardHeader className="border-b border-[var(--apple-separator)] px-6 py-4">
+            <CardTitle className="text-[15px] font-semibold text-[var(--apple-label)]">Epic Details</CardTitle>
+            <CardDescription className="text-[13px] text-[var(--apple-secondary-label)]">Fill in the details for your new epic</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
+          <CardContent className="px-6 py-5">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-foreground">Name *</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Name *</label>
                     <Input
                       value={formData.name}
                       onChange={(e) => handleChange('name', e.target.value)}
                       placeholder="Enter epic name"
+                      className="mt-1.5 h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Project *</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Project *</label>
                     <Select
                       value={formData.project}
                       onValueChange={(value) => handleChange('project', value)}
                       onOpenChange={open => { if (open) setProjectQuery(""); }}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">
@@ -259,9 +259,9 @@ export default function CreateEpicPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Priority</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Priority</label>
                     <Select value={formData.priority} onValueChange={(value) => handleChange('priority', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="mt-1.5 h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -274,11 +274,12 @@ export default function CreateEpicPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Due Date *</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Due Date *</label>
                     <Input
                       type="date"
                       value={formData.dueDate}
                       onChange={(e) => handleChange('dueDate', e.target.value)}
+                      className="mt-1.5 h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                       min={(() => {
                         const minDate = getValidDateRange()?.minDate;
                         if (minDate) {
@@ -301,26 +302,28 @@ export default function CreateEpicPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-foreground">Estimated Hours</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Estimated Hours</label>
                     <Input
                       type="number"
                       value={formData.estimatedHours}
                       onChange={(e) => handleChange('estimatedHours', e.target.value)}
                       placeholder="Enter estimated hours"
+                      className="mt-1.5 h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                     />
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Labels</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Labels</label>
                     <div className="space-y-2">
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-2 mt-1.5">
                         <Input
                           value={newLabel}
                           onChange={(e) => setNewLabel(e.target.value)}
                           placeholder="Enter label"
                           onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLabel())}
+                          className="h-9 rounded-[var(--apple-radius-pill)] text-[14px]"
                         />
-                        <Button type="button" onClick={addLabel} size="sm" disabled={newLabel.trim() === ''}>
+                        <Button type="button" onClick={addLabel} size="sm" disabled={newLabel.trim() === ''} className="rounded-full h-9 px-4">
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
@@ -329,7 +332,7 @@ export default function CreateEpicPage() {
                           {formData.labels.map((label, index) => (
                             <div
                               key={index}
-                              className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 rounded-md text-sm"
+                              className="inline-flex items-center gap-1.5 bg-[var(--apple-quaternary-fill)] border border-[var(--apple-separator)] px-3 py-1 rounded-full text-[13px]"
                             >
                               <span>{label}</span>
                               <button
@@ -350,20 +353,21 @@ export default function CreateEpicPage() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground">Description</label>
+                <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Description</label>
                 <Textarea
                   value={formData.description}
                   onChange={(e) => handleChange('description', e.target.value)}
                   placeholder="Enter epic description"
                   rows={4}
+                  className="mt-1.5 rounded-[var(--apple-radius-lg)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px] resize-none"
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 pt-6 mt-8 border-t border-muted">
-                <Button type="button" variant="outline" onClick={() => router.push('/epics')} className="w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-5 mt-2 border-t border-[var(--apple-separator)]">
+                <Button type="button" variant="outline" onClick={() => router.push('/epics')} className="rounded-full px-6 h-10 text-[14px] border-[var(--apple-separator)] font-medium w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading || !isFormValid()} className="w-full sm:w-auto">
+                <Button type="submit" disabled={loading || !isFormValid()} className="rounded-full px-6 h-10 text-[14px] bg-[var(--apple-system-blue)] text-white hover:opacity-90 font-medium w-full sm:w-auto">
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />

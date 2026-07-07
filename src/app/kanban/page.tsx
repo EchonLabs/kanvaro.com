@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo, type ReactElement } from 'react'
@@ -8,10 +9,8 @@ import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
@@ -19,7 +18,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import {
   DndContext,
   DragEndEvent,
-  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
@@ -31,56 +29,44 @@ import {
 import {
   SortableContext,
   verticalListSortingStrategy,
-  arrayMove,
 } from '@dnd-kit/sortable'
-import {
-  useSortable,
-} from '@dnd-kit/sortable'
+import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
   Plus,
   Search,
-  Filter,
   MoreHorizontal,
   Calendar,
   Clock,
-  CheckCircle,
-  Pause,
-  XCircle,
-  Play,
   Loader2,
-  User,
   Target,
-  Zap,
   BarChart3,
-  List,
-  Kanban,
-  Users,
-  TrendingUp,
-  Calendar as CalendarIcon,
-  Star,
-  Layers,
   GripVertical,
-  Eye,
-  Edit,
-  Trash2,
   X,
-  RotateCcw
+  RotateCcw,
+  Columns,
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import EditTaskModal from '@/components/tasks/EditTaskModal'
 import ViewTaskModal from '@/components/tasks/ViewTaskModal'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu'
 import { DateRange } from 'react-day-picker'
 import { format } from 'date-fns'
 import { useNotify } from '@/lib/notify'
 import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
 import { useAuthContext } from '@/contexts/AuthContext'
 
-// Task filter truncation and dropdown width constants
 const TRUNCATION_LENGTH = 40
 const TASK_FILTER_DROPDOWN_WIDTH = 'w-full'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Task {
   _id: string
@@ -89,22 +75,9 @@ interface Task {
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled' | 'backlog'
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
-  project: {
-    _id: string
-    name: string
-  }
-  assignedTo?: {
-    _id?: string
-    firstName: string
-    lastName: string
-    email: string
-  }
-  createdBy: {
-    _id?: string
-    firstName: string
-    lastName: string
-    email: string
-  }
+  project: { _id: string; name: string }
+  assignedTo?: { _id?: string; firstName: string; lastName: string; email: string }
+  createdBy: { _id?: string; firstName: string; lastName: string; email: string }
   taskNumber?: string | number
   displayId?: string
   storyPoints?: number
@@ -119,163 +92,223 @@ interface Task {
 
 interface Project {
   settings?: {
-    kanbanStatuses?: Array<{
-      key: string
-      title: string
-      color?: string
-      order: number
-    }>
+    kanbanStatuses?: Array<{ key: string; title: string; color?: string; order: number }>
     allowTimeTracking?: boolean
     allowManualTimeSubmission?: boolean
     allowExpenseTracking?: boolean
     requireApproval?: boolean
-    notifications?: {
-      taskUpdates?: boolean
-      budgetAlerts?: boolean
-      deadlineReminders?: boolean
-    }
+    notifications?: { taskUpdates?: boolean; budgetAlerts?: boolean; deadlineReminders?: boolean }
   }
   _id: string
   name: string
 }
 
-interface PersonOption {
-  id: string
-  name: string
-  email?: string
+interface PersonOption { id: string; name: string; email?: string }
+interface TaskOption { id: string; label: string; fullLabel: string }
+
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+
+const PRIORITY_ACCENT: Record<string, string> = {
+  low:      '#8E8E93',
+  medium:   '#007AFF',
+  high:     '#FF9500',
+  critical: '#FF453A',
 }
 
-interface TaskOption {
-  id: string
-  label: string
-  fullLabel: string
+const PRIORITY_BADGE: Record<string, { bg: string; text: string; border: string }> = {
+  low:      { bg: 'bg-gray-50 dark:bg-gray-900/40',      text: 'text-gray-500 dark:text-gray-400',     border: 'border-gray-200 dark:border-gray-700' },
+  medium:   { bg: 'bg-blue-50 dark:bg-blue-950/30',      text: 'text-blue-600 dark:text-blue-400',     border: 'border-blue-200 dark:border-blue-800' },
+  high:     { bg: 'bg-orange-50 dark:bg-orange-950/30',  text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-800' },
+  critical: { bg: 'bg-red-50 dark:bg-red-950/30',        text: 'text-red-600 dark:text-red-400',       border: 'border-red-200 dark:border-red-800' },
+}
+
+const TYPE_BADGE: Record<string, { bg: string; text: string; border: string }> = {
+  bug:         { bg: 'bg-red-50 dark:bg-red-950/30',        text: 'text-red-600 dark:text-red-400',        border: 'border-red-200 dark:border-red-800' },
+  feature:     { bg: 'bg-emerald-50 dark:bg-emerald-950/30',text: 'text-emerald-600 dark:text-emerald-400',border: 'border-emerald-200 dark:border-emerald-800' },
+  improvement: { bg: 'bg-blue-50 dark:bg-blue-950/30',      text: 'text-blue-600 dark:text-blue-400',      border: 'border-blue-200 dark:border-blue-800' },
+  task:        { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',      border: 'border-gray-200 dark:border-gray-700' },
+  subtask:     { bg: 'bg-purple-50 dark:bg-purple-950/30',   text: 'text-purple-600 dark:text-purple-400',  border: 'border-purple-200 dark:border-purple-800' },
+}
+
+const COLUMN_ACCENT: Record<string, string> = {
+  backlog:     '#8E8E93',
+  todo:        '#007AFF',
+  in_progress: '#FF9500',
+  review:      '#BF5AF2',
+  testing:     '#30B0C7',
+  done:        '#34C759',
+  cancelled:   '#FF453A',
+}
+
+function getColumnAccent(id: string) {
+  return COLUMN_ACCENT[id] ?? '#007AFF'
 }
 
 const defaultColumns = [
-  { id: 'backlog', title: 'Backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
-  { id: 'todo', title: 'To Do', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
-  { id: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-  { id: 'review', title: 'Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
-  { id: 'testing', title: 'Testing', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
-  { id: 'done', title: 'Done', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' }
+  { id: 'backlog',     title: 'Backlog' },
+  { id: 'todo',        title: 'To Do' },
+  { id: 'in_progress', title: 'In Progress' },
+  { id: 'review',      title: 'Review' },
+  { id: 'testing',     title: 'Testing' },
+  { id: 'done',        title: 'Done' },
 ]
 
-// Column Drop Zone Component
+// ─── Micro-badge atom ─────────────────────────────────────────────────────────
+
+function MicroBadge({ children, className }: { children: React.ReactNode; className: string }) {
+  return (
+    <span className={cn(
+      'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap',
+      className,
+    )}>
+      {children}
+    </span>
+  )
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  const cfg = PRIORITY_BADGE[priority] ?? PRIORITY_BADGE.low
+  return <MicroBadge className={cn(cfg.bg, cfg.text, cfg.border)}>{formatToTitleCase(priority)}</MicroBadge>
+}
+
+function TypeBadge({ type }: { type: string }) {
+  const cfg = TYPE_BADGE[type] ?? TYPE_BADGE.task
+  return <MicroBadge className={cn(cfg.bg, cfg.text, cfg.border)}>{formatToTitleCase(type)}</MicroBadge>
+}
+
+// ─── Column ───────────────────────────────────────────────────────────────────
+
 function ColumnDropZone({
-  column,
-  tasks,
-  onCreateTask,
-  onEditTask,
-  onDeleteTask,
-  pendingUpdates,
-  canCreateTask,
-  canDragTask
+  column, tasks, onCreateTask, onEditTask, onDeleteTask, pendingUpdates, canCreateTask, canDragTask,
 }: {
-  column: any,
-  tasks: Task[],
-  onCreateTask?: (status?: string) => void,
-  onEditTask?: (task: Task) => void,
-  onDeleteTask?: (taskId: string) => void,
+  column: any
+  tasks: Task[]
+  onCreateTask?: (status?: string) => void
+  onEditTask?: (task: Task) => void
+  onDeleteTask?: (taskId: string) => void
   pendingUpdates?: Set<string>
   canCreateTask?: boolean
   canDragTask?: (task: Task) => boolean
 }) {
   const router = useRouter()
-  const { setNodeRef, isOver } = useDroppable({
-    id: column.id,
-  })
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    }
-  }
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
-      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    }
-  }
+  const { setNodeRef, isOver } = useDroppable({ id: column.id })
+  const accent = getColumnAccent(column.id)
 
   return (
-    <div className="h-full flex flex-col border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-3 transition-colors">
-      <div className="space-y-4 flex-1 flex flex-col min-h-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Badge className={`${column.color} ${(() => {
-              if (column.color.includes('bg-slate-100')) return 'hover:bg-slate-100 dark:hover:bg-slate-900'
-              if (column.color.includes('bg-gray-100')) return 'hover:bg-gray-100 dark:hover:bg-gray-900'
-              if (column.color.includes('bg-blue-100')) return 'hover:bg-blue-100 dark:hover:bg-blue-900'
-              if (column.color.includes('bg-yellow-100')) return 'hover:bg-yellow-100 dark:hover:bg-yellow-900'
-              if (column.color.includes('bg-purple-100')) return 'hover:bg-purple-100 dark:hover:bg-purple-900'
-              if (column.color.includes('bg-green-100')) return 'hover:bg-green-100 dark:hover:bg-green-900'
-              return ''
-            })()}`}>
-              {column.title}
-            </Badge>
-            <span className="text-sm text-muted-foreground">
-              {tasks.length}
-            </span>
-          </div>
-          {canCreateTask && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onCreateTask?.(column.id)}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+    <div className={cn(
+      'flex flex-col rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden',
+      'shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none apple-transition',
+      isOver && 'ring-2 ring-[var(--apple-system-blue)] ring-offset-2 ring-offset-background shadow-[0_4px_16px_rgba(0,122,255,0.12)]',
+    )}>
+      {/* Colour accent strip */}
+      <div className="h-[3px] w-full flex-shrink-0" style={{ background: accent }} />
+
+      {/* Column header */}
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--apple-separator)]">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-semibold text-[var(--apple-label)]">{column.title}</span>
+          <span
+            className="inline-flex items-center justify-center h-4.5 min-w-[18px] px-1.5 rounded-full text-[10px] font-bold text-white font-apple-mono tabular-nums"
+            style={{ background: accent }}
+          >
+            {tasks.length}
+          </span>
+        </div>
+        {canCreateTask && (
+          <button
+            onClick={() => onCreateTask?.(column.id)}
+            className="h-6 w-6 flex items-center justify-center rounded-md text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+            aria-label={`Add task to ${column.title}`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Drop zone */}
+      <SortableContext items={tasks.map(t => t._id)} strategy={verticalListSortingStrategy}>
+        <div
+          ref={setNodeRef}
+          className="flex-1 space-y-2 p-3 min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden scrollbar-hide"
+        >
+          {tasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 gap-2 text-center select-none">
+              <div className="h-9 w-9 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] flex items-center justify-center">
+                <Target className="h-4 w-4 text-[var(--apple-tertiary-label)]" />
+              </div>
+              <p className="text-[12px] text-[var(--apple-tertiary-label)]">Drop tasks here</p>
+            </div>
+          ) : (
+            tasks.map((task) => (
+              <SortableTask
+                key={`${task._id}-${task.status}-${task.position}`}
+                task={task}
+                onClick={() => router.push(`/tasks/${task._id}`)}
+                onEdit={onEditTask}
+                onDelete={onDeleteTask}
+                isUpdating={pendingUpdates?.has(task._id)}
+                isDraggable={canDragTask ? canDragTask(task) : true}
+              />
+            ))
           )}
         </div>
+      </SortableContext>
 
-        <SortableContext
-          items={tasks.map(task => task._id)}
-          strategy={verticalListSortingStrategy}
+      {/* Add task footer (shown when column has cards) */}
+      {canCreateTask && tasks.length > 0 && (
+        <button
+          onClick={() => onCreateTask?.(column.id)}
+          className="flex items-center gap-1.5 w-full px-4 py-2.5 text-[13px] text-[var(--apple-tertiary-label)] hover:text-[var(--apple-secondary-label)] border-t border-[var(--apple-separator)] hover:bg-[var(--apple-quaternary-fill)] apple-transition"
         >
-          <div
-            ref={setNodeRef}
-            className={`space-y-3 min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors p-2 flex-1 ${isOver
-              ? 'border-primary bg-primary/5'
-              : 'border-border/30 dark:border-border/50 hover:border-border/50 dark:hover:border-border/70'
-              }`}
-          >
-            {tasks.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Drag tasks here to update status</p>
+          <Plus className="h-3.5 w-3.5" />
+          Add task
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Kanban Board Skeleton ────────────────────────────────────────────────────
+
+function KanbanSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="h-8 w-44 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+          <div className="h-4 w-60 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+        </div>
+        <div className="h-9 w-28 bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-md)] animate-pulse" />
+      </div>
+      <div className="h-10 w-full bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-md)] animate-pulse" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden">
+            <div className="h-[3px] bg-[var(--apple-tertiary-fill)]" />
+            <div className="px-3 py-2.5 border-b border-[var(--apple-separator)] flex items-center gap-2">
+              <div className="h-4 w-20 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+              <div className="h-4 w-5 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+            </div>
+            <div className="p-3 space-y-2">
+              {[1, 2, 3].map((j) => (
+                <div key={j} className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-card p-3 space-y-2">
+                  <div className="h-4 w-3/4 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+                  <div className="h-3 w-1/2 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+                  <div className="flex gap-1.5">
+                    <div className="h-4 w-14 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                    <div className="h-4 w-12 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                  </div>
                 </div>
-              </div>
-            ) : (
-              tasks.map((task) => (
-                <SortableTask
-                  key={`${task._id}-${task.status}-${task.position}`}
-                  task={task}
-                  onClick={() => router.push(`/tasks/${task._id}`)}
-                  getPriorityColor={getPriorityColor}
-                  getTypeColor={getTypeColor}
-                  onEdit={onEditTask}
-                  onDelete={onDeleteTask}
-                  isUpdating={pendingUpdates?.has(task._id)}
-                  isDraggable={canDragTask ? canDragTask(task) : true}
-                />
-              ))
-            )}
+              ))}
+            </div>
           </div>
-        </SortableContext>
+        ))}
       </div>
     </div>
   )
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function KanbanPage() {
   const router = useRouter()
@@ -313,19 +346,12 @@ export default function KanbanPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [pendingUpdates, setPendingUpdates] = useState<Set<string>>(new Set())
 
-  // Helper function to focus filter search inputs
   const focusSearchInput = (el: HTMLInputElement | null) => {
     if (!el || el.disabled) return
-
     const doFocus = () => {
       el.focus({ preventScroll: true })
-      try {
-        el.select?.()
-      } catch {
-        // ignore
-      }
+      try { el.select?.() } catch { /* ignore */ }
     }
-
     if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
       window.requestAnimationFrame(doFocus)
     } else {
@@ -333,101 +359,56 @@ export default function KanbanPage() {
     }
   }
 
-  // Filter search input refs
   const projectFilterInputRef = useRef<HTMLInputElement | null>(null)
   const assignedToFilterInputRef = useRef<HTMLInputElement | null>(null)
   const assignedByFilterInputRef = useRef<HTMLInputElement | null>(null)
   const priorityFilterInputRef = useRef<HTMLInputElement | null>(null)
   const typeFilterInputRef = useRef<HTMLInputElement | null>(null)
   const taskNumberFilterInputRef = useRef<HTMLInputElement | null>(null)
-
   const hasFetchedProjects = useRef(false)
 
   const isAdmin = userRole === 'admin'
 
-  // Check if any filters are active
-  const hasActiveFilters = projectFilter !== 'all' ||
-    priorityFilter !== 'all' ||
-    typeFilter !== 'all' ||
-    assignedToFilter !== 'all' ||
-    assignedByFilter !== 'all' ||
-    taskNumberFilter !== 'all' ||
-    dateRangeFilter !== undefined
+  const hasActiveFilters =
+    projectFilter !== 'all' || priorityFilter !== 'all' || typeFilter !== 'all' ||
+    assignedToFilter !== 'all' || assignedByFilter !== 'all' ||
+    taskNumberFilter !== 'all' || dateRangeFilter !== undefined
 
-  // Reset all filters
   const resetFilters = () => {
-    setProjectFilter('all')
-    setPriorityFilter('all')
-    setTypeFilter('all')
-    setAssignedToFilter('all')
-    setAssignedByFilter('all')
-    setTaskNumberFilter('all')
-    setDateRangeFilter(undefined)
-    setProjectFilterQuery('')
-    setPriorityFilterQuery('')
-    setTypeFilterQuery('')
-    setAssignedToFilterQuery('')
-    setAssignedByFilterQuery('')
+    setProjectFilter('all'); setPriorityFilter('all'); setTypeFilter('all')
+    setAssignedToFilter('all'); setAssignedByFilter('all'); setTaskNumberFilter('all')
+    setDateRangeFilter(undefined); setProjectFilterQuery(''); setPriorityFilterQuery('')
+    setTypeFilterQuery(''); setAssignedToFilterQuery(''); setAssignedByFilterQuery('')
     setTaskNumberFilterQuery('')
   }
 
-  // Handle date range changes with validation and auto-correction
   const handleDateRangeChange = useCallback((range: DateRange | undefined) => {
-    if (!range) {
-      setDateRangeFilter(undefined)
-      return
-    }
-
-    // Validate and auto-correct the date range
+    if (!range) { setDateRangeFilter(undefined); return }
     const correctedRange = validateAndCorrectDateRange(range.from, range.to)
     setDateRangeFilter(correctedRange as DateRange | undefined)
   }, [])
 
-  // Use the task state management hook
   const {
-    tasks,
-    setTasks,
-    isLoading: taskLoading,
-    error: taskError,
-    updateTask,
-    handleTaskUpdate,
-    handleTaskCreate,
-    handleTaskDelete
+    tasks, setTasks, isLoading: taskLoading, error: taskError,
+    updateTask, handleTaskUpdate, handleTaskCreate, handleTaskDelete,
   } = useTaskState([])
-  // Use the notification hook
 
-  // Use the task synchronization hook
-  const {
-    isConnected,
-    startPolling,
-    stopPolling,
-    updateTaskOptimistically
-  } = useTaskSync({
+  const { isConnected, startPolling, stopPolling, updateTaskOptimistically } = useTaskSync({
     onTaskUpdate: handleTaskUpdate,
     onTaskCreate: handleTaskCreate,
-    onTaskDelete: handleTaskDelete
+    onTaskDelete: handleTaskDelete,
   })
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const fetchTasks = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/tasks')
       const data = await response.json()
-
-      if (data.success) {
-        setTasks(data.data)
-      } else {
-        notifyError({ title: 'Failed to Load Tasks', message: data.error || 'Failed to fetch tasks' })
-      }
-    } catch (err) {
+      if (data.success) setTasks(data.data)
+      else notifyError({ title: 'Failed to Load Tasks', message: data.error || 'Failed to fetch tasks' })
+    } catch {
       notifyError({ title: 'Failed to Load Tasks', message: 'Failed to fetch tasks' })
     } finally {
       setLoading(false)
@@ -435,48 +416,30 @@ export default function KanbanPage() {
   }, [setTasks])
 
   const fetchProjects = useCallback(async (force = false) => {
-    if (hasFetchedProjects.current && !force) {
-      return
-    }
-
+    if (hasFetchedProjects.current && !force) return
     let fetchSucceeded = false
     hasFetchedProjects.current = true
-
     try {
       const response = await fetch('/api/projects')
       const data = await response.json()
-
-      if (data.success && Array.isArray(data.data)) {
-        setProjects(data.data)
-      } else {
-        setProjects([])
-      }
+      if (data.success && Array.isArray(data.data)) setProjects(data.data)
+      else setProjects([])
       fetchSucceeded = true
     } catch (err) {
       console.error('Failed to fetch projects:', err)
       setProjects([])
     } finally {
-      if (!fetchSucceeded) {
-        hasFetchedProjects.current = false
-      }
+      if (!fetchSucceeded) hasFetchedProjects.current = false
     }
   }, [])
 
   const fetchSelectedProject = useCallback(async (projectId: string) => {
-    if (projectId === 'all') {
-      setSelectedProject(null)
-      return
-    }
-
+    if (projectId === 'all') { setSelectedProject(null); return }
     try {
       const response = await fetch(`/api/projects/${projectId}`)
       const data = await response.json()
-
-      if (data.success) {
-        setSelectedProject(data.data)
-      } else {
-        setSelectedProject(null)
-      }
+      if (data.success) setSelectedProject(data.data)
+      else setSelectedProject(null)
     } catch (err) {
       console.error('Failed to fetch project:', err)
       setSelectedProject(null)
@@ -484,248 +447,121 @@ export default function KanbanPage() {
   }, [])
 
   const getColumns = useCallback(() => {
-    // If a specific project is selected and has custom columns, use them
     if (selectedProject?.settings?.kanbanStatuses && selectedProject.settings.kanbanStatuses.length > 0) {
-      // Sort by order and map to the expected format
       return selectedProject.settings.kanbanStatuses
         .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .map(col => ({
-          id: col.key,
-          title: col.title,
-          color: col.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-        }))
+        .map(col => ({ id: col.key, title: col.title }))
     }
-
-    // When "all" is selected or no custom columns, collect unique statuses from all projects
     if (projectFilter === 'all' && projects.length > 0) {
       const statusSet = new Set<string>()
-      const statusMap = new Map<string, { title: string; color: string }>()
-
-      // Collect all unique statuses from all projects
+      const statusMap = new Map<string, { title: string }>()
       projects.forEach(project => {
-        if (project.settings?.kanbanStatuses) {
-          project.settings.kanbanStatuses.forEach(col => {
-            if (!statusSet.has(col.key)) {
-              statusSet.add(col.key)
-              statusMap.set(col.key, {
-                title: col.title,
-                color: col.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-              })
-            }
-          })
-        }
+        project.settings?.kanbanStatuses?.forEach(col => {
+          if (!statusSet.has(col.key)) { statusSet.add(col.key); statusMap.set(col.key, { title: col.title }) }
+        })
       })
-
-      // If we found custom statuses, use them; otherwise use defaults
-      if (statusMap.size > 0) {
-        return Array.from(statusMap.entries()).map(([key, value]) => ({
-          id: key,
-          title: value.title,
-          color: value.color
-        }))
-      }
+      if (statusMap.size > 0) return Array.from(statusMap.entries()).map(([key, val]) => ({ id: key, title: val.title }))
     }
-
-    // Fall back to default columns
     return defaultColumns
   }, [selectedProject, projectFilter, projects])
 
   useEffect(() => {
     const assignedToMap = new Map<string, PersonOption>()
     const assignedByMap = new Map<string, PersonOption>()
-
     tasks.forEach((task) => {
       if (task.assignedTo && Array.isArray(task.assignedTo)) {
-        task.assignedTo.forEach((assignee: any) => {
+        (task.assignedTo as any[]).forEach((assignee: any) => {
           if (assignee.user) {
             const id = assignee.user._id
-            if (id) {
-              const name = `${assignee.user.firstName} ${assignee.user.lastName}`.trim()
-              assignedToMap.set(id, {
-                id,
-                name,
-                email: assignee.user.email
-              })
-            }
+            if (id) assignedToMap.set(id, { id, name: `${assignee.user.firstName} ${assignee.user.lastName}`.trim(), email: assignee.user.email })
           }
         })
       }
-
       if (task.createdBy) {
         const id = task.createdBy._id || task.createdBy.email || `${task.createdBy.firstName}-${task.createdBy.lastName}`
-        if (id) {
-          const name = `${task.createdBy.firstName} ${task.createdBy.lastName}`.trim()
-          assignedByMap.set(id, {
-            id,
-            name,
-            email: task.createdBy.email
-          })
-        }
+        if (id) assignedByMap.set(id, { id, name: `${task.createdBy.firstName} ${task.createdBy.lastName}`.trim(), email: task.createdBy.email })
       }
     })
-
     setAssignedToOptions(Array.from(assignedToMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
     setAssignedByOptions(Array.from(assignedByMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
   }, [tasks])
 
   useEffect(() => {
-    if (assignedToFilter !== 'all' && !assignedToOptions.some(option => option.id === assignedToFilter)) {
-      setAssignedToFilter('all')
-    }
-    if (assignedByFilter !== 'all' && !assignedByOptions.some(option => option.id === assignedByFilter)) {
-      setAssignedByFilter('all')
-    }
-    if (taskNumberFilter !== 'all' && !tasks.some(task => task._id === taskNumberFilter || String(task.taskNumber ?? '') === taskNumberFilter)) {
-      setTaskNumberFilter('all')
-    }
+    if (assignedToFilter !== 'all' && !assignedToOptions.some(o => o.id === assignedToFilter)) setAssignedToFilter('all')
+    if (assignedByFilter !== 'all' && !assignedByOptions.some(o => o.id === assignedByFilter)) setAssignedByFilter('all')
+    if (taskNumberFilter !== 'all' && !tasks.some(t => t._id === taskNumberFilter || String(t.taskNumber ?? '') === taskNumberFilter)) setTaskNumberFilter('all')
   }, [assignedToOptions, assignedByOptions, assignedToFilter, assignedByFilter, taskNumberFilter, tasks])
 
-  // Fetch selected project when project filter changes
   useEffect(() => {
     fetchSelectedProject(projectFilter)
-    // Also refresh projects list to get updated column settings
-    if (projectFilter !== 'all') {
-      fetchProjects(true)
-    }
+    if (projectFilter !== 'all') fetchProjects(true)
   }, [projectFilter, fetchSelectedProject, fetchProjects])
 
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
-
       if (response.ok) {
-        try {
-          const me = await response.json()
-          setUserRole(me?.role ?? null)
-        } catch {
-          setUserRole(null)
-        }
+        try { const me = await response.json(); setUserRole(me?.role ?? null) } catch { setUserRole(null) }
         setAuthError('')
         await Promise.all([fetchTasks(), fetchProjects()])
-        // Start real-time synchronization after successful auth
         startPolling()
       } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-
+        const refreshResponse = await fetch('/api/auth/refresh', { method: 'POST' })
         if (refreshResponse.ok) {
           try {
             const meResponse = await fetch('/api/auth/me')
-            if (meResponse.ok) {
-              const me = await meResponse.json()
-              setUserRole(me?.role ?? null)
-            } else {
-              setUserRole(null)
-            }
-          } catch {
-            setUserRole(null)
-          }
+            if (meResponse.ok) { const me = await meResponse.json(); setUserRole(me?.role ?? null) }
+            else setUserRole(null)
+          } catch { setUserRole(null) }
           setAuthError('')
           await Promise.all([fetchTasks(), fetchProjects()])
-          // Start real-time synchronization after successful refresh
           startPolling()
         } else {
-          setAuthError('Session expired')
-          setUserRole(null)
-          stopPolling()
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
+          setAuthError('Session expired'); setUserRole(null); stopPolling()
+          setTimeout(() => router.push('/login'), 2000)
         }
       } else {
-        setUserRole(null)
-        stopPolling()
-        router.push('/login')
+        setUserRole(null); stopPolling(); router.push('/login')
       }
     } catch (error) {
       console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setUserRole(null)
-      stopPolling()
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
+      setAuthError('Authentication failed'); setUserRole(null); stopPolling()
+      setTimeout(() => router.push('/login'), 2000)
     }
   }, [router, startPolling, stopPolling, fetchTasks, fetchProjects])
 
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
-
-  // Handle task errors from the task state hook
-  useEffect(() => {
-    if (taskError) {
-      notifyError({ title: 'Task Synchronization Error', message: taskError })
-    }
-  }, [taskError, notifyError])
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    }
-  }
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
-      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    }
-  }
+  useEffect(() => { checkAuth() }, [checkAuth])
+  useEffect(() => { if (taskError) notifyError({ title: 'Task Synchronization Error', message: taskError }) }, [taskError, notifyError])
 
   const startDateBoundary = useMemo(() => {
     if (!dateRangeFilter?.from) return null
-    const date = new Date(dateRangeFilter.from)
-    date.setHours(0, 0, 0, 0)
-    return date
+    const d = new Date(dateRangeFilter.from); d.setHours(0, 0, 0, 0); return d
   }, [dateRangeFilter])
 
   const endDateBoundary = useMemo(() => {
     if (!dateRangeFilter?.to) return null
-    const date = new Date(dateRangeFilter.to)
-    date.setHours(23, 59, 59, 999)
-    return date
+    const d = new Date(dateRangeFilter.to); d.setHours(23, 59, 59, 999); return d
   }, [dateRangeFilter])
 
   const filteredAssignedToOptions = useMemo(() => {
     if (!assignedToFilterQuery.trim()) return assignedToOptions
-    const query = assignedToFilterQuery.toLowerCase()
-    return assignedToOptions.filter(option =>
-      option.name.toLowerCase().includes(query) ||
-      (option.email?.toLowerCase().includes(query) ?? false)
-    )
+    const q = assignedToFilterQuery.toLowerCase()
+    return assignedToOptions.filter(o => o.name.toLowerCase().includes(q) || (o.email?.toLowerCase().includes(q) ?? false))
   }, [assignedToOptions, assignedToFilterQuery])
 
   const filteredAssignedByOptions = useMemo(() => {
     if (!assignedByFilterQuery.trim()) return assignedByOptions
-    const query = assignedByFilterQuery.toLowerCase()
-    return assignedByOptions.filter(option =>
-      option.name.toLowerCase().includes(query) ||
-      (option.email?.toLowerCase().includes(query) ?? false)
-    )
+    const q = assignedByFilterQuery.toLowerCase()
+    return assignedByOptions.filter(o => o.name.toLowerCase().includes(q) || (o.email?.toLowerCase().includes(q) ?? false))
   }, [assignedByOptions, assignedByFilterQuery])
 
   const taskNumberOptions = useMemo<TaskOption[]>(() => {
     const map = new Map<string, TaskOption>()
     tasks.forEach(task => {
       const id = task._id
-      // Use displayId if available, otherwise fall back to taskNumber, otherwise just title
       const identifier = task.displayId || (task.taskNumber ? String(task.taskNumber) : null)
-      const fullLabel = identifier
-        ? `#${identifier} - ${task.title}`
-        : task.title
-      
-      // Truncate label to 45 characters with "..." if needed
+      const fullLabel = identifier ? `#${identifier} - ${task.title}` : task.title
       const { truncated } = truncateText(fullLabel, TRUNCATION_LENGTH)
-      
       map.set(id, { id, label: truncated, fullLabel })
     })
     return Array.from(map.values()).sort((a, b) => a.fullLabel.localeCompare(b.fullLabel))
@@ -733,72 +569,51 @@ export default function KanbanPage() {
 
   const filteredTaskNumberOptions = useMemo(() => {
     if (!taskNumberFilterQuery.trim()) return taskNumberOptions
-    const query = taskNumberFilterQuery.toLowerCase()
-    return taskNumberOptions.filter(option =>
-      option.fullLabel.toLowerCase().includes(query) ||
-      option.id.toLowerCase().includes(query)
-    )
+    const q = taskNumberFilterQuery.toLowerCase()
+    return taskNumberOptions.filter(o => o.fullLabel.toLowerCase().includes(q) || o.id.toLowerCase().includes(q))
   }, [taskNumberOptions, taskNumberFilterQuery])
 
   const filteredProjectOptions = useMemo(() => {
-    const query = projectFilterQuery.trim().toLowerCase()
-    if (!query) return projects
-    return projects.filter((project) => project.name.toLowerCase().includes(query))
+    const q = projectFilterQuery.trim().toLowerCase()
+    if (!q) return projects
+    return projects.filter(p => p.name.toLowerCase().includes(q))
   }, [projects, projectFilterQuery])
 
   const priorityOptions = [
-    { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'high', label: 'High' },
-    { value: 'critical', label: 'Critical' }
+    { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' }, { value: 'critical', label: 'Critical' },
   ]
-
   const filteredPriorityOptions = useMemo(() => {
-    const query = priorityFilterQuery.trim().toLowerCase()
-    if (!query) return priorityOptions
-    return priorityOptions.filter((option) =>
-      option.label.toLowerCase().includes(query) ||
-      option.value.toLowerCase().includes(query)
-    )
+    const q = priorityFilterQuery.trim().toLowerCase()
+    if (!q) return priorityOptions
+    return priorityOptions.filter(o => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q))
   }, [priorityFilterQuery])
 
   const typeOptions = [
-    { value: 'bug', label: 'Bug' },
-    { value: 'feature', label: 'Feature' },
-    { value: 'improvement', label: 'Improvement' },
-    { value: 'task', label: 'Task' },
-    { value: 'subtask', label: 'Subtask' }
+    { value: 'bug', label: 'Bug' }, { value: 'feature', label: 'Feature' },
+    { value: 'improvement', label: 'Improvement' }, { value: 'task', label: 'Task' },
+    { value: 'subtask', label: 'Subtask' },
   ]
-
   const filteredTypeOptions = useMemo(() => {
-    const query = typeFilterQuery.trim().toLowerCase()
-    if (!query) return typeOptions
-    return typeOptions.filter((option) =>
-      option.label.toLowerCase().includes(query) ||
-      option.value.toLowerCase().includes(query)
-    )
+    const q = typeFilterQuery.trim().toLowerCase()
+    if (!q) return typeOptions
+    return typeOptions.filter(o => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q))
   }, [typeFilterQuery])
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
 
   const filteredTasks = tasks.filter(task => {
-    const matchesSearch =
-      !normalizedSearchQuery ||
+    const matchesSearch = !normalizedSearchQuery ||
       task.title.toLowerCase().includes(normalizedSearchQuery) ||
       (task.description || '').toLowerCase().includes(normalizedSearchQuery) ||
       (task.project?.name || '').toLowerCase().includes(normalizedSearchQuery) ||
       (task.displayId || '').toLowerCase().includes(normalizedSearchQuery) ||
       (task._id || '').toLowerCase().includes(normalizedSearchQuery)
-
     const matchesProject = projectFilter === 'all' || (task.project?._id && task.project._id === projectFilter)
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
     const matchesType = typeFilter === 'all' || task.type === typeFilter
-
-    // Check if the selected user is in the assignedTo array
     const matchesAssignedTo = assignedToFilter === 'all' ||
-      (Array.isArray(task.assignedTo) &&
-        task.assignedTo.some((assignee: any) => assignee.user?._id === assignedToFilter))
-
+      (Array.isArray(task.assignedTo) && (task.assignedTo as any[]).some((a: any) => a.user?._id === assignedToFilter))
     const createdById = task.createdBy?._id || task.createdBy?.email || `${task.createdBy?.firstName ?? ''}-${task.createdBy?.lastName ?? ''}`
     const matchesAssignedBy = assignedByFilter === 'all' || (createdById && createdById === assignedByFilter)
     const taskIdMatches = taskNumberFilter === 'all' ||
@@ -808,222 +623,115 @@ export default function KanbanPage() {
     const dueDate = task.dueDate ? new Date(task.dueDate) : null
     const matchesStartDate = !startDateBoundary || (dueDate && dueDate >= startDateBoundary)
     const matchesEndDate = !endDateBoundary || (dueDate && dueDate <= endDateBoundary)
-
-    return (
-      matchesSearch &&
-      matchesProject &&
-      matchesPriority &&
-      matchesType &&
-      matchesAssignedTo &&
-      matchesAssignedBy &&
-      taskIdMatches &&
-      matchesStartDate &&
-      matchesEndDate
-    )
+    return matchesSearch && matchesProject && matchesPriority && matchesType &&
+      matchesAssignedTo && matchesAssignedBy && taskIdMatches && matchesStartDate && matchesEndDate
   })
 
-  const getTasksByStatus = (status: string) => {
-    return filteredTasks.filter(task => task.status === status)
-  }
+  const getTasksByStatus = (status: string) => filteredTasks.filter(t => t.status === status)
 
   const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event
-    const task = tasks.find(t => t._id === active.id)
+    const task = tasks.find(t => t._id === event.active.id)
     setActiveTask(task || null)
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     setActiveTask(null)
-
     if (!over) return
-
     const activeId = active.id as string
     const overId = over.id
-
     if (activeId === overId) return
 
-    // Find the task being dragged
-    const activeTask = tasks.find(task => task._id === activeId)
-    if (!activeTask) return
+    const activeTaskItem = tasks.find(t => t._id === activeId)
+    if (!activeTaskItem) return
 
     const columns = getColumns()
-    let newStatus = activeTask.status
+    let newStatus = activeTaskItem.status
     let shouldReorder = false
-    let newPosition = activeTask.position || 0
+    let newPosition = activeTaskItem.position || 0
 
-    // Determine the drop target type and new status
     if (typeof overId === 'string' && columns.some(col => col.id === overId)) {
-      // Dropped directly on a column (empty column)
       newStatus = overId as any
-      // Set position to end of the column
-      const columnTasks = tasks.filter(t => t.status === newStatus)
-      newPosition = columnTasks.length
+      newPosition = tasks.filter(t => t.status === newStatus).length
     } else if (typeof overId === 'string') {
-      // Dropped on another task - get its status
-      const overTask = tasks.find(task => task._id === overId)
+      const overTask = tasks.find(t => t._id === overId)
       if (overTask) {
         newStatus = overTask.status
-        // Calculate new position based on drop location
         const columnTasks = tasks.filter(t => t.status === newStatus)
         const overIndex = columnTasks.findIndex(t => t._id === overId)
-
-        if (newStatus === activeTask.status) {
-          // Same column reordering
+        if (newStatus === activeTaskItem.status) {
           shouldReorder = true
-          const activeIndex = columnTasks.findIndex(t => t._id === activeId)
-          if (activeIndex < overIndex) {
-            newPosition = overIndex
-          } else {
-            newPosition = overIndex
-          }
+          newPosition = overIndex
         } else {
-          // Cross-column move - place at end
           newPosition = columnTasks.length
         }
       }
     }
 
-    // Optimistic update - update UI immediately
-    const originalTask = { ...activeTask }
-
-    if (newStatus !== activeTask.status || shouldReorder) {
-      // Mark task as having pending update
+    const originalTask = { ...activeTaskItem }
+    if (newStatus !== activeTaskItem.status || shouldReorder) {
       setPendingUpdates(prev => new Set(prev).add(activeId))
-
-      // Update local state immediately for instant visual feedback
       setTasks(prevTasks => {
         const updatedTasks = [...prevTasks]
         const taskIndex = updatedTasks.findIndex(t => t._id === activeId)
-
         if (taskIndex !== -1) {
-          // Update the task
-          updatedTasks[taskIndex] = {
-            ...updatedTasks[taskIndex],
-            status: newStatus,
-            position: newPosition
-          }
-
-          // If reordering within same column, reorder the array
-          if (shouldReorder && newStatus === activeTask.status) {
-            const columnTasks = updatedTasks.filter(t => t.status === newStatus)
+          updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], status: newStatus, position: newPosition }
+          if (shouldReorder && newStatus === activeTaskItem.status) {
+            const colTasks = updatedTasks.filter(t => t.status === newStatus)
             const otherTasks = updatedTasks.filter(t => t.status !== newStatus)
-
-            // Remove the moved task and reinsert at new position
-            const movedTask = columnTasks.find(t => t._id === activeId)
-            const remainingTasks = columnTasks.filter(t => t._id !== activeId)
-
-            remainingTasks.splice(newPosition, 0, movedTask!)
-
-            return [...otherTasks, ...remainingTasks]
+            const moved = colTasks.find(t => t._id === activeId)
+            const remaining = colTasks.filter(t => t._id !== activeId)
+            remaining.splice(newPosition, 0, moved!)
+            return [...otherTasks, ...remaining]
           }
         }
-
         return updatedTasks
       })
 
-      // Background sync with server
       try {
         if (shouldReorder) {
-          // Handle reordering
           const columnTasks = tasks.filter(t => t.status === newStatus)
           const orderedTaskIds = columnTasks
-            .filter(t => t._id !== activeId)
-            .slice(0, newPosition)
+            .filter(t => t._id !== activeId).slice(0, newPosition)
             .concat([activeId])
             .concat(columnTasks.filter(t => t._id !== activeId).slice(newPosition))
             .map(t => t._id)
-
           await fetch('/api/tasks/reorder', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              projectId: projectFilter === 'all' ? null : projectFilter,
-              status: newStatus,
-              orderedTaskIds
-            })
+            body: JSON.stringify({ projectId: projectFilter === 'all' ? null : projectFilter, status: newStatus, orderedTaskIds }),
           })
         } else {
-          // Handle status change
           const response = await fetch(`/api/tasks/${activeId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: newStatus,
-              position: newPosition
-            })
+            body: JSON.stringify({ status: newStatus, position: newPosition }),
           })
-
-          if (!response.ok) {
-            throw new Error('Failed to update task')
-          }
+          if (!response.ok) throw new Error('Failed to update task')
         }
-
-        // Success - remove from pending updates
-        setPendingUpdates(prev => {
-          const newSet = new Set(prev)
-          newSet.delete(activeId)
-          return newSet
-        })
+        setPendingUpdates(prev => { const s = new Set(prev); s.delete(activeId); return s })
       } catch (error) {
         console.error('Failed to sync task update:', error)
-
-        // Revert optimistic update on failure
         setTasks(prevTasks => {
-          const updatedTasks = [...prevTasks]
-          const taskIndex = updatedTasks.findIndex(t => t._id === activeId)
-
-          if (taskIndex !== -1) {
-            // Restore original task data
-            updatedTasks[taskIndex] = originalTask
-          }
-
-          return updatedTasks
+          const updated = [...prevTasks]
+          const idx = updated.findIndex(t => t._id === activeId)
+          if (idx !== -1) updated[idx] = originalTask
+          return updated
         })
-
-        // Remove from pending updates
-        setPendingUpdates(prev => {
-          const newSet = new Set(prev)
-          newSet.delete(activeId)
-          return newSet
-        })
-
-        notifyError({
-          title: 'Update Failed',
-          message: 'Failed to update task. Changes have been reverted.'
-        })
+        setPendingUpdates(prev => { const s = new Set(prev); s.delete(activeId); return s })
+        notifyError({ title: 'Update Failed', message: 'Failed to update task. Changes have been reverted.' })
       }
     }
   }
 
-  // Modal handlers
-  const handleCreateTask = (status?: string) => {
-    setCreateTaskStatus(status)
-    setShowCreateTaskModal(true)
-  }
-
-  const handleEditTask = (task: Task) => {
-    setSelectedTask(task)
-    setShowEditTaskModal(true)
-  }
-
-  const handleViewTask = (task: Task) => {
-    setSelectedTask(task)
-    setShowViewTaskModal(true)
-  }
-
+  const handleCreateTask = (status?: string) => { setCreateTaskStatus(status); setShowCreateTaskModal(true) }
+  const handleEditTask = (task: Task) => { setSelectedTask(task); setShowEditTaskModal(true) }
+  const handleViewTask = (task: Task) => { setSelectedTask(task); setShowViewTaskModal(true) }
   const handleDeleteTask = (taskId: string) => {
     const task = tasks.find(t => t._id === taskId)
-    if (task) {
-      setSelectedTask(task)
-      setShowDeleteConfirmModal(true)
-    }
+    if (task) { setSelectedTask(task); setShowDeleteConfirmModal(true) }
   }
-
-  const clearDateFilters = () => {
-    setDateRangeFilter(undefined)
-  }
-
+  const clearDateFilters = () => setDateRangeFilter(undefined)
   const confirmDeleteTask = async () => {
     if (selectedTask) {
       try {
@@ -1038,380 +746,267 @@ export default function KanbanPage() {
   }
 
   if (loading || taskLoading) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading Kanban board...</p>
+    return <MainLayout><div className="p-6"><KanbanSkeleton /></div></MainLayout>
+  }
+
+  // ─── Searchable dropdown shared pattern ───────────────────────────────────
+
+  const SearchableSelect = ({
+    value, onValueChange, placeholder, inputRef, filterQuery, setFilterQuery,
+    options, allLabel, onOpenChange,
+  }: {
+    value: string
+    onValueChange: (v: string) => void
+    placeholder: string
+    inputRef: React.MutableRefObject<HTMLInputElement | null>
+    filterQuery: string
+    setFilterQuery: (q: string) => void
+    options: Array<{ value: string; label: string }>
+    allLabel: string
+    onOpenChange?: (open: boolean) => void
+  }) => (
+    <Select value={value} onValueChange={onValueChange} onOpenChange={(open) => {
+      if (open) focusSearchInput(inputRef.current)
+      onOpenChange?.(open)
+    }}>
+      <SelectTrigger className="w-full h-9 text-sm">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent className="z-[10050] p-0">
+        <div className="p-2">
+          <div className="relative mb-2">
+            <Input
+              ref={inputRef}
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder={`Search ${placeholder.toLowerCase()}...`}
+              className="pr-8 h-8 text-sm"
+              onKeyDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            />
+            {filterQuery && (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFilterQuery(''); onValueChange('all') }}
+                className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            <SelectItem value="all">{allLabel}</SelectItem>
+            {options.length === 0 ? (
+              <div className="px-2 py-1.5 text-xs text-[var(--apple-tertiary-label)]">No results</div>
+            ) : (
+              options.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)
+            )}
           </div>
         </div>
-      </MainLayout>
-    )
-  }
+      </SelectContent>
+    </Select>
+  )
 
   return (
     <MainLayout>
       <TooltipProvider delayDuration={200}>
-        <div className="space-y-8 sm:space-y-10">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-6 p-6">
+
+          {/* ─── Header ────────────────────────────────────────────────────── */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Kanban Board</h1>
+              <div className="flex items-center gap-3">
+                <Columns className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
+                  Kanban Board
+                </h1>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                    <div
+                      className={cn(
+                        'h-2 w-2 rounded-full flex-shrink-0',
+                        isConnected ? 'bg-[var(--apple-system-green)]' : 'bg-[var(--apple-system-red)]',
+                      )}
+                      style={isConnected ? { animation: 'status-pulse 2s ease-in-out infinite' } : {}}
+                    />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{isConnected ? 'Real-time sync active' : 'Real-time sync inactive'}</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <p className="text-sm sm:text-base text-muted-foreground">Streamline workflow with intuitive drag-and-drop task management</p>
+              <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} across {getColumns().length} column{getColumns().length !== 1 ? 's' : ''}
+              </p>
             </div>
             {canCreateTask && (
-              <Button onClick={() => handleCreateTask()} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
+              <Button onClick={() => handleCreateTask()} className="w-full sm:w-auto apple-transition">
+                <Plus className="h-4 w-4 mr-1.5" />
                 New Task
               </Button>
             )}
           </div>
-          {/* Search and Filters */}
-          <div className="space-y-3">
-            {/* Search bar */}
+
+          {/* ─── Filters ───────────────────────────────────────────────────── */}
+          <div className="space-y-2.5">
+            {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <Input
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--apple-tertiary-label)] pointer-events-none" />
+              <input
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-full"
+                className={cn(
+                  'w-full pl-9 pr-4 h-10 rounded-[var(--apple-radius-md)]',
+                  'bg-[var(--apple-tertiary-fill)] border border-transparent',
+                  'text-[15px] text-[var(--apple-label)] placeholder:text-[var(--apple-tertiary-label)]',
+                  'focus:outline-none focus:ring-2 focus:ring-[var(--apple-system-blue)] focus:ring-offset-0',
+                  'apple-transition',
+                )}
               />
             </div>
-            {/* Filter options - 3-3 grid layout (3 filters per row, 2 rows) */}
+
+            {/* Filter grid: row 1 */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(projectFilterInputRef.current)
-              }}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Project" />
-                </SelectTrigger>
+              {/* Project */}
+              <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => { if (open) focusSearchInput(projectFilterInputRef.current) }}>
+                <SelectTrigger className="w-full h-9 text-sm"><SelectValue placeholder="Project" /></SelectTrigger>
                 <SelectContent className="z-[10050] p-0">
                   <div className="p-2">
                     <div className="relative mb-2">
-                      <Input
-                        ref={projectFilterInputRef}
-                        value={projectFilterQuery}
-                        onChange={(e) => setProjectFilterQuery(e.target.value)}
-                        placeholder="Search projects"
-                        className="pr-10"
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      />
-                      {projectFilterQuery && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setProjectFilterQuery('')
-                            setProjectFilter('all')
-                          }}
-                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                          aria-label="Clear project filter"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
+                      <Input ref={projectFilterInputRef} value={projectFilterQuery} onChange={(e) => setProjectFilterQuery(e.target.value)} placeholder="Search projects" className="pr-8 h-8 text-sm" onKeyDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} />
+                      {projectFilterQuery && <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setProjectFilterQuery(''); setProjectFilter('all') }} className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"><X className="h-3.5 w-3.5" /></button>}
                     </div>
-                    <div className="max-h-56 overflow-y-auto">
+                    <div className="max-h-52 overflow-y-auto">
                       <SelectItem value="all">All Projects</SelectItem>
-                      {filteredProjectOptions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                      ) : (
-                        filteredProjectOptions.map((project) => (
-                          <SelectItem key={project._id} value={project._id}>
-                            {project.name}
-                          </SelectItem>
-                        ))
-                      )}
+                      {filteredProjectOptions.length === 0 ? <div className="px-2 py-1.5 text-xs text-[var(--apple-tertiary-label)]">No matching projects</div> : filteredProjectOptions.map(p => <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>)}
                     </div>
                   </div>
                 </SelectContent>
               </Select>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(priorityFilterInputRef.current)
-              }}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
+
+              {/* Priority */}
+              <Select value={priorityFilter} onValueChange={setPriorityFilter} onOpenChange={(open) => { if (open) focusSearchInput(priorityFilterInputRef.current) }}>
+                <SelectTrigger className="w-full h-9 text-sm"><SelectValue placeholder="Priority" /></SelectTrigger>
                 <SelectContent className="z-[10050] p-0">
                   <div className="p-2">
                     <div className="relative mb-2">
-                      <Input
-                        ref={priorityFilterInputRef}
-                        value={priorityFilterQuery}
-                        onChange={(e) => setPriorityFilterQuery(e.target.value)}
-                        placeholder="Search priority"
-                        className="pr-10"
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      />
-                      {priorityFilterQuery && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setPriorityFilterQuery('')
-                            setPriorityFilter('all')
-                          }}
-                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                          aria-label="Clear priority filter"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
+                      <Input ref={priorityFilterInputRef} value={priorityFilterQuery} onChange={(e) => setPriorityFilterQuery(e.target.value)} placeholder="Search priority" className="pr-8 h-8 text-sm" onKeyDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} />
+                      {priorityFilterQuery && <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPriorityFilterQuery(''); setPriorityFilter('all') }} className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"><X className="h-3.5 w-3.5" /></button>}
                     </div>
-                    <div className="max-h-56 overflow-y-auto">
+                    <div className="max-h-52 overflow-y-auto">
                       <SelectItem value="all">All Priority</SelectItem>
-                      {filteredPriorityOptions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching priorities</div>
-                      ) : (
-                        filteredPriorityOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))
-                      )}
+                      {filteredPriorityOptions.length === 0 ? <div className="px-2 py-1.5 text-xs text-[var(--apple-tertiary-label)]">No results</div> : filteredPriorityOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </div>
                   </div>
                 </SelectContent>
               </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(typeFilterInputRef.current)
-              }}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
+
+              {/* Type */}
+              <Select value={typeFilter} onValueChange={setTypeFilter} onOpenChange={(open) => { if (open) focusSearchInput(typeFilterInputRef.current) }}>
+                <SelectTrigger className="w-full h-9 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
                 <SelectContent className="z-[10050] p-0">
                   <div className="p-2">
                     <div className="relative mb-2">
-                      <Input
-                        ref={typeFilterInputRef}
-                        value={typeFilterQuery}
-                        onChange={(e) => setTypeFilterQuery(e.target.value)}
-                        placeholder="Search type"
-                        className="pr-10"
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      />
-                      {typeFilterQuery && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setTypeFilterQuery('')
-                            setTypeFilter('all')
-                          }}
-                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                          aria-label="Clear type filter"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
+                      <Input ref={typeFilterInputRef} value={typeFilterQuery} onChange={(e) => setTypeFilterQuery(e.target.value)} placeholder="Search type" className="pr-8 h-8 text-sm" onKeyDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} />
+                      {typeFilterQuery && <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTypeFilterQuery(''); setTypeFilter('all') }} className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"><X className="h-3.5 w-3.5" /></button>}
                     </div>
-                    <div className="max-h-56 overflow-y-auto">
+                    <div className="max-h-52 overflow-y-auto">
                       <SelectItem value="all">All Types</SelectItem>
-                      {filteredTypeOptions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching types</div>
-                      ) : (
-                        filteredTypeOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))
-                      )}
+                      {filteredTypeOptions.length === 0 ? <div className="px-2 py-1.5 text-xs text-[var(--apple-tertiary-label)]">No results</div> : filteredTypeOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </div>
                   </div>
                 </SelectContent>
               </Select>
-              <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(assignedToFilterInputRef.current)
-              }}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Assigned To" />
-                </SelectTrigger>
+            </div>
+
+            {/* Filter grid: row 2 */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {/* Assigned To */}
+              <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => { if (open) focusSearchInput(assignedToFilterInputRef.current) }}>
+                <SelectTrigger className="w-full h-9 text-sm"><SelectValue placeholder="Assigned To" /></SelectTrigger>
                 <SelectContent className="z-[10050] p-0">
                   <div className="p-2">
                     <div className="relative mb-2">
-                      <Input
-                        ref={assignedToFilterInputRef}
-                        value={assignedToFilterQuery}
-                        onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                        placeholder="Search assignees"
-                        className="pr-10"
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      />
-                      {assignedToFilterQuery && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setAssignedToFilterQuery('')
-                            setAssignedToFilter('all')
-                          }}
-                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                          aria-label="Clear assignee filter"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
+                      <Input ref={assignedToFilterInputRef} value={assignedToFilterQuery} onChange={(e) => setAssignedToFilterQuery(e.target.value)} placeholder="Search assignees" className="pr-8 h-8 text-sm" onKeyDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} />
+                      {assignedToFilterQuery && <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAssignedToFilterQuery(''); setAssignedToFilter('all') }} className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"><X className="h-3.5 w-3.5" /></button>}
                     </div>
-                    <div className="max-h-56 overflow-y-auto">
+                    <div className="max-h-52 overflow-y-auto">
                       <SelectItem value="all">All Assignees</SelectItem>
-                      {filteredAssignedToOptions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
-                      ) : (
-                        filteredAssignedToOptions.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                            {option.name}
-                          </SelectItem>
-                        ))
-                      )}
+                      {filteredAssignedToOptions.length === 0 ? <div className="px-2 py-1.5 text-xs text-[var(--apple-tertiary-label)]">No matching assignees</div> : filteredAssignedToOptions.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
                     </div>
                   </div>
                 </SelectContent>
               </Select>
-              <Select value={assignedByFilter} onValueChange={setAssignedByFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(assignedByFilterInputRef.current)
-              }}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Assigned By" />
-                </SelectTrigger>
+
+              {/* Assigned By */}
+              <Select value={assignedByFilter} onValueChange={setAssignedByFilter} onOpenChange={(open) => { if (open) focusSearchInput(assignedByFilterInputRef.current) }}>
+                <SelectTrigger className="w-full h-9 text-sm"><SelectValue placeholder="Assigned By" /></SelectTrigger>
                 <SelectContent className="z-[10050] p-0">
                   <div className="p-2">
                     <div className="relative mb-2">
-                      <Input
-                        ref={assignedByFilterInputRef}
-                        value={assignedByFilterQuery}
-                        onChange={(e) => setAssignedByFilterQuery(e.target.value)}
-                        placeholder="Search creators"
-                        className="pr-10"
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      />
-                      {assignedByFilterQuery && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setAssignedByFilterQuery('')
-                            setAssignedByFilter('all')
-                          }}
-                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                          aria-label="Clear creator filter"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
+                      <Input ref={assignedByFilterInputRef} value={assignedByFilterQuery} onChange={(e) => setAssignedByFilterQuery(e.target.value)} placeholder="Search creators" className="pr-8 h-8 text-sm" onKeyDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} />
+                      {assignedByFilterQuery && <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAssignedByFilterQuery(''); setAssignedByFilter('all') }} className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"><X className="h-3.5 w-3.5" /></button>}
                     </div>
-                    <div className="max-h-56 overflow-y-auto">
+                    <div className="max-h-52 overflow-y-auto">
                       <SelectItem value="all">All Creators</SelectItem>
-                      {filteredAssignedByOptions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
-                      ) : (
-                        filteredAssignedByOptions.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                            {option.name}
-                          </SelectItem>
-                        ))
-                      )}
+                      {filteredAssignedByOptions.length === 0 ? <div className="px-2 py-1.5 text-xs text-[var(--apple-tertiary-label)]">No matching creators</div> : filteredAssignedByOptions.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
                     </div>
                   </div>
                 </SelectContent>
               </Select>
-              <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter} onOpenChange={(open) => {
-                if (open) focusSearchInput(taskNumberFilterInputRef.current)
-              }}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Task Number" />
-                </SelectTrigger>
+
+              {/* Task Number */}
+              <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter} onOpenChange={(open) => { if (open) focusSearchInput(taskNumberFilterInputRef.current) }}>
+                <SelectTrigger className="w-full h-9 text-sm"><SelectValue placeholder="Task Number" /></SelectTrigger>
                 <SelectContent className={`z-[10050] p-0 w-full ${TASK_FILTER_DROPDOWN_WIDTH}`} align="end">
                   <div className="p-2 w-full overflow-x-hidden">
                     <div className="relative mb-2">
-                      <Input
-                        ref={taskNumberFilterInputRef}
-                        value={taskNumberFilterQuery}
-                        onChange={(e) => setTaskNumberFilterQuery(e.target.value)}
-                        placeholder="Search tasks"
-                        className="pr-10"
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      />
-                      {taskNumberFilterQuery && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setTaskNumberFilterQuery('')
-                            setTaskNumberFilter('all')
-                          }}
-                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                          aria-label="Clear task filter"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
+                      <Input ref={taskNumberFilterInputRef} value={taskNumberFilterQuery} onChange={(e) => setTaskNumberFilterQuery(e.target.value)} placeholder="Search tasks" className="pr-8 h-8 text-sm" onKeyDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} />
+                      {taskNumberFilterQuery && <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTaskNumberFilterQuery(''); setTaskNumberFilter('all') }} className="absolute inset-y-0 right-0 flex items-center px-2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"><X className="h-3.5 w-3.5" /></button>}
                     </div>
                     <div className="max-h-40 overflow-y-auto [&::-webkit-scrollbar]:hidden">
                       <SelectItem value="all">All Tasks</SelectItem>
                       {filteredTaskNumberOptions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching tasks</div>
+                        <div className="px-2 py-1.5 text-xs text-[var(--apple-tertiary-label)]">No matching tasks</div>
                       ) : (
                         filteredTaskNumberOptions.map((option) => {
-                        // Extract displayId and title from fullLabel
-                        const displayIdMatch = option.fullLabel.match(/^#(.+?)\s-\s(.+)$/)
-                        const displayId = displayIdMatch ? displayIdMatch[1] : null
-                        const title = displayIdMatch ? displayIdMatch[2] : option.fullLabel
-                        
-                        const { truncated: truncatedTitle, isTruncated } = truncateText(title, TRUNCATION_LENGTH)
-                         
-                        return (
-                          <SelectItem key={option.id} value={option.id}>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    {displayId && (
-                                      <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
-                                        #{displayId}
-                                      </span>
-                                    )}
-                                    <span className="truncate">{truncatedTitle}</span>
-                                  </div>
-                                </TooltipTrigger>
-                                {isTruncated && (
-                                  <TooltipContent side="left" align="center" className="max-w-sm break-words">
-                                    <p className="whitespace-normal">{title}</p>
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                            </TooltipProvider>
-                          </SelectItem>
-                        )
-                      })
-                    )}
+                          const match = option.fullLabel.match(/^#(.+?)\s-\s(.+)$/)
+                          const displayId = match ? match[1] : null
+                          const title = match ? match[2] : option.fullLabel
+                          const { truncated: truncatedTitle, isTruncated } = truncateText(title, TRUNCATION_LENGTH)
+                          return (
+                            <SelectItem key={option.id} value={option.id}>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      {displayId && (
+                                        <span className="text-xs font-apple-mono bg-[var(--apple-tertiary-fill)] px-1.5 py-0.5 rounded flex-shrink-0">
+                                          #{displayId}
+                                        </span>
+                                      )}
+                                      <span className="truncate">{truncatedTitle}</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  {isTruncated && (
+                                    <TooltipContent side="left" align="center" className="max-w-sm break-words">
+                                      <p className="whitespace-normal">{title}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
+                            </SelectItem>
+                          )
+                        })
+                      )}
                     </div>
                   </div>
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Date range */}
             <div className="flex justify-end">
               <div className="w-full sm:w-72">
                 <Popover>
@@ -1419,20 +1014,16 @@ export default function KanbanPage() {
                     <Button
                       variant="outline"
                       className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
+                        'w-full justify-start text-left font-normal h-9 text-sm',
+                        !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-[var(--apple-tertiary-label)]',
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      <Calendar className="mr-2 h-4 w-4" />
                       {dateRangeFilter?.from ? (
-                        dateRangeFilter.to ? (
-                          `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
-                        ) : (
-                          `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
-                        )
-                      ) : (
-                        'Date Range'
-                      )}
+                        dateRangeFilter.to
+                          ? `${format(dateRangeFilter.from, 'LLL dd, y')} – ${format(dateRangeFilter.to, 'LLL dd, y')}`
+                          : `${format(dateRangeFilter.from, 'LLL dd, y')} – …`
+                      ) : 'Date Range'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -1444,14 +1035,8 @@ export default function KanbanPage() {
                       onSelect={handleDateRangeChange}
                       numberOfMonths={2}
                     />
-                    <div className="p-3 border-t">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearDateFilters}
-                        disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
-                        className="w-full"
-                      >
+                    <div className="p-3 border-t border-[var(--apple-separator)]">
+                      <Button variant="ghost" size="sm" onClick={clearDateFilters} disabled={!dateRangeFilter?.from && !dateRangeFilter?.to} className="w-full">
                         Clear dates
                       </Button>
                     </div>
@@ -1459,156 +1044,99 @@ export default function KanbanPage() {
                 </Popover>
               </div>
             </div>
-            {/* Task count and reset filters */}
+
+            {/* Count + reset */}
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
+              <p className="text-[13px] text-[var(--apple-secondary-label)]">
+                <span className="font-apple-mono font-semibold tabular-nums">{filteredTasks.length}</span>
+                {' '}task{filteredTasks.length !== 1 ? 's' : ''} found
               </p>
               {hasActiveFilters && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={resetFilters}
-                        className="text-xs"
-                        aria-label="Reset all filters"
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Reset Filters
+                      <Button variant="outline" size="sm" onClick={resetFilters} className="text-xs h-7 gap-1.5" aria-label="Reset all filters">
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reset
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Reset filters</p>
-                    </TooltipContent>
+                    <TooltipContent><p>Reset all filters</p></TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
             </div>
           </div>
 
-          {/* Kanban Board */}
-          <div>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCorners}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDragOver={(event) => {
-                // Optional: Add visual feedback during drag
-                const { over } = event
-                if (over) {
-                  // Could add hover effects here if needed
-                }
-              }}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                {getColumns().map((column) => {
-                  const columnTasks = getTasksByStatus(column.id)
+          {/* ─── Kanban Board ───────────────────────────────────────────────── */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragOver={() => {}}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              {getColumns().map((column) => (
+                <ColumnDropZone
+                  key={column.id}
+                  column={column}
+                  tasks={getTasksByStatus(column.id)}
+                  onCreateTask={handleCreateTask}
+                  onEditTask={handleEditTask}
+                  onDeleteTask={isAdmin ? handleDeleteTask : undefined}
+                  pendingUpdates={pendingUpdates}
+                  canCreateTask={canCreateTask}
+                  canDragTask={(task) => task.status !== 'backlog'}
+                />
+              ))}
+            </div>
 
-                  return (
-                    <ColumnDropZone
-                      key={column.id}
-                      column={column}
-                      tasks={columnTasks}
-                      onCreateTask={handleCreateTask}
-                      onEditTask={handleEditTask}
-                      onDeleteTask={isAdmin ? handleDeleteTask : undefined}
-                      pendingUpdates={pendingUpdates}
-                      canCreateTask={canCreateTask}
-                      canDragTask={(task) => {
-                        // Allow dragging if task is not in backlog, or if it is in backlog but assigned to a sprint
-                        return task.status !== 'backlog'
-                      }}
-                    />
-                  )
-                })}
-              </div>
-
-              <DragOverlay>
-                {activeTask ? (
-                  <SortableTask
-                    task={activeTask}
-                    onClick={() => { }}
-                    isDragOverlay
-                    getPriorityColor={getPriorityColor}
-                    getTypeColor={getTypeColor}
-                    onEdit={handleEditTask}
-                    onDelete={isAdmin ? handleDeleteTask : undefined}
-                  />
-                ) : null}
-              </DragOverlay>
-            </DndContext>
-          </div>
+            <DragOverlay>
+              {activeTask ? (
+                <SortableTask
+                  task={activeTask}
+                  onClick={() => {}}
+                  isDragOverlay
+                  onEdit={handleEditTask}
+                  onDelete={isAdmin ? handleDeleteTask : undefined}
+                />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         </div>
       </TooltipProvider>
-      {/* Modals */}
+
+      {/* ─── Modals ─────────────────────────────────────────────────────────── */}
       <CreateTaskModal
         isOpen={showCreateTaskModal}
-        onClose={() => {
-          setShowCreateTaskModal(false)
-          setCreateTaskStatus(undefined)
-        }}
+        onClose={() => { setShowCreateTaskModal(false); setCreateTaskStatus(undefined) }}
         projectId={projectFilter === 'all' ? '' : projectFilter}
         defaultStatus={createTaskStatus}
-        stayOnCurrentPage={true}
-        onTaskCreated={() => {
-          setShowCreateTaskModal(false)
-          setCreateTaskStatus(undefined)
-          // Refresh tasks after creation
-          fetchTasks()
-        }}
+        stayOnCurrentPage
+        onTaskCreated={() => { setShowCreateTaskModal(false); setCreateTaskStatus(undefined); fetchTasks() }}
       />
-
       {selectedTask && (
         <EditTaskModal
           isOpen={showEditTaskModal}
-          onClose={() => {
-            setShowEditTaskModal(false)
-            setSelectedTask(null)
-          }}
+          onClose={() => { setShowEditTaskModal(false); setSelectedTask(null) }}
           task={selectedTask}
-          onTaskUpdated={() => {
-            setShowEditTaskModal(false)
-            setSelectedTask(null)
-            // Refresh tasks after update
-            fetchTasks()
-          }}
+          onTaskUpdated={() => { setShowEditTaskModal(false); setSelectedTask(null); fetchTasks() }}
         />
       )}
-
       {selectedTask && (
         <ViewTaskModal
           isOpen={showViewTaskModal}
-          onClose={() => {
-            setShowViewTaskModal(false)
-            setSelectedTask(null)
-          }}
+          onClose={() => { setShowViewTaskModal(false); setSelectedTask(null) }}
           task={selectedTask}
-          onEdit={() => {
-            setShowViewTaskModal(false)
-            setShowEditTaskModal(true)
-          }}
+          onEdit={() => { setShowViewTaskModal(false); setShowEditTaskModal(true) }}
           canDelete={isAdmin}
           hideDeleteWhenDisabled
-          onDelete={
-            isAdmin
-              ? () => {
-                setShowViewTaskModal(false)
-                handleDeleteTask(selectedTask._id)
-              }
-              : undefined
-          }
+          onDelete={isAdmin ? () => { setShowViewTaskModal(false); handleDeleteTask(selectedTask._id) } : undefined}
         />
       )}
-
       <ConfirmationModal
         isOpen={showDeleteConfirmModal}
-        onClose={() => {
-          setShowDeleteConfirmModal(false)
-          setSelectedTask(null)
-        }}
+        onClose={() => { setShowDeleteConfirmModal(false); setSelectedTask(null) }}
         onConfirm={confirmDeleteTask}
         title="Delete Task"
         description={`Are you sure you want to delete "${selectedTask?.title}"? This action cannot be undone.`}
@@ -1620,11 +1148,11 @@ export default function KanbanPage() {
   )
 }
 
+// ─── Sortable Task Card ───────────────────────────────────────────────────────
+
 interface SortableTaskProps {
   task: Task
   onClick: () => void
-  getPriorityColor: (priority: string) => string
-  getTypeColor: (type: string) => string
   isDragOverlay?: boolean
   isUpdating?: boolean
   isDraggable?: boolean
@@ -1632,182 +1160,162 @@ interface SortableTaskProps {
   onDelete?: (taskId: string) => void
 }
 
-function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOverlay = false, isUpdating = false, isDraggable = true, onEdit, onDelete }: SortableTaskProps) {
+function SortableTask({
+  task, onClick, isDragOverlay = false, isUpdating = false, isDraggable = true, onEdit, onDelete,
+}: SortableTaskProps) {
   const { formatDate } = useDateTime()
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task._id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task._id })
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
+  const style = { transform: CSS.Transform.toString(transform), transition }
+  const accent = PRIORITY_ACCENT[task.priority] ?? '#8E8E93'
+
+  const assignee = task.assignedTo && !Array.isArray(task.assignedTo) ? task.assignedTo : null
 
   return (
-    <Card
+    <div
       ref={setNodeRef}
       style={style}
-      className={`hover:shadow-md transition-shadow relative ${isDraggable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
-        } ${isDragging ? 'opacity-50' : ''
-        } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''} ${isUpdating ? 'ring-2 ring-blue-500/50 ring-offset-1' : ''
-        }`}
+      className={cn(
+        'relative rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-card overflow-hidden',
+        'shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-none apple-transition',
+        isDraggable ? 'cursor-pointer' : 'cursor-not-allowed opacity-50',
+        isDragging && 'opacity-40 scale-[0.97]',
+        isDragOverlay && 'shadow-[0_16px_40px_rgba(0,0,0,0.20)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.55)] rotate-[1.5deg] scale-[1.03]',
+        isUpdating && 'ring-2 ring-[var(--apple-system-blue)]/40 ring-offset-1',
+      )}
       onClick={onClick}
     >
-      <CardContent className="p-4">
-        {isUpdating && (
-          <div className="absolute top-2 right-2">
-            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-          </div>
-        )}
-        <div className="space-y-3">
-          <div className="flex items-start justify-between">
-            <TruncateTooltip text={task.title}>
-              <h4 className="font-medium text-foreground text-sm line-clamp-2">
-                {task.title}
-              </h4>
-            </TruncateTooltip>
-            <div className="flex items-center space-x-1">
-              {isDraggable && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 cursor-grab active:cursor-grabbing"
-                  {...attributes}
-                  {...listeners}
+      {/* Priority left accent bar */}
+      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: accent }} />
+
+      <div className="pl-4 pr-2.5 py-3">
+        {/* Header: title + controls */}
+        <div className="flex items-start justify-between gap-2 mb-2.5">
+          <TruncateTooltip text={task.title}>
+            <h4 className="text-[14px] font-semibold text-[var(--apple-label)] leading-snug line-clamp-2 flex-1">
+              {task.title}
+            </h4>
+          </TruncateTooltip>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            {isUpdating && <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--apple-system-blue)]" />}
+            {isDraggable && (
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded text-[var(--apple-quaternary-label)] hover:text-[var(--apple-secondary-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition cursor-grab active:cursor-grabbing"
+                {...attributes}
+                {...listeners}
+                onClick={(e) => e.stopPropagation()}
+                aria-label="Drag to reorder"
+              >
+                <GripVertical className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="h-6 w-6 flex items-center justify-center rounded text-[var(--apple-quaternary-label)] hover:text-[var(--apple-secondary-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <GripVertical className="h-3 w-3" />
-                </Button>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => {
-                    e.stopPropagation()
-                    onClick()
-                  }}>
-                    View Details
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onClick() }}>
+                  View Details
+                </DropdownMenuItem>
+                {onEdit && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(task) }}>
+                    Edit Task
                   </DropdownMenuItem>
-                  {onEdit && (
-                    <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation()
-                      onEdit(task)
-                    }}>
-                      Edit Task
+                )}
+                {onDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={(e) => { e.stopPropagation(); onDelete(task._id) }}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      Delete Task
                     </DropdownMenuItem>
-                  )}
-                  {onDelete && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onDelete(task._id)
-                        }}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        Delete Task
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+        </div>
 
-          <div className="flex items-center space-x-2">
-            <Badge className={getPriorityColor(task.priority)}>
-              {formatToTitleCase(task?.priority)}
-            </Badge>
-            <Badge className={getTypeColor(task.type)}>
-              {formatToTitleCase(task?.type)}
-            </Badge>
-          </div>
-          {task.displayId && (
-            <p className="text-xs text-muted-foreground font-medium mt-1">
-              #{task.displayId}
-            </p>
+        {/* Badges */}
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          <TypeBadge type={task.type} />
+          <PriorityBadge priority={task.priority} />
+        </div>
+
+        {/* Meta */}
+        <div className="space-y-1">
+          {task.project?.name && (
+            <div className="flex items-center gap-1.5">
+              <Target className="h-3 w-3 flex-shrink-0 text-[var(--apple-tertiary-label)]" />
+              <TruncateTooltip text={task.project.name}>
+                <span className="text-[12px] text-[var(--apple-tertiary-label)] truncate">{task.project.name}</span>
+              </TruncateTooltip>
+            </div>
           )}
-
-          <div className="text-xs text-muted-foreground">
-            <div className="flex items-center space-x-1 mb-1">
-              <Target className="h-3 w-3" />
-              <TruncateTooltip text={task?.project?.name}>
-                <span className="text-foreground text-sm line-clamp-2">{task?.project?.name}</span>
-              </TruncateTooltip>
-            </div>
-            {task.dueDate && (
-              <div className="flex items-center space-x-1 mb-1">
-                <Calendar className="h-3 w-3" />
-                <span>Due {formatDate(task.dueDate)}</span>
-              </div>
-            )}
-            {task.storyPoints && (
-              <div className="flex items-center space-x-1 mb-1">
-                <BarChart3 className="h-3 w-3" />
-                <span>{task?.storyPoints} points</span>
-              </div>
-            )}
-            {task.estimatedHours && (
-              <div className="flex items-center space-x-1">
-                <Clock className="h-3 w-3" />
-                <span>{task?.estimatedHours}h</span>
-              </div>
-            )}
-          </div>
-
-          <div className="text-xs text-muted-foreground">
-            {task.assignedTo ? (
-              <TruncateTooltip text={`${task?.assignedTo?.firstName} ${task?.assignedTo?.lastName}`}>
-                <span>{task?.assignedTo?.firstName} {task?.assignedTo?.lastName}</span>
-              </TruncateTooltip>
-            ) : (
-              <span>Not assigned</span>
-            )}
-          </div>
-
-          {task?.labels?.length > 0 && (
-            <div className="flex items-center gap-1 overflow-hidden flex-nowrap">
-              {task.labels.slice(0, 2).map((label, index) => (
-                <TruncateTooltip key={`${label}-${index}`} text={label}>
-                  <Badge
-                    variant="outline"
-                    className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent"
-                  >
-                    {label}
-                  </Badge>
-                </TruncateTooltip>
-              ))}
-              {task.labels.length > 2 && (
-                <Badge
-                  variant="outline"
-                  className="text-xs flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent"
-                  title={task.labels.slice(2).join(', ')}
-                >
-                  +{task.labels.length - 2}
-                </Badge>
-              )}
+          {task.displayId && (
+            <span className="text-[11px] font-apple-mono text-[var(--apple-tertiary-label)]">
+              #{task.displayId}
+            </span>
+          )}
+          {task.dueDate && (
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-3 w-3 flex-shrink-0 text-[var(--apple-tertiary-label)]" />
+              <span className="text-[12px] text-[var(--apple-tertiary-label)]">Due {formatDate(task.dueDate)}</span>
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Footer */}
+        {(task.storyPoints || task.estimatedHours || assignee || (task.labels?.length > 0)) && (
+          <div className="mt-2.5 pt-2.5 border-t border-[var(--apple-separator)] flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 text-[12px] text-[var(--apple-tertiary-label)]">
+              {task.storyPoints && (
+                <span className="flex items-center gap-1 font-apple-mono tabular-nums">
+                  <BarChart3 className="h-3 w-3" />{task.storyPoints}sp
+                </span>
+              )}
+              {task.estimatedHours && (
+                <span className="flex items-center gap-1 font-apple-mono tabular-nums">
+                  <Clock className="h-3 w-3" />{task.estimatedHours}h
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              {task.labels?.length > 0 && (
+                <div className="flex items-center gap-1">
+                  {task.labels.slice(0, 1).map((lbl, i) => (
+                    <span key={i} className="text-[11px] px-1.5 py-0.5 rounded-md bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)] font-medium">
+                      {lbl}
+                    </span>
+                  ))}
+                  {task.labels.length > 1 && (
+                    <span className="text-[11px] text-[var(--apple-tertiary-label)]">+{task.labels.length - 1}</span>
+                  )}
+                </div>
+              )}
+              {assignee && (
+                <TruncateTooltip text={`${assignee.firstName} ${assignee.lastName}`}>
+                  <div className="h-5 w-5 rounded-full bg-[var(--apple-system-blue)] flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0 select-none">
+                    {assignee.firstName?.[0]?.toUpperCase() ?? '?'}
+                  </div>
+                </TruncateTooltip>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
+
+// ─── Tooltip helper ───────────────────────────────────────────────────────────
 
 interface TruncateTooltipProps {
   text?: string | number | null
@@ -1816,15 +1324,10 @@ interface TruncateTooltipProps {
 
 function TruncateTooltip({ text, children }: TruncateTooltipProps) {
   const displayText = text === undefined || text === null ? '' : String(text)
-  if (!displayText.trim()) {
-    return children
-  }
-
+  if (!displayText.trim()) return children
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        {children}
-      </TooltipTrigger>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent side="top" align="start">
         <p className="max-w-sm break-words">{displayText}</p>
       </TooltipContent>

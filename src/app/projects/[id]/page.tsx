@@ -41,7 +41,8 @@ import {
   File,
   Image as ImageIcon,
   ExternalLink,
-  Upload
+  Upload,
+  FolderOpen
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import BulkTaskUploadDialog from '@/components/tasks/BulkTaskUploadDialog'
@@ -253,6 +254,40 @@ export default function ProjectDetailPage() {
   const canManageTests = hasPermission(Permission.TEST_MANAGE)
   const canViewIncome = !permissionsLoading && hasPermission(Permission.FINANCIAL_VIEW_INCOME, projectId)
   const canCreateIncome = !permissionsLoading && hasPermission(Permission.FINANCIAL_CREATE_INCOME, projectId)
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', order: 1 },
+    { id: 'team', label: 'Team', order: 2 },
+    { id: 'attachments', label: 'Attachments', order: 3 },
+    { id: 'budget', label: 'Budget', order: 4 },
+    { id: 'tasks', label: 'Tasks', order: 5 },
+    { id: 'kanban', label: 'Kanban', order: 6 },
+    { id: 'calendar', label: 'Calendar', order: 7 },
+    { id: 'backlog', label: 'Backlog', order: 8 },
+    ...(canManageTests ? [{ id: 'testing', label: 'Testing' }] : []),
+    { id: 'reports', label: 'Reports' },
+    { id: 'settings', label: 'Settings' },
+  ].map((tab, idx) => ({ ...tab, order: idx + 1 }))
+
+  const currentTabIndex = tabs.findIndex(tab => tab.id === activeTab)
+  const prevTab = currentTabIndex > 0 ? tabs[currentTabIndex - 1] : null
+  const nextTab = currentTabIndex < tabs.length - 1 ? tabs[currentTabIndex + 1] : null
+
+  const handlePrevTab = () => {
+    if (prevTab) {
+      const newSearchParams = new URLSearchParams(searchParams.toString())
+      newSearchParams.set('tab', prevTab.id)
+      router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
+    }
+  }
+
+  const handleNextTab = () => {
+    if (nextTab) {
+      const newSearchParams = new URLSearchParams(searchParams.toString())
+      newSearchParams.set('tab', nextTab.id)
+      router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
+    }
+  }
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -778,16 +813,22 @@ export default function ProjectDetailPage() {
       <MainLayout>
         <div className="space-y-8 mt-4">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1 min-w-0">
-              <Button variant="outline" size="sm" onClick={() => router.back()} className="w-full sm:w-auto">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 flex-1 min-w-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.back()}
+                className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto hidden sm:inline-flex"
+              >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+                  <FolderOpen className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
                   <h1
-                    className="text-2xl sm:text-3xl font-bold text-foreground line-clamp-2 max-w-full"
+                    className="text-xl sm:text-2xl lg:text-3xl font-bold text-[var(--apple-label)] leading-tight tracking-tight line-clamp-2 max-w-full break-words"
                     title={project.name}
                   >
                     {project.name}
@@ -810,26 +851,28 @@ export default function ProjectDetailPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto sm:mt-4 lg:mt-6">
-              {canUpdateProject && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/projects/create?edit=${projectId}`)}
-                  className="w-full sm:w-auto"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Project
-                </Button>
-              )}
+            <div className="flex flex-col items-stretch gap-2 w-full sm:w-auto sm:justify-end">
+              <div className="flex flex-wrap items-stretch gap-2 sm:justify-end">
+                {canUpdateProject && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/projects/create?edit=${projectId}`)}
+                    className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Project
+                  </Button>
+                )}
+                {canCreateTask && (
+                  <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Task
+                  </Button>
+                )}
+              </div>
               {canCreateTask && (
-                <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Task
-                </Button>
-              )}
-              {canCreateTask && (
-                <Button size="sm" variant="outline" onClick={() => setShowBulkUploadDialog(true)} className="w-full sm:w-auto">
+                <Button size="sm" variant="outline" onClick={() => setShowBulkUploadDialog(true)} className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto">
                   <Upload className="h-4 w-4 mr-2" />
                   Bulk Upload
                 </Button>
@@ -838,76 +881,93 @@ export default function ProjectDetailPage() {
           </div>
 
           {/* Project Stats */}
-          <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                    <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Progress</p>
-                    <p className="text-2xl font-bold text-foreground">{project.progress?.completionPercentage || 0}%</p>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-6">
+            {/* Progress */}
+            <div className="card-fade-in card-fade-in-delay-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+              <div className="px-3 pt-3 pb-3">
+                <div className="mb-2">
+                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Progress</span>
+                </div>
+                <div className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-none mb-2" style={{ background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                  {project.progress?.completionPercentage || 0}%
+                </div>
+                <div className="h-[4px] w-full rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden mb-1.5">
+                  <div
+                    className="h-full rounded-full progress-bar-animated relative overflow-hidden"
+                    style={{
+                      width: `${project.progress?.completionPercentage || 0}%`,
+                      background: 'var(--apple-chart-gradient)',
+                      boxShadow: (project.progress?.completionPercentage || 0) > 2 ? '0 0 6px var(--apple-chart-glow)' : 'none',
+                    }}
+                  >
+                    {(project.progress?.completionPercentage || 0) > 2 && <span className="progress-shimmer absolute inset-0" />}
                   </div>
                 </div>
-                <div className="mt-4">
-                  <Progress value={project.progress?.completionPercentage || 0} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {project.progress?.tasksCompleted || 0} of {project.progress?.totalTasks || 0} tasks completed
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                <span className="text-[11px] text-[var(--apple-tertiary-label)]">
+                  {project.progress?.tasksCompleted || 0} of {project.progress?.totalTasks || 0} tasks
+                </span>
+              </div>
+            </div>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                    <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Team Members</p>
-                    <p className="text-2xl font-bold text-foreground">{project.teamMembers.length}</p>
-                  </div>
+            {/* Team Members */}
+            <div className="card-fade-in card-fade-in-delay-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+              <div className="px-3 pt-3 pb-3">
+                <div className="mb-2">
+                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Team Members</span>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-none mb-1.5" style={{ background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                  {project.teamMembers.length}
+                </div>
+                <span className="text-[11px] text-[var(--apple-tertiary-label)]">
+                  {project.teamMembers.length === 1 ? 'member' : 'members'} assigned
+                </span>
+              </div>
+            </div>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                    <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Duration</p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {project.startDate && project.endDate
-                        ? Math.ceil((new Date(project.endDate).getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24))
-                        : 'N/A'
-                      }
-                    </p>
-                    <p className="text-xs text-muted-foreground">days</p>
-                  </div>
+            {/* Duration */}
+            <div className="card-fade-in card-fade-in-delay-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+              <div className="px-3 pt-3 pb-3">
+                <div className="mb-2">
+                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Duration</span>
                 </div>
-              </CardContent>
-            </Card>
+                {project.startDate && project.endDate ? (
+                  <>
+                    <div className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-none mb-1.5" style={{ background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                      {Math.ceil((new Date(project.endDate).getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24))}
+                    </div>
+                    <span className="text-[11px] text-[var(--apple-tertiary-label)]">days total</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-[18px] sm:text-[20px] font-bold tracking-tight leading-none mb-1.5" style={{ color: 'var(--apple-secondary-label)' }}>
+                      No due date
+                    </div>
+                    <span className="text-[11px] text-[var(--apple-tertiary-label)]">End date not set</span>
+                  </>
+                )}
+              </div>
+            </div>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                    <DollarSign className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Budget</p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {project.budget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total) : 'N/A'}
-                    </p>
-                  </div>
+            {/* Budget */}
+            <div className="card-fade-in card-fade-in-delay-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+              <div className="px-3 pt-3 pb-3">
+                <div className="mb-2">
+                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Budget</span>
                 </div>
-              </CardContent>
-            </Card>
+                <div
+                  className="text-[18px] sm:text-[22px] font-bold tracking-tight leading-none mb-1.5 truncate"
+                  style={project.budget
+                    ? { background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
+                    : { color: 'var(--apple-secondary-label)' }
+                  }
+                >
+                  {project.budget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total) : 'No budget'}
+                </div>
+                <span className="text-[11px] text-[var(--apple-tertiary-label)]">
+                  {project.budget ? 'total budget' : 'Budget not set'}
+                </span>
+              </div>
+            </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={(value) => {
@@ -915,18 +975,70 @@ export default function ProjectDetailPage() {
             newSearchParams.set('tab', value)
             router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
           }} className="space-y-8">
-            <TabsList className={`grid w-full gap-1 overflow-x-auto mt-2 ${canManageTests ? 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-11' : 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-10'}`}>
-              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-              <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
-              <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
-              <TabsTrigger value="budget" className="text-xs sm:text-sm">Budget</TabsTrigger>
-              <TabsTrigger value="tasks" className="text-xs sm:text-sm">Tasks</TabsTrigger>
-              <TabsTrigger value="kanban" className="text-xs sm:text-sm">Kanban</TabsTrigger>
-              <TabsTrigger value="calendar" className="text-xs sm:text-sm">Calendar</TabsTrigger>
-              <TabsTrigger value="backlog" className="text-xs sm:text-sm">Backlog</TabsTrigger>
-              {canManageTests && <TabsTrigger value="testing" className="text-xs sm:text-sm">Testing</TabsTrigger>}
-              <TabsTrigger value="reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
-              <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
+            <div className="mt-2 sm:hidden">
+              <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-background via-background to-muted/30 p-3 shadow-sm ring-1 ring-black/5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                    Tab {currentTabIndex + 1} of {tabs.length}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleNextTab}
+                    disabled={!nextTab}
+                    className="h-7 w-7"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
+                  <div className="min-w-0 rounded-xl bg-primary/8 px-3 py-2 ring-1 ring-primary/10">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground shadow-sm">
+                        {currentTabIndex + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-medium uppercase tracking-wide text-primary/70">
+                          Current
+                        </p>
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {tabs.find(tab => tab.id === activeTab)?.label || activeTab}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center text-muted-foreground">
+                    <ArrowRight className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 rounded-xl border border-border/70 bg-muted/40 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-background text-[11px] font-semibold text-foreground ring-1 ring-border/70">
+                        {nextTab ? nextTab.order : '✓'}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {nextTab ? 'Next' : 'Done'}
+                        </p>
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {nextTab ? nextTab.label : 'All tabs viewed'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <TabsList className={'mt-2 hidden h-auto w-full gap-1 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-sm sm:grid ' + (canManageTests ? 'sm:grid-cols-11' : 'sm:grid-cols-10')}>
+              {tabs.map((tab) => (
+                <TabsTrigger key={tab.id} value={tab.id} className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    {tab.order}
+                  </span>
+                  <span>{tab.label}</span>
+                </TabsTrigger>
+              ))}
             </TabsList>
 
             <TabsContent value="overview" className="space-y-8">
@@ -2027,107 +2139,128 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Project Progress</CardTitle>
-                      <Target className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{project?.stats?.tasks?.completionRate || 0}%</div>
-                      <p className="text-xs text-muted-foreground">
-                        {project?.stats?.tasks?.completed || 0} of {project?.stats?.tasks?.total || 0} tasks completed
-                      </p>
-                    </CardContent>
-                  </Card>
+                {/* ── Stat cards ── */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  {/* Task completion */}
+                  <div className="card-fade-in card-fade-in-delay-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Target className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+                      <p className="text-[12px] font-semibold tracking-[0.05em] uppercase text-[var(--apple-secondary-label)]">Task Completion</p>
+                    </div>
+                    <p className="text-[30px] font-bold font-apple-mono tabular-nums leading-none" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                      {Math.round(project?.stats?.tasks?.completionRate ?? 0)}%
+                    </p>
+                    <p className="text-[12px] text-[var(--apple-secondary-label)] mt-2">
+                      {project?.stats?.tasks?.completed ?? 0} of {project?.stats?.tasks?.total ?? 0} tasks done
+                    </p>
+                  </div>
 
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Budget Utilization</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{project?.stats?.budget?.utilizationRate || 0}%</div>
-                      <p className="text-xs text-muted-foreground">
-                        {project?.stats?.budget?.spent || 0} of {project?.stats?.budget?.total || 0} spent
-                      </p>
-                    </CardContent>
-                  </Card>
+                  {/* Budget */}
+                  {(() => {
+                    const utilizationRate = Math.round(project?.stats?.budget?.utilizationRate ?? 0)
+                    const rateColor = utilizationRate > 85 ? '#FF453A' : utilizationRate > 65 ? '#FF9F0A' : undefined
+                    return (
+                      <div className="card-fade-in card-fade-in-delay-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <DollarSign className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+                          <p className="text-[12px] font-semibold tracking-[0.05em] uppercase text-[var(--apple-secondary-label)]">Budget Used</p>
+                        </div>
+                        <p
+                          className="text-[30px] font-bold font-apple-mono tabular-nums leading-none"
+                          style={rateColor ? { color: rateColor } : { background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+                        >
+                          {utilizationRate}%
+                        </p>
+                        <p className="text-[12px] text-[var(--apple-secondary-label)] mt-2">
+                          {formatCurrency(project?.stats?.budget?.spent ?? 0)} of {formatCurrency(project?.stats?.budget?.total ?? 0)}
+                        </p>
+                      </div>
+                    )
+                  })()}
 
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Time Tracking</CardTitle>
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{project?.stats?.timeTracking?.totalHours || 0}h</div>
-                      <p className="text-xs text-muted-foreground">
-                        {project?.stats?.timeTracking?.entries || 0} time entries
-                      </p>
-                    </CardContent>
-                  </Card>
+                  {/* Time */}
+                  <div className="card-fade-in card-fade-in-delay-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Clock className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+                      <p className="text-[12px] font-semibold tracking-[0.05em] uppercase text-[var(--apple-secondary-label)]">Time Logged</p>
+                    </div>
+                    <p className="text-[30px] font-bold font-apple-mono tabular-nums leading-none" style={{ background: 'var(--apple-card-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                      {(project?.stats?.timeTracking?.totalHours ?? 0).toFixed(1)}h
+                    </p>
+                    <p className="text-[12px] text-[var(--apple-secondary-label)] mt-2">
+                      {project?.stats?.timeTracking?.entries ?? 0} {project?.stats?.timeTracking?.entries === 1 ? 'entry' : 'entries'}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="grid gap-8 lg:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Recent Activity</CardTitle>
-                      <CardDescription>Latest project activities and updates</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <div className="flex-1 space-y-1">
-                            <p className="text-sm font-medium">Project created</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDate(project?.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <div className="flex-1 space-y-1">
-                            <p className="text-sm font-medium">First task completed</p>
-                            <p className="text-xs text-muted-foreground">2 days ago</p>
-                          </div>
-                        </div>
+                {/* ── Project info grid ── */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Timeline */}
+                  <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                    <p className="text-[12px] font-semibold tracking-[0.05em] uppercase text-[var(--apple-secondary-label)] mb-4">Timeline</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-[var(--apple-secondary-label)]">Start date</span>
+                        <span className="text-[13px] font-medium text-[var(--apple-label)]">{project.startDate ? formatDate(project.startDate) : '—'}</span>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-[var(--apple-secondary-label)]">End date</span>
+                        <span className="text-[13px] font-medium text-[var(--apple-label)]">{project.endDate ? formatDate(project.endDate) : 'Not set'}</span>
+                      </div>
+                      {project.startDate && project.endDate && (() => {
+                        const today = new Date()
+                        const end = new Date(project.endDate)
+                        const daysLeft = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                        const isOverdue = daysLeft < 0
+                        return (
+                          <div className="flex items-center justify-between">
+                            <span className="text-[13px] text-[var(--apple-secondary-label)]">{isOverdue ? 'Overdue by' : 'Days remaining'}</span>
+                            <span className="text-[13px] font-semibold font-apple-mono" style={{ color: isOverdue ? '#FF453A' : daysLeft <= 7 ? '#FF9F0A' : '#34C759' }}>
+                              {Math.abs(daysLeft)}d
+                            </span>
+                          </div>
+                        )
+                      })()}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] text-[var(--apple-secondary-label)]">Created</span>
+                        <span className="text-[13px] font-medium text-[var(--apple-label)]">{formatDate(project.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Team Performance</CardTitle>
-                      <CardDescription>Team member productivity and workload</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {project?.teamMembers?.slice(0, 3).map((member: Project['teamMembers'][number], index: number) => {
-                          const user = member.memberId;
-                          return (
-                            <div key={member._id || index} className="flex items-center space-x-4">
-                              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                                {user?.firstName?.[0]}{user?.lastName?.[0]}
-                              </div>
-                              <div className="flex-1 space-y-1">
-                                <p className="text-sm font-medium">
-                                  {user?.firstName} {user?.lastName}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{user?.role ? formatToTitleCase(user.role.replace(/_/g, ' ')) : ''}</p>
-                                {member.hourlyRate && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {member.hourlyRate}/hr
-                                  </p>
-                                )}
-                              </div>
-                              <Badge variant="secondary" className="hover:bg-secondary dark:hover:bg-secondary">Active</Badge>
+                  {/* Team */}
+                  <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[12px] font-semibold tracking-[0.05em] uppercase text-[var(--apple-secondary-label)]">Team</p>
+                      <span className="text-[12px] font-semibold font-apple-mono text-[var(--apple-secondary-label)]">{project.teamMembers.length} {project.teamMembers.length === 1 ? 'member' : 'members'}</span>
+                    </div>
+                    <div className="space-y-3">
+                      {project.teamMembers.slice(0, 4).map((member, index) => {
+                        const user = member.memberId
+                        const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`
+                        return (
+                          <div key={member._id || index} className="flex items-center gap-3">
+                            <div className="h-7 w-7 rounded-full bg-[var(--apple-tertiary-fill)] flex items-center justify-center text-[11px] font-semibold text-[var(--apple-label)] flex-shrink-0">
+                              {initials}
                             </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[13px] font-medium text-[var(--apple-label)] truncate">{user?.firstName} {user?.lastName}</p>
+                              {user?.role && <p className="text-[11px] text-[var(--apple-tertiary-label)] truncate">{formatToTitleCase(user.role.replace(/_/g, ' '))}</p>}
+                            </div>
+                            {member.hourlyRate && (
+                              <span className="text-[11px] font-apple-mono text-[var(--apple-tertiary-label)] flex-shrink-0">{formatCurrency(member.hourlyRate)}/hr</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {project.teamMembers.length > 4 && (
+                        <p className="text-[12px] text-[var(--apple-tertiary-label)] pt-1">+{project.teamMembers.length - 4} more</p>
+                      )}
+                      {project.teamMembers.length === 0 && (
+                        <p className="text-[13px] text-[var(--apple-tertiary-label)]">No team members assigned</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </TabsContent>

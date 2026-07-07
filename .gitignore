@@ -41,6 +41,8 @@ next-env.d.ts
 .idea/
 *.swp
 *.swo
+.agents/
+skills-lock.json
 
 # OS
 Thumbs.db
@@ -159,6 +161,10 @@ dist
 # Docker
 .dockerignore
 
-# Uploads
-# uploads/
-
+# Uneeded temp md files
+FIX_LANDING_IMAGES.md
+LANDING_PAGE_TROUBLESHOOTING.md
+QUICK_FIX_IMAGES.md
+SAVE_IMAGES_NOW.md
+SET_LANDING_IMAGES.md
+TIMER_AUTO_STOP_FIX.md

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 interface UseSessionTimeoutOptions {
-  /** Total inactivity timeout in milliseconds (default: 30 minutes) */
+  /** Total inactivity timeout in milliseconds (default: 4 hours) */
   timeoutMs?: number
   /** Time before timeout to show warning in milliseconds (default: 5 minutes) */
   warningBeforeMs?: number
@@ -42,9 +42,13 @@ export function useSessionTimeout({
   const countdownRef = useRef<NodeJS.Timeout | null>(null)
   const throttleRef = useRef<number>(0)
   const onTimeoutRef = useRef(onTimeout)
+  // Ref-based flag so handleUserActivity never closes over showWarning state,
+  // preventing the activity-listener useEffect from re-running when the warning appears.
+  const showWarningRef = useRef(false)
 
-  // Keep onTimeout ref up to date
+  // Keep refs up to date
   onTimeoutRef.current = onTimeout
+  showWarningRef.current = showWarning
 
   const clearAllTimers = useCallback(() => {
     if (warningTimerRef.current) {
@@ -69,6 +73,7 @@ export function useSessionTimeout({
     // Timer for showing the warning
     warningTimerRef.current = setTimeout(() => {
       setShowWarning(true)
+      showWarningRef.current = true
       setRemainingSeconds(Math.floor(warningBeforeMs / 1000))
 
       // Start countdown
@@ -86,6 +91,7 @@ export function useSessionTimeout({
     timeoutTimerRef.current = setTimeout(() => {
       clearAllTimers()
       setShowWarning(false)
+      showWarningRef.current = false
       onTimeoutRef.current()
     }, timeoutMs)
   }, [timeoutMs, warningBeforeMs, clearAllTimers])
@@ -93,13 +99,15 @@ export function useSessionTimeout({
   const resetTimer = useCallback(() => {
     lastActivityRef.current = Date.now()
     setShowWarning(false)
+    showWarningRef.current = false
     setRemainingSeconds(0)
     startTimers()
   }, [startTimers])
 
   const handleUserActivity = useCallback(() => {
-    // Don't reset if warning is already showing
-    if (showWarning) return
+    // Use ref so this callback is stable and doesn't cause the effect to re-run
+    // when showWarning changes — which would incorrectly reset the timeout timer.
+    if (showWarningRef.current) return
 
     const now = Date.now()
     // Throttle activity events
@@ -107,10 +115,11 @@ export function useSessionTimeout({
     throttleRef.current = now
 
     resetTimer()
-  }, [showWarning, resetTimer])
+  }, [resetTimer])
 
   const stayLoggedIn = useCallback(() => {
     setShowWarning(false)
+    showWarningRef.current = false
     setRemainingSeconds(0)
     resetTimer()
   }, [resetTimer])
@@ -118,6 +127,7 @@ export function useSessionTimeout({
   const handleLogout = useCallback(() => {
     clearAllTimers()
     setShowWarning(false)
+    showWarningRef.current = false
     onTimeoutRef.current()
   }, [clearAllTimers])
 
@@ -142,6 +152,7 @@ export function useSessionTimeout({
           // Show warning with correct remaining time
           const remaining = Math.max(0, timeoutMs - elapsed)
           setShowWarning(true)
+          showWarningRef.current = true
           setRemainingSeconds(Math.floor(remaining / 1000))
         }
       }

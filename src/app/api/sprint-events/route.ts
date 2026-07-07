@@ -293,8 +293,8 @@ export async function GET(req: NextRequest) {
     const sprintEvents = await SprintEvent.find(query)
       .populate('sprint', 'name status')
       .populate('project', 'name')
-      .populate('facilitator', 'firstName lastName email')
-      .populate('attendees', 'firstName lastName email')
+      .populate('facilitator', 'firstName lastName email avatar')
+      .populate('attendees', 'firstName lastName email avatar')
       .sort({ createdAt: -1 })
 
     // Debug sprint population and fix data integrity issues
@@ -595,8 +595,8 @@ export async function POST(req: NextRequest) {
     const populatedEvent = await SprintEvent.findById(createdEvents[0]._id)
       .populate('sprint', 'name status')
       .populate('project', 'name')
-      .populate('facilitator', 'firstName lastName email')
-      .populate('attendees', 'firstName lastName email')
+      .populate('facilitator', 'firstName lastName email avatar')
+      .populate('attendees', 'firstName lastName email avatar')
 
     // Send email notifications to attendees (asynchronously)
     if (attendees && attendees.length > 0) {

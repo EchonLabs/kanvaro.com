@@ -1,400 +1,230 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
-import { Button } from '@/components/ui/Button'
-import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Area,
-  AreaChart
-} from 'recharts'
-import { 
-  Calendar, 
-  Clock, 
-  Target,
-  TrendingUp,
-  AlertCircle,
-  CheckCircle
-} from 'lucide-react'
+import { Calendar, CheckCircle2, AlertCircle } from 'lucide-react'
 
 interface Project {
-  _id: string
-  name: string
-  status: string
-  startDate: string
-  endDate?: string
-  description?: string
-  budget?: {
-    total: number
-    spent: number
-    remaining: number
-  }
-  team?: any[]
+  _id: string; name: string; status: string; startDate: string; endDate?: string
+  description?: string; teamMembers?: any[]
   stats: {
-    tasks: {
-      total: number
-      completed: number
-      completionRate: number
-    }
-    sprints: {
-      total: number
-      active: number
-    }
-    timeTracking: {
-      totalHours: number
-      entries: number
-    }
-    budget: {
-      total: number
-      spent: number
-      remaining: number
-      utilizationRate: number
-    }
+    tasks: { total: number; completed: number; completionRate: number }
+    sprints: { total: number; active: number }
+    timeTracking: { totalHours: number; entries: number }
+    budget: { total: number; spent: number; remaining: number; utilizationRate: number }
   }
 }
 
-interface ProjectTimelineReportProps {
-  projects: Project[]
-  filters: any
+interface ProjectTimelineReportProps { projects: Project[]; filters: any }
+
+const STATUS_PALETTE: Record<string, { color: string; bg: string; label: string }> = {
+  active:    { color: '#34C759', bg: 'rgba(52,199,89,0.12)', label: 'Active' },
+  completed: { color: '#007AFF', bg: 'rgba(0,122,255,0.12)', label: 'Completed' },
+  'on-hold': { color: '#FF9500', bg: 'rgba(255,149,0,0.12)', label: 'On Hold' },
+  cancelled: { color: '#FF453A', bg: 'rgba(255,69,58,0.12)', label: 'Cancelled' },
+  planning:  { color: '#BF5AF2', bg: 'rgba(191,90,242,0.12)', label: 'Planning' },
 }
+const getStatus = (s: string) => STATUS_PALETTE[s] || { color: '#8E8E93', bg: 'rgba(142,142,147,0.12)', label: s }
 
-export function ProjectTimelineReport({ projects, filters }: ProjectTimelineReportProps) {
-  const { formatDate } = useDateTime()
+const BAR_COLORS = ['#007AFF', '#34C759', '#FF9500', '#BF5AF2', '#FF453A', '#5AC8FA', '#FFD60A', '#30D158', '#FF6B6B', '#5E5CE6']
 
-  // Prepare timeline data
-  const timelineData = projects.map(project => {
-    const startDate = new Date(project.startDate)
-    const endDate = project.endDate ? new Date(project.endDate) : new Date()
-    const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-    const daysElapsed = Math.ceil((new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-    const progress = Math.min(100, (daysElapsed / duration) * 100)
-    
-    return {
-      name: project.name,
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
-      duration,
-      daysElapsed,
-      progress,
-      completion: project.stats.tasks.completionRate,
-      status: project.status,
-      isOverdue: project.status !== 'completed' && daysElapsed > duration
-    }
-  })
-
-  // Generate monthly project data
-  const monthlyData = generateMonthlyProjectData(projects)
-
-  // Calculate timeline metrics
-  const overdueProjects = timelineData.filter(p => p.isOverdue)
-  const onTrackProjects = timelineData.filter(p => !p.isOverdue && p.status === 'active')
-  const completedProjects = timelineData.filter(p => p.status === 'completed')
-
+const AppleTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null
   return (
-    <div className="space-y-8">
-      {/* Timeline Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Projects</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">{projects.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              In timeline view
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">On Track</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold text-green-600">
-              {onTrackProjects.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Projects on schedule
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Overdue</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold text-red-600">
-              {overdueProjects.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Projects behind schedule
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Completed</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {completedProjects.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Successfully finished
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Project Timeline Gantt-like View */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Project Timeline</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Project duration and progress over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={timelineData} layout="horizontal">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value} days`, 'Duration']} />
-                <Bar dataKey="duration" fill="#8884d8" name="Planned Duration" />
-                <Bar dataKey="daysElapsed" fill="#82ca9d" name="Days Elapsed" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Monthly Project Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Monthly Project Activity</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Project starts and completions by month</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Area 
-                  type="monotone" 
-                  dataKey="started" 
-                  stackId="1" 
-                  stroke="#00C49F" 
-                  fill="#00C49F" 
-                  fillOpacity={0.6}
-                  name="Projects Started"
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="completed" 
-                  stackId="2" 
-                  stroke="#0088FE" 
-                  fill="#0088FE" 
-                  fillOpacity={0.6}
-                  name="Projects Completed"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Progress vs Time */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Progress vs Time</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Task completion vs timeline progress</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={timelineData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
-                <Line 
-                  type="monotone" 
-                  dataKey="progress" 
-                  stroke="#8884d8" 
-                  strokeWidth={2}
-                  name="Timeline Progress"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="completion" 
-                  stroke="#82ca9d" 
-                  strokeWidth={2}
-                  name="Task Completion"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Project Status Over Time */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Project Status Trends</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Status distribution over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar dataKey="active" fill="#00C49F" name="Active" />
-                <Bar dataKey="completed" fill="#0088FE" name="Completed" />
-                <Bar dataKey="overdue" fill="#FF8042" name="Overdue" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Project Timeline Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base sm:text-lg">Project Timeline Details</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Detailed timeline view for each project</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-5">
-            {timelineData.map((project) => (
-              <div key={project.name} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
-                <div className="flex-1 min-w-0 w-full sm:w-auto">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
-                    <h3 className="font-semibold text-sm sm:text-base truncate">{project.name}</h3>
-                    <Badge variant={project.isOverdue ? 'destructive' : 'default'} className="flex-shrink-0">
-                      {project.status}
-                    </Badge>
-                    {project.isOverdue && (
-                      <Badge variant="destructive" className="flex items-center space-x-1 flex-shrink-0">
-                        <AlertCircle className="h-3 w-3" />
-                        <span className="text-xs sm:text-sm">Overdue</span>
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  {/* Timeline Progress */}
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
-                        <span className="flex items-center space-x-1">
-                          <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                          <span>Timeline Progress</span>
-                        </span>
-                        <span className="flex-shrink-0 ml-2">{project.progress.toFixed(1)}%</span>
-                      </div>
-                      <Progress value={project.progress} className="h-2" />
-                      <div className="text-xs text-muted-foreground mt-1 break-words">
-                        {project.daysElapsed} of {project.duration} days elapsed
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
-                        <span className="flex items-center space-x-1">
-                          <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                          <span>Task Completion</span>
-                        </span>
-                        <span className="flex-shrink-0 ml-2">{project.completion.toFixed(1)}%</span>
-                      </div>
-                      <Progress value={project.completion} className="h-2" />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-5 w-full sm:w-auto sm:ml-6">
-                  <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
-                    <div className="text-xs sm:text-sm font-medium truncate">
-                      {project.startDate}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Start Date</div>
-                  </div>
-                  <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
-                    <div className="text-xs sm:text-sm font-medium truncate">
-                      {project.endDate}
-                    </div>
-                    <div className="text-xs text-muted-foreground">End Date</div>
-                  </div>
-                  <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {project.duration}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Days</div>
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full sm:w-auto flex-shrink-0">
-                    View Details
-                  </Button>
-                </div>
-              </div>
-            ))}
+    <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px] min-w-[140px]">
+      {label && <p className="font-semibold text-[var(--apple-label)] mb-2">{label}</p>}
+      {payload.map((item: any, i: number) => (
+        <div key={i} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+            <span className="text-[var(--apple-secondary-label)]">{item.name}</span>
           </div>
-        </CardContent>
-      </Card>
+          <span className="font-semibold font-apple-mono text-[var(--apple-label)]">{item.value} days</span>
+        </div>
+      ))}
     </div>
   )
 }
 
-function generateMonthlyProjectData(projects: Project[]) {
-  const months = []
-  const now = new Date()
-  
-  for (let i = 11; i >= 0; i--) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-    
-    // Count projects by status for this month
-    const monthProjects = projects.filter(project => {
-      const startDate = new Date(project.startDate)
-      return startDate.getMonth() === date.getMonth() && startDate.getFullYear() === date.getFullYear()
-    })
-    
-    const completedProjects = projects.filter(project => {
-      if (!project.endDate) return false
-      const endDate = new Date(project.endDate)
-      return endDate.getMonth() === date.getMonth() && endDate.getFullYear() === date.getFullYear()
-    })
-    
-    months.push({
-      month: monthName,
-      started: monthProjects.length,
-      completed: completedProjects.length,
-      active: projects.filter(p => p.status === 'active').length,
-      overdue: projects.filter(p => {
-        const startDate = new Date(p.startDate)
-        const endDate = p.endDate ? new Date(p.endDate) : new Date()
-        const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-        const daysElapsed = Math.ceil((new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-        return p.status !== 'completed' && daysElapsed > duration
-      }).length
-    })
-  }
-  
-  return months
+export function ProjectTimelineReport({ projects, filters }: ProjectTimelineReportProps) {
+  const { formatDate } = useDateTime()
+  const today = new Date()
+
+  const timelineProjects = projects.map(p => {
+    const start = new Date(p.startDate)
+    const end = p.endDate ? new Date(p.endDate) : today
+    const duration = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
+    const elapsed = Math.max(0, Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
+    const daysLeft = p.endDate ? Math.ceil((new Date(p.endDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
+    const isOverdue = daysLeft !== null && daysLeft < 0 && p.status !== 'completed'
+    return { ...p, duration, elapsed, daysLeft, isOverdue }
+  })
+
+  const durationData = timelineProjects.map(p => ({
+    name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name,
+    Duration: p.duration,
+  }))
+
+  const avgDuration = timelineProjects.length > 0
+    ? timelineProjects.reduce((s, p) => s + p.duration, 0) / timelineProjects.length
+    : 0
+
+  const overdueCount = timelineProjects.filter(p => p.isOverdue).length
+  const onTimeCount = timelineProjects.filter(p => !p.isOverdue && p.status !== 'completed').length
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── Stats Strip ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Projects', value: String(projects.length), sub: 'All tracked', color: 'var(--apple-chart-color)' },
+          { label: 'Avg Duration', value: `${avgDuration.toFixed(0)} days`, sub: 'Per project', color: '#FF9500' },
+          { label: 'Overdue', value: String(overdueCount), sub: 'Past deadline', color: '#FF453A' },
+          { label: 'On Track', value: String(onTimeCount), sub: 'Within schedule', color: '#34C759' },
+        ].map(s => (
+          <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
+            <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
+            <p className="text-[22px] font-bold font-apple-mono tracking-tight" style={{ color: s.color }}>{s.value}</p>
+            <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{s.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Duration Chart ── */}
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+        <div className="mb-4">
+          <p className="text-[17px] font-semibold">Project Durations</p>
+          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Total duration in days per project</p>
+        </div>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={durationData} barCategoryGap="40%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}d`} />
+            <Tooltip content={<AppleTooltip />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+            <Bar dataKey="Duration" radius={[5,5,0,0]} maxBarSize={44}>
+              {durationData.map((_, i) => (
+                <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── Timeline Rows ── */}
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+        <div className="px-5 pt-5 pb-4 border-b border-[var(--apple-separator)]">
+          <p className="text-[17px] font-semibold">Project Timeline</p>
+          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Schedule and progress for all projects</p>
+        </div>
+
+        {/* Column headers */}
+        <div className="hidden md:grid grid-cols-[1fr_180px_90px_90px_80px] gap-4 px-5 py-2 border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)]">Project</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)]">Date Range</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Duration</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Tasks</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)] text-right">Schedule</p>
+        </div>
+
+        <div className="divide-y divide-[var(--apple-separator)]">
+          {timelineProjects.map(p => {
+            const st = getStatus(p.status)
+            const progress = Math.min(100, (p.elapsed / p.duration) * 100)
+            const taskColor = p.stats.tasks.completionRate >= 75 ? '#34C759' : p.stats.tasks.completionRate >= 40 ? '#FF9F0A' : 'var(--apple-chart-color)'
+            const scheduleColor = p.status === 'completed' ? '#007AFF' : p.isOverdue ? '#FF453A' : p.daysLeft !== null && p.daysLeft <= 7 ? '#FF9F0A' : '#34C759'
+            const scheduleLabel = p.status === 'completed'
+              ? 'Done'
+              : p.daysLeft === null
+              ? '—'
+              : p.isOverdue
+              ? `${Math.abs(p.daysLeft)}d over`
+              : `${p.daysLeft}d left`
+            return (
+              <div key={p._id} className="apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                {/* Desktop row */}
+                <div className="hidden md:grid grid-cols-[1fr_180px_90px_90px_80px] gap-4 items-center px-5 py-3.5">
+                  {/* Name + status */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: st.color }} />
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-semibold truncate">{p.name}</p>
+                      <span className="text-[11px] font-medium" style={{ color: st.color }}>{st.label}</span>
+                    </div>
+                    {p.isOverdue && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-50 dark:bg-red-950/30 text-red-500 flex-shrink-0">
+                        <AlertCircle className="h-2.5 w-2.5" />Overdue
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Date range */}
+                  <div className="flex items-center gap-1.5 text-[12px] text-[var(--apple-secondary-label)]">
+                    <Calendar className="h-3 w-3 flex-shrink-0 text-[var(--apple-tertiary-label)]" />
+                    <span className="font-apple-mono">{formatDate(p.startDate)}</span>
+                    {p.endDate && (
+                      <>
+                        <span className="text-[var(--apple-tertiary-label)]">→</span>
+                        <span className="font-apple-mono">{formatDate(p.endDate)}</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Duration */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono text-[var(--apple-label)]">{p.duration}d</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">{Math.round(progress)}% elapsed</p>
+                  </div>
+
+                  {/* Tasks */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono" style={{ color: taskColor }}>{p.stats.tasks.completionRate.toFixed(0)}%</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">{p.stats.tasks.completed}/{p.stats.tasks.total}</p>
+                  </div>
+
+                  {/* Schedule status */}
+                  <div className="text-right">
+                    <p className="text-[14px] font-semibold font-apple-mono" style={{ color: scheduleColor }}>{scheduleLabel}</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">{p.duration}d total</p>
+                  </div>
+                </div>
+
+                {/* Mobile card */}
+                <div className="md:hidden px-5 py-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: st.color }} />
+                      <p className="text-[14px] font-semibold truncate">{p.name}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="text-[11px] font-semibold rounded-full px-2 py-0.5" style={{ backgroundColor: st.bg, color: st.color }}>{st.label}</span>
+                      {p.isOverdue && <AlertCircle className="h-3.5 w-3.5 text-red-500" />}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[12px] text-[var(--apple-secondary-label)]">
+                    <Calendar className="h-3 w-3 text-[var(--apple-tertiary-label)]" />
+                    <span className="font-apple-mono">{formatDate(p.startDate)}{p.endDate ? ` → ${formatDate(p.endDate)}` : ''}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-[8px] bg-[var(--apple-quaternary-fill)] p-2 text-center">
+                      <p className="text-[13px] font-semibold font-apple-mono text-[var(--apple-label)]">{p.duration}d</p>
+                      <p className="text-[10px] text-[var(--apple-tertiary-label)]">Duration</p>
+                    </div>
+                    <div className="rounded-[8px] bg-[var(--apple-quaternary-fill)] p-2 text-center">
+                      <p className="text-[13px] font-semibold font-apple-mono" style={{ color: taskColor }}>{p.stats.tasks.completionRate.toFixed(0)}%</p>
+                      <p className="text-[10px] text-[var(--apple-tertiary-label)]">Tasks</p>
+                    </div>
+                    <div className="rounded-[8px] bg-[var(--apple-quaternary-fill)] p-2 text-center">
+                      <p className="text-[13px] font-semibold font-apple-mono" style={{ color: scheduleColor }}>{scheduleLabel}</p>
+                      <p className="text-[10px] text-[var(--apple-tertiary-label)]">Schedule</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
 }

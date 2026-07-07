@@ -103,7 +103,7 @@ export function StandupScheduleDialog({ open, onOpenChange, members, onSubmit }:
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
                     {selectedDate ? format(selectedDate, 'PPP') : 'Pick a date'}
                   </Button>
                 </PopoverTrigger>
@@ -156,10 +156,24 @@ export function StandupScheduleDialog({ open, onOpenChange, members, onSubmit }:
         </DialogBody>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Create Schedule
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="rounded-full px-5 h-9 text-[13.5px] font-medium border-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="rounded-full px-5 h-9 text-[13.5px] font-medium text-white border-0 apple-transition"
+            style={{ background: 'var(--apple-system-blue)', boxShadow: '0 2px 10px rgba(0,122,255,0.28)' }}
+          >
+            {submitting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.5} />Scheduling…</>
+            ) : (
+              'Create Schedule'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,561 +1,367 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useOrganization } from '@/hooks/useOrganization'
-import { Mail, Send, AlertCircle, CheckCircle, TestTube, XCircle, X } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Mail, TestTube, Save, AlertCircle, CheckCircle, Loader2, Server, Cloud, Ban } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
+import { cn } from '@/lib/utils'
+
+const PROVIDERS = [
+  {
+    id: 'smtp',
+    label: 'SMTP Server',
+    description: 'Use your own SMTP server',
+    icon: Server,
+    gradient: 'var(--apple-card-gradient)',
+    glow: 'var(--apple-chart-glow)',
+  },
+  {
+    id: 'azure',
+    label: 'Azure App',
+    description: 'Azure App with Exchange Online',
+    icon: Cloud,
+    gradient: 'var(--apple-card-gradient)',
+    glow: 'var(--apple-chart-glow)',
+  },
+  {
+    id: 'skip',
+    label: 'Skip Email',
+    description: 'Disable email notifications',
+    icon: Ban,
+    gradient: 'var(--apple-card-gradient)',
+    glow: 'var(--apple-chart-glow)',
+  },
+] as const
 
 export function EmailSettings() {
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { organization, loading } = useOrganization()
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
-  
-  const [formData, setFormData] = useState({
-    provider: 'smtp' as 'smtp' | 'azure' | 'sendgrid' | 'mailgun' | 'skip',
-    smtp: {
-      host: '',
-      port: 587,
-      secure: false,
-      username: '',
-      password: '',
-      fromEmail: '',
-      fromName: ''
-    },
-    azure: {
-      clientId: '',
-      clientSecret: '',
-      tenantId: '',
-      fromEmail: '',
-      fromName: ''
-    }
-  })
-  
-  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null)
-  const [testMessage, setTestMessage] = useState('')
-  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Load email configuration from API
+  const [formData, setFormData] = useState({
+    provider: 'smtp' as 'smtp' | 'azure' | 'skip',
+    smtp: { host: '', port: 587, secure: false, username: '', password: '', fromEmail: '', fromName: '' },
+    azure: { clientId: '', clientSecret: '', tenantId: '', fromEmail: '', fromName: '' },
+  })
+
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const savedConfig = useRef<typeof formData | null>(null)
+
   useEffect(() => {
     const loadEmailConfig = async () => {
       try {
         const response = await fetch('/api/settings/email')
         if (response.ok) {
           const config = await response.json()
-          setFormData({
+          const loaded = {
             provider: config.provider || 'smtp',
             smtp: {
-              host: config.smtp?.host || '',
-              port: config.smtp?.port || 587,
-              secure: config.smtp?.secure || false,
-              username: config.smtp?.username || '',
-              password: config.smtp?.password || '',
-              fromEmail: config.smtp?.fromEmail || '',
-              fromName: config.smtp?.fromName || ''
+              host: config.smtp?.host || '', port: config.smtp?.port || 587,
+              secure: config.smtp?.secure || false, username: config.smtp?.username || '',
+              password: config.smtp?.password || '', fromEmail: config.smtp?.fromEmail || '',
+              fromName: config.smtp?.fromName || '',
             },
             azure: {
-              clientId: config.azure?.clientId || '',
-              clientSecret: config.azure?.clientSecret || '',
-              tenantId: config.azure?.tenantId || '',
-              fromEmail: config.azure?.fromEmail || '',
-              fromName: config.azure?.fromName || ''
-            }
-          })
+              clientId: config.azure?.clientId || '', clientSecret: config.azure?.clientSecret || '',
+              tenantId: config.azure?.tenantId || '', fromEmail: config.azure?.fromEmail || '',
+              fromName: config.azure?.fromName || '',
+            },
+          }
+          setFormData(loaded)
+          savedConfig.current = loaded
         }
       } catch (error) {
         console.error('Failed to load email configuration:', error)
-      } finally {
-        // Loading completed
       }
     }
-
     loadEmailConfig()
   }, [])
 
+  const hasChanges = !savedConfig.current || JSON.stringify(formData) !== JSON.stringify(savedConfig.current)
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
-
     if (formData.provider === 'smtp') {
       if (!formData.smtp.host.trim()) newErrors.host = 'SMTP Host is required'
       if (!formData.smtp.username.trim()) newErrors.username = 'Username is required'
       if (!formData.smtp.password.trim()) newErrors.password = 'Password is required'
       if (!formData.smtp.fromEmail.trim()) newErrors.fromEmail = 'From Email is required'
       if (!formData.smtp.fromName.trim()) newErrors.fromName = 'From Name is required'
-      if (formData.smtp.fromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.smtp.fromEmail)) {
+      if (formData.smtp.fromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.smtp.fromEmail))
         newErrors.fromEmail = 'Please enter a valid Email Address'
-      }
     } else if (formData.provider === 'azure') {
       if (!formData.azure.clientId.trim()) newErrors.clientId = 'Client ID is required'
       if (!formData.azure.clientSecret.trim()) newErrors.clientSecret = 'Client Secret is required'
       if (!formData.azure.tenantId.trim()) newErrors.tenantId = 'Tenant ID is required'
       if (!formData.azure.fromEmail.trim()) newErrors.fromEmail = 'From Email is required'
       if (!formData.azure.fromName.trim()) newErrors.fromName = 'From Name is required'
-      if (formData.azure.fromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.azure.fromEmail)) {
+      if (formData.azure.fromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.azure.fromEmail))
         newErrors.fromEmail = 'Please enter a valid Email Address'
-      }
     }
-
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleTestEmail = async () => {
     setTesting(true)
-    setTestResult(null)
-    setTestMessage('')
-
     try {
       const response = await fetch('/api/setup/email/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-
       const result = await response.json()
-
       if (response.ok) {
-        setTestResult('success')
-        setTestMessage('Email configuration test successful!')
-        notifySuccess({
-          title: 'Email Test Successful',
-          message: 'Email configuration is working correctly'
-        })
+        notifySuccess({ title: 'Email Test Successful', message: 'Email configuration is working correctly' })
       } else {
-        setTestResult('error')
-        setTestMessage(result.error || 'Email test failed')
-        notifyError({
-          title: 'Email Test Failed',
-          message: result.error || 'Email configuration test failed'
-        })
+        notifyError({ title: 'Email Test Failed', message: result.error || 'Email configuration test failed' })
       }
-    } catch (error) {
-      setTestResult('error')
-      setTestMessage('Email test failed')
-      notifyError({
-        title: 'Test Failed',
-        message: 'Network error during email test'
-      })
+    } catch {
+      notifyError({ title: 'Test Failed', message: 'Network error during email test' })
     } finally {
       setTesting(false)
     }
   }
 
-
   const handleSave = async () => {
-    if (formData.provider !== 'skip' && !validateForm()) {
-      return
-    }
-
+    if (formData.provider !== 'skip' && !validateForm()) return
     setSaving(true)
-
     try {
       const response = await fetch('/api/settings/email', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to update email settings')
-      }
-
-      notifySuccess({
-        title: 'Email Settings Updated',
-        message: 'Email configuration has been updated successfully'
-      })
+      if (!response.ok) throw new Error('Failed to update email settings')
+      savedConfig.current = { ...formData }
+      notifySuccess({ title: 'Email Settings Updated', message: 'Email configuration has been updated successfully' })
     } catch (error) {
-      notifyError({
-        title: 'Update Failed',
-        message: error instanceof Error ? error.message : 'Failed to update email settings'
-      })
+      notifyError({ title: 'Update Failed', message: error instanceof Error ? error.message : 'Failed to update email settings' })
     } finally {
       setSaving(false)
     }
   }
 
   const handleTest = async () => {
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return
     await handleTestEmail()
   }
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary"></div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-7 w-7 animate-spin text-[var(--apple-system-blue)]" />
+      </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Mail className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-            <span className="truncate">Email Configuration</span>
-          </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">
-            Configure your email provider settings for sending notifications and invitations.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6 sm:space-y-8 p-4 sm:p-6 pt-0">
-          {/* Email Provider Selection */}
-          <div className="space-y-5">
-            <Label className="text-xs sm:text-sm">Email Provider</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-6">
-              <div
-                className={`p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  formData.provider === 'smtp'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted hover:border-muted-foreground/50'
-                }`}
-                onClick={() => setFormData({ ...formData, provider: 'smtp' })}
-              >
-                <div className="text-center">
-                  <Mail className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-2 flex-shrink-0" />
-                  <h3 className="text-sm sm:text-base font-semibold">SMTP Server</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
-                    Use your own SMTP server
-                  </p>
-                </div>
-              </div>
+    <div className="space-y-5">
 
-              <div
-                className={`p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  formData.provider === 'azure'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted hover:border-muted-foreground/50'
-                }`}
-                onClick={() => setFormData({ ...formData, provider: 'azure' })}
-              >
-                <div className="text-center">
-                  <Mail className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-2 flex-shrink-0" />
-                  <h3 className="text-sm sm:text-base font-semibold">Azure App</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
-                    Use Azure App with Exchange Online
-                  </p>
-                </div>
-              </div>
+      {/* ── Provider card ── */}
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
 
-              <div
-                className={`p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  formData.provider === 'skip'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted hover:border-muted-foreground/50'
-                }`}
-                onClick={() => setFormData({ ...formData, provider: 'skip' })}
-              >
-                <div className="text-center">
-                  <Mail className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground mx-auto mb-2 flex-shrink-0" />
-                  <h3 className="text-sm sm:text-base font-semibold">Skip Email</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
-                    Disable email notifications
-                  </p>
-                </div>
-              </div>
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--apple-separator)]">
+          <Mail className="h-5 w-5 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+          <div>
+            <p className="text-[15px] font-semibold text-[var(--apple-label)]">Email Configuration</p>
+            <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">Configure your email provider for notifications and invitations</p>
+          </div>
+        </div>
+
+        <div className="px-5 py-5 space-y-5">
+          {/* Provider selector */}
+          <div className="space-y-2">
+            <p className="apple-section-label">Email Provider</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {PROVIDERS.map(({ id, label, description, icon: Icon, gradient, glow }) => {
+                const active = formData.provider === id
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setFormData({ ...formData, provider: id as any })}
+                    className={cn(
+                      'flex flex-col items-center gap-2 p-4 rounded-[var(--apple-radius-md)] border apple-transition text-center',
+                      active
+                        ? 'border-transparent bg-[var(--apple-tertiary-fill)]'
+                        : 'border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] hover:bg-[var(--apple-tertiary-fill)]'
+                    )}
+                  >
+                    <Icon className="h-6 w-6 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+                    <div>
+                      <p className="text-[13px] font-semibold" style={{ color: active ? 'var(--apple-chart-color)' : 'var(--apple-label)' }}>{label}</p>
+                      <p className="text-[11px] text-[var(--apple-tertiary-label)] mt-0.5">{description}</p>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
+          {/* SMTP fields */}
           {formData.provider === 'smtp' && (
-            <div className="space-y-3 sm:space-y-4 mt-4">
-              <Alert className="mt-4 mb-4">
-                <Mail className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <AlertTitle className="text-xs sm:text-sm">SMTP Configuration</AlertTitle>
-                <AlertDescription className="text-xs sm:text-sm break-words">
-                  Configure your SMTP server settings. Common providers: Gmail (smtp.gmail.com:587), Outlook (smtp-mail.outlook.com:587), or your custom SMTP server.
-                </AlertDescription>
-              </Alert>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-host" className="text-xs sm:text-sm">SMTP Host *</Label>
-                  <Input
-                    id="smtp-host"
-                    type="text"
-                    value={formData.smtp.host}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      smtp: { ...formData.smtp, host: e.target.value.trim() }
-                    })}
+            <div className="space-y-4 pt-1">
+              <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-3 flex gap-2">
+                <Mail className="h-4 w-4 text-[var(--apple-system-blue)] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                <p className="text-[12px] text-[var(--apple-secondary-label)]">
+                  Common providers: Gmail (smtp.gmail.com:587), Outlook (smtp-mail.outlook.com:587).
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField label="SMTP Host *" htmlFor="smtp-host" error={errors.host}>
+                  <Input id="smtp-host" value={formData.smtp.host}
+                    onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, host: e.target.value.trim() } })}
                     placeholder="smtp.gmail.com"
-                    className={`text-xs sm:text-sm ${errors.host ? 'border-red-500' : ''}`}
-                  />
-                  {errors.host && (
-                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.host}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-port" className="text-xs sm:text-sm">Port *</Label>
-                  <Input
-                    id="smtp-port"
-                    type="number"
-                    value={formData.smtp.port}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      smtp: { ...formData.smtp, port: parseInt(e.target.value) || 587 }
-                    })}
-                    placeholder="587"
-                    className="text-xs sm:text-sm"
-                  />
-                </div>
+                    className={errors.host ? 'border-[var(--apple-system-red)]' : ''} />
+                </FormField>
+                <FormField label="Port *" htmlFor="smtp-port">
+                  <Input id="smtp-port" type="number" value={formData.smtp.port}
+                    onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, port: parseInt(e.target.value) || 587 } })}
+                    placeholder="587" />
+                </FormField>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="smtp-secure"
-                  checked={formData.smtp.secure}
-                  onCheckedChange={(checked) => setFormData({
-                    ...formData,
-                    smtp: { ...formData.smtp, secure: checked }
-                  })}
-                  className="flex-shrink-0"
-                />
-                <Label htmlFor="smtp-secure" className="text-xs sm:text-sm">Use SSL/TLS</Label>
+              <div className="flex items-center gap-2.5">
+                <Switch id="smtp-secure" checked={formData.smtp.secure}
+                  onCheckedChange={(v) => setFormData({ ...formData, smtp: { ...formData.smtp, secure: v } })} />
+                <Label htmlFor="smtp-secure" className="text-[13px] text-[var(--apple-label)]">Use SSL/TLS</Label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-username" className="text-xs sm:text-sm">Username *</Label>
-                  <Input
-                    id="smtp-username"
-                    type="text"
-                    value={formData.smtp.username}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      smtp: { ...formData.smtp, username: e.target.value.trim() }
-                    })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField label="Username *" htmlFor="smtp-username" error={errors.username}>
+                  <Input id="smtp-username" value={formData.smtp.username}
+                    onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, username: e.target.value.trim() } })}
                     placeholder="your-email@gmail.com"
-                    className={`text-xs sm:text-sm ${errors.username ? 'border-red-500' : ''}`}
-                  />
-                  {errors.username && (
-                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.username}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-password" className="text-xs sm:text-sm">Password *</Label>
-                  <Input
-                    id="smtp-password"
-                    type="password"
-                    value={formData.smtp.password}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      smtp: { ...formData.smtp, password: e.target.value }
-                    })}
+                    className={errors.username ? 'border-[var(--apple-system-red)]' : ''} />
+                </FormField>
+                <FormField label="Password *" htmlFor="smtp-password" error={errors.password}>
+                  <Input id="smtp-password" type="password" value={formData.smtp.password}
+                    onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, password: e.target.value } })}
                     placeholder="Email account password"
-                    className={`text-xs sm:text-sm ${errors.password ? 'border-red-500' : ''}`}
-                  />
-                  {errors.password && (
-                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.password}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-from-email" className="text-xs sm:text-sm">From Email *</Label>
-                  <Input
-                    id="smtp-from-email"
-                    type="email"
-                    value={formData.smtp.fromEmail}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      smtp: { ...formData.smtp, fromEmail: e.target.value.trim() }
-                    })}
+                    className={errors.password ? 'border-[var(--apple-system-red)]' : ''} />
+                </FormField>
+                <FormField label="From Email *" htmlFor="smtp-from-email" error={errors.fromEmail}>
+                  <Input id="smtp-from-email" type="email" value={formData.smtp.fromEmail}
+                    onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, fromEmail: e.target.value.trim() } })}
                     placeholder="noreply@yourcompany.com"
-                    className={`text-xs sm:text-sm ${errors.fromEmail ? 'border-red-500' : ''}`}
-                  />
-                  {errors.fromEmail && (
-                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.fromEmail}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-from-name" className="text-xs sm:text-sm">From Name *</Label>
-                  <Input
-                    id="smtp-from-name"
-                    type="text"
-                    value={formData.smtp.fromName}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      smtp: { ...formData.smtp, fromName: e.target.value.trim() }
-                    })}
+                    className={errors.fromEmail ? 'border-[var(--apple-system-red)]' : ''} />
+                </FormField>
+                <FormField label="From Name *" htmlFor="smtp-from-name" error={errors.fromName}>
+                  <Input id="smtp-from-name" value={formData.smtp.fromName}
+                    onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, fromName: e.target.value.trim() } })}
                     placeholder="Your Company"
-                    className={`text-xs sm:text-sm ${errors.fromName ? 'border-red-500' : ''}`}
-                  />
-                  {errors.fromName && (
-                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.fromName}</p>
-                  )}
-                </div>
+                    className={errors.fromName ? 'border-[var(--apple-system-red)]' : ''} />
+                </FormField>
               </div>
             </div>
           )}
 
+          {/* Azure fields */}
           {formData.provider === 'azure' && (
-            <div className="space-y-3 sm:space-y-4">
-              <Alert className="mt-4 mb-4">
-                <Mail className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <AlertTitle className="text-xs sm:text-sm">Azure App Configuration</AlertTitle>
-                <AlertDescription className="text-xs sm:text-sm break-words">
-                  Configure your Azure App registration for Exchange Online. You'll need to create an app in Azure Portal and grant it Mail.Send permissions.
-                </AlertDescription>
-              </Alert>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="azure-client-id" className="text-xs sm:text-sm">Client ID *</Label>
-                  <Input
-                    id="azure-client-id"
-                    type="text"
-                    value={formData.azure.clientId}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      azure: { ...formData.azure, clientId: e.target.value }
-                    })}
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    className={`text-xs sm:text-sm ${errors.clientId ? 'border-red-500' : ''}`}
-                  />
-                  {errors.clientId && (
-                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.clientId}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="azure-tenant-id" className="text-xs sm:text-sm">Tenant ID *</Label>
-                  <Input
-                    id="azure-tenant-id"
-                    type="text"
-                    value={formData.azure.tenantId}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      azure: { ...formData.azure, tenantId: e.target.value }
-                    })}
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    className={`text-xs sm:text-sm ${errors.tenantId ? 'border-red-500' : ''}`}
-                  />
-                  {errors.tenantId && (
-                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.tenantId}</p>
-                  )}
-                </div>
+            <div className="space-y-4 pt-1">
+              <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-3 flex gap-2">
+                <Cloud className="h-4 w-4 text-[var(--apple-system-blue)] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                <p className="text-[12px] text-[var(--apple-secondary-label)]">
+                  Create an app in Azure Portal and grant it Mail.Send permissions.
+                </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="azure-client-secret" className="text-xs sm:text-sm">Client Secret *</Label>
-                <Input
-                  id="azure-client-secret"
-                  type="password"
-                  value={formData.azure.clientSecret}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    azure: { ...formData.azure, clientSecret: e.target.value }
-                  })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField label="Client ID *" htmlFor="azure-client-id" error={errors.clientId}>
+                  <Input id="azure-client-id" value={formData.azure.clientId}
+                    onChange={(e) => setFormData({ ...formData, azure: { ...formData.azure, clientId: e.target.value } })}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    className={errors.clientId ? 'border-[var(--apple-system-red)]' : ''} />
+                </FormField>
+                <FormField label="Tenant ID *" htmlFor="azure-tenant-id" error={errors.tenantId}>
+                  <Input id="azure-tenant-id" value={formData.azure.tenantId}
+                    onChange={(e) => setFormData({ ...formData, azure: { ...formData.azure, tenantId: e.target.value } })}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    className={errors.tenantId ? 'border-[var(--apple-system-red)]' : ''} />
+                </FormField>
+              </div>
+
+              <FormField label="Client Secret *" htmlFor="azure-client-secret" error={errors.clientSecret}>
+                <Input id="azure-client-secret" type="password" value={formData.azure.clientSecret}
+                  onChange={(e) => setFormData({ ...formData, azure: { ...formData.azure, clientSecret: e.target.value } })}
                   placeholder="Enter your Azure app client secret"
-                  className={`text-xs sm:text-sm ${errors.clientSecret ? 'border-red-500' : ''}`}
-                />
-                {errors.clientSecret && (
-                  <p className="text-xs sm:text-sm text-red-600 break-words">{errors.clientSecret}</p>
-                )}
-              </div>
+                  className={errors.clientSecret ? 'border-[var(--apple-system-red)]' : ''} />
+              </FormField>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="azure-from-email" className="text-xs sm:text-sm">From Email *</Label>
-                  <Input
-                    id="azure-from-email"
-                    type="email"
-                    value={formData.azure.fromEmail}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      azure: { ...formData.azure, fromEmail: e.target.value.trim() }
-                    })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField label="From Email *" htmlFor="azure-from-email" error={errors.fromEmail}>
+                  <Input id="azure-from-email" type="email" value={formData.azure.fromEmail}
+                    onChange={(e) => setFormData({ ...formData, azure: { ...formData.azure, fromEmail: e.target.value.trim() } })}
                     placeholder="noreply@yourcompany.com"
-                    className={`text-xs sm:text-sm ${errors.fromEmail ? 'border-red-500' : ''}`}
-                  />
-                  {errors.fromEmail && (
-                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.fromEmail}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="azure-from-name" className="text-xs sm:text-sm">From Name *</Label>
-                  <Input
-                    id="azure-from-name"
-                    type="text"
-                    value={formData.azure.fromName}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      azure: { ...formData.azure, fromName: e.target.value.trim() }
-                    })}
+                    className={errors.fromEmail ? 'border-[var(--apple-system-red)]' : ''} />
+                </FormField>
+                <FormField label="From Name *" htmlFor="azure-from-name" error={errors.fromName}>
+                  <Input id="azure-from-name" value={formData.azure.fromName}
+                    onChange={(e) => setFormData({ ...formData, azure: { ...formData.azure, fromName: e.target.value.trim() } })}
                     placeholder="Your Company"
-                    className={`text-xs sm:text-sm ${errors.fromName ? 'border-red-500' : ''}`}
-                  />
-                  {errors.fromName && (
-                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.fromName}</p>
-                  )}
-                </div>
+                    className={errors.fromName ? 'border-[var(--apple-system-red)]' : ''} />
+                </FormField>
               </div>
             </div>
           )}
 
+          {/* Skip state */}
           {formData.provider === 'skip' && (
-            <div className="py-6">
-              <Alert>
-                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <AlertDescription className="text-xs sm:text-sm">
-                  <p className="font-medium">Email notifications disabled</p>
-                  <p className="break-words">Email functionality will be disabled for this organization.</p>
-                </AlertDescription>
-              </Alert>
+            <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-5 flex gap-3">
+              <AlertCircle className="h-5 w-5 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
+              <div>
+                <p className="text-[13px] font-semibold text-[var(--apple-label)]">Email notifications disabled</p>
+                <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">Email functionality will be disabled for this organization.</p>
+              </div>
             </div>
           )}
 
-          {formData.provider !== 'skip' && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0">
-              <Button 
-                onClick={handleTest} 
-                disabled={testing || saving}
+          {/* Actions */}
+          <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--apple-separator)]">
+            {formData.provider !== 'skip' ? (
+              <Button
                 variant="outline"
-                className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm"
+                onClick={handleTest}
+                disabled={testing || saving}
+                className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px] border-[var(--apple-separator)]"
               >
-                {testing ? (
-                  <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-current"></div>
-                ) : (
-                  <TestTube className="h-3 w-3 sm:h-4 sm:w-4" />
-                )}
-                {testing ? 'Testing...' : 'Test Email'}
+                {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <TestTube className="h-3.5 w-3.5" strokeWidth={1.5} />}
+                {testing ? 'Testing…' : 'Test Email'}
               </Button>
+            ) : <div />}
 
-              
-            </div>
-          )}
-
-
-          <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
-              {saving ? (
-                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
-              ) : (
-                <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
-              )}
-              {saving ? 'Saving...' : 'Save Configuration'}
+            <Button
+              onClick={handleSave}
+              disabled={saving || !hasChanges}
+              className="h-9 gap-2 px-4 rounded-[var(--apple-radius-sm)] apple-transition text-[13px]"
+              style={{ background: hasChanges ? 'var(--apple-card-gradient)' : undefined }}
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <Save className="h-3.5 w-3.5" strokeWidth={1.5} />}
+              {saving ? 'Saving…' : 'Save Configuration'}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FormField({ label, htmlFor, error, children }: {
+  label: string; htmlFor?: string; error?: string; children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={htmlFor} className="text-[13px] font-medium text-[var(--apple-label)]">{label}</Label>
+      {children}
+      {error && <p className="text-[11px] text-[var(--apple-system-red)]">{error}</p>}
     </div>
   )
 }

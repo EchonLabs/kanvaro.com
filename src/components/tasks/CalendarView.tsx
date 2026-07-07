@@ -312,7 +312,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" strokeWidth={1.5} />
           <p className="text-muted-foreground">Loading calendar...</p>
         </div>
       </div>
@@ -357,12 +357,12 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
               </Button>
             </div>
             <Button variant="outline" size="sm" onClick={refreshTasks} className="w-full sm:w-auto">
-              <CalendarIcon className="h-4 w-4 mr-2" />
+              <CalendarIcon className="h-4 w-4 mr-2" strokeWidth={1.5} />
               Refresh
             </Button>
             {hasPermission(Permission.TASK_CREATE) && (
               <Button onClick={onCreateTask} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 mr-2" strokeWidth={1.5} />
                 Add Task
               </Button>
             )}
@@ -377,13 +377,13 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                 <CardTitle>{formatDate(currentDate)}</CardTitle>
                 <div className="flex items-center space-x-2">
                   <Button variant="outline" size="sm" onClick={() => navigateMonth('prev')}>
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
                     Today
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => navigateMonth('next')}>
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
                   </Button>
                 </div>
               </div>
@@ -429,9 +429,9 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                                   onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                                 >
                                   <div className="font-medium truncate flex items-center gap-1">
-                                    <Video className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                    <Video className="h-3 w-3 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
                                     {event.title}
-                                    {event.isRecurringSeries && <Repeat className="h-2.5 w-2.5 text-muted-foreground" />}
+                                    {event.isRecurringSeries && <Repeat className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={1.5} />}
                                   </div>
                                   <div className="text-[10px] text-muted-foreground">
                                     {event.startTime || 'All day'} • {formatToTitleCase(event.eventType.replace('_', ' '))}
@@ -492,13 +492,13 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                 <CardTitle>{formatWeekDate(currentDate)}</CardTitle>
                 <div className="flex items-center space-x-2">
                   <Button variant="outline" size="sm" onClick={() => navigateWeek('prev')}>
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
                     Today
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => navigateWeek('next')}>
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
                   </Button>
                 </div>
               </div>
@@ -539,9 +539,9 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                               onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                             >
                               <div className="font-medium truncate flex items-center gap-1">
-                                <Video className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                <Video className="h-3 w-3 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
                                 {event.title}
-                                {event.isRecurringSeries && <Repeat className="h-2.5 w-2.5 text-muted-foreground" />}
+                                {event.isRecurringSeries && <Repeat className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={1.5} />}
                               </div>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[10px] text-muted-foreground">
@@ -553,7 +553,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                               </div>
                               {event.attendees && event.attendees.length > 0 && (
                                 <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
-                                  <Users className="h-2.5 w-2.5" />
+                                  <Users className="h-2.5 w-2.5" strokeWidth={1.5} />
                                   {event.attendees.length} attendee(s)
                                 </div>
                               )}
@@ -605,13 +605,13 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                 <CardTitle>{formatDayDate(currentDate)}</CardTitle>
                 <div className="flex items-center space-x-2">
                   <Button variant="outline" size="sm" onClick={() => navigateDay('prev')}>
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
                     Today
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => navigateDay('next')}>
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
                   </Button>
                 </div>
               </div>
@@ -646,9 +646,9 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                           onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                         >
                           <div className="flex items-center gap-2">
-                            <Video className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            <Video className="h-4 w-4 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
                             <span className="font-medium">{event.title}</span>
-                            {event.isRecurringSeries && <Repeat className="h-3 w-3 text-muted-foreground" />}
+                            {event.isRecurringSeries && <Repeat className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />}
                             <Badge className={`text-xs ${getEventTypeColor(event.eventType)}`}>
                               {formatToTitleCase(event.eventType.replace('_', ' '))}
                             </Badge>
@@ -658,7 +658,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                           )}
                           <div className="flex items-center flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
                             <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
+                              <Clock className="h-3 w-3" strokeWidth={1.5} />
                               <span>{event.startTime || 'All day'}{event.endTime ? ` - ${event.endTime}` : ''}</span>
                             </div>
                             {event.duration && (
@@ -666,19 +666,19 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                             )}
                             {event.attendees && event.attendees.length > 0 && (
                               <div className="flex items-center gap-1">
-                                <Users className="h-3 w-3" />
+                                <Users className="h-3 w-3" strokeWidth={1.5} />
                                 <span>{event.attendees.length} attendee(s)</span>
                               </div>
                             )}
                             {event.location && (
                               <div className="flex items-center gap-1">
-                                <Target className="h-3 w-3" />
+                                <Target className="h-3 w-3" strokeWidth={1.5} />
                                 <span>{event.location}</span>
                               </div>
                             )}
                             {event.facilitator && (
                               <div className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
+                                <User className="h-3 w-3" strokeWidth={1.5} />
                                 <span>{event.facilitator.firstName} {event.facilitator.lastName}</span>
                               </div>
                             )}
@@ -691,7 +691,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                               className="inline-flex items-center gap-1 mt-2 text-xs text-purple-600 dark:text-purple-400 hover:underline"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <Video className="h-3 w-3" />
+                              <Video className="h-3 w-3" strokeWidth={1.5} />
                               Join Meeting
                             </a>
                           )}
@@ -715,7 +715,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                             </Badge>
                             {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
                               <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                                <User className="h-3 w-3" />
+                                <User className="h-3 w-3" strokeWidth={1.5} />
                                 <span>
                                   {(() => {
                                     const firstAssignee = task.assignedTo[0];

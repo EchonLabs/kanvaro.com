@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { PageContent } from '@/components/ui/PageContent'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
@@ -14,8 +12,13 @@ import type { StandupScheduleDetail } from '@/components/standup-dashboard/stand
 import { parseStandupSummary } from '@/components/standup-dashboard/standup-summary-parser'
 import { getDelayedTasks } from '@/components/standup-dashboard/standup-delay-reason-utils'
 import { formatLoggedHours } from '@/components/standup-dashboard/standup-timelog-utils'
-import { ArrowLeft, CalendarDays, Clock3, Loader2, Sparkles, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Clock3, Loader2, Sparkles, Users, CalendarCheck, AlertTriangle } from 'lucide-react'
 import { formatToTitleCase } from '@/lib/utils'
+
+
+const STATUS_LABEL: Record<string, string> = {
+  scheduled: 'Scheduled', in_progress: 'In Progress', completed: 'Completed', missed: 'Missed'
+}
 
 export default function StandupSummaryPage() {
   const params = useParams()
@@ -38,24 +41,14 @@ export default function StandupSummaryPage() {
     const abortController = new AbortController()
 
     const loadDetail = async () => {
-      if (!user?.organization) {
-        setLoading(false)
-        return
-      }
-
+      if (!user?.organization) { setLoading(false); return }
       try {
         const data = await fetchStandupScheduleDetail(projectId, meetingId, user.organization, abortController.signal)
-        if (!abortController.signal.aborted) {
-          setDetail(data)
-        }
+        if (!abortController.signal.aborted) setDetail(data)
       } catch (error) {
-        if (!abortController.signal.aborted) {
-          console.error(error)
-        }
+        if (!abortController.signal.aborted) console.error(error)
       } finally {
-        if (!abortController.signal.aborted) {
-          setLoading(false)
-        }
+        if (!abortController.signal.aborted) setLoading(false)
       }
     }
 
@@ -78,12 +71,10 @@ export default function StandupSummaryPage() {
     return (
       <MainLayout breadcrumbItems={breadcrumbItems}>
         <PageContent>
-          <Card>
-            <CardContent className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              Loading summary...
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-center gap-2.5 py-20 text-[13px] text-[var(--apple-secondary-label)]">
+            <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} />
+            Loading summary…
+          </div>
         </PageContent>
       </MainLayout>
     )
@@ -93,53 +84,73 @@ export default function StandupSummaryPage() {
     <MainLayout breadcrumbItems={breadcrumbItems}>
       <PageContent>
         <div className="space-y-6 sm:space-y-8">
+
+          {/* Page header */}
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <Button variant="ghost" size="sm" className="w-fit px-0 text-muted-foreground" onClick={() => router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meetingId}`)}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
+            <div className="space-y-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-fit gap-1.5 px-0 text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
+                onClick={() => router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meetingId}`)}
+              >
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
                 Back to details
               </Button>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{detail.meeting.title} Summary</h1>
-                <Badge variant="outline" className="capitalize">{formatToTitleCase(detail.meeting.status)}</Badge>
+
+              <div className="flex items-center gap-3">
+                <Sparkles className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+                <div>
+                  <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">{detail.meeting.title} Summary</h1>
+                  <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
+                    {detail.project.name} · {formatDate(detail.meeting.date)}
+                  </p>
+                </div>
               </div>
-              <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
-                {detail.project.name} • {formatDate(detail.meeting.date)}
-              </p>
-              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" />{detail.meeting.participants.length} participants</span>
-                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{detail.meeting.time}</span>
-                <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4" />{detail.meeting.durationMinutes} mins</span>
+
+              <div className="flex flex-wrap items-center gap-4 text-[13px] text-[var(--apple-secondary-label)]">
+                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.participants.length} participants</span>
+                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.time}</span>
+                <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4" strokeWidth={1.5} />{detail.meeting.durationMinutes} mins</span>
+                <span className="flex items-center gap-1.5 rounded-full bg-[var(--apple-tertiary-fill)] px-2.5 py-0.5 text-[11px] font-medium">
+                  {STATUS_LABEL[detail.meeting.status] || formatToTitleCase(detail.meeting.status)}
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-            <Card className="border-border/80 shadow-xs">
-              <CardHeader className="border-b bg-muted/20">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-500" />
-                  <CardTitle className="text-base sm:text-lg">Summary Preview</CardTitle>
+          {/* Two-column layout */}
+          <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+
+            {/* Summary preview */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
+              {/* Card header */}
+              <div className="flex items-center gap-3 border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-5 py-4">
+                <Sparkles className="h-5 w-5 shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+                <div>
+                  <p className="text-[15px] font-semibold">Summary Preview</p>
+                  <p className="text-[11px] text-[var(--apple-secondary-label)] mt-0.5">
+                    AI-generated overview of the completed standup.
+                  </p>
                 </div>
-                <CardDescription>
-                  A readable overview of the completed standup. If a generated summary exists, it is shown here in sectioned form.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 p-5">
+              </div>
+
+              <div className="p-5 space-y-4">
                 {parsedSummary ? (
                   <div className="space-y-4">
-                    <div className="rounded-xl border border-border/70 bg-background/80 p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Standup Summary</p>
-                      <h2 className="mt-1 text-xl font-bold tracking-tight text-foreground">{parsedSummary.title}</h2>
+                    {/* Title block */}
+                    <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-4">
+                      <p className="apple-section-label text-[var(--apple-secondary-label)]">Standup Summary</p>
+                      <h2 className="mt-1 text-[20px] font-bold tracking-tight">{parsedSummary.title}</h2>
                       {parsedSummary.metaLines.length > 0 && (
                         <div className="mt-4 grid gap-2 sm:grid-cols-2">
                           {parsedSummary.metaLines.map((line) => {
                             const [label, ...rest] = line.split(':')
                             const value = rest.join(':').trim()
                             return (
-                              <div key={line} className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm">
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label.trim()}</div>
-                                <div className="mt-0.5 text-foreground">{value || '—'}</div>
+                              <div key={line} className="rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-3 py-2">
+                                <p className="apple-section-label text-[var(--apple-secondary-label)]">{label.trim()}</p>
+                                <p className="mt-0.5 text-[13px] font-medium">{value || '—'}</p>
                               </div>
                             )
                           })}
@@ -147,93 +158,112 @@ export default function StandupSummaryPage() {
                       )}
                     </div>
 
-                    <div className="space-y-4">
+                    {/* Sections */}
+                    <div className="space-y-3">
                       {parsedSummary.sections.map((section) => (
-                        <section key={section.title} className="rounded-xl border border-border/70 bg-background/70 p-4">
-                          <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-2">
-                            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-foreground">{section.title}</h3>
-                            <span className="text-[11px] text-muted-foreground">{section.lines.length} item{section.lines.length === 1 ? '' : 's'}</span>
+                        <div
+                          key={section.title}
+                          className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-4"
+                        >
+                          <div className="flex items-center justify-between gap-3 border-b border-[var(--apple-separator)] pb-2 mb-3">
+                            <p className="apple-section-label text-[var(--apple-label)]">{section.title}</p>
+                            <span className="text-[10px] text-[var(--apple-secondary-label)]">
+                              {section.lines.length} item{section.lines.length === 1 ? '' : 's'}
+                            </span>
                           </div>
-                          <div className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
-                            {section.lines.map((line, index) => (
-                              <p key={`${section.title}-${index}`} className={index === 0 ? 'text-foreground' : ''}>
+                          <div className="space-y-2 text-[13px] leading-relaxed text-[var(--apple-secondary-label)]">
+                            {section.lines.map((line, i) => (
+                              <p key={`${section.title}-${i}`} className={i === 0 ? 'text-[var(--apple-label)] font-medium' : ''}>
                                 {line}
                               </p>
                             ))}
                           </div>
-                        </section>
+                        </div>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-border/70 bg-muted/10 p-6 text-sm text-muted-foreground">
-                    No generated summary exists yet. This page still shows the current standup snapshot below so you can review the meeting in context.
+                  <div className="rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-6 py-10 text-center space-y-2">
+                    <Sparkles className="h-6 w-6 text-amber-400 mx-auto opacity-50" strokeWidth={1.5} />
+                    <p className="text-[13px] font-medium text-[var(--apple-secondary-label)]">No summary generated yet</p>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)]">
+                      This page still shows the current standup snapshot so you can review the meeting in context.
+                    </p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
+            {/* Right sidebar */}
             <div className="space-y-4">
-              <Card className="border-border/80 shadow-xs">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base sm:text-lg">Standup Snapshot</CardTitle>
-                  <CardDescription>Current meeting context and progress indicators.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Status</span>
-                    <Badge variant="outline" className="capitalize">{formatToTitleCase(detail.meeting.status)}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Participants</span>
-                    <span>{detail.meeting.participants.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Logged time</span>
-                    <span>{formatLoggedHours(totalLoggedMinutes)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Delayed tasks</span>
-                    <span>{delayedTasks.length}</span>
-                  </div>
-                </CardContent>
-              </Card>
 
-              <Card className="border-border/80 shadow-xs">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base sm:text-lg">Meeting Notes</CardTitle>
-                  <CardDescription>Helpful context from the standup record.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm text-foreground">
-                  <p>{detail.meeting.notes || 'No standup notes were recorded.'}</p>
-                </CardContent>
-              </Card>
+              {/* Snapshot card */}
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
+                <div className="border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-3">
+                  <p className="text-[15px] font-semibold">Standup Snapshot</p>
+                  <p className="text-[11px] text-[var(--apple-secondary-label)] mt-0.5">Current meeting context and progress indicators.</p>
+                </div>
+                <div className="p-4 space-y-2.5 text-[13px]">
+                  {[
+                    { label: 'Status',        value: <span className="rounded-full bg-[var(--apple-tertiary-fill)] px-2 py-0.5 text-[11px] font-medium capitalize">{formatToTitleCase(detail.meeting.status)}</span> },
+                    { label: 'Participants',   value: <span className="font-apple-mono">{detail.meeting.participants.length}</span> },
+                    { label: 'Logged time',    value: <span className="font-apple-mono">{formatLoggedHours(totalLoggedMinutes)}</span> },
+                    { label: 'Delayed tasks',  value: <span className="font-apple-mono">{delayedTasks.length}</span> },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex items-center justify-between gap-4">
+                      <span className="text-[var(--apple-secondary-label)]">{label}</span>
+                      {value}
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-              <Card className="border-border/80 shadow-xs">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base sm:text-lg">Delayed Tasks</CardTitle>
-                  <CardDescription>Tasks that exceeded their estimates for this standup day.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
+              {/* Meeting notes */}
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
+                <div className="border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-3">
+                  <p className="text-[15px] font-semibold">Meeting Notes</p>
+                  <p className="text-[11px] text-[var(--apple-secondary-label)] mt-0.5">Helpful context from the standup record.</p>
+                </div>
+                <div className="p-4">
+                  <p className="text-[13px] leading-relaxed">{detail.meeting.notes || 'No standup notes were recorded.'}</p>
+                </div>
+              </div>
+
+              {/* Delayed tasks */}
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
+                <div className="border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5 text-[var(--apple-system-red)]" strokeWidth={1.5} />
+                    <p className="text-[15px] font-semibold">Delayed Tasks</p>
+                  </div>
+                  <p className="text-[11px] text-[var(--apple-secondary-label)] mt-0.5">Tasks that exceeded their estimates.</p>
+                </div>
+                <div className="p-4 space-y-3">
                   {delayedTasks.length > 0 ? (
                     delayedTasks.map((task) => (
-                      <div key={task._id} className="rounded-xl border border-red-500/20 bg-red-500/5 p-3">
+                      <div key={task._id} className="rounded-[var(--apple-radius-sm)] border border-red-500/20 bg-red-500/5 p-3">
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="font-semibold text-foreground truncate">{task.displayId ? `${task.displayId} · ` : ''}{task.title}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{task.loggedHours}h logged against {task.estimateHours}h estimate</p>
+                            <p className="text-[13px] font-semibold truncate">
+                              {task.displayId ? `${task.displayId} · ` : ''}{task.title}
+                            </p>
+                            <p className="text-[11px] text-[var(--apple-secondary-label)] mt-0.5">
+                              {task.loggedHours}h logged · {task.estimateHours}h estimated
+                            </p>
                           </div>
-                          <Badge className="bg-red-500/10 text-red-600 border-red-500/20">overdue</Badge>
+                          <span className="shrink-0 rounded-full bg-red-500/10 border border-red-500/20 px-2 py-0.5 text-[10px] font-semibold text-[var(--apple-system-red)]">
+                            overdue
+                          </span>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="rounded-xl border border-dashed border-border/70 bg-muted/10 p-4 text-muted-foreground">
+                    <div className="rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-4 py-6 text-center text-[12px] text-[var(--apple-secondary-label)]">
                       No delayed tasks were detected.
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </div>
         </div>

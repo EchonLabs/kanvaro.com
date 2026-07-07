@@ -5,40 +5,47 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useAuth } from '@/hooks/useAuth'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
-import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Badge } from '@/components/ui/Badge'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { 
-  Calendar, 
-  Clock, 
-  Users, 
+import {
+  Calendar,
+  Clock,
+  Users,
   Plus,
   Search,
-  CheckCircle,
-  Play,
-  Square,
   List,
   Edit,
   Trash2,
   Eye,
   MoreVertical,
   X,
-  RotateCcw
+  RotateCcw,
+  Target,
+  Zap,
 } from 'lucide-react'
 import { AddSprintEventModal } from '@/components/sprint-events/AddSprintEventModal'
 import { EditSprintEventModal } from '@/components/sprint-events/EditSprintEventModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useNotify } from '@/lib/notify'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
-import { focusSearchInput } from '@/lib/utils'
+import { PermissionGate } from '@/lib/permissions/permission-components'
+import { focusSearchInput, formatToTitleCase, cn } from '@/lib/utils'
+import {
+  StatusBadge,
+  PageHeader,
+  TasksEmptyState,
+  CardGridSkeleton,
+  PaginationBar,
+  MetaChip,
+  FullPageLoader,
+  ViewSwitcher,
+} from '@/components/tasks/TasksShared'
 
 interface SprintEvent {
   _id: string
@@ -104,6 +111,21 @@ interface Project {
   name: string
 }
 
+const EVENT_ICONS: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
+  planning:      { icon: <Target className="h-5 w-5" strokeWidth={1.5} />,    color: 'text-blue-600 dark:text-blue-400',     bg: 'bg-blue-50 dark:bg-blue-950/30' },
+  review:        { icon: <Eye className="h-5 w-5" strokeWidth={1.5} />,       color: 'text-amber-600 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-950/30' },
+  retrospective: { icon: <RotateCcw className="h-5 w-5" strokeWidth={1.5} />, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/30' },
+  standup:       { icon: <Users className="h-5 w-5" strokeWidth={1.5} />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  daily_standup: { icon: <Users className="h-5 w-5" strokeWidth={1.5} />,     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  grooming:      { icon: <List className="h-5 w-5" strokeWidth={1.5} />,      color: 'text-sky-600 dark:text-sky-400',       bg: 'bg-sky-50 dark:bg-sky-950/30' },
+  demo:          { icon: <Zap className="h-5 w-5" strokeWidth={1.5} />,       color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/30' },
+}
+const defaultEventStyle = {
+  icon: <Calendar className="h-5 w-5" strokeWidth={1.5} />,
+  color: 'text-gray-600 dark:text-gray-400',
+  bg: 'bg-gray-50 dark:bg-gray-900/40',
+}
+
 export default function SprintEventsPage() {
   const params = useParams()
   const router = useRouter()
@@ -141,10 +163,10 @@ export default function SprintEventsPage() {
 
   // Debounced search (300ms delay)
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
-  
+
   // Request cancellation
   const abortControllerRef = useRef<AbortController | null>(null)
-  
+
   // Simple cache for API responses (2 minute TTL)
   const cacheRef = useRef<{
     events?: { data: SprintEvent[]; timestamp: number }
@@ -171,11 +193,11 @@ export default function SprintEventsPage() {
       setProjects(cached.data)
       return
     }
-    
+
     try {
       const response = await fetch('/api/projects', { signal })
       if (signal?.aborted) return
-      
+
       if (response.ok) {
         const data = await response.json()
         // API returns { success: true, data: [...projects], pagination: {...} }
@@ -196,7 +218,7 @@ export default function SprintEventsPage() {
     try {
       setLoading(true)
       const url = projectId ? `/api/sprint-events?projectId=${projectId}` : '/api/sprint-events'
-      
+
       // Check cache first (unless force refresh is requested)
       const cacheKey = projectId || 'all'
       const cached = cacheRef.current.events
@@ -205,10 +227,10 @@ export default function SprintEventsPage() {
         setLoading(false)
         return
       }
-      
+
       const response = await fetch(url, { signal })
       if (signal?.aborted) return
-      
+
       if (response.ok) {
         const data = await response.json()
         setEvents(data)
@@ -239,15 +261,15 @@ export default function SprintEventsPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return
-    
+
     // Cancel any pending requests
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
-      }
-    
+    }
+
     abortControllerRef.current = new AbortController()
     const signal = abortControllerRef.current.signal
-    
+
     // Fetch data in parallel
     const fetchAllData = async () => {
       const promises: Promise<void>[] = [fetchSprintEvents(signal)]
@@ -255,22 +277,22 @@ export default function SprintEventsPage() {
         promises.push(fetchProjects(signal))
       }
       await Promise.all(promises)
-      }
-    
+    }
+
     fetchAllData()
-    
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
+      }
     }
-  }
   }, [projectId, isAuthenticated, fetchSprintEvents, fetchProjects])
 
   // Check for success/error messages from URL query parameters
   useEffect(() => {
     const successParam = searchParams?.get('success')
     const errorParam = searchParams?.get('error')
-    
+
     if (successParam === 'created') {
       notifySuccess({ title: 'Sprint Event Created', message: 'Sprint Event created successfully' })
       router.replace('/sprint-events', { scroll: false })
@@ -338,66 +360,18 @@ export default function SprintEventsPage() {
   const getEventTypeIcon = (eventType: string) => {
     switch (eventType) {
       case 'planning':
-        return <Calendar className="h-4 w-4" />
+        return <Calendar className="h-4 w-4" strokeWidth={1.5} />
       case 'review':
-        return <CheckCircle className="h-4 w-4" />
+        return <Eye className="h-4 w-4" strokeWidth={1.5} />
       case 'retrospective':
-        return <Users className="h-4 w-4" />
+        return <Users className="h-4 w-4" strokeWidth={1.5} />
       case 'daily_standup':
-        return <Clock className="h-4 w-4" />
+        return <Clock className="h-4 w-4" strokeWidth={1.5} />
       case 'demo':
-        return <Play className="h-4 w-4" />
+        return <Zap className="h-4 w-4" strokeWidth={1.5} />
       default:
-        return <Calendar className="h-4 w-4" />
+        return <Calendar className="h-4 w-4" strokeWidth={1.5} />
     }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      'scheduled': 'secondary',
-      'in_progress': 'default',
-      'completed': 'outline',
-      'cancelled': 'destructive'
-    } as const
-    
-    const labels = {
-      'scheduled': 'Scheduled',
-      'in_progress': 'In Progress',
-      'completed': 'Completed',
-      'cancelled': 'Cancelled'
-    } as const
-    
-    return (
-      <Badge variant={variants[status as keyof typeof variants] || 'secondary'}>
-        {labels[status as keyof typeof labels] || status}
-      </Badge>
-    )
-  }
-
-  const getEventTypeBadge = (eventType: string) => {
-    const colors = {
-      'planning': 'bg-blue-500',
-      'review': 'bg-green-500',
-      'retrospective': 'bg-purple-500',
-      'daily_standup': 'bg-yellow-500',
-      'demo': 'bg-orange-500',
-      'other': 'bg-gray-500'
-    }
-    
-    const labels = {
-      'planning': 'Planning',
-      'review': 'Review',
-      'retrospective': 'Retrospective',
-      'daily_standup': 'Daily Standup',
-      'demo': 'Demo',
-      'other': 'Other'
-    }
-    
-    return (
-      <Badge variant="outline" className={`${colors[eventType as keyof typeof colors] || 'bg-gray-500'} text-white border-0`}>
-        {labels[eventType as keyof typeof labels] || eventType}
-      </Badge>
-    )
   }
 
   const formatDateTime = (date: string, startTime?: string, endTime?: string) => {
@@ -419,7 +393,7 @@ export default function SprintEventsPage() {
       const matchesType = filterType === 'all' || event.eventType === filterType
       const matchesStatus = filterStatus === 'all' || event.status === filterStatus
       const matchesProject = filterProject === 'all' || event.project?._id === filterProject
-      const matchesSprint = filterSprint === 'all' || event.sprint?._id === filterSprint  
+      const matchesSprint = filterSprint === 'all' || event.sprint?._id === filterSprint
 
 
       return matchesSearch && matchesType && matchesStatus && matchesProject && matchesSprint
@@ -443,9 +417,7 @@ export default function SprintEventsPage() {
   if (authLoading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
+        <FullPageLoader label="Loading sprint events..." />
       </MainLayout>
     )
   }
@@ -453,13 +425,14 @@ export default function SprintEventsPage() {
   if (!isAuthenticated) {
     return (
       <MainLayout>
-        <div className="text-center py-8">
-          <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-2xl font-semibold mb-2">Authentication Required</h2>
-          <p className="text-muted-foreground mb-4">
-            Please log in to access sprint events.
-          </p>
-          <Button onClick={() => router.push('/login')}>
+        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+          <Calendar className="h-12 w-12 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+          <h2 className="text-[22px] font-semibold text-[var(--apple-label)]">Authentication Required</h2>
+          <p className="text-[15px] text-[var(--apple-secondary-label)]">Please log in to access sprint events.</p>
+          <Button
+            onClick={() => router.push('/login')}
+            className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
+          >
             Go to Login
           </Button>
         </div>
@@ -470,103 +443,64 @@ export default function SprintEventsPage() {
   if (loading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
+        <FullPageLoader label="Loading sprint events..." />
       </MainLayout>
     )
   }
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold truncate">Sprint Events</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              {projectId ? 'Manage agile events and ceremonies' : 'View all sprint events across your projects'}
-            </p>
-          </div>
-          <Button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden xs:inline">Create Event</span>
-            <span className="xs:hidden">Create Event</span>
-          </Button>
-        </div>
+      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300 min-h-full">
 
-        {/* Success/Error Messages */}
+        {/* Page Header */}
+        <PageHeader
+          title="Sprint Events"
+          subtitle="Plan and track your sprint ceremonies"
+          icon={Calendar}
+          iconGradient="var(--apple-card-gradient)"
+          iconGlow="var(--apple-chart-glow)"
+          actions={
+            <PermissionGate permission={Permission.SPRINT_EVENT_VIEW_ALL}>
+              <Button
+                onClick={() => setShowAddModal(true)}
+                className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
+              >
+                <Plus className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                Add Event
+              </Button>
+            </PermissionGate>
+          }
+        />
 
-        {/* Search and Filters */}
-        <div className="space-y-3">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search events..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              autoFocus
-            />
-          </div>
-          {/* Filter options - compact grid layout */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {!projectId && (
-                  <Select 
-                    value={filterProject} 
-                    onValueChange={setFilterProject}
-                    onOpenChange={(open) => { 
-                      if (open) {
-                        setProjectQuery('') 
-                        focusSearchInput(projectFilterSearchRef.current)
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Project" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div className="p-2">
-                        <Input
-                          ref={projectFilterSearchRef}
-                          value={projectQuery}
-                          onChange={(e) => setProjectQuery(e.target.value)}
-                          placeholder="Type to search projects"
-                          className="mb-2"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          autoFocus
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value="all">
-                            All Projects
-                          </SelectItem>
-                          {projects
-                            .filter(p => 
-                              !projectQuery.trim() || 
-                              p.name.toLowerCase().includes(projectQuery.toLowerCase())
-                            )
-                            .map((project) => (
-                              <SelectItem key={project._id} value={project._id}>
-                                {project.name}
-                              </SelectItem>
-                            ))}
-                          {projects.filter(p => 
-                            !projectQuery.trim() || 
-                            p.name.toLowerCase().includes(projectQuery.toLowerCase())
-                          ).length === 0 && projectQuery.trim() && (
-                            <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
+        {/* ── Filter Toolbar ───────────────────────────────────────────────── */}
+
+        {/* Row 1: Search (50%) + Type (25%) + Status (25%) — Desktop */}
+        <div className="hidden sm:flex items-center gap-2">
+            <div className="relative w-1/2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" />
+                <input
+                    placeholder="Search events..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                />
+                {searchTerm && (
+                    <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
+                        aria-label="Clear search"
+                    >
+                        <X className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
                 )}
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="w-full">
+            </div>
+
+            <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-1/4 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder="Event Type" />
-                  </SelectTrigger>
-                  <SelectContent>
+                </SelectTrigger>
+                <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="planning">Planning</SelectItem>
                     <SelectItem value="review">Review</SelectItem>
@@ -574,331 +508,418 @@ export default function SprintEventsPage() {
                     <SelectItem value="daily_standup">Daily Standup</SelectItem>
                     <SelectItem value="demo">Demo</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-full">
+                </SelectContent>
+            </Select>
+
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-1/4 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                     <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="scheduled">Scheduled</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+
+        {/* Row 1: Mobile layout (stack) */}
+        <div className="flex sm:hidden flex-col gap-2">
+            <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" />
+                <input
+                    placeholder="Search events..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                />
+                {searchTerm && (
+                    <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
+                        aria-label="Clear search"
+                    >
+                        <X className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                )}
+            </div>
+            <div className="flex gap-2">
+                <Select value={filterType} onValueChange={setFilterType}>
+                    <SelectTrigger className="w-1/2 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                        <SelectValue placeholder="Event Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="planning">Planning</SelectItem>
+                        <SelectItem value="review">Review</SelectItem>
+                        <SelectItem value="retrospective">Retrospective</SelectItem>
+                        <SelectItem value="daily_standup">Daily Standup</SelectItem>
+                        <SelectItem value="demo">Demo</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                 </Select>
-          </div>
-          {/* Event count and reset filters */}
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} found
-            </p>
-            {hasActiveFilters && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={resetFilters}
-                      className="text-xs"
-                      aria-label="Reset all filters"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      Reset Filters
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Reset filters</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="w-1/2 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                        <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        </div>
+
+        {/* Row 2: Secondary Filters (Grid 20% each on Desktop, 2 cols on mobile) */}
+        {!projectId && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2">
+                <Select
+                  value={filterProject}
+                  onValueChange={setFilterProject}
+                  onOpenChange={(open) => {
+                    if (open) {
+                      setProjectQuery('')
+                      focusSearchInput(projectFilterSearchRef.current)
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
+                    <SelectValue placeholder="All Projects" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10050] p-0">
+                    <div className="p-2">
+                      <Input
+                        ref={projectFilterSearchRef}
+                        value={projectQuery}
+                        onChange={(e) => setProjectQuery(e.target.value)}
+                        placeholder="Search projects..."
+                        className="mb-2 h-8 text-[13px]"
+                        onKeyDown={(e) => e.stopPropagation()}
+                        autoFocus
+                      />
+                      <div className="max-h-56 overflow-y-auto">
+                        <SelectItem value="all">All Projects</SelectItem>
+                        {projects
+                          .filter(p =>
+                            !projectQuery.trim() ||
+                            p.name.toLowerCase().includes(projectQuery.toLowerCase())
+                          )
+                          .map((project) => (
+                            <SelectItem key={project._id} value={project._id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        {projects.filter(p =>
+                          !projectQuery.trim() ||
+                          p.name.toLowerCase().includes(projectQuery.toLowerCase())
+                        ).length === 0 && projectQuery.trim() && (
+                          <div className="px-2 py-1 text-[13px] text-[var(--apple-secondary-label)]">No matching projects</div>
+                        )}
+                      </div>
+                    </div>
+                  </SelectContent>
+                </Select>
+            </div>
+        )}
+
+        {/* Row 3: Active Filters & Clear */}
+        {(filterStatus !== 'all' || filterType !== 'all' || filterProject !== 'all' || filterSprint !== 'all' || searchTerm) && (
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t border-[var(--apple-separator)]">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[12px] font-medium text-[var(--apple-secondary-label)] uppercase tracking-wider mr-1">
+                        Active Filters:
+                    </span>
+                    {searchTerm && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Search: {searchTerm}
+                            <button onClick={() => setSearchTerm('')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                    {filterType !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Type: {formatToTitleCase(filterType)}
+                            <button onClick={() => setFilterType('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                    {filterStatus !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Status: {formatToTitleCase(filterStatus)}
+                            <button onClick={() => setFilterStatus('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                    {filterProject !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Project: {projects.find(p => p._id === filterProject)?.name || 'Selected'}
+                            <button onClick={() => setFilterProject('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                </div>
+                <Button
+                    variant="ghost"
+                    onClick={resetFilters}
+                    className="h-8 px-3 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] rounded-full"
+                >
+                    Clear All
+                </Button>
+            </div>
+        )}
+
+        {/* Count + View Switcher */}
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[13px] text-[var(--apple-secondary-label)]">
+            <span className="font-apple-mono font-medium text-[var(--apple-label)]">
+              {totalCount}
+            </span>{" "}
+            event{totalCount !== 1 ? 's' : ''}
+          </p>
+          <ViewSwitcher
+            value={viewMode}
+            onChange={(v) => setViewMode(v as 'grid' | 'list')}
+            options={['grid', 'list']}
+          />
         </div>
 
         {/* Events Display */}
         {filteredEvents.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-8 sm:py-12 px-4 sm:px-6">
-              <Calendar className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-              <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4">
-                {hasActiveFilters ? 'No events match your filters' : 'No sprint events found'}
-              </p>
-              <Button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                {hasActiveFilters ? 'Create New Event' : 'Create First Event'}
-              </Button>
-            </CardContent>
-          </Card>
+          <TasksEmptyState
+            icon={<Calendar className="h-10 w-10" strokeWidth={1.5} />}
+            title="No sprint events found"
+            description={hasActiveFilters ? 'Try adjusting your filters to find what you are looking for.' : 'Schedule your first sprint ceremony.'}
+            action={
+              <PermissionGate permission={Permission.SPRINT_EVENT_VIEW_ALL}>
+                <Button
+                  onClick={() => setShowAddModal(true)}
+                  className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-4 h-9 hover:opacity-90 apple-transition"
+                >
+                  <Plus className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                  Add Event
+                </Button>
+              </PermissionGate>
+            }
+          />
         ) : (
-          <Card>
-            <CardContent className="pt-6">
-              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="grid">Grid View</TabsTrigger>
-                  <TabsTrigger value="list">List View</TabsTrigger>
-                </TabsList>
+          <div className="space-y-4">
+            {/* Grid View */}
+            {viewMode === 'grid' && (
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {paginatedEvents.map((event) => {
+                  const style = EVENT_ICONS[event.eventType?.toLowerCase()] ?? defaultEventStyle
+                  const canManage = hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id)
+                  return (
+                    <div
+                      key={event._id}
+                      className="card-fade-in group rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-none hover:shadow-[0_6px_24px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_6px_24px_rgba(0,0,0,0.36)] hover:-translate-y-0.5 apple-transition cursor-pointer"
+                      onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
+                    >
+                      {/* Top accent strip */}
+                      <div className="h-[3px] w-full" style={{ background: 'var(--apple-card-gradient)' }} />
 
-                <TabsContent value="grid" className="space-y-4 sm:space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                    {paginatedEvents.map((event) => (
-                      <Card 
-                        key={event._id} 
-                        className="hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
-                      >
-                        <CardContent className="p-4 sm:p-6">
-                          <div className="space-y-3 sm:space-y-4">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                {getEventTypeIcon(event.eventType)}
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="text-base sm:text-lg font-semibold truncate">{event.title}</h3>
-                                  <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                                    {(() => {
-                                      return (event.sprint?.name || 'Unavailable Sprint') + ' • ' + (event.project?.name || 'Unavailable Project')
-                                    })()}
-                                  </p>
-                                </div>
-                              </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                                    className="h-8 w-8 p-0 flex-shrink-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation()
-                            router.push(`/sprint-events/view-sprint-event/${event._id}`)
-                          }}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Event
-                          </DropdownMenuItem>
-                          {hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id) ? (
-                            <>
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation()
-                                        // Find the current event data by ID to ensure we have fresh data
-                                        const currentEvent = events.find(ev => ev._id === event._id)
-                                        setEditingEvent(currentEvent || event)
-                              }}>
-                                <Edit className="h-4 w-4 mr-2" />
+                      <div className="p-4 sm:p-5">
+                        {/* Header row */}
+                        <div className="flex items-start gap-3 mb-3">
+                          {/* Event type icon */}
+                          <div className={cn('flex-shrink-0 w-9 h-9 rounded-[var(--apple-radius-sm)] flex items-center justify-center', style.bg)}>
+                            <span className={style.color}>{style.icon}</span>
+                          </div>
+
+                          {/* Title + type label */}
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <h3 className="text-[15px] font-semibold text-[var(--apple-label)] truncate leading-tight">{event.title}</h3>
+                            <span className="text-[11px] font-medium text-[var(--apple-secondary-label)]">{formatToTitleCase(event.eventType)}</span>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 flex-shrink-0 -mt-0.5">
+                            <StatusBadge status={event.status} size="sm" />
+                            {canManage && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreVertical className="h-4 w-4" strokeWidth={1.5} />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/sprint-events/view-sprint-event/${event._id}`) }}>
+                                    <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                    View Event
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingEvent(events.find(ev => ev._id === event._id) || event) }}>
+                                    <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                    Edit Event
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="h-px bg-[var(--apple-separator)] mb-3" />
+
+                        {/* Meta row */}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] text-[var(--apple-secondary-label)]">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                            {formatDate(event.scheduledDate)}
+                          </span>
+                          {event.startTime && event.endTime ? (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                              {formatTime(event.startTime)} – {formatTime(event.endTime)}
+                            </span>
+                          ) : event.duration > 0 ? (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                              {event.duration} min
+                            </span>
+                          ) : null}
+                          {event.attendees?.length > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                              {event.attendees.length}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Sprint / Project tags */}
+                        {(event.sprint?.name || event.project?.name) && (
+                          <div className="flex flex-wrap gap-1.5 mt-3">
+                            {event.sprint?.name && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--apple-quaternary-fill)] text-[11px] text-[var(--apple-secondary-label)]">
+                                {event.sprint.name}
+                              </span>
+                            )}
+                            {event.project?.name && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--apple-quaternary-fill)] text-[11px] text-[var(--apple-tertiary-label)]">
+                                {event.project.name}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* List View */}
+            {viewMode === 'list' && (
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] overflow-hidden divide-y divide-[var(--apple-separator)]">
+                {paginatedEvents.map((event) => {
+                  const style = EVENT_ICONS[event.eventType?.toLowerCase()] ?? defaultEventStyle
+                  const canManage = hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id)
+                  return (
+                    <div
+                      key={event._id}
+                      className="card-fade-in group relative flex items-center gap-3 sm:gap-4 pl-4 sm:pl-5 pr-3 sm:pr-4 py-3 sm:py-3.5 bg-card apple-transition hover:bg-[var(--apple-quaternary-fill)] cursor-pointer"
+                      onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
+                    >
+                      {/* Left accent bar */}
+                      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: 'var(--apple-card-gradient)' }} />
+
+                      {/* Icon */}
+                      <div className={cn('flex-shrink-0 w-8 h-8 rounded-[var(--apple-radius-sm)] flex items-center justify-center', style.bg)}>
+                        <span className={style.color}>{style.icon}</span>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[14px] sm:text-[15px] font-semibold text-[var(--apple-label)] truncate">{event.title}</span>
+                          <StatusBadge status={event.status} size="sm" />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-[12px] text-[var(--apple-secondary-label)]">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                            {formatDate(event.scheduledDate)}
+                          </span>
+                          {event.duration > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                              {event.duration}m
+                            </span>
+                          )}
+                          {event.sprint?.name && (
+                            <span className="hidden sm:flex items-center gap-1">
+                              <Zap className="h-3 w-3 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                              {event.sprint.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right side */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {event.attendees?.length > 0 && (
+                          <span className="hidden md:flex items-center gap-1 text-[12px] text-[var(--apple-tertiary-label)]">
+                            <Users className="h-3.5 w-3.5" strokeWidth={1.5} />
+                            {event.attendees.length}
+                          </span>
+                        )}
+                        {canManage && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)] sm:opacity-0 sm:group-hover:opacity-100 apple-transition"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="h-4 w-4" strokeWidth={1.5} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/sprint-events/view-sprint-event/${event._id}`) }}>
+                                <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                View Event
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingEvent(events.find(ev => ev._id === event._id) || event) }}>
+                                <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                                 Edit Event
                               </DropdownMenuItem>
-                              {false && <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDeleteClick(event)
-                                  }}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </>}
-                            </>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                            </div>
-
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {getEventTypeBadge(event.eventType)}
-                              {getStatusBadge(event.status)}
-                            </div>
-
-                            <div className="space-y-2">
-                              <div className="flex items-start space-x-2 text-xs sm:text-sm">
-                                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                                <span className="text-muted-foreground break-words">
-                                  {formatDateTime(event.scheduledDate, event.startTime, event.endTime)}
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-2 text-xs sm:text-sm">
-                                <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                <span className="text-muted-foreground">
-                                  {event.attendees.length} {event.attendees.length === 1 ? 'attendee' : 'attendees'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="list" className="space-y-4 sm:space-y-6">
-                  <div className="flex flex-col gap-4 sm:gap-6">
-                    {paginatedEvents.map((event) => (
-              <Card 
-                key={event._id} 
-                className="hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
-              >
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                    <div className="flex items-start space-x-3 flex-1 min-w-0">
-                      <div className="flex-shrink-0 mt-1">
-                        {getEventTypeIcon(event.eventType)}
-                      </div>
-                        <div className="min-w-0 flex-1">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
-                          <h3 className="text-base sm:text-lg font-semibold truncate">{event.title}</h3>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {getEventTypeBadge(event.eventType)}
-                            {getStatusBadge(event.status)}
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1 text-xs sm:text-sm text-muted-foreground">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="truncate">
-                              {event.sprint?.name || 'Unavailable Sprint'}
-                            </span>
-                            <span className="hidden sm:inline">•</span>
-                            <span className="truncate">
-                              {event.project?.name || 'Unavailable Project'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Calendar className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">
-                              {formatDateTime(event.scheduledDate, event.startTime, event.endTime)}
-                            </span>
-                            <span className="hidden sm:inline">•</span>
-                            <Users className="h-3 w-3 flex-shrink-0 sm:hidden" />
-                            <span className="sm:hidden">•</span>
-                            <span>
-                              {event.attendees.length} {event.attendees.length === 1 ? 'attendee' : 'attendees'}
-                            </span>
-                          </div>
-                        </div>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeleteClick(event) }} className="text-destructive">
+                                <Trash2 className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={(e) => {
-                          e.stopPropagation()
-                          router.push(`/sprint-events/view-sprint-event/${event._id}`)
-                        }}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Event
-                        </DropdownMenuItem>
-                        {hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id) ? (
-                          <>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation()
-                              // Find the current event data by ID to ensure we have fresh data
-                              const currentEvent = events.find(ev => ev._id === event._id)
-                              setEditingEvent(currentEvent || event)
-                            }}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit Event
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDeleteClick(event)
-                              }}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </>
-                        ) : null}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardContent>
-              </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-              </Tabs>
+                  )
+                })}
+              </div>
+            )}
 
-              {/* Pagination Controls */}
-              {totalCount > 0 && (
-                <div className="flex flex-col gap-4 mt-6 pt-4 border-t">
-                  {/* Page size selector and info */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                    <span>Items per page:</span>
-                    <Select
-                      value={pageSize.toString()}
-                      onValueChange={(value) => {
-                        const newSize = parseInt(value)
-                        setPageSize(newSize)
-                        setCurrentPage(1)
-                      }}
-                    >
-                          <SelectTrigger className="w-16 sm:w-20 h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="100">100</SelectItem>
-                      </SelectContent>
-                    </Select>
-                      </div>
-                      <span className="text-center sm:text-left">
-                      Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
-                    </span>
-                  </div>
-
-                    {/* Navigation buttons */}
-                    <div className="flex items-center justify-center sm:justify-end gap-2">
-                    <Button
-                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1 || loading}
-                      variant="outline"
-                      size="sm"
-                        className="min-w-[80px]"
-                    >
-                      Previous
-                    </Button>
-                      <span className="text-xs sm:text-sm text-muted-foreground px-2 min-w-fit">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <Button
-                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage >= totalPages || loading}
-                      variant="outline"
-                      size="sm"
-                        className="min-w-[80px]"
-                    >
-                      Next
-                    </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            {/* Pagination */}
+            {totalCount > pageSize && (
+              <PaginationBar
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size)
+                  setCurrentPage(1)
+                }}
+                loading={loading}
+              />
+            )}
+          </div>
         )}
 
         {/* Modals */}

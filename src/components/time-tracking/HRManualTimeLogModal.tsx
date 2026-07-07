@@ -96,10 +96,12 @@ export function HRManualTimeLogModal({
     memo: ''
   })
 
-  // Time tracking settings (for maxSessionHours validation)
+  // Time tracking settings
   const [timeTrackingSettings, setTimeTrackingSettings] = useState<{
     maxSessionHours?: number
     allowOvertime?: boolean
+    allowPastTime?: boolean
+    pastTimeLimitDays?: number
   } | null>(null)
 
   // Errors
@@ -108,6 +110,20 @@ export function HRManualTimeLogModal({
   const [startTimeError, setStartTimeError] = useState('')
   const [endDateError, setEndDateError] = useState('')
   const [endTimeError, setEndTimeError] = useState('')
+
+  // Allowed date range: today back to pastTimeLimitDays (default 1 = yesterday)
+  const { todayStr, minDateStr, pastLimitMsg } = useMemo(() => {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const limitDays = timeTrackingSettings?.pastTimeLimitDays ?? 1
+    const minDate = new Date(now)
+    minDate.setDate(minDate.getDate() - limitDays)
+    const msg = limitDays === 1
+      ? 'Manual time logs can only be added for today or yesterday'
+      : `Manual time logs can only be added within the last ${limitDays} days`
+    return { todayStr: fmt(now), minDateStr: fmt(minDate), pastLimitMsg: msg }
+  }, [timeTrackingSettings?.pastTimeLimitDays])
 
   // Filtered lists based on search
   const filteredEmployees = useMemo(() => {
@@ -322,6 +338,19 @@ export function HRManualTimeLogModal({
       return
     }
 
+    // Restrict to allowed past time window
+    const startDateOnly = formData.startDate
+    if (startDateOnly < minDateStr) {
+      setStartDateError(pastLimitMsg)
+      return
+    }
+
+    const endDateOnly = formData.endDate
+    if (endDateOnly < minDateStr) {
+      setEndDateError(pastLimitMsg)
+      return
+    }
+
     // Validate against maxSessionHours
     if (timeTrackingSettings?.maxSessionHours) {
       const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60)
@@ -332,7 +361,7 @@ export function HRManualTimeLogModal({
         )
       }
     }
-  }, [formData.startDate, formData.startTime, formData.endDate, formData.endTime, timeTrackingSettings])
+  }, [formData.startDate, formData.startTime, formData.endDate, formData.endTime, timeTrackingSettings, minDateStr, pastLimitMsg])
 
   // Validate times when date/time fields change
   useEffect(() => {
@@ -743,8 +772,16 @@ export function HRManualTimeLogModal({
                 id="hr-start-date"
                 type="date"
                 value={formData.startDate}
+                min={minDateStr}
+                max={todayStr}
                 onChange={(e) => {
-                  setFormData(prev => ({ ...prev, startDate: e.target.value }))
+                  const val = e.target.value
+                  if (val && (val < minDateStr || val > todayStr)) {
+                    setStartDateError(pastLimitMsg)
+                    return
+                  }
+                  setStartDateError('')
+                  setFormData(prev => ({ ...prev, startDate: val }))
                   setError('')
                 }}
                 disabled={!selectedTaskId}
@@ -785,8 +822,16 @@ export function HRManualTimeLogModal({
                 id="hr-end-date"
                 type="date"
                 value={formData.endDate}
+                min={minDateStr}
+                max={todayStr}
                 onChange={(e) => {
-                  setFormData(prev => ({ ...prev, endDate: e.target.value }))
+                  const val = e.target.value
+                  if (val && (val < minDateStr || val > todayStr)) {
+                    setEndDateError(pastLimitMsg)
+                    return
+                  }
+                  setEndDateError('')
+                  setFormData(prev => ({ ...prev, endDate: val }))
                   setError('')
                 }}
                 disabled={!selectedTaskId}

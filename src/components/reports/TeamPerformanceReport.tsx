@@ -1,422 +1,271 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Area,
-  AreaChart
+import {
+  BarChart, Bar, AreaChart, Area, LineChart, Line,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import { 
-  Users, 
-  TrendingUp, 
-  Target,
-  Award,
-  Clock,
-  Activity
-} from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar'
+import { Star } from 'lucide-react'
 
 interface TeamMember {
-  _id: string
-  firstName: string
-  lastName: string
-  email: string
-  role: string
-  department: string
-  avatar?: string
+  _id: string; firstName: string; lastName: string; email: string
+  role: string; department: string; avatar?: string
   stats: {
-    tasksCompleted: number
-    totalTasks: number
-    completionRate: number
-    hoursLogged: number
-    averageSessionLength: number
-    productivityScore: number
-    workloadScore: number
+    tasksCompleted: number; totalTasks: number; completionRate: number
+    hoursLogged: number; averageSessionLength: number; productivityScore: number; workloadScore: number
   }
-  recentActivity: {
-    date: string
-    activity: string
-    type: 'task' | 'time' | 'project'
-  }[]
+}
+
+interface PerformanceTrend {
+  // API shape
+  date?: string
+  productivity?: number
+  workload?: number
+  hours?: number
+  // alt shape
+  period?: string
+  averageProductivity?: number
+  averageCompletionRate?: number
+  totalTasksCompleted?: number
+  totalHoursLogged?: number
 }
 
 interface TeamPerformanceReportProps {
   members: TeamMember[]
-  productivityTrends: {
-    date: string
-    productivity: number
-    workload: number
-    hours: number
-  }[]
+  performanceTrends?: PerformanceTrend[]
+  productivityTrends?: PerformanceTrend[]
   filters: any
 }
 
-export function TeamPerformanceReport({ members, productivityTrends, filters }: TeamPerformanceReportProps) {
-  // Calculate performance metrics
-  const averageProductivity = members.length > 0 
-    ? members.reduce((sum, member) => sum + member.stats.productivityScore, 0) / members.length 
-    : 0
-  const averageWorkload = members.length > 0 
-    ? members.reduce((sum, member) => sum + member.stats.workloadScore, 0) / members.length 
-    : 0
-  const totalHoursLogged = members.reduce((sum, member) => sum + member.stats.hoursLogged, 0)
-  const totalTasksCompleted = members.reduce((sum, member) => sum + member.stats.tasksCompleted, 0)
+const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px] min-w-[148px]">
+      {label && <p className="font-semibold text-[var(--apple-label)] mb-2">{label}</p>}
+      {payload.map((item: any, i: number) => (
+        <div key={i} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+            <span className="text-[var(--apple-secondary-label)]">{item.name}</span>
+          </div>
+          <span className="font-semibold font-apple-mono text-[var(--apple-label)]">
+            {formatValue ? formatValue(item.value) : item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
-  // Prepare data for charts
-  const performanceData = members.map(member => ({
-    name: `${member.firstName} ${member.lastName}`.length > 15 
-      ? `${member.firstName} ${member.lastName}`.substring(0, 15) + '...' 
-      : `${member.firstName} ${member.lastName}`,
-    productivity: member.stats.productivityScore,
-    workload: member.stats.workloadScore,
-    completion: member.stats.completionRate,
-    hours: member.stats.hoursLogged
-  }))
+function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+      <div className="mb-4">
+        <p className="text-[17px] font-semibold tracking-tight">{title}</p>
+        {subtitle && <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
 
-  const departmentPerformance = members.reduce((acc, member) => {
-    if (!acc[member.department]) {
-      acc[member.department] = {
-        department: member.department,
-        members: 0,
-        totalProductivity: 0,
-        totalWorkload: 0,
-        totalHours: 0,
-        totalTasks: 0
-      }
-    }
-    acc[member.department].members += 1
-    acc[member.department].totalProductivity += member.stats.productivityScore
-    acc[member.department].totalWorkload += member.stats.workloadScore
-    acc[member.department].totalHours += member.stats.hoursLogged
-    acc[member.department].totalTasks += member.stats.tasksCompleted
-    return acc
-  }, {} as Record<string, any>)
+const PERF_TIERS = [
+  { min: 90, label: 'Outstanding', color: '#007AFF', bg: 'rgba(0,122,255,0.12)' },
+  { min: 75, label: 'Excellent',   color: '#34C759', bg: 'rgba(52,199,89,0.12)' },
+  { min: 60, label: 'Good',        color: '#FF9500', bg: 'rgba(255,149,0,0.12)' },
+  { min: 0,  label: 'Needs Work',  color: '#FF453A', bg: 'rgba(255,69,58,0.12)' },
+]
+const getTier = (score: number) => PERF_TIERS.find(t => score >= t.min) ?? PERF_TIERS[3]
 
-  const departmentData = Object.values(departmentPerformance).map((dept: any) => ({
-    department: dept.department,
-    members: dept.members,
-    avgProductivity: dept.members > 0 ? dept.totalProductivity / dept.members : 0,
-    avgWorkload: dept.members > 0 ? dept.totalWorkload / dept.members : 0,
-    totalHours: dept.totalHours,
-    totalTasks: dept.totalTasks
-  }))
+export function TeamPerformanceReport({ members, performanceTrends, productivityTrends, filters }: TeamPerformanceReportProps) {
+  const resolvedTrends = performanceTrends ?? productivityTrends ?? []
+  const avgScore = members.length > 0 ? members.reduce((s, m) => s + m.stats.productivityScore, 0) / members.length : 0
+  const avgCompletion = members.length > 0 ? members.reduce((s, m) => s + m.stats.completionRate, 0) / members.length : 0
+  const topCount = members.filter(m => m.stats.productivityScore >= 75).length
+  const totalTasks = members.reduce((s, m) => s + m.stats.tasksCompleted, 0)
 
-  const topPerformers = members
+  const memberBarData = [...members]
     .sort((a, b) => b.stats.productivityScore - a.stats.productivityScore)
-    .slice(0, 5)
+    .slice(0, 10)
+    .map(m => ({
+      name: `${m.firstName} ${m.lastName.charAt(0)}.`,
+      Score: m.stats.productivityScore,
+      Completion: m.stats.completionRate,
+    }))
+
+  const trendData = resolvedTrends.map(t => ({
+    period: t.period ?? t.date ?? '',
+    'Productivity': t.averageProductivity ?? t.productivity ?? 0,
+    'Completion Rate': t.averageCompletionRate ?? 0,
+  }))
+
+  const tasksData = resolvedTrends.map(t => ({
+    period: t.period ?? t.date ?? '',
+    'Tasks Done': t.totalTasksCompleted ?? 0,
+    'Hours': t.totalHoursLogged ?? t.hours ?? 0,
+  }))
 
   return (
-    <div className="space-y-8">
-      {/* Performance Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Team Members</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">{members.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Active team members
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Avg Productivity</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {averageProductivity.toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Team productivity score
-            </p>
-            <Progress value={averageProductivity} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Hours</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold break-words">
-              {totalHoursLogged.toFixed(0)}h
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Logged across team
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Tasks Completed</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {totalTasksCompleted}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Total completed tasks
-            </p>
-          </CardContent>
-        </Card>
+      {/* ── Stats Strip ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Avg Score', value: `${avgScore.toFixed(1)}%`, sub: 'Team productivity', color: 'var(--apple-chart-color)' },
+          { label: 'Avg Completion', value: `${avgCompletion.toFixed(1)}%`, sub: 'Task completion rate', color: '#34C759' },
+          { label: 'High Performers', value: String(topCount), sub: 'Score ≥ 75%', color: '#FF9500' },
+          { label: 'Tasks Completed', value: String(totalTasks), sub: 'Total by team', color: 'var(--apple-chart-color)' },
+        ].map(s => (
+          <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
+            <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
+            <p className="text-[24px] font-bold font-apple-mono tracking-tight" style={{ color: s.color }}>{s.value}</p>
+            <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{s.sub}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-        {/* Individual Performance */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Individual Performance</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Productivity and workload by team member</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={performanceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
-                <Bar dataKey="productivity" fill="#00C49F" name="Productivity" />
-                <Bar dataKey="workload" fill="#FFBB28" name="Workload" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* ── Charts ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Department Performance */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Department Performance</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Average performance by department</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={departmentData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="department" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
-                <Bar dataKey="avgProductivity" fill="#00C49F" name="Avg Productivity" />
-                <Bar dataKey="avgWorkload" fill="#FFBB28" name="Avg Workload" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Productivity Trends */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Productivity Trends</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Team productivity over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={productivityTrends}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
-                <Area 
-                  type="monotone" 
-                  dataKey="productivity" 
-                  stackId="1" 
-                  stroke="#00C49F" 
-                  fill="#00C49F" 
-                  fillOpacity={0.6}
-                  name="Productivity"
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="workload" 
-                  stackId="2" 
-                  stroke="#FFBB28" 
-                  fill="#FFBB28" 
-                  fillOpacity={0.6}
-                  name="Workload"
-                />
+        {/* Area — performance trends */}
+        <ChartCard title="Performance Trends" subtitle="Productivity and completion rate over time">
+          {trendData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={trendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="tp-comp" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#34C759" stopOpacity={0.20} /><stop offset="100%" stopColor="#34C759" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="period" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+                <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
+                <Area type="monotone" dataKey="Productivity" stroke="var(--apple-chart-color)" strokeWidth={2} fill="var(--apple-chart-color)" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
+                <Area type="monotone" dataKey="Completion Rate" stroke="#34C759" strokeWidth={2} fill="url(#tp-comp)" dot={false} activeDot={{ r: 4 }} />
+                <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
               </AreaChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center">
+              <p className="text-[13px] text-[var(--apple-secondary-label)]">No trend data available</p>
+            </div>
+          )}
+        </ChartCard>
 
-        {/* Hours vs Performance */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Hours vs Performance</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Hours logged vs productivity correlation</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={performanceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
-                <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Line 
-                  yAxisId="left"
-                  type="monotone" 
-                  dataKey="productivity" 
-                  stroke="#00C49F" 
-                  strokeWidth={2}
-                  name="Productivity %"
-                />
-                <Line 
-                  yAxisId="right"
-                  type="monotone" 
-                  dataKey="hours" 
-                  stroke="#8884d8" 
-                  strokeWidth={2}
-                  name="Hours Logged"
-                />
+        {/* Horizontal bar — top members by score */}
+        <ChartCard title="Member Performance Ranking" subtitle="Top 10 members by productivity score">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={memberBarData} layout="vertical" barCategoryGap="30%" margin={{ top: 4, right: 8, left: 40, bottom: 0 }}>
+              <defs>
+                <linearGradient id="tp-compl" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#34C759" stopOpacity={0.9} /><stop offset="100%" stopColor="#30D158" stopOpacity={0.8} />
+                </linearGradient>
+              </defs>
+              <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={40} />
+              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <Bar dataKey="Score" fill="var(--apple-chart-color)" radius={[0, 5, 5, 0]} maxBarSize={10} />
+              <Bar dataKey="Completion" fill="url(#tp-compl)" radius={[0, 5, 5, 0]} maxBarSize={10} />
+              <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        {/* Line — tasks + hours over time */}
+        <ChartCard title="Team Output Over Time" subtitle="Tasks completed and hours logged by period">
+          {tasksData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={tasksData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <XAxis dataKey="period" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="tasks" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={28} />
+                <YAxis yAxisId="hours" orientation="right" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}h`} />
+                <Tooltip content={<AppleTooltip />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
+                <Line yAxisId="tasks" type="monotone" dataKey="Tasks Done" stroke="#FF9500" strokeWidth={2.5} dot={{ r: 3, fill: '#FF9500' }} activeDot={{ r: 5 }} />
+                <Line yAxisId="hours" type="monotone" dataKey="Hours" stroke="#BF5AF2" strokeWidth={2.5} dot={{ r: 3, fill: '#BF5AF2' }} activeDot={{ r: 5 }} strokeDasharray="5 3" />
+                <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
               </LineChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center">
+              <p className="text-[13px] text-[var(--apple-secondary-label)]">No data available</p>
+            </div>
+          )}
+        </ChartCard>
+
+        {/* Performance tier distribution */}
+        <ChartCard title="Performance Tier Distribution" subtitle="Members grouped by tier">
+          <div className="space-y-4 mt-1">
+            {PERF_TIERS.map((tier, idx) => {
+              const prevMin = idx === 0 ? Infinity : PERF_TIERS[idx - 1].min
+              const count = members.filter(m => m.stats.productivityScore >= tier.min && m.stats.productivityScore < prevMin).length
+              const pct = members.length > 0 ? (count / members.length) * 100 : 0
+              return (
+                <div key={tier.label} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[13px]">
+                    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: tier.bg, color: tier.color }}>{tier.label}</span>
+                    <div className="flex items-center gap-2 font-apple-mono">
+                      <span className="font-semibold text-[var(--apple-label)]">{count} members</span>
+                      <span className="text-[var(--apple-tertiary-label)]">{pct.toFixed(0)}%</span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: tier.color }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </ChartCard>
       </div>
 
-      {/* Top Performers */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
-            <Award className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-            <span className="truncate">Top Performers</span>
-          </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Team members with highest productivity scores</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-5">
-            {topPerformers.map((performer, index) => (
-              <div key={performer._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
-                <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 flex-shrink-0">
-                    <Badge variant="outline" className="w-6 h-6 rounded-full flex items-center justify-center">
-                      {index + 1}
-                    </Badge>
-                    <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
-                      <AvatarImage src={performer.avatar} />
-                      <AvatarFallback className="text-xs sm:text-sm">
-                        {performer.firstName.charAt(0)}{performer.lastName.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm sm:text-base truncate">
-                      {performer.firstName} {performer.lastName}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                      {performer.role} • {performer.department}
-                    </p>
-                  </div>
+      {/* ── Individual Performance Table ── */}
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+        <div className="px-5 pt-5 pb-4 border-b border-[var(--apple-separator)]">
+          <div className="flex items-center gap-2">
+            <Star className="h-4 w-4 text-[#FF9500]" />
+            <p className="text-[17px] font-semibold">Individual Performance</p>
+          </div>
+          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">All team members ranked by performance score</p>
+        </div>
+        <div className="divide-y divide-[var(--apple-separator)]">
+          {[...members].sort((a, b) => b.stats.productivityScore - a.stats.productivityScore).map((m, i) => {
+            const tier = getTier(m.stats.productivityScore)
+            return (
+              <div key={m._id} className="px-5 py-3.5 flex items-center gap-4 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--apple-tertiary-fill)] text-[12px] font-bold text-[var(--apple-secondary-label)] flex-shrink-0">
+                  {i + 1}
                 </div>
-                <div className="grid grid-cols-2 sm:flex sm:items-center sm:space-x-4 sm:space-x-6 gap-3 sm:gap-0 w-full sm:w-auto flex-shrink-0">
-                  <div className="text-center">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {performer.stats.productivityScore.toFixed(1)}%
-                    </div>
-                    <div className="text-xs text-muted-foreground">Productivity</div>
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarImage src={m.avatar} />
+                  <AvatarFallback className="text-[11px] font-semibold bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                    {m.firstName.charAt(0)}{m.lastName.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-[14px] font-semibold truncate">{m.firstName} {m.lastName}</p>
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold flex-shrink-0" style={{ backgroundColor: tier.bg, color: tier.color }}>{tier.label}</span>
                   </div>
-                  <div className="text-center">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {performer.stats.tasksCompleted}
+                  <p className="text-[11px] text-[var(--apple-secondary-label)] truncate">{m.role} · {m.department}</p>
+                </div>
+                <div className="hidden sm:grid grid-cols-4 gap-4 text-center text-[12px] flex-shrink-0">
+                  {[
+                    { val: `${m.stats.productivityScore.toFixed(0)}%`, lbl: 'Score', c: tier.color },
+                    { val: `${m.stats.completionRate.toFixed(0)}%`, lbl: 'Done', c: '#34C759' },
+                    { val: String(m.stats.tasksCompleted), lbl: 'Tasks', c: 'var(--apple-label)' },
+                    { val: `${m.stats.hoursLogged.toFixed(0)}h`, lbl: 'Hours', c: 'var(--apple-label)' },
+                  ].map(s => (
+                    <div key={s.lbl}>
+                      <p className="font-semibold font-apple-mono" style={{ color: s.c }}>{s.val}</p>
+                      <p className="text-[11px] text-[var(--apple-tertiary-label)]">{s.lbl}</p>
                     </div>
-                    <div className="text-xs text-muted-foreground">Tasks Done</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {performer.stats.hoursLogged.toFixed(1)}h
-                    </div>
-                    <div className="text-xs text-muted-foreground">Hours Logged</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {performer.stats.completionRate.toFixed(1)}%
-                    </div>
-                    <div className="text-xs text-muted-foreground">Completion</div>
-                  </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Team Performance Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base sm:text-lg">Team Performance Details</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Detailed performance metrics for all team members</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-5">
-            {members.map((member) => (
-              <div key={member._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
-                <div className="flex-1 min-w-0 w-full sm:w-auto">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
-                    <div className="flex items-center space-x-2">
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarImage src={member.avatar} />
-                        <AvatarFallback className="text-xs sm:text-sm">
-                          {member.firstName.charAt(0)}{member.lastName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm sm:text-base truncate">
-                          {member.firstName} {member.lastName}
-                        </h3>
-                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                          {member.role} • {member.department}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant={member.stats.productivityScore > 80 ? 'default' : 
-                                   member.stats.productivityScore > 60 ? 'secondary' : 'outline'} className="flex-shrink-0">
-                      {member.stats.productivityScore.toFixed(1)}% productivity
-                    </Badge>
-                  </div>
-                  
-                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5 text-xs sm:text-sm">
-                    <div>
-                      <div className="text-muted-foreground">Tasks Completed</div>
-                      <div className="font-medium break-words">{member.stats.tasksCompleted}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">Hours Logged</div>
-                      <div className="font-medium break-words">{member.stats.hoursLogged.toFixed(1)}h</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">Completion Rate</div>
-                      <div className="font-medium">{member.stats.completionRate.toFixed(1)}%</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">Workload</div>
-                      <div className="font-medium">{member.stats.workloadScore.toFixed(1)}%</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

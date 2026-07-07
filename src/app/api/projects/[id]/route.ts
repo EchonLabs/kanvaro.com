@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Project } from '@/models/Project'
 import { Task } from '@/models/Task'
+import { TimeEntry } from '@/models/TimeEntry'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
@@ -88,6 +89,33 @@ export async function GET(
       totalTasks
     }
 
+    // Calculate stats for reports tab
+    const timeEntries = await TimeEntry.find({ project: projectId })
+    const totalMinutes = timeEntries.reduce((sum: number, entry: any) => sum + (entry.duration || 0), 0)
+
+    const totalBudget = project.budget?.total || 0
+    const budgetSpent = project.budget?.spent || 0
+    const budgetRemaining = totalBudget - budgetSpent
+    const budgetUtilizationRate = totalBudget > 0 ? Math.round((budgetSpent / totalBudget) * 100) : 0
+
+    const stats = {
+      tasks: {
+        total: totalTasks,
+        completed: tasksCompleted,
+        completionRate: completionPercentage
+      },
+      budget: {
+        total: totalBudget,
+        spent: budgetSpent,
+        remaining: budgetRemaining,
+        utilizationRate: budgetUtilizationRate
+      },
+      timeTracking: {
+        totalHours: Math.round((totalMinutes / 60) * 10) / 10,
+        entries: timeEntries.length
+      }
+    }
+
     const projectData = project.toObject()
     // Cross-reference teamMembers with User collection for isActive === true
     if (Array.isArray(projectData.teamMembers) && projectData.teamMembers.length > 0) {
@@ -118,7 +146,8 @@ export async function GET(
       success: true,
       data: {
         ...projectData,
-        progress
+        progress,
+        stats
       }
     })
 

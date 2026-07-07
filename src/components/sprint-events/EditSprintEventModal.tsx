@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -90,7 +89,6 @@ interface EditSprintEventModalProps {
 }
 
 export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEventModalProps) {
-  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
@@ -366,11 +364,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
         })
         setLoading(false)
         onSuccess()
-        // Close modal and redirect after showing success notification
-        setTimeout(() => {
-          onClose()
-          router.push('/sprint-events?success=updated')
-        }, 1000)
+        onClose()
       } else {
         const errorData = await response.json()
         const errorMessage = errorData.error || 'Failed to update event'

@@ -1,3 +1,86 @@
+## [1.40.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.40.0...v1.40.1) (2026-06-24)
+
+
+### Bug Fixes
+
+* application error due to sprint event duration exceeding ([daa2510](https://github.com/EchonLabs/kanvaro.com/commit/daa251072754dfd4033e5442b626e621bb1e835c))
+* calender page formatting and layout issues ([854360f](https://github.com/EchonLabs/kanvaro.com/commit/854360fd84b4245f9e620b235a2266672a9fa6fc))
+* fixed the scrollbar popup in sprint events page. ([5017987](https://github.com/EchonLabs/kanvaro.com/commit/5017987ff95f218f00887ee7f970703623e48e44))
+* fixed vertical scrollbar in Toast Notifications and added new info for Info cards in Project view page ([5c0c37b](https://github.com/EchonLabs/kanvaro.com/commit/5c0c37bbaee63e4646634bd150a209350ab5e5f4))
+* handled the duplicate toast notifications and fixed the UI issue in the sprint event view page ([c07d856](https://github.com/EchonLabs/kanvaro.com/commit/c07d856c9a0291ae74b5e47e05c3bd1052ab7f54))
+* layout and spacing issues in the Sprint page List View ([fbb49f0](https://github.com/EchonLabs/kanvaro.com/commit/fbb49f03480a732b020e3bf1a913d68e5def62f3))
+* reworked the logic in the reports tab in the project view page. ([fff765a](https://github.com/EchonLabs/kanvaro.com/commit/fff765ab6b23d1a7cc9cc8a107a0abe48b03fe22))
+* reworked the logic on all four sub pages of the Project Reports page ([0f4e7c1](https://github.com/EchonLabs/kanvaro.com/commit/0f4e7c1a4a4e9154769c2a2a1d8b71070cb95a60))
+* scrollbar popup issue when no results were found ([e126c3f](https://github.com/EchonLabs/kanvaro.com/commit/e126c3f18bf8e2dfdb864c697044ea103eb2f025))
+* showing unformatted task descriptions in the Tasks page List view ([8c11d6d](https://github.com/EchonLabs/kanvaro.com/commit/8c11d6d62ef55a334489876b3e63f6b842681c91))
+
+# [1.40.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.39.1...v1.40.0) (2026-06-15)
+
+
+### Bug Fixes
+
+* added the outline svg style to all Title svgs in all pages and made the sidebar active state follow the new UI theme ([3bffcb1](https://github.com/EchonLabs/kanvaro.com/commit/3bffcb13f5f88ad1809d2c969032aafe900b5590))
+* changed all svgs to outlined svgs in all pages belonging to the Time Tracking Module ([4b64083](https://github.com/EchonLabs/kanvaro.com/commit/4b640835ffc8ff413fd3940af8c09dbeb00731e3))
+* final adjustments for the sprint events and epic pages to follow the new UI theme. ([f12dfa6](https://github.com/EchonLabs/kanvaro.com/commit/f12dfa6154cbfa8440443e5618864806e8a521f4))
+* member avatars not showing in the dashboard and Standup Dashboard ([7707d8d](https://github.com/EchonLabs/kanvaro.com/commit/7707d8d6b8e7cac2560a0ae85f3de0da93c7afad))
+* redesigned the dashboard to fit the new theme and align with Apple design standards. ([d7d3af6](https://github.com/EchonLabs/kanvaro.com/commit/d7d3af6e52e6f73f3297096bf9ce993dd9474ac8))
+* removed unnecessary and redundant .md files ([588bcd7](https://github.com/EchonLabs/kanvaro.com/commit/588bcd7a4ed68428948d200e0539660be33f9da7))
+* replaced lucide icons with Outlined icons in the dashboard. ([d368cd9](https://github.com/EchonLabs/kanvaro.com/commit/d368cd96426bde0d3bf6dd28e5f5cd8c6ff409c2))
+* upadeted all pages in the Test Management Module to use outlined svgs ([55c3c98](https://github.com/EchonLabs/kanvaro.com/commit/55c3c984e3458be630d5e6a1ba4bf914c769fe52))
+* updated all pages in Settings Module to use outlined svgs ([ef5743b](https://github.com/EchonLabs/kanvaro.com/commit/ef5743b438e275982b4a70f88c8def56401fdcb8))
+* updated all pages in the Reports Module to use outlined svgs ([472a0fd](https://github.com/EchonLabs/kanvaro.com/commit/472a0fd5db0a4c302aedb44063c899aeacf939dc))
+* updated all pages related to Tasks Module and Project Module to use oulined svgs. ([94b5d74](https://github.com/EchonLabs/kanvaro.com/commit/94b5d74b70bb67597e660d3a1343367a1c6db93c))
+* updated all scheduled standup pages to follow the new UI theme ([58c5667](https://github.com/EchonLabs/kanvaro.com/commit/58c5667d4a84eea2f733ff0822228aa43d32410e))
+
+
+### Features
+
+* added the new theme as a toggle for users and removed the gradient background for both dark and light modes. ([6e4ed49](https://github.com/EchonLabs/kanvaro.com/commit/6e4ed49bbc6df901edb03209f105681caadfbf6c))
+* changed all page related to the Projects Module to follow the new UI color theme ([dd23adf](https://github.com/EchonLabs/kanvaro.com/commit/dd23adf030ae2b4623cfb72cbf213a2ce01a700a))
+* changed the Standup Dashboard and all pages related to this feature follow the new theme. ([e183b42](https://github.com/EchonLabs/kanvaro.com/commit/e183b42ca65c9a1e227eab9ee48e6c9a29bf7700))
+* final design fixes for the dashboard and updated the signout confirmation modal. ([5dc9c1c](https://github.com/EchonLabs/kanvaro.com/commit/5dc9c1c4a707e3febe651a6b481f71f7c53a495e))
+* redesigned both sprint and task popup modals and and the task view page ([1eb3159](https://github.com/EchonLabs/kanvaro.com/commit/1eb31598867f336e4bdb5709e0b8b1e31676632c))
+* **ui:** Added a new theme feature for users to select from a group of four premium colors as the global theme. ([039ab6f](https://github.com/EchonLabs/kanvaro.com/commit/039ab6fa51fea419e58dfb363b47ddd2e0a24619))
+* updated all pages and components related to the reports module to follow the new UI theme ([13535f2](https://github.com/EchonLabs/kanvaro.com/commit/13535f24c8d96224dd4153b6e7a8ca5f70a3f77b))
+* updated all pages of the Tasks Module to follow the new UI color theme ([2a1e1f0](https://github.com/EchonLabs/kanvaro.com/commit/2a1e1f0a00500127c8ee926b54d7425b3d173633))
+* updated all pages of the Timer Tracking Module to fit the new UI color theme ([35ab351](https://github.com/EchonLabs/kanvaro.com/commit/35ab3512904452de34abfcc6d5d1e14a0ebe2414))
+* updated all the pages in Test Management Module to follow the new UI theme. ([fc560a6](https://github.com/EchonLabs/kanvaro.com/commit/fc560a6d95256b240978e6497968411166c28a21))
+* updated pages in the Settings Module to follow the new UI theme ([485851b](https://github.com/EchonLabs/kanvaro.com/commit/485851b72df0157014c733bb4494f4c9502306dd))
+
+## [1.39.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.39.0...v1.39.1) (2026-06-10)
+
+
+### Bug Fixes
+
+* harden session timeout logic and stabilize token refresh Enforce a minimum session timeout of 4 hours in SessionTimeoutWrapper ([cd59682](https://github.com/EchonLabs/kanvaro.com/commit/cd59682939a51daa3008b530ddcb12ad75c7f8dc))
+* implement dynamic past time log limits Update the time tracking system to use a configurable past time limit ([f700305](https://github.com/EchonLabs/kanvaro.com/commit/f70030524ad094713d9cf80f9d5fff6a371e4bbe))
+* restrict manual time logs to today and yesterday ([0afbee3](https://github.com/EchonLabs/kanvaro.com/commit/0afbee32126e86ef8fe9e31dc65c46a5870628fb))
+
+# [1.39.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.2...v1.39.0) (2026-06-09)
+
+
+### Bug Fixes
+
+* adjust order of elements in dashboard layout for better responsiveness ([771dacb](https://github.com/EchonLabs/kanvaro.com/commit/771dacb3860d6202dc5088000b080a57cd75cfe9))
+* improve responsiveness and layout across project and calendar pages ([1b7a517](https://github.com/EchonLabs/kanvaro.com/commit/1b7a517213cee5f486ec67da3771fbda36564fd4))
+* refine glassmorphism effects and transition timing Adjusted the opacity and blur intensity of Apple-inspired glass materials to improve visual depth and transparency. Additionally, introduce a custom cubic-bezier timing function and transition duration to align with premium motion standards. ([b0c897b](https://github.com/EchonLabs/kanvaro.com/commit/b0c897bdba1fd469d96f3852272753ab60d22810))
+* **reports:** improve responsiveness and add date filtering to Gantt charts Update `QuickActions` component to use a dynamic grid system that adapts to the number of available actions. ([f97b15f](https://github.com/EchonLabs/kanvaro.com/commit/f97b15fe6966bc8fdf5e89ae7bfbd59968c5b27e))
+
+
+### Features
+
+* **dashboard:** redesigned the UI to fit Apple theme enhanced data aggregation and refine typography scales ([401154f](https://github.com/EchonLabs/kanvaro.com/commit/401154f42dd6978a9cfffcd6ad9ce7f1bb0f17d6))
+* **ui/dashboard:** implement Apple HIG design system tokens ([7839f56](https://github.com/EchonLabs/kanvaro.com/commit/7839f5626f9aab3f12d7940560b5c2215375be0c))
+* **ui:** apply Apple HIG semantic styling and component refinements to dashboard core UI Components ([f1adb0b](https://github.com/EchonLabs/kanvaro.com/commit/f1adb0b680cd1eab0758e6c4ccaf64fd74705580))
+* **ui:** Implement a more sophisticated visual presentation for time tracking components and extend the manual logging functionality for administrative users. ([ae9b1f8](https://github.com/EchonLabs/kanvaro.com/commit/ae9b1f88f7ab99248a8ab3c19198173945c4709e))
+* **ui:** implemented new revamped designs for all pages realted to the Time Tracking Module and added new animation styles ([c8c5440](https://github.com/EchonLabs/kanvaro.com/commit/c8c54403e59353cc832fccdee8550df3eb92c8d2))
+* **ui:** implemented revamped UI to all Team Module pages ([b188b04](https://github.com/EchonLabs/kanvaro.com/commit/b188b044bd185fa9c2eda1c01ab2543ade7e829f))
+* **ui:** redesign all report pages, components and the calender page with Apple-inspired design system ([76c536b](https://github.com/EchonLabs/kanvaro.com/commit/76c536bf4eda0f3d865cc0bb30a8c2705af311b4))
+* **ui:** redesign standup dashboard with Apple-inspired design system ([bd97109](https://github.com/EchonLabs/kanvaro.com/commit/bd97109628b0dae55c58acf0114c07229b5ef317))
+* **ui:** redesign UI and improve component structure in Test Management Module pages ([26ffcef](https://github.com/EchonLabs/kanvaro.com/commit/26ffcef4541dc7d9bf481e0b53325a81bdd9e633))
+* **ui:** refactor task management pages with shared components and Apple-inspired design ([9c1f424](https://github.com/EchonLabs/kanvaro.com/commit/9c1f424a286cbeb4cea22c09e5dd91236d1762d2))
+* **ui:** Update Kanban and Projects pages with new design tokens, improved typography, and refined component structures  Implement a theme switcher (Light, Dark, System) in the MobileMenu using `next-themes`. ([be4d213](https://github.com/EchonLabs/kanvaro.com/commit/be4d213f883a4e0594831da3235f0406b7f0419f))
+
 ## [1.38.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.1...v1.38.2) (2026-06-02)
 
 ## [1.38.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.0...v1.38.1) (2026-06-02)

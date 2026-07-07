@@ -123,7 +123,7 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" strokeWidth={1.5} />
           <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
@@ -155,64 +155,61 @@ export default function DashboardPage() {
   return (
     <MainLayout>
       <PageContent>
-        <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
-          {/* Welcome Section */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 mb-1">
-            <div className="flex-1 min-w-0 w-full sm:w-auto">
+        <div className="space-y-5 overflow-x-hidden">
+
+          {/* Row 0: Header + role badge + refresh */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
               <DashboardHeader user={user} />
             </div>
-          </div>
-
-          {dataError && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-2 sm:p-3">
-              <p className="text-destructive text-xs break-words">{dataError}</p>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-xs text-[var(--apple-secondary-label)] hidden sm:inline whitespace-nowrap">
+                Last login: {lastLoginText}
+              </span>
+              <Badge variant="secondary" className="text-[10px] h-5 px-2">
+                {user?.customRole?.name || formatToTitleCase(user?.role) || 'Team Member'}
+              </Badge>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRefresh}
-                className="mt-1.5 w-full sm:w-auto text-xs"
+                disabled={isRefreshing}
+                className="h-8"
               >
+                <RefreshCw className={`h-3 w-3 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} strokeWidth={1.5} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Error state */}
+          {dataError && (
+            <div className="bg-[var(--apple-system-red)]/10 border border-[var(--apple-system-red)]/20 rounded-[var(--apple-radius-md)] p-3">
+              <p className="text-[var(--apple-system-red)] text-xs break-words">{dataError}</p>
+              <Button variant="outline" size="sm" onClick={handleRefresh} className="mt-2">
                 Try Again
               </Button>
             </div>
           )}
 
-          {/* Quick Actions - Full Width at Top */}
-          <div className="w-full mb-2">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
-              <h2 className="text-sm font-semibold text-foreground">Quick Actions</h2>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    Last login: {lastLoginText}
-                  </span>
-                  <Badge variant="secondary" className="text-[10px] h-4.5 px-1.5 py-0 hover:bg-secondary dark:hover:bg-secondary">
-                    {user?.customRole?.name || formatToTitleCase(user?.role) || 'Team Member'}
-                  </Badge>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  className="h-7 px-2 text-[10px]"
-                >
-                  <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-              </div>
-            </div>
+          {/* Row 1: Quick Actions — fixed-size cards, aligned left */}
+          <div>
+            <p className="apple-section-label mb-2.5">Quick Actions</p>
             <QuickActions />
           </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-            <div className="lg:col-span-2 flex flex-col gap-4 sm:gap-6">
-              <StatsCards
-                stats={dashboardData?.stats}
-                changes={dashboardData?.changes}
-                isLoading={!dashboardData}
-              />
-              <NotificationsWidget />
+
+          {/* Row 2: 4 Stat Cards with area sparklines */}
+          <StatsCards
+            stats={dashboardData?.stats}
+            changes={dashboardData?.changes}
+            isLoading={!dashboardData}
+          />
+
+          {/* Row 3: Two-column layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+            {/* Left column — 2/3: Projects → Tasks → Activity */}
+            <div className="lg:col-span-2 flex flex-col gap-4 order-2 lg:order-1">
               <RecentProjects
                 projects={dashboardData?.recentProjects}
                 isLoading={!dashboardData}
@@ -228,8 +225,9 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-3 sm:gap-4">
-              {user.id && user.organization  && (
+            {/* Right column — 1/3: Timer → Active Timers → Notifications */}
+            <div className="flex flex-col gap-4 order-1 lg:order-2">
+              {user.id && user.organization && (
                 <TimeTrackingWidget
                   userId={user.id}
                   organizationId={user.organization}
@@ -239,7 +237,9 @@ export default function DashboardPage() {
               {user.organization && (
                 <ActiveTimersWidget organizationId={user.organization} />
               )}
+              <NotificationsWidget />
             </div>
+
           </div>
         </div>
       </PageContent>
