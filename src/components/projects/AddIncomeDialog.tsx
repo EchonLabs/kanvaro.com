@@ -8,21 +8,26 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
-import { Calendar as CalendarIcon, DollarSign, Loader2, Paperclip, Upload, X } from 'lucide-react'
+import { Calendar as CalendarIcon, CreditCard, DollarSign, Loader2, Paperclip, Upload, UserCheck, X } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
+import { MemberPickerDialog } from './MemberPickerDialog'
 
 type IncomeCategory = 'invoice' | 'consulting' | 'other'
-type IncomeSubCategory = 'amc' | 'cr'
+type IncomeSubCategory = 'amc' | 'cr' | 'other'
+type IncomePaidStatus = 'paid' | 'unpaid'
 
 type IncomeInput = {
   _id?: string
   invoiceNumber?: string
   category?: IncomeCategory
   subCategory?: IncomeSubCategory
+  customSubCategory?: string
   description?: string
   utilizableBudget?: number
   approvedDate?: string | Date
   actualStartDate?: string | Date
+  paidStatus?: IncomePaidStatus
+  receivedBy?: string
   attachments?: UploadedAttachment[]
 }
 
@@ -56,15 +61,19 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
   const [submitting, setSubmitting] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
+  const [showMemberPicker, setShowMemberPicker] = useState(false)
 
   const [formData, setFormData] = useState({
     invoiceNumber: '',
     category: '' as IncomeCategory | '',
     subCategory: '' as IncomeSubCategory | '',
+    customSubCategory: '',
     description: '',
     utilizableBudget: '',
     approvedDate: '',
     actualStartDate: '',
+    paidStatus: 'unpaid' as IncomePaidStatus,
+    receivedBy: '',
     attachments: [] as UploadedAttachment[]
   })
 
@@ -86,6 +95,7 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
       invoiceNumber: isEditing ? String(income?.invoiceNumber || '') : '',
       category: isEditing ? (income?.category || '') : '',
       subCategory: isEditing ? (income?.subCategory || '') : '',
+      customSubCategory: isEditing ? String(income?.customSubCategory || '') : '',
       description: isEditing ? String(income?.description || '') : '',
       utilizableBudget:
         isEditing && income?.utilizableBudget !== undefined && income?.utilizableBudget !== null
@@ -93,6 +103,8 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
           : '',
       approvedDate: isEditing ? toDateInputValue(income?.approvedDate) : '',
       actualStartDate: isEditing ? toDateInputValue(income?.actualStartDate) : '',
+      paidStatus: isEditing ? (income?.paidStatus || 'unpaid') : 'unpaid',
+      receivedBy: isEditing ? (income?.receivedBy || '') : '',
       attachments: isEditing && Array.isArray(income?.attachments) ? income.attachments ?? [] : []
     })
   }, [open, income])
@@ -128,7 +140,9 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
     formData.description.trim() !== '' &&
     formData.utilizableBudget !== '' &&
     formData.approvedDate !== '' &&
-    (!isInvoiceCategory || formData.subCategory !== '')
+    (!isInvoiceCategory || formData.subCategory !== '') &&
+    (formData.subCategory !== 'other' || formData.customSubCategory.trim() !== '') &&
+    (formData.paidStatus !== 'paid' || formData.receivedBy.trim() !== '')
 
   const handleFileUpload = async (files: FileList) => {
     const fileArray = Array.from(files)
@@ -216,10 +230,15 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
           invoiceNumber: formData.invoiceNumber.trim(),
           category: formData.category,
           subCategory: isInvoiceCategory ? formData.subCategory : undefined,
+          customSubCategory: isInvoiceCategory && formData.subCategory === 'other'
+            ? formData.customSubCategory.trim()
+            : undefined,
           description: formData.description,
           utilizableBudget: parseFloat(formData.utilizableBudget),
           approvedDate: formData.approvedDate,
           actualStartDate: formData.actualStartDate || undefined,
+          paidStatus: formData.paidStatus,
+          receivedBy: formData.paidStatus === 'paid' ? formData.receivedBy.trim() : undefined,
           attachments: formData.attachments.map(att => ({
             ...att,
             uploadedBy: currentUser?.id,
@@ -259,6 +278,7 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
         className="max-w-2xl p-0 gap-0"
@@ -300,7 +320,8 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
                   setFormData(prev => ({
                     ...prev,
                     category: value,
-                    subCategory: value === 'invoice' ? prev.subCategory : ''
+                      subCategory: value === 'invoice' ? prev.subCategory : '',
+                      customSubCategory: value === 'invoice' ? prev.customSubCategory : ''
                   }))
                 }}
               >
@@ -321,7 +342,11 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
               <Label htmlFor="subCategory">Sub Category <span className="text-destructive">*</span></Label>
               <Select
                 value={formData.subCategory}
-                onValueChange={(value: IncomeSubCategory) => setFormData(prev => ({ ...prev, subCategory: value }))}
+                onValueChange={(value: IncomeSubCategory) => setFormData(prev => ({
+                  ...prev,
+                  subCategory: value,
+                  customSubCategory: value === 'other' ? prev.customSubCategory : ''
+                }))}
               >
                 <SelectTrigger id="subCategory">
                   <SelectValue placeholder="Select sub category" />
@@ -329,8 +354,22 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
                 <SelectContent>
                   <SelectItem value="amc">AMC (Annual Maintenance Cost)</SelectItem>
                   <SelectItem value="cr">CR</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {isInvoiceCategory && formData.subCategory === 'other' && (
+            <div className="space-y-2">
+              <Label htmlFor="customSubCategory">Custom Sub Category <span className="text-destructive">*</span></Label>
+              <Input
+                id="customSubCategory"
+                value={formData.customSubCategory}
+                onChange={(e) => setFormData(prev => ({ ...prev, customSubCategory: e.target.value }))}
+                placeholder="Enter custom sub category"
+                required
+              />
             </div>
           )}
 
@@ -389,6 +428,73 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
                 <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
             </div>
+          </div>
+
+          {/* Payment Status */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <CreditCard className="h-4 w-4" /> Payment Status
+            </h3>
+            <div className="space-y-2">
+              <Label htmlFor="paidStatus">Receipt Status <span className="text-destructive">*</span></Label>
+              <Select
+                value={formData.paidStatus}
+                onValueChange={(value: IncomePaidStatus) => {
+                  setFormData(prev => ({ ...prev, paidStatus: value, receivedBy: value === 'unpaid' ? '' : prev.receivedBy }))
+                }}
+              >
+                <SelectTrigger id="paidStatus">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-green-500" />
+                      Paid
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="unpaid">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-yellow-500" />
+                      Unpaid
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.paidStatus === 'paid' && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Received By <span className="text-destructive">*</span></Label>
+                {formData.receivedBy ? (
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                      <UserCheck className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-medium flex-1">{formData.receivedBy}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-muted-foreground"
+                      onClick={() => setFormData(prev => ({ ...prev, receivedBy: '' }))}
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-10 justify-start gap-2 text-muted-foreground"
+                    onClick={() => setShowMemberPicker(true)}
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    Select a project member…
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -480,5 +586,20 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess, income }:
         </form>
       </DialogContent>
     </Dialog>
+
+    <MemberPickerDialog
+      open={showMemberPicker}
+      onClose={() => setShowMemberPicker(false)}
+      projectId={projectId}
+      title="Select Who Received Payment"
+      description="Choose the project member who received this payment"
+      onSelect={(member) => {
+        setFormData(prev => ({
+          ...prev,
+          receivedBy: `${member.firstName} ${member.lastName}`
+        }))
+      }}
+    />
+    </>
   )
 }

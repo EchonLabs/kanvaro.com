@@ -31,7 +31,6 @@ import {
   BarChart3,
   Target,
   Download,
-  ChevronDown,
   Edit,
   MoreVertical,
   Save,
@@ -185,7 +184,7 @@ type ProjectTask = {
 }
 
 type IncomeCategory = 'invoice' | 'consulting' | 'other'
-type IncomeSubCategory = 'amc' | 'cr'
+type IncomeSubCategory = 'amc' | 'cr' | 'other'
 
 type IncomeAttachment = {
   name: string
@@ -201,10 +200,13 @@ type Income = {
   invoiceNumber?: string
   category?: IncomeCategory
   subCategory?: IncomeSubCategory
+  customSubCategory?: string
   description?: string
   utilizableBudget?: number
   approvedDate?: string | Date
   actualStartDate?: string | Date
+  paidStatus?: 'paid' | 'unpaid'
+  receivedBy?: string
   attachments?: IncomeAttachment[]
 }
 
@@ -248,12 +250,19 @@ export default function ProjectDetailPage() {
   const orgCurrency = organization?.currency || 'USD'
   const { formatCurrency } = useOrgCurrency()
   const { formatDate } = useDateTime()
-  const { hasPermission, loading: permissionsLoading } = usePermissions()
+  const { hasPermission, loading: permissionsLoading, permissions } = usePermissions()
   const canUpdateProject = hasPermission(Permission.PROJECT_UPDATE)
   const canCreateTask = hasPermission(Permission.TASK_CREATE)
   const canManageTests = hasPermission(Permission.TEST_MANAGE)
-  const canViewIncome = !permissionsLoading && hasPermission(Permission.FINANCIAL_VIEW_INCOME, projectId)
-  const canCreateIncome = !permissionsLoading && hasPermission(Permission.FINANCIAL_CREATE_INCOME, projectId)
+
+  // Financial action gating: only Admin, Super Admin, HR, and PM can manage income/expenses.
+  // We check userRole directly because the hasPermission hook returns true while loading,
+  // which would incorrectly show action buttons to team members during the loading phase.
+  const FINANCIAL_MANAGER_ROLES = ['super_admin', 'admin', 'human_resource', 'project_manager']
+  const canManageFinancials = !permissionsLoading && permissions !== null && FINANCIAL_MANAGER_ROLES.includes(permissions.userRole ?? '')
+  const canViewIncome = canManageFinancials || (!permissionsLoading && permissions !== null && hasPermission(Permission.FINANCIAL_VIEW_INCOME, projectId))
+  const canCreateIncome = canManageFinancials
+  const canManageExpense = canManageFinancials
 
   const tabs = [
     { id: 'overview', label: 'Overview', order: 1 },
@@ -310,14 +319,6 @@ export default function ProjectDetailPage() {
   const [editingSuite, setEditingSuite] = useState<TestSuite | null>(null)
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [showDeleteExpenseConfirmModal, setShowDeleteExpenseConfirmModal] = useState(false)
-  const [expandedExpenseAttachments, setExpandedExpenseAttachments] = useState<Record<string, boolean>>({})
-  const toggleExpenseAttachments = (expenseId: string) => {
-    setExpandedExpenseAttachments(prev => ({
-      ...prev,
-      [expenseId]: !prev[expenseId]
-    }))
-  }
-
   const formatFileSize = (size?: number) => {
     if (!size) return ''
     if (size >= 1024 * 1024) {
@@ -392,6 +393,8 @@ export default function ProjectDetailPage() {
   }
 
   const [expenseToDelete, setExpenseToDelete] = useState<ExpenseToDelete | null>(null)
+  const [incomeToDelete, setIncomeToDelete] = useState<{ id: string; name: string } | null>(null)
+  const [showDeleteIncomeConfirmModal, setShowDeleteIncomeConfirmModal] = useState(false)
   const [parentSuiteIdForCreate, setParentSuiteIdForCreate] = useState<string | undefined>(undefined)
   const [suitesRefreshCounter, setSuitesRefreshCounter] = useState(0)
   const [testCasesRefreshCounter, setTestCasesRefreshCounter] = useState(0)
@@ -604,6 +607,35 @@ export default function ProjectDetailPage() {
       setIncomesLoading(false)
     }
   }, [projectId, canViewIncome])
+
+  const handleIncomeDeleted = (incomeId: string, incomeName: string) => {
+    setIncomeToDelete({ id: incomeId, name: incomeName })
+    setShowDeleteIncomeConfirmModal(true)
+  }
+
+  const confirmDeleteIncome = async () => {
+    if (!incomeToDelete) return
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/income?incomeId=${incomeToDelete.id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        notifySuccess({ title: 'Income Deleted', message: 'Income has been deleted successfully' })
+        fetchIncomes()
+      } else {
+        const errorData = await response.json()
+        notifyError({ title: 'Delete Failed', message: errorData.error || 'Failed to delete income' })
+      }
+    } catch (error) {
+      console.error('Error deleting income:', error)
+      notifyError({ title: 'Delete Failed', message: 'Failed to delete income. Please try again.' })
+    } finally {
+      setShowDeleteIncomeConfirmModal(false)
+      setIncomeToDelete(null)
+    }
+  }
 
   const handleExpenseDeleted = async (expenseId: string, expenseName: string) => {
     setExpenseToDelete({ id: expenseId, name: expenseName })
@@ -1675,107 +1707,124 @@ export default function ProjectDetailPage() {
                             ? 'AMC (Annual Maintenance Cost)'
                             : income.subCategory === 'cr'
                               ? 'CR'
-                              : undefined
+                              : income.subCategory === 'other'
+                                ? (income.customSubCategory?.trim() || 'Other')
+                                : undefined
 
                           return (
-                            <Card key={income._id} className="hover:shadow-md transition-shadow">
-                              <CardContent className="p-4 space-y-3">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <h4 className="font-semibold text-sm truncate" title={income.invoiceNumber}>
-                                      {income.invoiceNumber}
-                                    </h4>
-                                    <div className="mt-1 flex flex-wrap gap-2">
-                                      <Badge variant="secondary" className="capitalize">
-                                        {formatToTitleCase(income.category || 'other')}
-                                      </Badge>
-                                      {subCategoryLabel && (
-                                        <Badge variant="outline">{subCategoryLabel}</Badge>
-                                      )}
-                                      <Badge variant="outline">
-                                        {formatCurrencyNoGrouping(Number(income.utilizableBudget || 0), orgCurrency)}
-                                      </Badge>
-                                    </div>
-                                  </div>
-
-                                  {canCreateIncome && (
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 w-8 p-0"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={(e) => {
+                            <Card key={income._id} className="hover:shadow-md transition-shadow flex flex-col">
+                              {/* Card Header */}
+                              <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-3 border-b">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Invoice</p>
+                                  <h4 className="font-semibold text-sm truncate" title={income.invoiceNumber}>
+                                    {income.invoiceNumber}
+                                  </h4>
+                                </div>
+                                {canCreateIncome && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 w-7 p-0 flex-shrink-0"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation()
+                                        setEditingIncome(income)
+                                      }}>
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
                                           e.stopPropagation()
-                                          setEditingIncome(income)
-                                        }}>
-                                          <Edit className="h-4 w-4 mr-2" />
-                                          Edit Income
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
+                                          handleIncomeDeleted(income._id, income.invoiceNumber ?? '')
+                                        }}
+                                        className="text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                              </div>
+
+                              <CardContent className="p-4 space-y-3 flex-1">
+                                {/* Amount + Status row */}
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xl font-bold">
+                                    {formatCurrencyNoGrouping(Number(income.utilizableBudget || 0), orgCurrency)}
+                                  </span>
+                                  <Badge variant={income.paidStatus === 'paid' ? 'default' : 'secondary'}>
+                                    {income.paidStatus === 'paid' ? 'Received' : 'Pending'}
+                                  </Badge>
+                                </div>
+
+                                {/* Category badges */}
+                                <div className="flex flex-wrap gap-1.5">
+                                  <Badge variant="secondary" className="capitalize text-[10px]">
+                                    {formatToTitleCase(income.category || 'other')}
+                                  </Badge>
+                                  {subCategoryLabel && (
+                                    <Badge variant="outline" className="text-[10px]">{subCategoryLabel}</Badge>
                                   )}
                                 </div>
 
+                                {/* Description */}
                                 {income.description && (
-                                  <p className="text-xs text-muted-foreground line-clamp-3" title={income.description}>
+                                  <p className="text-xs text-muted-foreground line-clamp-2" title={income.description}>
                                     {income.description}
                                   </p>
                                 )}
 
-                                <div className="grid grid-cols-1 gap-1 text-xs text-muted-foreground">
+                                {/* Meta rows */}
+                                <div className="space-y-1.5 text-xs">
                                   {income.approvedDate && (
                                     <div className="flex items-center justify-between">
-                                      <span>Approved Date:</span>
-                                      <span className="text-foreground">{formatDate(income.approvedDate)}</span>
+                                      <span className="text-muted-foreground">Approved</span>
+                                      <span className="font-medium">{formatDate(income.approvedDate)}</span>
                                     </div>
                                   )}
                                   {income.actualStartDate && (
                                     <div className="flex items-center justify-between">
-                                      <span>Actual Start Date:</span>
-                                      <span className="text-foreground">{formatDate(income.actualStartDate)}</span>
+                                      <span className="text-muted-foreground">Start Date</span>
+                                      <span className="font-medium">{formatDate(income.actualStartDate)}</span>
+                                    </div>
+                                  )}
+                                  {income.paidStatus === 'paid' && income.receivedBy && (
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-muted-foreground">Received By</span>
+                                      <span className="font-medium">{income.receivedBy}</span>
                                     </div>
                                   )}
                                 </div>
 
+                                {/* Attachments */}
                                 {safeAttachments.length > 0 && (
                                   <div className="pt-2 border-t">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                        <Paperclip className="h-4 w-4" />
-                                        Attachments
-                                      </span>
-                                      <Badge variant="secondary" className="text-xs">{safeAttachments.length}</Badge>
-                                    </div>
-                                    <div className={`space-y-2 ${safeAttachments.length > 3 ? 'max-h-32 overflow-y-auto pr-1' : ''}`}>
-                                      {safeAttachments.map((att, index: number) => {
-                                        const uploadedByName = resolveUploadedByName(att.uploadedBy)
-                                        return (
-                                          <a
-                                            key={`${att.url}-${index}`}
-                                            href={att.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-start gap-2 rounded-md border bg-muted/30 px-2 py-1.5 hover:bg-muted/40 transition-colors"
-                                            title={att.name}
-                                          >
-                                            <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                                            <div className="min-w-0">
-                                              <div className="text-xs font-medium text-foreground truncate">{att.name}</div>
-                                              <div className="text-[11px] text-muted-foreground">
-                                                {formatFileSize(att.size)}
-                                                {uploadedByName ? ` • ${uploadedByName}` : ''}
-                                              </div>
-                                            </div>
-                                          </a>
-                                        )
-                                      })}
+                                    <p className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 mb-1.5">
+                                      <Paperclip className="h-3 w-3" />
+                                      {safeAttachments.length} attachment{safeAttachments.length > 1 ? 's' : ''}
+                                    </p>
+                                    <div className={`space-y-1 ${safeAttachments.length > 3 ? 'max-h-32 overflow-y-auto' : ''}`}>
+                                      {safeAttachments.map((att, index: number) => (
+                                        <div key={`${att.url}-${index}`} className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5">
+                                          <div className="min-w-0 flex-1">
+                                            <p className="text-[11px] font-medium truncate">{att.name}</p>
+                                          </div>
+                                          <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex-shrink-0">View</a>
+                                          <span className="text-muted-foreground/40 text-[10px]">·</span>
+                                          <a href={att.url} download={att.name} className="text-[10px] text-primary hover:underline flex-shrink-0">Download</a>
+                                        </div>
+                                      ))}
                                     </div>
                                   </div>
                                 )}
@@ -1795,15 +1844,12 @@ export default function ProjectDetailPage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Expenses</CardTitle>
-                      <PermissionGate
-                        permission={Permission.PROJECT_MANAGE_BUDGET}
-                        projectId={projectId}
-                      >
+                      {canManageExpense && (
                         <Button onClick={() => setShowAddExpenseDialog(true)} size="sm">
                           <Plus className="h-4 w-4 mr-2" />
                           Add Expense
                         </Button>
-                      </PermissionGate>
+                      )}
                     </div>
                   </CardHeader>
 
@@ -1817,7 +1863,9 @@ export default function ProjectDetailPage() {
                       <div className="text-center py-8 text-muted-foreground">
                         <DollarSign className="h-12 w-12 mx-auto mb-2 opacity-50" />
                         <p>No expenses added yet</p>
-                        <p className="text-sm mt-1">Click &quot;Add Expense&quot; to get started</p>
+                        {canManageExpense && (
+                          <p className="text-sm mt-1">Click &quot;Add Expense&quot; to get started</p>
+                        )}
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1825,93 +1873,93 @@ export default function ProjectDetailPage() {
                           const attachments: ExpenseAttachment[] = Array.isArray(expense.attachments)
                             ? expense.attachments as ExpenseAttachment[]
                             : []
-                          const isExpanded = expandedExpenseAttachments[expense._id]
+
                           return (
-                            <Card key={expense._id} className="hover:shadow-md transition-shadow">
-                              <CardContent className="p-4">
-                                <div className="flex items-start justify-between mb-2">
-                                  <div className="flex-1">
-                                    <h4 className="font-semibold text-sm mb-1">{expense.name}</h4>
-                                    {expense.description && (
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <p className="text-xs text-muted-foreground line-clamp-2 mb-2 cursor-help">{expense.description}</p>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="max-w-xs">
-                                            <p className="text-sm">{expense.description}</p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    )}
-                                  </div>
-                                  <PermissionGate
-                                    permission={Permission.PROJECT_MANAGE_BUDGET}
-                                    projectId={projectId}
-                                  >
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 w-8 p-0"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={(e) => {
+                            <Card key={expense._id} className="hover:shadow-md transition-shadow flex flex-col">
+                              {/* Card Header */}
+                              <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-3 border-b">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Expense</p>
+                                  <h4 className="font-semibold text-sm truncate" title={expense.name}>
+                                    {expense.name}
+                                  </h4>
+                                </div>
+                                {canManageExpense && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 w-7 p-0 flex-shrink-0"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation()
+                                        setEditingExpense(expense)
+                                      }}>
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
                                           e.stopPropagation()
-                                          setEditingExpense(expense)
-                                        }}>
-                                          <Edit className="h-4 w-4 mr-2" />
-                                          Edit Expense
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleExpenseDeleted(expense._id, expense.name)
-                                          }}
-                                          className="text-destructive"
-                                        >
-                                          <Trash2 className="h-4 w-4 mr-2" />
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </PermissionGate>
+                                          handleExpenseDeleted(expense._id, expense.name)
+                                        }}
+                                        className="text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                              </div>
+
+                              <CardContent className="p-4 space-y-3 flex-1">
+                                {/* Amount + Status row */}
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xl font-bold">
+                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(expense.fullAmount ?? 0)}
+                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    {expense.isBillable && (
+                                      <Badge variant="outline" className="text-[10px]">Billable</Badge>
+                                    )}
+                                    <Badge variant={expense.paidStatus === 'paid' ? 'default' : 'secondary'}>
+                                      {expense.paidStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                                    </Badge>
+                                  </div>
                                 </div>
 
-                                <div className="flex items-center justify-start mb-2">
-                                  <Badge variant={expense.paidStatus === 'paid' ? 'default' : 'secondary'}>
-                                    {expense.paidStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                                {/* Category badge */}
+                                <div>
+                                  <Badge variant="secondary" className="capitalize text-[10px]">
+                                    {expense.category}
                                   </Badge>
                                 </div>
 
-                                <div className="space-y-1 text-xs">
-                                  <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Amount:</span>
-                                    <span className="font-semibold">
-                                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(expense.fullAmount ?? 0)}
-                                    </span>
+                                {/* Description */}
+                                {expense.description && (
+                                  <p className="text-xs text-muted-foreground line-clamp-2" title={expense.description}>
+                                    {expense.description}
+                                  </p>
+                                )}
+
+                                {/* Meta rows */}
+                                <div className="space-y-1.5 text-xs">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground">Date</span>
+                                    <span className="font-medium">{expense.expenseDate ? formatDate(expense.expenseDate) : '—'}</span>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Category:</span>
-                                    <span className="capitalize">{expense.category}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Date:</span>
-                                    <span>{expense.expenseDate ? formatDate(expense.expenseDate) : '—'}</span>
-                                  </div>
-                                  {expense.isBillable && (
-                                    <Badge variant="outline" className="mt-1">Billable</Badge>
-                                  )}
                                   {expense.paidStatus === 'paid' && expense.paidBy && (
-                                    <div className="flex justify-between mt-1">
-                                      <span className="text-muted-foreground">Paid by:</span>
-                                      <span>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-muted-foreground">Paid By</span>
+                                      <span className="font-medium">
                                         {typeof expense.paidBy === 'string'
                                           ? expense.paidBy
                                           : `${expense.paidBy.firstName} ${expense.paidBy.lastName}`}
@@ -1920,67 +1968,33 @@ export default function ProjectDetailPage() {
                                   )}
                                 </div>
 
-                                <div className="mt-4 border-t pt-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleExpenseAttachments(expense._id)}
-                                    className="flex w-full items-center justify-between text-xs font-semibold text-primary hover:text-primary/80"
-                                    aria-expanded={isExpanded ? 'true' : 'false'}
-                                  >
-                                    <span>
-                                      View attachments {attachments.length > 0 ? `(${attachments.length})` : ''}
-                                    </span>
-                                    <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                  </button>
-                                  {isExpanded && (
-                                    <div className="mt-3 space-y-2">
-                                      {attachments.length === 0 ? (
-                                        <p className="text-xs text-muted-foreground">No attachments added for this expense.</p>
-                                      ) : (
-                                        attachments.map((att, idx) => {
-                                          const uploadedByName = resolveUploadedByName(att.uploadedBy)
-                                          return (
-                                            <div
-                                              key={`${expense._id}-${att.url || idx}`}
-                                              className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-2 text-xs sm:flex-row sm:items-center sm:justify-between"
-                                            >
-                                              <div className="flex items-center gap-2 min-w-0">
-                                                <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                                <div className="min-w-0">
-                                                  <p className="font-medium text-foreground truncate" title={att.name || 'Attachment'}>
-                                                    {att.name || 'Attachment'}
-                                                  </p>
-                                                  <p className="text-[11px] text-muted-foreground">
-                                                    {formatFileSize(att.size)}
-                                                    {uploadedByName ? ` • ${uploadedByName}` : ''}
-                                                  </p>
-                                                </div>
-                                              </div>
-                                              {att.url ? (
-                                                <div className="flex items-center gap-2 flex-shrink-0">
-                                                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" asChild>
-                                                    <a href={att.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1">
-                                                      <ExternalLink className="h-3.5 w-3.5" />
-                                                      View
-                                                    </a>
-                                                  </Button>
-                                                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" asChild>
-                                                    <a href={att.url} download={att.name || 'attachment'} className="inline-flex items-center gap-1">
-                                                      <Download className="h-3.5 w-3.5" />
-                                                      Download
-                                                    </a>
-                                                  </Button>
-                                                </div>
-                                              ) : (
-                                                <p className="text-[11px] text-destructive">Attachment URL unavailable.</p>
-                                              )}
-                                            </div>
-                                          )
-                                        })
-                                      )}
+                                {/* Attachments */}
+                                {attachments.length > 0 && (
+                                  <div className="pt-2 border-t">
+                                    <p className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 mb-1.5">
+                                      <Paperclip className="h-3 w-3" />
+                                      {attachments.length} attachment{attachments.length > 1 ? 's' : ''}
+                                    </p>
+                                    <div className={`space-y-1 ${attachments.length > 3 ? 'max-h-32 overflow-y-auto' : ''}`}>
+                                      {attachments.map((att, idx) => (
+                                        <div key={`${expense._id}-${att.url || idx}`} className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5">
+                                          <div className="min-w-0 flex-1">
+                                            <p className="text-[11px] font-medium truncate">{att.name || 'Attachment'}</p>
+                                          </div>
+                                          {att.url ? (
+                                            <>
+                                              <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex-shrink-0">View</a>
+                                              <span className="text-muted-foreground/40 text-[10px]">·</span>
+                                              <a href={att.url} download={att.name || 'attachment'} className="text-[10px] text-primary hover:underline flex-shrink-0">Download</a>
+                                            </>
+                                          ) : (
+                                            <span className="text-[10px] text-destructive">Unavailable</span>
+                                          )}
+                                        </div>
+                                      ))}
                                     </div>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
                               </CardContent>
                             </Card>
                           )
@@ -2807,6 +2821,21 @@ export default function ProjectDetailPage() {
               fetchExpenses()
               fetchProject() // Refresh project to update budget
             }}
+          />
+
+          {/* Delete Income Confirmation Modal */}
+          <ConfirmationModal
+            isOpen={showDeleteIncomeConfirmModal}
+            onClose={() => {
+              setShowDeleteIncomeConfirmModal(false)
+              setIncomeToDelete(null)
+            }}
+            onConfirm={confirmDeleteIncome}
+            title="Delete Income"
+            description={`Are you sure you want to delete "${incomeToDelete?.name}"? This action cannot be undone.`}
+            confirmText="Delete"
+            cancelText="Cancel"
+            variant="destructive"
           />
 
           {/* Delete Expense Confirmation Modal */}

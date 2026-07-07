@@ -97,6 +97,8 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
   const [typeFilter, setTypeFilter] = useState('all')
   const [sortBy, setSortBy] = useState('priority')
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [totalTaskCount, setTotalTaskCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -146,6 +148,9 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
 
       if (data.success) {
         setTasks(data.data)
+        if (data.pagination?.total !== undefined) {
+          setTotalTaskCount(data.pagination.total)
+        }
       } else {
         setError(data.error || 'Failed to fetch tasks')
       }
@@ -175,9 +180,10 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
     }
   }
 
-  const refreshTasks = () => {
-    fetchTasks()
-    fetchStories()
+  const refreshTasks = async () => {
+    setRefreshing(true)
+    await Promise.all([fetchTasks(), fetchStories()])
+    setRefreshing(false)
   }
 
   const getPriorityColor = (priority: string) => {
@@ -234,9 +240,8 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
   // Tasks are already paginated from the server, no need for client-side slicing
   const paginatedTasks = filteredAndSortedTasks
 
-  // Determine if we're on the last page (API returns fewer items than requested)
   const isLastPage = tasks.length < pageSize
-  const totalPages = isLastPage && currentPage === 1 ? 1 : currentPage + (isLastPage ? 0 : 1)
+  const totalPages = totalTaskCount > 0 ? Math.ceil(totalTaskCount / pageSize) : (isLastPage && currentPage === 1 ? 1 : currentPage + (isLastPage ? 0 : 1))
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -361,7 +366,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
   }
 
   const stats = useMemo(() => {
-    const totalTasks = tasks.length
+    const totalTasks = totalTaskCount
     const todoTasks = tasks.filter(task => task.status === 'todo').length
     const inProgressTasks = tasks.filter(task => task.status === 'in_progress').length
     const completedTasks = tasks.filter(task => task.status === 'done').length
@@ -382,7 +387,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
       completedStoryPoints,
       completionPercentage: totalStoryPoints > 0 ? Math.round((completedStoryPoints / totalStoryPoints) * 100) : 0
     }
-  }, [tasks, stories])
+  }, [tasks, stories, totalTaskCount])
 
   if (loading) {
     return (
@@ -405,8 +410,8 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-          <Button variant="outline" size="sm" onClick={refreshTasks} className="w-full sm:w-auto">
-            <RefreshCw className="h-4 w-4 mr-2" strokeWidth={1.5} />
+          <Button variant="outline" size="sm" onClick={refreshTasks} disabled={refreshing} className="w-full sm:w-auto">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} strokeWidth={1.5} />
             Refresh
           </Button>
           {/* <Button onClick={onCreateTask} className="w-full sm:w-auto">
@@ -726,7 +731,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
               <option value="50">50</option>
             </select>
             <span>
-              Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, (currentPage - 1) * pageSize + paginatedTasks.length)} of ~{!isLastPage ? 'many' : (currentPage - 1) * pageSize + paginatedTasks.length}
+              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalTaskCount || (currentPage - 1) * pageSize + paginatedTasks.length)} of {totalTaskCount || paginatedTasks.length}
             </span>
           </div>
           <div className="flex items-center gap-2">

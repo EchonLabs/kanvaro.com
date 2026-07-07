@@ -2,7 +2,7 @@
 
 import {
   BarChart, Bar, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar'
 import { AlertTriangle, CheckCircle2, Minus } from 'lucide-react'
@@ -31,7 +31,6 @@ interface TeamWorkloadReportProps {
   filters: any
 }
 
-const APPLE_COLORS = ['var(--apple-chart-color)','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7']
 
 const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
   if (!active || !payload?.length) return null
@@ -85,21 +84,25 @@ export function TeamWorkloadReport({ members, departmentBreakdown = [], workload
   const balanced = members.filter(m => m.stats.workloadScore >= 50 && m.stats.workloadScore < 70).length
   const light = members.filter(m => m.stats.workloadScore < 50).length
 
-  const deptWorkload = departmentBreakdown.map((d, i) => ({
-    name: d.department.length > 10 ? d.department.slice(0, 10) + '…' : d.department,
-    Workload: d.averageWorkload,
-    Productivity: d.averageProductivity,
-    fill: APPLE_COLORS[i % APPLE_COLORS.length],
-  }))
+  // Stacked bar: completed vs remaining tasks per member (top 10 by total tasks)
+  const taskBreakdownData = [...members]
+    .sort((a, b) => b.stats.totalTasks - a.stats.totalTasks)
+    .slice(0, 10)
+    .map(m => ({
+      name: `${m.firstName} ${m.lastName.charAt(0)}.`,
+      Done: m.stats.tasksCompleted,
+      Remaining: Math.max(0, m.stats.totalTasks - m.stats.tasksCompleted),
+    }))
 
-  const memberWorkload = [...members].sort((a, b) => b.stats.workloadScore - a.stats.workloadScore).map((m, i) => ({
+  const maxTasks = Math.max(...members.map(x => x.stats.totalTasks), 1)
+
+  const memberWorkload = [...members].sort((a, b) => b.stats.workloadScore - a.stats.workloadScore).map(m => ({
     name: `${m.firstName} ${m.lastName.charAt(0)}.`,
     Workload: m.stats.workloadScore,
     Tasks: m.stats.totalTasks,
-    fill: getWorkloadColor(m.stats.workloadScore),
   }))
 
-  const radarData = departmentBreakdown.map(d => ({
+  const radarData = departmentBreakdown.map((d) => ({
     dept: d.department.length > 8 ? d.department.slice(0, 8) + '…' : d.department,
     Workload: d.averageWorkload,
     Productivity: d.averageProductivity,
@@ -127,41 +130,44 @@ export function TeamWorkloadReport({ members, departmentBreakdown = [], workload
       {/* ── Charts ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Bar — member workload ranking */}
+        {/* Bar — member workload ranking (horizontal scroll) */}
         <ChartCard title="Member Workload" subtitle="Workload scores across all team members">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={memberWorkload.slice(0, 10)} barCategoryGap="35%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, 100]} />
-              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Workload" radius={[5, 5, 0, 0]} maxBarSize={40}>
-                {memberWorkload.slice(0, 10).map((entry, i) => (
-                  <Cell key={i} fill={entry.fill} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="overflow-x-auto">
+            <div style={{ minWidth: Math.max(400, memberWorkload.length * 56) }}>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={memberWorkload} barCategoryGap="35%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+                  <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+                  <Bar dataKey="Workload" fill="#007AFF" radius={[5, 5, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </ChartCard>
 
-        {/* Bar — dept workload */}
-        <ChartCard title="Workload by Department" subtitle="Average workload and productivity per department">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={deptWorkload} barCategoryGap="30%" barGap={4} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="wl-dept" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FF453A" stopOpacity={0.85} /><stop offset="100%" stopColor="#FF9500" stopOpacity={0.65} />
-                </linearGradient>
-                <linearGradient id="prod-dept" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#34C759" stopOpacity={0.85} /><stop offset="100%" stopColor="#30D158" stopOpacity={0.65} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, 100]} />
-              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Workload" fill="url(#wl-dept)" radius={[5, 5, 0, 0]} maxBarSize={28} />
-              <Bar dataKey="Productivity" fill="url(#prod-dept)" radius={[5, 5, 0, 0]} maxBarSize={28} />
-            </BarChart>
-          </ResponsiveContainer>
+        {/* Stacked bar — tasks done vs remaining per member (vertical scroll) */}
+        <ChartCard title="Task Completion by Member" subtitle="Completed vs remaining tasks per member">
+          {taskBreakdownData.length > 0 ? (
+            <div className="overflow-y-auto" style={{ maxHeight: 240 }}>
+              <div style={{ height: Math.max(240, taskBreakdownData.length * 28 + 32) }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={taskBreakdownData} layout="vertical" barCategoryGap="28%" margin={{ top: 4, right: 16, left: 44, bottom: 20 }}>
+                    <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={44} />
+                    <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v} tasks`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+                    <Bar dataKey="Done"      stackId="tasks" fill="#34C759" radius={[0, 0, 0, 0]} maxBarSize={14} />
+                    <Bar dataKey="Remaining" stackId="tasks" fill="#FF9500" radius={[0, 4, 4, 0]} maxBarSize={14} />
+                    <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center">
+              <p className="text-[13px] text-[var(--apple-secondary-label)]">No task data available</p>
+            </div>
+          )}
         </ChartCard>
 
         {/* Radar — dept balance */}
@@ -180,7 +186,7 @@ export function TeamWorkloadReport({ members, departmentBreakdown = [], workload
           </ChartCard>
         ) : (
           <ChartCard title="Workload Intensity" subtitle="Members by workload level">
-            <div className="space-y-4 mt-1">
+            <div className="space-y-4 mt-1 max-h-[240px] overflow-y-auto pr-1">
               {[
                 { label: 'Overloaded (≥85%)', count: overloaded, color: '#FF453A', bg: 'rgba(255,69,58,0.12)' },
                 { label: 'High (70–85%)', count: members.filter(m => m.stats.workloadScore >= 70 && m.stats.workloadScore < 85).length, color: '#FF9500', bg: 'rgba(255,149,0,0.12)' },
@@ -211,9 +217,7 @@ export function TeamWorkloadReport({ members, departmentBreakdown = [], workload
         <ChartCard title="Active Tasks Load" subtitle="Current total tasks per team member">
           <div className="space-y-2.5 mt-1 max-h-[240px] overflow-y-auto pr-1">
             {[...members].sort((a, b) => b.stats.totalTasks - a.stats.totalTasks).map((m, i) => {
-              const maxT = Math.max(...members.map(x => x.stats.totalTasks), 1)
-              const pct = (m.stats.totalTasks / maxT) * 100
-              const wl = getWorkloadLabel(m.stats.workloadScore)
+              const pct = (m.stats.totalTasks / maxTasks) * 100
               return (
                 <div key={m._id} className="flex items-center gap-3">
                   <Avatar className="h-6 w-6 flex-shrink-0">
@@ -222,11 +226,11 @@ export function TeamWorkloadReport({ members, departmentBreakdown = [], workload
                       {m.firstName.charAt(0)}{m.lastName.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <p className="text-[12px] font-medium w-22 truncate flex-shrink-0">{m.firstName} {m.lastName.charAt(0)}.</p>
+                  <p className="text-[12px] font-medium w-24 truncate flex-shrink-0">{m.firstName} {m.lastName.charAt(0)}.</p>
                   <div className="flex-1 h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: getWorkloadColor(m.stats.workloadScore) }} />
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: '#BF5AF2' }} />
                   </div>
-                  <span className="text-[11px] font-semibold font-apple-mono w-10 text-right flex-shrink-0" style={{ color: getWorkloadColor(m.stats.workloadScore) }}>
+                  <span className="text-[11px] font-semibold font-apple-mono text-[var(--apple-secondary-label)] w-10 text-right flex-shrink-0">
                     {m.stats.totalTasks}
                   </span>
                 </div>
@@ -236,59 +240,68 @@ export function TeamWorkloadReport({ members, departmentBreakdown = [], workload
         </ChartCard>
       </div>
 
-      {/* ── Member Workload List ── */}
-      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
-        <div className="px-5 pt-5 pb-4 border-b border-[var(--apple-separator)]">
+      {/* ── Workload Detail — tier groups ── */}
+      <div className="space-y-4">
+        <div>
           <p className="text-[17px] font-semibold">Workload Detail</p>
-          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Individual workload and task status per member</p>
+          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Members grouped by workload tier</p>
         </div>
-        <div className="divide-y divide-[var(--apple-separator)]">
-          {[...members].sort((a, b) => b.stats.workloadScore - a.stats.workloadScore).map(m => {
-            const wl = getWorkloadLabel(m.stats.workloadScore)
-            const Icon = m.stats.workloadScore >= 85 ? AlertTriangle : m.stats.workloadScore >= 50 ? Minus : CheckCircle2
-            return (
-              <div key={m._id} className="px-5 py-4 flex items-center gap-4 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0" style={{ backgroundColor: wl.bg }}>
-                  <Icon className="h-4 w-4" style={{ color: wl.color }} />
+
+        {[
+          { text: 'Overloaded', color: '#FF453A', bg: 'rgba(255,69,58,0.10)', border: 'rgba(255,69,58,0.25)', test: (s: number) => s >= 85 },
+          { text: 'High',       color: '#FF9500', bg: 'rgba(255,149,0,0.10)', border: 'rgba(255,149,0,0.25)',  test: (s: number) => s >= 70 && s < 85 },
+          { text: 'Balanced',   color: '#34C759', bg: 'rgba(52,199,89,0.10)', border: 'rgba(52,199,89,0.25)', test: (s: number) => s >= 50 && s < 70 },
+          { text: 'Light',      color: '#30B0C7', bg: 'rgba(48,176,199,0.10)', border: 'rgba(48,176,199,0.25)', test: (s: number) => s < 50 },
+        ].map(tier => {
+          const tierMembers = [...members]
+            .filter(m => tier.test(m.stats.workloadScore))
+            .sort((a, b) => b.stats.workloadScore - a.stats.workloadScore)
+          if (tierMembers.length === 0) return null
+          const Icon = tier.text === 'Overloaded' ? AlertTriangle : tier.text === 'High' ? Minus : CheckCircle2
+          return (
+            <div key={tier.text} className="rounded-[var(--apple-radius-lg)] overflow-hidden border" style={{ borderColor: tier.border }}>
+              {/* Tier header */}
+              <div className="flex items-center gap-2.5 px-4 py-3" style={{ backgroundColor: tier.bg }}>
+                <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: tier.color + '25' }}>
+                  <Icon className="h-3.5 w-3.5" style={{ color: tier.color }} />
                 </div>
-                <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarImage src={m.avatar} />
-                  <AvatarFallback className="text-[11px] font-semibold bg-gradient-to-br from-blue-500 to-purple-500 text-white">
-                    {m.firstName.charAt(0)}{m.lastName.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-[14px] font-semibold">{m.firstName} {m.lastName}</p>
-                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold flex-shrink-0" style={{ backgroundColor: wl.bg, color: wl.color }}>{wl.text}</span>
-                  </div>
-                  <p className="text-[11px] text-[var(--apple-secondary-label)] truncate">{m.role} · {m.department}</p>
-                  <div className="mt-2 space-y-1">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-[var(--apple-secondary-label)]">Workload</span>
-                      <span className="font-semibold font-apple-mono" style={{ color: wl.color }}>{m.stats.workloadScore.toFixed(0)}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${m.stats.workloadScore}%`, backgroundColor: getWorkloadColor(m.stats.workloadScore) }} />
-                    </div>
-                  </div>
-                </div>
-                <div className="hidden sm:grid grid-cols-3 gap-4 text-center text-[12px] flex-shrink-0">
-                  {[
-                    { val: String(m.stats.totalTasks), lbl: 'Total' },
-                    { val: String(m.stats.tasksCompleted), lbl: 'Done' },
-                    { val: `${m.stats.completionRate.toFixed(0)}%`, lbl: 'Rate' },
-                  ].map(s => (
-                    <div key={s.lbl}>
-                      <p className="font-semibold font-apple-mono text-[var(--apple-label)]">{s.val}</p>
-                      <p className="text-[11px] text-[var(--apple-tertiary-label)]">{s.lbl}</p>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-[13px] font-semibold" style={{ color: tier.color }}>{tier.text}</p>
+                <span className="ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: tier.color + '20', color: tier.color }}>
+                  {tierMembers.length} {tierMembers.length === 1 ? 'member' : 'members'}
+                </span>
               </div>
-            )
-          })}
-        </div>
+
+              {/* Member rows */}
+              <div className="bg-card divide-y divide-[var(--apple-separator)]">
+                {tierMembers.map(m => (
+                  <div key={m._id} className="flex items-center gap-3 px-4 py-3 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                    <Avatar className="h-8 w-8 flex-shrink-0">
+                      <AvatarImage src={m.avatar} />
+                      <AvatarFallback className="text-[11px] font-semibold bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                        {m.firstName.charAt(0)}{m.lastName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold truncate">{m.firstName} {m.lastName}</p>
+                      <p className="text-[11px] text-[var(--apple-secondary-label)] truncate">{m.role} · {m.department}</p>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="hidden sm:block text-[11px] text-[var(--apple-tertiary-label)] font-apple-mono">
+                        {m.stats.tasksCompleted}/{m.stats.totalTasks} tasks
+                      </span>
+                      <span className="hidden sm:block text-[11px] font-semibold font-apple-mono text-[var(--apple-secondary-label)]">
+                        {m.stats.completionRate.toFixed(0)}% done
+                      </span>
+                      <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ backgroundColor: tier.bg, color: tier.color }}>
+                        {m.stats.workloadScore.toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

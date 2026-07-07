@@ -157,6 +157,18 @@ interface TasksClientProps {
 
 const TASKS_MODULE_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
 
+// Module-level store: survives client-side navigation, resets on full page reload
+const _myTasksFilters = {
+    searchQuery: '',
+    statusFilter: 'all',
+    priorityFilter: 'all',
+    typeFilter: 'all',
+    projectFilter: 'all',
+    assignedToFilter: 'all',
+    createdByFilter: 'all',
+    dateRangeFilter: undefined as DateRange | undefined,
+}
+
 export default function TasksClient({
     initialTasks,
     initialPagination,
@@ -187,20 +199,20 @@ export default function TasksClient({
         typeof initialPagination?.total === 'number' ? initialPagination.total : initialTasks?.length || 0
     )
     const [loading, setLoading] = useState(false)
-    const [searchQuery, setSearchQuery] = useState(initialFilters.search || '')
-    const [statusFilter, setStatusFilter] = useState(initialFilters.status || 'all')
-    const [priorityFilter, setPriorityFilter] = useState(initialFilters.priority || 'all')
-    const [typeFilter, setTypeFilter] = useState(initialFilters.type || 'all')
-    const [projectFilter, setProjectFilter] = useState(initialFilters.project || 'all')
-    const [assignedToFilter, setAssignedToFilter] = useState(initialFilters.assignedTo || 'all')
-    const [createdByFilter, setCreatedByFilter] = useState(initialFilters.createdBy || 'all')
+    const [searchQuery, setSearchQuery] = useState(initialFilters.search || _myTasksFilters.searchQuery)
+    const [statusFilter, setStatusFilter] = useState(initialFilters.status || _myTasksFilters.statusFilter)
+    const [priorityFilter, setPriorityFilter] = useState(initialFilters.priority || _myTasksFilters.priorityFilter)
+    const [typeFilter, setTypeFilter] = useState(initialFilters.type || _myTasksFilters.typeFilter)
+    const [projectFilter, setProjectFilter] = useState(initialFilters.project || _myTasksFilters.projectFilter)
+    const [assignedToFilter, setAssignedToFilter] = useState(initialFilters.assignedTo || _myTasksFilters.assignedToFilter)
+    const [createdByFilter, setCreatedByFilter] = useState(initialFilters.createdBy || _myTasksFilters.createdByFilter)
     const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>(
         initialFilters.createdAtFrom || initialFilters.createdAtTo
             ? {
                 from: initialFilters.createdAtFrom ? new Date(initialFilters.createdAtFrom) : undefined,
                 to: initialFilters.createdAtTo ? new Date(initialFilters.createdAtTo) : undefined,
             }
-            : undefined
+            : _myTasksFilters.dateRangeFilter
     )
     const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([])
     const [assignedToOptions, setAssignedToOptions] = useState<UserSummary[]>([])
@@ -243,6 +255,18 @@ export default function TasksClient({
         // Trigger a fresh fetch with reset filters
         fetchTasks(true, '')
     }
+
+    // Sync filter state back to module-level store so it survives navigation
+    useEffect(() => {
+        _myTasksFilters.searchQuery = searchQuery
+        _myTasksFilters.statusFilter = statusFilter
+        _myTasksFilters.priorityFilter = priorityFilter
+        _myTasksFilters.typeFilter = typeFilter
+        _myTasksFilters.projectFilter = projectFilter
+        _myTasksFilters.assignedToFilter = assignedToFilter
+        _myTasksFilters.createdByFilter = createdByFilter
+        _myTasksFilters.dateRangeFilter = dateRangeFilter
+    }, [searchQuery, statusFilter, priorityFilter, typeFilter, projectFilter, assignedToFilter, createdByFilter, dateRangeFilter])
 
     // Handle date range changes with validation and auto-correction
     const handleDateRangeChange = useCallback((range: DateRange | undefined) => {

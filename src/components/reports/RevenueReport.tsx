@@ -205,7 +205,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-semibold">{source.source}</p>
                 <div className="mt-1.5 h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${source.percentage}%`, backgroundColor: APPLE_COLORS[i % APPLE_COLORS.length] }} />
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, source.percentage)}%`, backgroundColor: APPLE_COLORS[i % APPLE_COLORS.length] }} />
                 </div>
               </div>
               <div className="text-right flex-shrink-0">

@@ -51,12 +51,6 @@ interface FilterState {
   sortBy: string; sortOrder: 'asc' | 'desc'
 }
 
-const STAT_ACCENTS = [
-  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
-  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
-  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
-  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
-]
 
 function StatCard({
   label, value, sub, icon: Icon, valueColor,
@@ -371,10 +365,10 @@ export default function FinancialReportsPage() {
               <FinancialOverviewReport overview={reportData.overview} budgetBreakdown={reportData.budgetBreakdown} monthlyTrends={reportData.monthlyTrends} filters={filters} />
             </TabsContent>
             <TabsContent value="budget" className="mt-0">
-              <BudgetAnalysisReport budgetBreakdown={reportData.budgetBreakdown} monthlyTrends={reportData.monthlyTrends} filters={filters} />
+              <BudgetAnalysisReport overview={reportData.overview} budgetBreakdown={reportData.budgetBreakdown} monthlyTrends={reportData.monthlyTrends} filters={filters} />
             </TabsContent>
             <TabsContent value="expenses" className="mt-0">
-              <ExpenseReport topExpenses={reportData.topExpenses} budgetBreakdown={reportData.budgetBreakdown} filters={filters} />
+              <ExpenseReport topExpenses={reportData.topExpenses} budgetBreakdown={reportData.budgetBreakdown} totalSpent={reportData.overview.totalSpent} filters={filters} />
             </TabsContent>
             <TabsContent value="revenue" className="mt-0">
               <RevenueReport revenueSources={reportData.revenueSources} monthlyTrends={reportData.monthlyTrends} filters={filters} />

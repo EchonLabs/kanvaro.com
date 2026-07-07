@@ -7,6 +7,10 @@ import {
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface BudgetAnalysisReportProps {
+  overview: {
+    totalBudget: number; totalSpent: number; totalRevenue: number; netProfit: number
+    budgetUtilization: number; profitMargin: number
+  }
   budgetBreakdown: {
     category: string; budgeted: number; spent: number; remaining: number; utilizationRate: number
   }[]
@@ -50,12 +54,12 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle?: st
   )
 }
 
-export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }: BudgetAnalysisReportProps) {
+export function BudgetAnalysisReport({ overview, budgetBreakdown, monthlyTrends, filters }: BudgetAnalysisReportProps) {
   const { formatCurrency } = useOrgCurrency()
 
-  const totalBudgeted = budgetBreakdown.reduce((s, i) => s + i.budgeted, 0)
-  const totalSpent = budgetBreakdown.reduce((s, i) => s + i.spent, 0)
-  const totalRemaining = budgetBreakdown.reduce((s, i) => s + i.remaining, 0)
+  const totalBudgeted = overview.totalBudget
+  const totalSpent = overview.totalSpent
+  const totalRemaining = overview.totalBudget - overview.totalSpent
   const avgUtilization = budgetBreakdown.length > 0
     ? budgetBreakdown.reduce((s, i) => s + i.utilizationRate, 0) / budgetBreakdown.length
     : 0
@@ -84,9 +88,9 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
       {/* ── Stats Strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Budgeted',  value: formatCurrency(totalBudgeted),  sub: 'Across all categories',                                                          color: 'var(--apple-chart-color)' },
-          { label: 'Total Spent',     value: formatCurrency(totalSpent),      sub: `${totalBudgeted > 0 ? ((totalSpent/totalBudgeted)*100).toFixed(1) : 0}% of budget`, color: '#FF453A' },
-          { label: 'Remaining',       value: formatCurrency(totalRemaining),  sub: 'Available to spend',                                                             color: '#34C759' },
+          { label: 'Total Budgeted',  value: formatCurrency(totalBudgeted),  sub: 'Across all categories',                                                                  color: 'var(--apple-chart-color)' },
+          { label: 'Total Spent',     value: formatCurrency(totalSpent),      sub: `${totalBudgeted > 0 ? ((totalSpent/totalBudgeted)*100).toFixed(1) : '0.0'}% of budget`, color: '#FF453A' },
+          { label: 'Remaining',       value: formatCurrency(totalRemaining),  sub: 'Available to spend',                                                                     color: totalRemaining >= 0 ? '#34C759' : '#FF453A' },
           { label: 'Avg Utilization', value: `${avgUtilization.toFixed(1)}%`, sub: 'Across categories',                                                             color: 'var(--apple-chart-color)' },
         ].map(s => (
           <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
@@ -107,8 +111,8 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
               <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-              <Bar dataKey="Budgeted" fill="var(--apple-chart-color)"              radius={[6,6,0,0]} maxBarSize={32} />
-              <Bar dataKey="Spent"    fill="var(--apple-chart-color)" fillOpacity={0.45} radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Budgeted" fill="var(--apple-chart-color)" radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Spent"    fill="#FF453A"                  radius={[6,6,0,0]} maxBarSize={32} />
               <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
             </BarChart>
           </ResponsiveContainer>
@@ -119,8 +123,8 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={utilizationData} barCategoryGap="35%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0,100]} />
-              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, (dataMax: number) => Math.max(100, Math.ceil(dataMax / 10) * 10)]} />
+              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${Number(v).toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
               <Bar dataKey="Utilization" fill="var(--apple-chart-color)" radius={[6,6,0,0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>

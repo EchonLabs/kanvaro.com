@@ -477,6 +477,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.BUDGET_HANDLING,
     Permission.FINANCIAL_CREATE_EXPENSE,
     Permission.FINANCIAL_APPROVE_EXPENSE,
+    Permission.FINANCIAL_VIEW_INCOME,
+    Permission.FINANCIAL_CREATE_INCOME,
     Permission.FINANCIAL_CREATE_INVOICE,
     Permission.FINANCIAL_SEND_INVOICE,
 
