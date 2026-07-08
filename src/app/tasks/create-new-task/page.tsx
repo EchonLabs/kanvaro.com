@@ -623,11 +623,13 @@ export default function CreateTaskPage() {
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-              <Target className="h-8 w-8 text-green-600" />
-              <span>Create New Task</span>
-            </h1>
-            <p className="text-muted-foreground">Create a new task for your project</p>
+            <div className="flex items-center gap-3">
+              <Target className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+              <div>
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">Create New Task</h1>
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">Create a new task for your project</p>
+              </div>
+            </div>
           </div>
         </div>
 

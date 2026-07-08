@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Play, Pause, Square, Clock } from 'lucide-react'
+import { Play, Pause, Square, Clock, FolderOpen, Target, FileText, Loader2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useToast } from '@/components/ui/Toast'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { cn } from '@/lib/utils'
 
 interface TimerProps {
   userId: string
@@ -415,72 +416,120 @@ export function Timer({
 
   if (activeTimer) {
     return (
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Active Timer
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+        {/* Card header */}
+        <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center gap-2">
+          <Clock
+            className="h-5 w-5 flex-shrink-0"
+            strokeWidth={1.5}
+            style={{ color: activeTimer.isPaused ? '#FF9500' : '#34C759' }}
+          />
+          <span className="text-[15px] font-semibold text-[var(--apple-label)]">Active Timer</span>
+          <span
+            className={cn(
+              'ml-auto inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border',
+              activeTimer.isPaused
+                ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+            )}
+            style={{ animation: 'badge-border-pulse 3s ease-in-out infinite' }}
+          >
+            <span
+              className={cn('h-1.5 w-1.5 rounded-full', activeTimer.isPaused ? 'bg-amber-500' : 'bg-emerald-500')}
+              style={!activeTimer.isPaused ? { animation: 'status-pulse 2s ease-in-out infinite' } : undefined}
+            />
+            {activeTimer.isPaused ? 'Paused' : 'Running'}
+          </span>
+        </div>
+
+        <div className="p-5 space-y-5">
           {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+            <div className="flex items-start gap-2.5 rounded-[var(--apple-radius-md)] bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3">
+              <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+              <p className="text-[13px] text-red-600 dark:text-red-400">{error}</p>
+            </div>
           )}
 
-          <div className="text-center">
-            <div className="text-4xl font-mono font-bold text-primary">
-              {displayTime}
-            </div>
+          {/* Clock display */}
+          <div className="flex flex-col items-center py-6">
+            <span className="inline-flex items-center text-[56px] font-timer tabular-nums text-[var(--apple-label)]">
+              {displayTime.split('').map((char, i) =>
+                /[0-9]/.test(char) ? (
+                  <span key={`${i}-${char}`} className="number-digit-flip">{char}</span>
+                ) : (
+                  <span key={`s${i}`} className="mx-[0.18em] opacity-50 select-none">:</span>
+                )
+              )}
+            </span>
+            {activeTimer.isBillable && (
+              <span className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                Billable
+              </span>
+            )}
           </div>
 
-          <div className="space-y-2 min-w-0 max-h-48 overflow-y-auto pr-1">
-            <div className="min-w-0">
-              <Label className="text-sm font-medium">Project</Label>
-              <p className="text-sm text-muted-foreground break-words whitespace-normal" title={activeTimer.project.name}>
-                {activeTimer.project.name}
-              </p>
+          {/* Details row */}
+          <div className="rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] p-4 space-y-2.5">
+            <div className="flex items-center gap-2.5 text-[14px]">
+              <FolderOpen className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
+              <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Project</span>
+              <span className="text-[var(--apple-label)] font-medium truncate">{activeTimer.project.name}</span>
             </div>
             {activeTimer.task && (
-              <div className="min-w-0">
-                <Label className="text-sm font-medium">Task</Label>
-                <div className="flex items-center gap-2 mt-0.5">
+              <div className="flex items-center gap-2.5 text-[14px]">
+                <Target className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
+                <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Task</span>
+                <div className="flex items-center gap-2 min-w-0">
                   {activeTimer.task.displayId && (
-                    <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                    <span className="text-[11px] font-apple-mono bg-[var(--apple-quaternary-fill)] px-1.5 py-0.5 rounded flex-shrink-0">
                       {activeTimer.task.displayId}
                     </span>
                   )}
-                  <p className="text-sm text-muted-foreground truncate" title={activeTimer.task.title}>
-                    {activeTimer.task.title}
-                  </p>
+                  <span className="text-[var(--apple-label)] truncate">{activeTimer.task.title}</span>
                 </div>
               </div>
             )}
-            <div className="min-w-0">
-              <Label className="text-sm font-medium">Memo</Label>
-              <p className="text-sm text-muted-foreground break-words whitespace-pre-wrap" title={activeTimer.description}>
-                {activeTimer.description}
-              </p>
-            </div>
+            {activeTimer.description && (
+              <div className="flex items-start gap-2.5 text-[14px]">
+                <FileText className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Memo</span>
+                <span className="text-[var(--apple-label)] line-clamp-2">{activeTimer.description}</span>
+              </div>
+            )}
           </div>
 
-          <div className="flex gap-2">
+          {/* Controls */}
+          <div className="flex gap-3">
             {activeTimer.isPaused ? (
-              <Button onClick={handleResumeTimer} disabled={isLoading} className="flex-1">
-                <Play className="h-4 w-4 mr-2" />
+              <button
+                onClick={handleResumeTimer}
+                disabled={isLoading}
+                className="flex-1 h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 2px 8px rgba(52,199,89,0.30)' }}
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Play className="h-4 w-4" strokeWidth={1.5} fill="none" />}
                 Resume
-              </Button>
+              </button>
             ) : (
-              <Button onClick={handlePauseTimer} disabled={isLoading} className="flex-1">
-                <Pause className="h-4 w-4 mr-2" />
+              <button
+                onClick={handlePauseTimer}
+                disabled={isLoading}
+                className="flex-1 h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', boxShadow: '0 2px 8px rgba(255,149,0,0.30)' }}
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Pause className="h-4 w-4" strokeWidth={1.5} fill="none" />}
                 Pause
-              </Button>
+              </button>
             )}
-            <Button onClick={() => setShowStopConfirmation(true)} disabled={isLoading} variant="destructive">
-              <Square className="h-4 w-4 mr-2" />
+            <button
+              onClick={() => setShowStopConfirmation(true)}
+              disabled={isLoading}
+              className="flex-1 h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(135deg,#FF3B30 0%,#FF453A 100%)', boxShadow: '0 2px 8px rgba(255,59,48,0.30)' }}
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Square className="h-4 w-4" strokeWidth={1.5} fill="none" />}
               Stop
-            </Button>
+            </button>
           </div>
 
           <ConfirmationModal
@@ -498,34 +547,35 @@ export function Timer({
               </>
             }
             confirmText="Stop Timer"
-            confirmIcon={<Square className="h-4 w-4" />}
+            confirmIcon={<Square className="h-4 w-4" strokeWidth={1.5} fill="none" />}
             cancelText="Cancel"
             variant="destructive"
             isLoading={isLoading}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   return (
     <div className="space-y-4">
       {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="flex items-start gap-2.5 rounded-[var(--apple-radius-md)] bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3">
+          <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+          <p className="text-[13px] text-red-600 dark:text-red-400">{error}</p>
+        </div>
       )}
 
-      {/* Show warning when daily limit is reached */}
       {!allowOvertime && maxDailyHours && dailyHoursLogged >= maxDailyHours && (
-        <Alert variant="destructive">
-          <AlertDescription>
+        <div className="flex items-start gap-2.5 rounded-[var(--apple-radius-md)] bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3">
+          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+          <p className="text-[13px] text-amber-600 dark:text-amber-400">
             Daily time limit reached ({dailyHoursLogged.toFixed(1)}h / {maxDailyHours}h). You cannot start a new timer until tomorrow.
-          </AlertDescription>
-        </Alert>
+          </p>
+        </div>
       )}
 
-      <Button
+      <button
         onClick={handleStartTimer}
         disabled={
           isLoading ||
@@ -534,11 +584,12 @@ export function Timer({
           (!description.trim()) ||
           (!allowOvertime && !!maxDailyHours && dailyHoursLogged >= maxDailyHours)
         }
-        className="w-full"
+        className="w-full h-11 rounded-[var(--apple-radius-md)] text-[16px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
+        style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 2px 8px rgba(0,122,255,0.30)' }}
       >
-        <Play className="h-4 w-4 mr-2" />
-        Start Timer
-      </Button>
+        {isLoading ? <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} /> : <Play className="h-5 w-5" strokeWidth={1.5} fill="none" />}
+        {isLoading ? 'Starting…' : 'Start Timer'}
+      </button>
     </div>
   )
 }

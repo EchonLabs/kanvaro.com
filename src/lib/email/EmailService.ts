@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import connectDB from '@/lib/db-config'
 import { Organization } from '@/models/Organization'
+import { EMAIL_LOGO_URL, escapeHtml, formatDisplayName, resolveEmailLogoUrl } from './email-branding'
 
 interface EmailOptions {
   to: string
@@ -8,6 +9,8 @@ interface EmailOptions {
   html: string
   text?: string
 }
+
+const COMPANY_LOGO_URL = EMAIL_LOGO_URL
 
 export class EmailService {
   private static instance: EmailService
@@ -540,10 +543,19 @@ export class EmailService {
     email: string,
     roleDisplayName: string,
     organizationName: string = 'Kanvaro',
-    loginUrl?: string
+        loginUrl?: string,
+        inviterDisplayName?: string
   ): string {
-    const fullName = `${firstName} ${lastName}`
+        const fullName = formatDisplayName({ firstName, lastName, email })
+        const inviterName = inviterDisplayName?.trim() || 'Your administrator'
     const loginLink = loginUrl || '#'
+        const organizationLabel = escapeHtml(organizationName)
+        const roleLabel = escapeHtml(roleDisplayName)
+        const fullNameLabel = escapeHtml(fullName)
+        const inviterLabel = escapeHtml(inviterName)
+        const emailLabel = escapeHtml(email)
+        const firstNameLabel = escapeHtml(firstName || fullName)
+        const logoUrl = resolveEmailLogoUrl(COMPANY_LOGO_URL)
     
     return `
 <!DOCTYPE html>
@@ -577,29 +589,16 @@ export class EmailService {
             margin-bottom: 32px;
         }
         .logo {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            border-radius: 12px;
+            width: 176px;
+            max-width: 100%;
             margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 28px;
-            font-weight: bold;
         }
-        .welcome-icon {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            border-radius: 50%;
-            margin: 0 auto 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 40px;
+        .logo img {
+            display: block;
+            width: 176px;
+            max-width: 100%;
+            height: auto;
+            margin: 0 auto;
         }
         h1 {
             color: #111827;
@@ -663,6 +662,26 @@ export class EmailService {
         .info-value {
             color: #111827;
             font-weight: 600;
+        }
+        .inviter-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+        .inviter-label {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        .inviter-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #111827;
         }
         .steps-section {
             background: #f0f9ff;
@@ -766,14 +785,15 @@ export class EmailService {
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">${organizationName.charAt(0).toUpperCase()}</div>
-            <div class="welcome-icon">👋</div>
-            <h1>Welcome to ${organizationName}!</h1>
+            <div class="logo">
+                <img src="${logoUrl}" alt="${organizationLabel} logo" width="176" style="display:block;width:176px;max-width:100%;height:auto;margin:0 auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />
+            </div>
+            <h1>Welcome to ${organizationLabel}!</h1>
             <p class="subtitle">We're thrilled to have you join our team</p>
         </div>
 
         <div class="greeting">
-            Hi ${firstName}! 👋
+            Hi ${firstNameLabel}! 👋
         </div>
 
         <div class="content">
@@ -785,23 +805,28 @@ export class EmailService {
             <div class="info-item">
                 <span class="info-icon">👤</span>
                 <span class="info-label">Name:</span>
-                <span class="info-value">${fullName}</span>
+                <span class="info-value">${fullNameLabel}</span>
             </div>
             <div class="info-item">
                 <span class="info-icon">✉️</span>
                 <span class="info-label">Email:</span>
-                <span class="info-value">${email}</span>
+                <span class="info-value">${emailLabel}</span>
             </div>
             <div class="info-item">
                 <span class="info-icon">🎯</span>
                 <span class="info-label">Role:</span>
-                <span class="info-value">${roleDisplayName}</span>
+                <span class="info-value">${roleLabel}</span>
             </div>
             <div class="info-item">
                 <span class="info-icon">🏢</span>
                 <span class="info-label">Organization:</span>
-                <span class="info-value">${organizationName}</span>
+                <span class="info-value">${organizationLabel}</span>
             </div>
+        </div>
+
+        <div class="inviter-box">
+            <div class="inviter-label">Invited By</div>
+            <div class="inviter-name">${inviterLabel}</div>
         </div>
 
         <div class="steps-section">
@@ -830,7 +855,7 @@ export class EmailService {
         </div>
 
         <div class="cta-section">
-            <a href="${loginLink}" class="cta-button">Sign In to Your Account →</a>
+            <a href="${loginLink}" class="cta-button" style="color: #ffffff;">Sign In to Your Account →</a>
         </div>
 
         <div class="help-section">
@@ -845,11 +870,14 @@ export class EmailService {
 
         <div class="footer">
             <p class="footer-text">
-                Welcome aboard! We're excited to see what you'll accomplish with <span class="footer-highlight">${organizationName}</span>.
+                Welcome aboard! You were invited by <span class="footer-highlight">${inviterLabel}</span> to join <span class="footer-highlight">${organizationLabel}</span>.
             </p>
             <p class="footer-text" style="margin-top: 16px;">
                 Best regards,<br>
-                <strong>The ${organizationName} Team</strong>
+                <strong>The ${organizationLabel} Team</strong>
+            </p>
+            <p class="footer-text" style="margin-top: 8px;">
+                Invited by <strong>${inviterLabel}</strong>
             </p>
             <p class="footer-text" style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
                 This is an automated welcome email. If you have any questions, please contact your administrator.
@@ -869,7 +897,15 @@ export class EmailService {
     organizationName: string = 'Kanvaro',
     verificationUrl: string
   ): string {
-    const fullName = `${firstName} ${lastName}`
+        const fullName = formatDisplayName({ firstName, lastName, email })
+        const inviterName = 'Your administrator'
+        const organizationLabel = escapeHtml(organizationName)
+        const roleLabel = escapeHtml(roleDisplayName)
+        const fullNameLabel = escapeHtml(fullName)
+        const inviterLabel = escapeHtml(inviterName)
+        const emailLabel = escapeHtml(email)
+        const firstNameLabel = escapeHtml(firstName || fullName)
+        const logoUrl = resolveEmailLogoUrl(COMPANY_LOGO_URL)
 
     return `
 <!DOCTYPE html>
@@ -903,17 +939,16 @@ export class EmailService {
             margin-bottom: 32px;
         }
         .logo {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            border-radius: 12px;
+            width: 176px;
+            max-width: 100%;
             margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            font-weight: bold;
-            color: white;
+        }
+        .logo img {
+            display: block;
+            width: 176px;
+            max-width: 100%;
+            height: auto;
+            margin: 0 auto;
         }
         .title {
             font-size: 28px;
@@ -1045,15 +1080,17 @@ export class EmailService {
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">K</div>
+            <div class="logo">
+                <img src="${logoUrl}" alt="${organizationLabel} logo" width="176" style="display:block;width:176px;max-width:100%;height:auto;margin:0 auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />
+            </div>
             <h1 class="title">Verify Your Email</h1>
-            <p class="subtitle">Complete your account setup for ${organizationName}</p>
+            <p class="subtitle">Complete your account setup for ${organizationLabel}</p>
         </div>
 
         <div class="content">
-            <div class="greeting">Hi ${firstName}!</div>
+            <div class="greeting">Hi ${firstNameLabel}!</div>
             <div class="message">
-                Welcome to ${organizationName}! We're excited to have you join our team as a ${roleDisplayName}.
+                Welcome to ${organizationLabel}! We're excited to have you join our team as a ${roleLabel}.
                 To complete your account setup and start collaborating, please verify your email address by clicking the button below.
             </div>
 
@@ -1061,27 +1098,27 @@ export class EmailService {
                 <div class="info-item">
                     <span class="info-icon">👤</span>
                     <span class="info-label">Name:</span>
-                    <span class="info-value">${fullName}</span>
+                    <span class="info-value">${fullNameLabel}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-icon">📧</span>
                     <span class="info-label">Email:</span>
-                    <span class="info-value">${email}</span>
+                    <span class="info-value">${emailLabel}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-icon">🏢</span>
                     <span class="info-label">Organization:</span>
-                    <span class="info-value">${organizationName}</span>
+                    <span class="info-value">${organizationLabel}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-icon">👔</span>
                     <span class="info-label">Role:</span>
-                    <span class="info-value">${roleDisplayName}</span>
+                    <span class="info-value">${roleLabel}</span>
                 </div>
             </div>
 
             <div class="cta-section">
-                <a href="${verificationUrl}" class="cta-button">Verify Your Email →</a>
+                <a href="${verificationUrl}" class="cta-button" style="color: #ffffff;">Verify Your Email →</a>
             </div>
 
             <div class="help-section">
@@ -1103,6 +1140,16 @@ export class EmailService {
                     After verifying your email, you'll be able to sign in to your account and start exploring the platform. You'll have access to projects, tasks, and collaboration tools based on your role.
                 </p>
             </div>
+
+            <div class="help-section" style="background: #f8fafc; border-color: #cbd5e1;">
+                <div class="help-title" style="color: #334155;">
+                    <span class="help-icon">👤</span>
+                    Invited By
+                </div>
+                <p class="help-text" style="color: #334155; margin: 0;">
+                    ${inviterLabel}
+                </p>
+            </div>
         </div>
 
         <div class="footer">
@@ -1111,7 +1158,7 @@ export class EmailService {
             </p>
             <p class="footer-text" style="margin-top: 16px;">
                 Best regards,<br>
-                <strong>The ${organizationName} Team</strong>
+                <strong>The ${organizationLabel} Team</strong>
             </p>
             <p class="footer-text" style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
                 This is an automated verification email. Please do not reply to this message.

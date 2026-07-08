@@ -1,10 +1,9 @@
 'use client'
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react'
-import { Button } from './Button'
+import { X, CheckCircle2, XCircle, Info, AlertTriangle } from 'lucide-react'
 
-export type ToastType = 'success' | 'error' | 'info' | 'warning'
+export type ToastType = 'success' | 'error' | 'info' | 'warning' | 'critical'
 
 export interface Toast {
   id: string
@@ -30,7 +29,6 @@ export function useToast() {
   return context
 }
 
-// Consistent toast duration across the system (5 seconds)
 export const TOAST_DURATION = 5000
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -38,15 +36,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback((toast: Omit<Toast, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 9)
-    const newToast: Toast = {
-      ...toast,
-      id,
-      duration: toast.duration ?? TOAST_DURATION
-    }
-    
+    const newToast: Toast = { ...toast, id, duration: toast.duration ?? TOAST_DURATION }
     setToasts((prev) => [...prev, newToast])
-
-    // Auto-remove after duration
     if (newToast.duration && newToast.duration > 0) {
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -66,11 +57,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-function ToastContainer({ toasts, removeToast }: { toasts: Toast[], removeToast: (id: string) => void }) {
+function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast: (id: string) => void }) {
   if (toasts.length === 0) return null
-
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-3 w-full max-w-lg px-4 pointer-events-none">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-2 w-full max-w-sm px-4 pointer-events-none overflow-hidden">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
       ))}
@@ -78,77 +68,96 @@ function ToastContainer({ toasts, removeToast }: { toasts: Toast[], removeToast:
   )
 }
 
-function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) => void }) {
+const TYPE_CONFIG: Record<ToastType, {
+  icon: React.ElementType
+  color: string
+  style: string
+  shadow: string
+  titleClass: string
+}> = {
+  success: {
+    icon: CheckCircle2,
+    color: 'var(--apple-system-green)',
+    style: 'bg-green-500/[0.12] dark:bg-green-500/[0.18] border-green-500/[0.55] dark:border-green-400/[0.55]',
+    shadow: 'shadow-[0_4px_16px_rgba(0,0,0,0.10)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.40)]',
+    titleClass: 'text-[var(--apple-label)]',
+  },
+  error: {
+    icon: XCircle,
+    color: 'var(--apple-system-red)',
+    style: 'bg-red-500/[0.12] dark:bg-red-500/[0.18] border-red-500/[0.55] dark:border-red-400/[0.55]',
+    shadow: 'shadow-[0_4px_16px_rgba(0,0,0,0.10)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.40)]',
+    titleClass: 'text-[var(--apple-label)]',
+  },
+  warning: {
+    icon: AlertTriangle,
+    color: 'var(--apple-system-orange)',
+    style: 'bg-orange-500/[0.12] dark:bg-orange-500/[0.18] border-orange-500/[0.55] dark:border-orange-400/[0.55]',
+    shadow: 'shadow-[0_4px_16px_rgba(0,0,0,0.10)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.40)]',
+    titleClass: 'text-[var(--apple-label)]',
+  },
+  info: {
+    icon: Info,
+    color: 'var(--apple-system-blue)',
+    style: 'bg-blue-500/[0.12] dark:bg-blue-500/[0.18] border-blue-500/[0.55] dark:border-blue-400/[0.55]',
+    shadow: 'shadow-[0_4px_16px_rgba(0,0,0,0.10)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.40)]',
+    titleClass: 'text-[var(--apple-label)]',
+  },
+  critical: {
+    icon: XCircle,
+    color: 'var(--apple-system-red)',
+    style: 'bg-red-500/[0.18] dark:bg-red-500/[0.26] border-red-500/[0.70] dark:border-red-400/[0.70]',
+    shadow: 'shadow-[0_4px_16px_rgba(255,59,48,0.20)] dark:shadow-[0_4px_16px_rgba(255,69,58,0.35)]',
+    titleClass: 'text-[var(--apple-system-red)]',
+  },
+}
+
+function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
-    // Trigger animation
-    setTimeout(() => setIsVisible(true), 10)
+    const t = setTimeout(() => setIsVisible(true), 10)
+    return () => clearTimeout(t)
   }, [])
 
   const handleRemove = () => {
     setIsVisible(false)
-    setTimeout(() => onRemove(toast.id), 300)
+    setTimeout(() => onRemove(toast.id), 250)
   }
 
-  const icons = {
-    success: CheckCircle,
-    error: AlertCircle,
-    warning: AlertTriangle,
-    info: Info
-  }
-
-  const colors = {
-    success: 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200',
-    error: 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200',
-    warning: 'bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200',
-    info: 'bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
-  }
-
-  const iconColors = {
-    success: 'text-green-600 dark:text-green-400',
-    error: 'text-red-600 dark:text-red-400',
-    warning: 'text-yellow-600 dark:text-yellow-400',
-    info: 'text-blue-600 dark:text-blue-400'
-  }
-
-  const Icon = icons[toast.type]
-
-  const closeButtonStyles = {
-    success: 'text-green-700 hover:text-green-900 hover:bg-green-100 dark:text-green-100 dark:hover:text-green-50 dark:hover:bg-green-800/50',
-    error: 'text-red-700 hover:text-red-900 hover:bg-red-100 dark:text-red-100 dark:hover:text-red-50 dark:hover:bg-red-800/50',
-    warning: 'text-yellow-700 hover:text-yellow-900 hover:bg-yellow-100 dark:text-yellow-100 dark:hover:text-yellow-50 dark:hover:bg-yellow-800/50',
-    info: 'text-blue-700 hover:text-blue-900 hover:bg-blue-100 dark:text-blue-100 dark:hover:text-blue-50 dark:hover:bg-blue-800/50'
-  }
+  const { icon: Icon, color, style, shadow, titleClass } = TYPE_CONFIG[toast.type]
 
   return (
     <div
       className={`
-        ${colors[toast.type]}
-        border rounded-lg shadow-lg p-4 flex items-start gap-3
-        transition-all duration-300 ease-in-out
-        ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
+        backdrop-blur-[8px] ${style} ${shadow} border
+        rounded-full
         pointer-events-auto
+        transition-all duration-250 ease-out
+        ${isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-[0.96]'}
       `}
       role="alert"
     >
-      <Icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${iconColors[toast.type]}`} />
-      <div className="flex-1 min-w-0">
-        <h4 className="font-semibold text-sm mb-1">{toast.title}</h4>
-        {toast.message && (
-          <p className="text-sm opacity-90 break-words">{toast.message}</p>
-        )}
+      <div className="flex items-center gap-2.5 pl-3.5 pr-3 py-2">
+        <Icon className="flex-shrink-0 w-5 h-5" style={{ color }} />
+        <div className="flex-1 min-w-0">
+          <p className={`text-[13.5px] font-semibold leading-snug tracking-[-0.01em] ${titleClass}`}>
+            {toast.title}
+          </p>
+          {toast.message && (
+            <p className="text-[12px] leading-snug text-[var(--apple-secondary-label)] break-words">
+              {toast.message}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={handleRemove}
+          className="flex-shrink-0 w-[20px] h-[20px] flex items-center justify-center rounded-full bg-black/[0.07] dark:bg-white/[0.10] hover:bg-black/[0.12] dark:hover:bg-white/[0.16] apple-transition text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
+          aria-label="Dismiss"
+        >
+          <X className="w-3 h-3" />
+        </button>
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleRemove}
-        className={`h-7 w-7 p-0 flex-shrink-0 rounded-full transition-colors self-start ${closeButtonStyles[toast.type]}`}
-        aria-label="Close notification"
-      >
-        <X className="h-4 w-4" />
-      </Button>
     </div>
   )
 }
-

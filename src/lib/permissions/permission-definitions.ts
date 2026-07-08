@@ -450,6 +450,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Team
     Permission.TEAM_READ,
     Permission.TEAM_INVITE,
+    Permission.TEAM_EDIT,
     // Permission.TEAM_DELETE,
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
@@ -476,6 +477,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.BUDGET_HANDLING,
     Permission.FINANCIAL_CREATE_EXPENSE,
     Permission.FINANCIAL_APPROVE_EXPENSE,
+    Permission.FINANCIAL_VIEW_INCOME,
+    Permission.FINANCIAL_CREATE_INCOME,
     Permission.FINANCIAL_CREATE_INVOICE,
     Permission.FINANCIAL_SEND_INVOICE,
 
@@ -616,7 +619,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEAM_READ,
     Permission.TEAM_INVITE,
     // Permission.TEAM_DELETE,
-    Permission.TEAM_REMOVE,
+    // Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
     Permission.TEAM_MEMBER_WIDGET_VIEW,

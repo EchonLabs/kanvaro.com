@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { cn } from '@/lib/utils'
 import {
   Clock,
   Play,
@@ -18,12 +18,10 @@ import {
   TrendingUp,
   Loader2,
   ArrowRight,
-  Plus,
   Clock3,
   CheckCircle2,
   FolderOpen,
-  Pause,
-  Square
+  Zap
 } from 'lucide-react'
 
 interface ActiveTimer {
@@ -36,6 +34,12 @@ interface ActiveTimer {
   isPaused: boolean
   isBillable: boolean
 }
+
+const TIME_PALETTE = [
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-600 dark:text-blue-400' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)', bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-600 dark:text-purple-400' },
+]
 
 export default function TimeTrackingPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -76,11 +80,9 @@ export default function TimeTrackingPage() {
   useEffect(() => {
     const fetchStats = async () => {
       if (!user) return
-
       try {
         setStatsLoading(true)
         const response = await fetch('/api/time-tracking/stats')
-
         if (response.ok) {
           const statsData = await response.json()
           setStats(statsData)
@@ -91,11 +93,9 @@ export default function TimeTrackingPage() {
         setStatsLoading(false)
       }
     }
-
     fetchStats()
   }, [user])
 
-  // Ticking display for active timer
   useEffect(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
@@ -127,8 +127,11 @@ export default function TimeTrackingPage() {
     }
   }, [activeTimer])
 
-  const formatDuration = (minutes: number) => {
-    return minutes.toFixed(2)
+  const fmtMins = (minutes: number) => {
+    const h = Math.floor(minutes / 60)
+    const m = Math.round(minutes % 60)
+    if (h > 0) return `${h}h ${m}m`
+    return `${m}m`
   }
 
   const formatDate = (dateString: string) => {
@@ -139,368 +142,327 @@ export default function TimeTrackingPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading time tracking...</p>
+        <div className="text-center space-y-3">
+          <div className="h-10 w-10 rounded-full border-2 border-[var(--apple-system-blue)] border-t-transparent animate-spin mx-auto" />
+          <p className="text-[15px] text-[var(--apple-secondary-label)]">Loading time tracking…</p>
         </div>
       </div>
     )
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-muted-foreground">No user data available</p>
-        </div>
-      </div>
-    )
-  }
+  if (!user) return null
+
+  const todayHours = stats?.todaySummary?.timeTracked ?? 0
+  const weekHours = stats?.weekSummary?.totalHours ?? 0
+  const tasksCompleted = stats?.todaySummary?.tasksCompleted ?? 0
+  const billableTime = stats?.todaySummary?.billableTime ?? 0
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                <Clock className="h-8 w-8 text-blue-600" />
-              </div>
-              <span>Time Tracking</span>
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Track your time, manage entries, and view detailed reports
-            </p>
+      <div className="space-y-6 view-transition-container">
+
+        {/* ── Page Header ─────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Clock className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+            <div>
+              <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
+                Time Tracking
+              </h1>
+              <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                Track your work, manage entries, and analyze performance
+              </p>
+            </div>
           </div>
+          <Button
+            onClick={() => router.push('/time-tracking/timer')}
+            className="h-9 px-4 rounded-[var(--apple-radius-md)] text-[15px] font-medium flex-shrink-0"
+            style={{ background: 'var(--apple-card-gradient)' }}
+          >
+            <Play className="h-4 w-4 mr-2" strokeWidth={1.5} />
+            Start Timer
+          </Button>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/time-tracking/timer')}>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                  <Play className="h-6 w-6 text-green-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">Start Timer</h3>
-                  <p className="text-sm text-muted-foreground">Begin tracking time for a task</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        {/* ── Stats Bar ───────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: "Today's Hours", value: statsLoading ? '…' : fmtMins(todayHours), icon: Clock, color: 'text-[var(--apple-system-blue)]', bg: 'bg-blue-50 dark:bg-blue-950/30' },
+            { label: "Billable Time", value: statsLoading ? '…' : fmtMins(billableTime), icon: Zap, color: 'text-[var(--apple-system-green)]', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+            { label: "This Week", value: statsLoading ? '…' : fmtMins(weekHours), icon: Calendar, color: 'text-[var(--apple-system-purple)]', bg: 'bg-purple-50 dark:bg-purple-950/30' },
+            { label: "Tasks Done Today", value: statsLoading ? '…' : String(tasksCompleted), icon: CheckCircle2, color: 'text-[var(--apple-system-orange)]', bg: 'bg-orange-50 dark:bg-orange-950/30' },
+          ].map((stat) => {
+            const Icon = stat.icon
+            return (
+              <div
+                key={stat.label}
+                className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4 apple-transition hover:shadow-[0_4px_14px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_4px_14px_rgba(0,0,0,0.35)]"
+              >
+                <Icon className={cn('h-5 w-5 mb-3', stat.color)} strokeWidth={1.5} />
+                <p className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">
+                  {stat.label}
+                </p>
+                <p className="text-[22px] font-bold tracking-tight text-[var(--apple-label)] font-apple-mono tabular-nums mt-0.5">
+                  {stat.value}
+                </p>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/time-tracking/logs')}>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                  <FileText className="h-6 w-6 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">Time Logs</h3>
-                  <p className="text-sm text-muted-foreground">View and manage time entries</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/time-tracking/reports')}>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
-                  <BarChart3 className="h-6 w-6 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">Reports</h3>
-                  <p className="text-sm text-muted-foreground">Analyze time tracking data</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
+            )
+          })}
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Active Timer Section */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Timer className="h-5 w-5" />
-                  <span>Active Timer</span>
-                </CardTitle>
-                <CardDescription>
-                  Current time tracking session
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {activeTimer ? (
-                  <div className="space-y-4">
-                    <div className="text-center py-2">
-                      <div className="text-4xl font-mono font-bold text-primary mb-1">
-                        {displayTime}
-                      </div>
-                      <Badge variant={activeTimer.isPaused ? 'secondary' : 'default'} className="text-xs">
-                        {activeTimer.isPaused ? 'Paused' : 'Running'}
-                      </Badge>
-                    </div>
-                    <div className="border-t pt-4 space-y-2">
-                      <div className="flex items-center gap-2 text-sm">
-                        <FolderOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <span className="font-semibold">Project:</span>
-                        <span className="text-muted-foreground truncate">{activeTimer.project?.name}</span>
-                      </div>
-                      {activeTimer.task && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Target className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="font-semibold">Task:</span>
-                          <span className="text-muted-foreground truncate">{activeTimer.task.title}</span>
-                        </div>
-                      )}
-                      {activeTimer.description && (
-                        <div className="flex items-start gap-2 text-sm">
-                          <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                          <span className="font-semibold">Memo:</span>
-                          <span className="text-muted-foreground line-clamp-2">{activeTimer.description}</span>
-                        </div>
-                      )}
-                      {activeTimer.isBillable && (
-                        <Badge variant="outline" className="text-xs">Billable</Badge>
-                      )}
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const pid = activeTimer.project?._id ? `projectId=${encodeURIComponent(activeTimer.project._id)}` : ''
-                        const tid = activeTimer.task?._id ? `taskId=${encodeURIComponent(activeTimer.task._id)}` : ''
-                        const qs = [pid, tid].filter(Boolean).join('&')
-                        router.push(qs ? `/time-tracking/timer?${qs}` : '/time-tracking/timer')
-                      }}
-                      className="w-full"
-                    >
-                      <Clock className="h-4 w-4 mr-2" />
-                      Manage Timer
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="p-4 bg-muted rounded-lg inline-block mb-4">
-                      <Clock3 className="h-12 w-12 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-2">No Active Timer</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Start tracking time for your tasks
-                    </p>
-                    <Button onClick={() => router.push('/time-tracking/timer')} className="w-full">
-                      <Play className="h-4 w-4 mr-2" />
-                      Start Timer
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <TrendingUp className="h-5 w-5" />
-                  <span>Today's Summary</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Time Tracked</span>
-                  <span className="font-medium">
-                    {statsLoading ? '...' : formatDuration(stats?.todaySummary?.timeTracked || 0)}
-                  </span>
+        {/* ── Quick Actions ───────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { label: 'Timer', desc: 'Start or manage a live timer', path: '/time-tracking/timer', ...TIME_PALETTE[0], icon: Play },
+            { label: 'Time Logs', desc: 'Review and edit time entries', path: '/time-tracking/logs', ...TIME_PALETTE[1], icon: FileText },
+            { label: 'Reports', desc: 'Analyze tracked time data', path: '/time-tracking/reports', ...TIME_PALETTE[2], icon: BarChart3 },
+          ].map((action) => {
+            const Icon = action.icon
+            return (
+              <button
+                key={action.label}
+                onClick={() => router.push(action.path)}
+                className="card-fade-in text-left rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5 apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5 group"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <Icon className={cn('h-6 w-6', action.text)} strokeWidth={1.5} />
+                  <ArrowRight className="h-4 w-4 text-[var(--apple-tertiary-label)] group-hover:text-[var(--apple-system-blue)] group-hover:translate-x-0.5 apple-transition" strokeWidth={1.5} />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Billable Time</span>
-                  <span className="font-medium">
-                    {statsLoading ? '...' : formatDuration(stats?.todaySummary?.billableTime || 0)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Tasks Completed</span>
-                  <span className="font-medium">
-                    {statsLoading ? '...' : (stats?.todaySummary?.tasksCompleted || 0)}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card >
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Calendar className="h-5 w-5" />
-                  <span>This Week</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total Hours</span>
-                  <span className="font-medium">
-                    {statsLoading ? '...' : formatDuration(stats?.weekSummary?.totalHours || 0)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Average Daily</span>
-                  <span className="font-medium">
-                    {statsLoading ? '...' : formatDuration(stats?.weekSummary?.averageDaily || 0)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Most Active Day</span>
-                  <span className="font-medium">
-                    {statsLoading ? '...' : (stats?.weekSummary?.mostActiveDay ? formatDate(stats.weekSummary.mostActiveDay.date) : '-')}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                <p className="text-[17px] font-semibold text-[var(--apple-label)]">{action.label}</p>
+                <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{action.desc}</p>
+              </button>
+            )
+          })}
         </div>
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Clock className="h-5 w-5" />
-              <span>Recent Activity</span>
-            </CardTitle>
-            <CardDescription>
-              Your latest time tracking entries
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <div className="text-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-                <p className="text-muted-foreground">Loading recent activity...</p>
-              </div>
-            ) : stats?.recentActivity && stats.recentActivity.length > 0 ? (
-              <div className="space-y-4">
-                {stats.recentActivity.map((entry: any) => (
-                  <div key={entry._id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{entry.description}</p>
-                      <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-1">
-                        {entry.project && (
-                          <span className="flex items-center space-x-1">
-                            <Target className="h-3 w-3" />
-                            <span>{entry.project.name}</span>
-                          </span>
-                        )}
-                        {entry.task && (
-                          <span className="flex items-center space-x-1">
-                            <CheckCircle2 className="h-3 w-3" />
-                            <span>{entry.task.title}</span>
-                          </span>
-                        )}
-                        {entry.isBillable && (
-                          <Badge variant="secondary" className="text-xs">Billable</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-sm">{formatDuration(entry.duration)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(entry.startTime).toLocaleDateString()}
-                      </p>
-                    </div>
+        {/* ── Active Timer + Weekly Summary ───────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          {/* Active Timer */}
+          <div className="lg:col-span-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center gap-2">
+              <Timer className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+              <span className="text-[15px] font-semibold text-[var(--apple-label)]">Active Timer</span>
+              {activeTimer && (
+                <span
+                  className={cn(
+                    'ml-auto inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border',
+                    activeTimer.isPaused
+                      ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                      : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                  )}
+                  style={{ animation: 'badge-border-pulse 3s ease-in-out infinite' }}
+                >
+                  <span
+                    className={cn('h-1.5 w-1.5 rounded-full', activeTimer.isPaused ? 'bg-amber-500' : 'bg-emerald-500')}
+                    style={!activeTimer.isPaused ? { animation: 'status-pulse 2s ease-in-out infinite' } : undefined}
+                  />
+                  {activeTimer.isPaused ? 'Paused' : 'Running'}
+                </span>
+              )}
+            </div>
+            <div className="p-5">
+              {activeTimer ? (
+                <div className="space-y-5">
+                  {/* Clock display */}
+                  <div className="flex flex-col items-center py-4">
+                    <Clock className="h-12 w-12 mb-4 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+                    <span className="text-[44px] font-bold font-apple-mono tabular-nums tracking-[-0.02em] text-[var(--apple-label)]">
+                      {displayTime}
+                    </span>
                   </div>
-                ))}
-                <div className="pt-4 border-t">
-                  <Button variant="outline" onClick={() => router.push('/time-tracking/logs')} className="w-full">
-                    <FileText className="h-4 w-4 mr-2" />
-                    View All Logs
+
+                  {/* Timer details */}
+                  <div className="rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] p-4 space-y-2.5">
+                    <div className="flex items-center gap-2.5 text-[14px]">
+                      <FolderOpen className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
+                      <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Project</span>
+                      <span className="text-[var(--apple-label)] font-medium truncate">{activeTimer.project?.name}</span>
+                    </div>
+                    {activeTimer.task && (
+                      <div className="flex items-center gap-2.5 text-[14px]">
+                        <Target className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
+                        <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Task</span>
+                        <span className="text-[var(--apple-label)] truncate">{activeTimer.task.title}</span>
+                      </div>
+                    )}
+                    {activeTimer.description && (
+                      <div className="flex items-start gap-2.5 text-[14px]">
+                        <FileText className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                        <span className="text-[var(--apple-tertiary-label)] font-medium min-w-[4rem]">Memo</span>
+                        <span className="text-[var(--apple-label)] line-clamp-2">{activeTimer.description}</span>
+                      </div>
+                    )}
+                    {activeTimer.isBillable && (
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-4 flex-shrink-0" />
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                          Billable
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const pid = activeTimer.project?._id ? `projectId=${encodeURIComponent(activeTimer.project._id)}` : ''
+                      const tid = activeTimer.task?._id ? `taskId=${encodeURIComponent(activeTimer.task._id)}` : ''
+                      const qs = [pid, tid].filter(Boolean).join('&')
+                      router.push(qs ? `/time-tracking/timer?${qs}` : '/time-tracking/timer')
+                    }}
+                    className="w-full h-9 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] text-[15px] font-medium apple-transition hover:bg-[var(--apple-quaternary-fill)]"
+                  >
+                    <Clock className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                    Manage Timer
                   </Button>
                 </div>
+              ) : (
+                <div className="flex flex-col items-center py-8 gap-4">
+                  <Clock3 className="h-10 w-10 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                  <div className="text-center">
+                    <p className="text-[17px] font-semibold text-[var(--apple-label)]">No Active Timer</p>
+                    <p className="text-[14px] text-[var(--apple-secondary-label)] mt-1">
+                      Start the timer to begin tracking work
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => router.push('/time-tracking/timer')}
+                    className="h-9 px-5 rounded-[var(--apple-radius-md)] text-[15px] font-medium"
+                    style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+                  >
+                    <Play className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                    Start Timer
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Weekly Summary */}
+          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+              <span className="text-[15px] font-semibold text-[var(--apple-label)]">Weekly Overview</span>
+            </div>
+            <div className="p-5 space-y-4">
+              {[
+                { label: 'Total Hours', value: statsLoading ? '…' : fmtMins(weekHours), sub: 'this week' },
+                { label: 'Daily Average', value: statsLoading ? '…' : fmtMins(stats?.weekSummary?.averageDaily || 0), sub: 'per day' },
+                { label: 'Most Active Day', value: statsLoading ? '…' : (stats?.weekSummary?.mostActiveDay ? formatDate(stats.weekSummary.mostActiveDay.date) : '—'), sub: '' },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between py-2 border-b border-[var(--apple-separator)] last:border-0">
+                  <div>
+                    <p className="text-[13px] text-[var(--apple-secondary-label)]">{row.label}</p>
+                    {row.sub && <p className="text-[11px] text-[var(--apple-tertiary-label)] mt-0.5">{row.sub}</p>}
+                  </div>
+                  <span className="text-[17px] font-semibold font-apple-mono tabular-nums text-[var(--apple-label)]">
+                    {row.value}
+                  </span>
+                </div>
+              ))}
+
+              <Button
+                variant="outline"
+                onClick={() => router.push('/time-tracking/reports')}
+                className="w-full h-9 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] text-[14px] font-medium mt-2 apple-transition hover:bg-[var(--apple-quaternary-fill)]"
+              >
+                <BarChart3 className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                View Reports
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Recent Activity ─────────────────────────────────────────── */}
+        <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+              <span className="text-[15px] font-semibold text-[var(--apple-label)]">Recent Activity</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/time-tracking/logs')}
+              className="h-7 px-2.5 text-[13px] text-[var(--apple-system-blue)] hover:bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-sm)]"
+            >
+              View All
+            </Button>
+          </div>
+          <div className="p-5">
+            {statsLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 animate-pulse">
+                    <div className="h-9 w-9 rounded-full bg-[var(--apple-tertiary-fill)] flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3.5 w-48 rounded-full bg-[var(--apple-tertiary-fill)]" />
+                      <div className="h-3 w-32 rounded-full bg-[var(--apple-tertiary-fill)]" />
+                    </div>
+                    <div className="h-3.5 w-12 rounded-full bg-[var(--apple-tertiary-fill)]" />
+                  </div>
+                ))}
+              </div>
+            ) : stats?.recentActivity && stats.recentActivity.length > 0 ? (
+              <div className="space-y-1">
+                {stats.recentActivity.map((entry: any, idx: number) => {
+                  const palette = TIME_PALETTE[idx % TIME_PALETTE.length]
+                  return (
+                    <div
+                      key={entry._id}
+                      className="flex items-center gap-3 rounded-[var(--apple-radius-md)] px-3 py-2.5 apple-transition hover:bg-[var(--apple-quaternary-fill)] group"
+                    >
+                      <div
+                        className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[12px] font-bold"
+                        style={{ background: palette.gradient }}
+                      >
+                        {(entry.project?.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-medium text-[var(--apple-label)] truncate">
+                          {entry.description || entry.project?.name || 'Time entry'}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {entry.project && (
+                            <span className="text-[12px] text-[var(--apple-secondary-label)] flex items-center gap-1">
+                              <FolderOpen className="h-3 w-3" strokeWidth={1.5} />
+                              {entry.project.name}
+                            </span>
+                          )}
+                          {entry.isBillable && (
+                            <span className="inline-flex items-center px-1.5 py-0 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                              Billable
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-[14px] font-semibold font-apple-mono tabular-nums text-[var(--apple-label)]">
+                          {fmtMins(entry.duration)}
+                        </p>
+                        <p className="text-[11px] text-[var(--apple-tertiary-label)] mt-0.5">
+                          {new Date(entry.startTime).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <div className="p-4 bg-muted rounded-lg inline-block mb-4">
-                  <CheckCircle2 className="h-12 w-12 text-muted-foreground" />
+              <div className="flex flex-col items-center py-8 gap-3">
+                <div className="h-14 w-14 rounded-full bg-[var(--apple-tertiary-fill)] flex items-center justify-center">
+                  <CheckCircle2 className="h-7 w-7 text-[var(--apple-tertiary-label)]" />
                 </div>
-                <h3 className="text-lg font-medium mb-2">No Recent Activity</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start tracking time to see your activity here
+                <p className="text-[15px] font-semibold text-[var(--apple-label)]">No Recent Activity</p>
+                <p className="text-[13px] text-[var(--apple-secondary-label)]">
+                  Start tracking time to see activity here
                 </p>
-                <Button variant="outline" onClick={() => router.push('/time-tracking/logs')}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  View All Logs
-                </Button>
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Quick Tips */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Target className="h-5 w-5" />
-                <span>Getting Started</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Select a project and task to track time</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Set your hourly rate for billable time</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Use categories and tags to organize</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Pause and resume as needed</span>
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <TrendingUp className="h-5 w-5" />
-                <span>Best Practices</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <span>Start timer when beginning work</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <span>Use descriptive entries</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <span>Review and approve time entries</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <span>Generate reports regularly</span>
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
+          </div>
         </div>
+
       </div>
     </MainLayout>
   )

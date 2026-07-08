@@ -64,7 +64,7 @@ export async function GET(
     }
 
     const tasks = await Task.find(query)
-      .select('_id title status priority isBillable taskNumber displayId')
+      .select('_id title status priority isBillable taskNumber displayId estimatedHours dueDate completedAt actualHours')
       .sort({ taskNumber: 1 })
       .lean()
 

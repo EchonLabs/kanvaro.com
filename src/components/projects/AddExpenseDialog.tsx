@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/Badge'
-import { Loader2, Upload, X, File, Image as ImageIcon, Paperclip, DollarSign, Calendar, Tag, CreditCard } from 'lucide-react'
+import { Loader2, Upload, X, File, Image as ImageIcon, Paperclip, DollarSign, Calendar, Tag, CreditCard, UserCheck } from 'lucide-react'
+import { MemberPickerDialog } from './MemberPickerDialog'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useToast } from '@/components/ui/Toast'
 import { useNotify } from '@/lib/notify'
@@ -39,7 +40,7 @@ interface ExpenseLike {
   category?: ExpenseCategory
   isBillable?: boolean
   paidStatus?: PaidStatus
-  paidBy?: string
+  paidBy?: string | { _id?: string; firstName?: string; lastName?: string; email?: string }
   attachments?: ExpenseAttachment[]
 }
 
@@ -65,7 +66,8 @@ interface ExpenseFormData {
   category: ExpenseCategory
   isBillable: boolean
   paidStatus: PaidStatus
-  paidBy: string
+  paidById: string
+  paidByName: string
   attachments: ExpenseAttachment[]
 }
 
@@ -95,13 +97,23 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
     category: 'other',
     isBillable: false,
     paidStatus: 'unpaid',
-    paidBy: '',
+    paidById: '',
+    paidByName: '',
     attachments: []
   })
+  const [showMemberPicker, setShowMemberPicker] = useState(false)
 
   // Initialize form data when expense prop changes or dialog opens
   useEffect(() => {
     if (open && expense) {
+      const existingPaidBy = expense.paidBy
+      const existingPaidById = typeof existingPaidBy === 'object' && existingPaidBy
+        ? (existingPaidBy._id || '')
+        : (typeof existingPaidBy === 'string' ? existingPaidBy : '')
+      const existingPaidByName = typeof existingPaidBy === 'object' && existingPaidBy
+        ? `${existingPaidBy.firstName || ''} ${existingPaidBy.lastName || ''}`.trim()
+        : ''
+
       const expenseFormData = {
         name: expense.name || '',
         description: expense.description || '',
@@ -112,7 +124,8 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
         category: (expense.category as ExpenseFormData['category']) || 'other',
         isBillable: expense.isBillable || false,
         paidStatus: (expense.paidStatus as ExpenseFormData['paidStatus']) || 'unpaid',
-        paidBy: expense.paidBy || '',
+        paidById: existingPaidById,
+        paidByName: existingPaidByName,
         attachments: expense.attachments || []
       }
       setFormData(expenseFormData)
@@ -129,7 +142,8 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
         category: 'other',
         isBillable: false,
         paidStatus: 'unpaid',
-        paidBy: '',
+        paidById: '',
+        paidByName: '',
         attachments: []
       }
       setFormData(defaultFormData)
@@ -145,7 +159,7 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
     formData.quantity !== '' &&
     formData.expenseDate !== '' &&
     formData.paidStatus &&
-    (formData.paidStatus !== 'paid' || formData.paidBy.trim() !== '');
+    (formData.paidStatus !== 'paid' || formData.paidById !== '');
 
   // Check if any changes have been made (only for edit mode)
   const hasChanges = initialFormData ? (() => {
@@ -159,7 +173,8 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
       formData.category !== initialFormData.category ||
       formData.isBillable !== initialFormData.isBillable ||
       formData.paidStatus !== initialFormData.paidStatus ||
-      formData.paidBy !== initialFormData.paidBy ||
+      formData.paidById !== initialFormData.paidById ||
+      formData.paidByName !== initialFormData.paidByName ||
       JSON.stringify(formData.attachments) !== JSON.stringify(initialFormData.attachments)
     )
   })() : true; // For add mode, always allow submission if form is valid
@@ -169,6 +184,11 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
       // Reset form to initial state when dialog opens
       if (expense) {
         // Editing mode - populate with existing expense data
+        const pb = expense.paidBy
+        const editPaidById = typeof pb === 'object' && pb ? (pb._id || '') : (typeof pb === 'string' ? pb : '')
+        const editPaidByName = typeof pb === 'object' && pb
+          ? `${pb.firstName || ''} ${pb.lastName || ''}`.trim()
+          : ''
         setFormData({
           name: expense.name || '',
           description: expense.description || '',
@@ -179,7 +199,8 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
           category: expense.category || 'other',
           isBillable: expense.isBillable || false,
           paidStatus: expense.paidStatus || 'unpaid',
-          paidBy: expense.paidBy || '',
+          paidById: editPaidById,
+          paidByName: editPaidByName,
           attachments: expense.attachments || []
         })
       } else {
@@ -194,7 +215,8 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
           category: 'other',
           isBillable: false,
           paidStatus: 'unpaid',
-          paidBy: '',
+          paidById: '',
+          paidByName: '',
           attachments: []
         })
       }
@@ -365,7 +387,7 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
         category: formData.category,
         isBillable: formData.isBillable,
         paidStatus: formData.paidStatus,
-        paidBy: formData.paidStatus === 'paid' && formData.paidBy ? formData.paidBy : undefined,
+        paidBy: formData.paidStatus === 'paid' && formData.paidById ? formData.paidById : undefined,
         attachments: formData.attachments.map(att => ({
           ...att,
           uploadedBy: currentUser?.id,
@@ -404,7 +426,8 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
             category: 'other',
             isBillable: false,
             paidStatus: 'unpaid',
-            paidBy: '',
+            paidById: '',
+            paidByName: '',
             attachments: []
           })
         }
@@ -428,6 +451,7 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
         className="max-w-3xl max-h-[90vh] p-0 gap-0 bg-background/95 backdrop-blur-xl border-border/50 shadow-2xl"
@@ -584,7 +608,7 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
                 <Select
                   value={formData.paidStatus}
                   onValueChange={(value: 'paid' | 'unpaid') => {
-                    setFormData(prev => ({ ...prev, paidStatus: value, paidBy: value === 'unpaid' ? '' : prev.paidBy }))
+                    setFormData(prev => ({ ...prev, paidStatus: value, paidById: value === 'unpaid' ? '' : prev.paidById, paidByName: value === 'unpaid' ? '' : prev.paidByName }))
                   }}
                 >
                   <SelectTrigger className="h-10">
@@ -610,32 +634,34 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
 
             {formData.paidStatus === 'paid' && (
               <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                <Label htmlFor="paidBy" className="text-sm font-medium">Paid By <span className="text-destructive">*</span></Label>
-                <div className="relative">
-                  <Input
-                    id="paidBy"
-                    value={formData.paidBy}
-                    onChange={(e) => setFormData(prev => ({ ...prev, paidBy: e.target.value }))}
-                    placeholder="Enter who paid for this expense or click Find"
-                    className="h-10 pr-20"
-                    required
-                  />
+                <Label className="text-sm font-medium">Paid By <span className="text-destructive">*</span></Label>
+                {formData.paidByName ? (
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                      <UserCheck className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-medium flex-1">{formData.paidByName}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-muted-foreground"
+                      onClick={() => setFormData(prev => ({ ...prev, paidById: '', paidByName: '' }))}
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
-                    className="absolute right-1 top-1 h-8 px-3 text-xs"
-                    onClick={() => {
-                      // TODO: Open user selection modal
-                      showToast({ title: 'Find functionality coming soon', type: 'info' })
-                    }}
+                    className="w-full h-10 justify-start gap-2 text-muted-foreground"
+                    onClick={() => setShowMemberPicker(true)}
                   >
-                    Find
+                    <UserCheck className="h-4 w-4" />
+                    Select a project member…
                   </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Type a name or click Find to search for employees
-                </p>
+                )}
               </div>
             )}
 
@@ -841,6 +867,22 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
         </form>
       </DialogContent>
     </Dialog>
+
+    <MemberPickerDialog
+      open={showMemberPicker}
+      onClose={() => setShowMemberPicker(false)}
+      projectId={projectId}
+      title="Select Who Paid"
+      description="Choose the project member who paid for this expense"
+      onSelect={(member) => {
+        setFormData(prev => ({
+          ...prev,
+          paidById: member._id,
+          paidByName: `${member.firstName} ${member.lastName}`
+        }))
+      }}
+    />
+    </>
   )
 }
 

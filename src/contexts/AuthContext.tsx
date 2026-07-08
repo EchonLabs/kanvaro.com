@@ -49,6 +49,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
+  setUser: (user: AuthUser | null) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -129,11 +130,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadUser])
 
-  // Periodic background refresh (every 5 minutes) to handle token expiry
+  // Keep a stable ref so the interval callback can read the latest user without
+  // being in the dependency array (which would recreate the interval on every refresh).
+  const userRef = useRef(user)
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
+
+  // Periodic background refresh (every 5 minutes) to keep the access token alive.
+  // Runs once on mount; userRef lets the callback see the current auth state.
   useEffect(() => {
     refreshIntervalRef.current = setInterval(() => {
-      // Only refresh if user is already authenticated
-      if (user) {
+      if (userRef.current) {
         fetchCurrentUser().then((userData) => {
           if (userData) {
             setUser(userData)
@@ -150,7 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearInterval(refreshIntervalRef.current)
       }
     }
-  }, [user])
+  }, []) // intentionally empty — interval is created once and reads user via ref
 
   const login = useCallback(async (email: string, password: string) => {
     try {
@@ -220,6 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     refreshUser,
+    setUser,
   }
 
   return (

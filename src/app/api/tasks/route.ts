@@ -181,6 +181,7 @@ export async function GET(request: NextRequest) {
     const after = searchParams.get('after');
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || '';
+    const excludeStatus = searchParams.get('excludeStatus') || '';
     const priority = searchParams.get('priority') || '';
     const type = searchParams.get('type') || '';
     const project = searchParams.get('project') || '';
@@ -296,6 +297,10 @@ export async function GET(request: NextRequest) {
 
     // Apply simple filters
     if (status) filters.status = status;
+    if (excludeStatus) {
+      const excluded = excludeStatus.split(',').map((s) => s.trim()).filter(Boolean);
+      if (excluded.length > 0) filters.status = { ...(filters.status || {}), $nin: excluded };
+    }
     if (priority) filters.priority = priority;
     if (type) filters.type = type;
     if (project) filters.project = project;

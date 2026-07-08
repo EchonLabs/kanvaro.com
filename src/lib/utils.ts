@@ -125,4 +125,29 @@ export const focusSearchInput = (el: HTMLInputElement | null) => {
   } else {
     setTimeout(doFocus, 0)
   }
-}
+}
+
+/**
+ * Truncates a string to a maximum character length and appends "..." if truncated
+ * Smart truncation: if text contains more than 10 capital letters, truncates earlier
+ * because capital letters take up more visual space in the UI
+ * @param text - The text to truncate
+ * @param maxLength - Maximum length before truncation (default: 30)
+ * @returns Truncated text with "..." if it exceeds maxLength
+ */
+export function truncateText(text?: string, maxLength: number = 30): { truncated: string; isTruncated: boolean } {
+  if (!text) return { truncated: '', isTruncated: false }
+  
+  // Count capital letters to detect uppercase-heavy text
+  const capitalLetterCount = (text.match(/[A-Z]/g) || []).length
+  
+  // If text has more than 10 capital letters, use a shorter truncation length
+  // Capital letters take up more visual space in the UI
+  const adjustedMaxLength = capitalLetterCount > 10 ? Math.max(15, maxLength - 13) : maxLength
+  
+  if (text.length <= adjustedMaxLength) {
+    return { truncated: text, isTruncated: false }
+  }
+  
+  return { truncated: `${text.slice(0, adjustedMaxLength)}...`, isTruncated: true }
+}

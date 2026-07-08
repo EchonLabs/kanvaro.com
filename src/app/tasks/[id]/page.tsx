@@ -1213,98 +1213,79 @@ export default function TaskDetailPage() {
     const isAuthor = comment.author?._id === currentUserId
     const isEditing = editingCommentId === commentId
     const isReplying = replyTargetId === commentId
+    const authorName = comment.author?.firstName || comment.author?.lastName
+      ? `${comment.author?.firstName || ''} ${comment.author?.lastName || ''}`.trim()
+      : comment.author?.email || 'User'
+    const initials = authorName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
 
     return (
-      <div key={commentId} className="rounded-md border p-3 bg-muted/30" style={{ marginLeft: depth ? depth * 16 : 0 }}>
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-sm font-medium">
-            {comment.author?.firstName || comment.author?.lastName
-              ? `${comment.author?.firstName || ''} ${comment.author?.lastName || ''}`.trim()
-              : comment.author?.email || 'User'}
+      <div key={commentId} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] p-4 bg-[var(--apple-quaternary-fill)]" style={{ marginLeft: depth ? depth * 20 : 0 }}>
+        <div className="flex items-start gap-3">
+          <div className="h-8 w-8 rounded-full bg-[var(--apple-system-blue)]/15 flex items-center justify-center flex-shrink-0">
+            <span className="text-[11px] font-semibold text-[var(--apple-system-blue)]">{initials}</span>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {comment.updatedAt ? formatDateTimeSafe(comment.updatedAt) : (comment.createdAt ? formatDateTimeSafe(comment.createdAt) : '')}
-            {comment.updatedAt && (
-              <span className="ml-2 text-[11px]">(edited)</span>
-            )}
-          </div>
-        </div>
-        {isEditing ? (
-          <div className="space-y-2 mt-1">
-            <Textarea
-              value={editingContent}
-              onChange={(e) => setEditingContent(e.target.value)}
-              rows={3}
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleSaveEdit} disabled={!editingContent.trim()}>
-                Save
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                Cancel
-              </Button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-[14px] font-semibold text-[var(--apple-label)]">{authorName}</span>
+              <span className="text-[12px] text-[var(--apple-tertiary-label)]">
+                {comment.updatedAt ? formatDateTimeSafe(comment.updatedAt) : (comment.createdAt ? formatDateTimeSafe(comment.createdAt) : '')}
+                {comment.updatedAt && <span className="ml-1 text-[11px]">(edited)</span>}
+              </span>
             </div>
-          </div>
-        ) : (
-          <div className="text-sm text-foreground whitespace-pre-wrap mt-1">{comment.content}</div>
-        )}
-        <div className="flex flex-wrap gap-2 mt-2 items-center">
-          {comment.mentions && comment.mentions.length > 0 && (
-            <Badge variant="outline" className="text-xs">
-              Mentions: {comment.mentions.length}
-            </Badge>
-          )}
-          {comment.linkedIssues && comment.linkedIssues.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {comment.linkedIssues.map((issue) => (
-                <Badge
-                  key={issue?._id || Math.random().toString(36)}
-                  variant="secondary"
-                  className="text-xs cursor-pointer"
-                  onClick={() => {
-                    if (issue?._id) router.push(`/tasks/${issue._id}`)
-                  }}
-                >
-                  #{issue?.displayId || issue?._id} {issue?.title ? `— ${issue.title}` : ''}
-                </Badge>
-              ))}
+            {isEditing ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={editingContent}
+                  onChange={(e) => setEditingContent(e.target.value)}
+                  rows={3}
+                  className="text-[14px] rounded-[var(--apple-radius-md)] border-[var(--apple-separator)]"
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleSaveEdit} disabled={!editingContent.trim()} className="rounded-full h-7 px-3 text-[13px] bg-[var(--apple-system-blue)] text-white hover:opacity-90">Save</Button>
+                  <Button size="sm" variant="outline" onClick={handleCancelEdit} className="rounded-full h-7 px-3 text-[13px] border-[var(--apple-separator)]">Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[14px] text-[var(--apple-label)] whitespace-pre-wrap leading-relaxed">{comment.content}</p>
+            )}
+            {comment.linkedIssues && comment.linkedIssues.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {comment.linkedIssues.map((issue) => (
+                  <button
+                    key={issue?._id || Math.random().toString(36)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-[var(--apple-separator)] text-[11px] text-[var(--apple-system-blue)] hover:bg-[var(--apple-system-blue)]/10 apple-transition"
+                    onClick={() => { if (issue?._id) router.push(`/tasks/${issue._id}`) }}
+                  >
+                    #{issue?.displayId || issue?._id}{issue?.title ? ` — ${issue.title}` : ''}
+                  </button>
+                ))}
+              </div>
+            )}
+            {comment.attachments && comment.attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {comment.attachments.map((att, idx) => (
+                  <a key={`${att.url}-${idx}`} href={att.url} target="_blank" rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-[var(--apple-separator)] text-[12px] text-[var(--apple-system-blue)] hover:bg-[var(--apple-system-blue)]/10 apple-transition">
+                    <Paperclip className="h-3 w-3" />{att.name}{att.size ? ` (${(att.size / 1024).toFixed(1)} KB)` : ''}
+                  </a>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-1 mt-2">
+              {!isAuthor && !isEditing && (
+                <button onClick={() => handleStartReply(commentId)} className="text-[12px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-system-blue)] apple-transition font-medium px-1">Reply</button>
+              )}
+              {isAuthor && !isEditing && (
+                <>
+                  <button onClick={() => handleStartEditComment(commentId, comment.content)} className="text-[12px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-system-blue)] apple-transition font-medium px-1">Edit</button>
+                  <button onClick={() => setDeleteConfirmId(commentId)} className="text-[12px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-system-red)] apple-transition font-medium px-1">Delete</button>
+                </>
+              )}
             </div>
-          )}
-          <div className="flex gap-2 text-xs ml-auto">
-            {!isAuthor && !isEditing && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2"
-                onClick={() => handleStartReply(commentId)}
-              >
-                Reply
-              </Button>
-            )}
-            {isAuthor && !isEditing && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2"
-                  onClick={() => handleStartEditComment(commentId, comment.content)}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-destructive"
-                  onClick={() => setDeleteConfirmId(commentId)}
-                >
-                  Delete
-                </Button>
-              </>
-            )}
           </div>
         </div>
         {isReplying && (
-          <div className="mt-2 space-y-2">
+          <div className="mt-3 ml-11 space-y-2">
             <div ref={replyComposerRef} className="relative space-y-2">
               <Textarea
                 ref={replyEditorRef}
@@ -1319,82 +1300,42 @@ export default function TaskDetailPage() {
                 }}
                 onBlur={() => handleComposerBlur('reply')}
                 rows={3}
-                placeholder="Write a reply..."
-                className={suggestionMode && suggestionComposer === 'reply' ? 'ring-2 ring-blue-500/20 border-blue-500/30' : ''}
+                placeholder="Write a reply…"
+                className={`text-[14px] rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] ${suggestionMode && suggestionComposer === 'reply' ? 'ring-2 ring-[var(--apple-system-blue)]/20 border-[var(--apple-system-blue)]/40' : ''}`}
               />
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>
-                  Use <code className="bg-muted px-1 py-0.5 rounded text-[11px]">@</code> to mention teammates and
-                  <code className="bg-muted px-1 py-0.5 rounded text-[11px] ml-1">#</code> to link tasks.
-                </p>
-                {suggestionMode && suggestionComposer === 'reply' && (
-                  <p className="text-[11px] text-blue-600 dark:text-blue-400">
-                    💡 Use ↑↓ arrows to navigate, Enter to select, Esc to close
-                  </p>
-                )}
-              </div>
               <div className="flex items-center gap-2">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div
-                        role="button"
-                        aria-label="Attachments"
-                        className="h-8 w-8 inline-flex items-center justify-center rounded-md border hover:bg-muted cursor-pointer"
-                        onClick={() => replyFileInputRef.current?.click()}
-                      >
-                        <Paperclip className="h-4 w-4" />
+                      <div role="button" aria-label="Attachments"
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] hover:bg-[var(--apple-tertiary-fill)] cursor-pointer apple-transition"
+                        onClick={() => replyFileInputRef.current?.click()}>
+                        <Paperclip className="h-4 w-4 text-[var(--apple-secondary-label)]" />
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="top">Attachments</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                <input
-                  ref={replyFileInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => handleFileInputChange(e, true)}
-                />
-                {replyAttachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    {replyAttachments.map((att, idx) => (
-                      <span key={`${att.url}-${idx}`} className="inline-flex items-center gap-1 rounded border px-2 py-1">
-                        <a className="text-primary hover:underline" href={att.url} target="_blank" rel="noreferrer">
-                          {att.name}
-                        </a>
-                        {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <input ref={replyFileInputRef} type="file" className="hidden" onChange={(e) => handleFileInputChange(e, true)} />
+                {replyAttachments.map((att, idx) => (
+                  <span key={`${att.url}-${idx}`} className="inline-flex items-center gap-1 rounded-full border border-[var(--apple-separator)] px-2.5 py-1 text-[12px] text-[var(--apple-secondary-label)]">
+                    <a className="text-[var(--apple-system-blue)] hover:underline" href={att.url} target="_blank" rel="noreferrer">{att.name}</a>
+                  </span>
+                ))}
               </div>
               {renderSuggestionMenu('reply')}
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleSubmitReply} disabled={!replyContent.trim() || commentSubmitting}>
-                Reply
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleCancelReply}>
-                Cancel
-              </Button>
+              <Button size="sm" onClick={handleSubmitReply} disabled={!replyContent.trim() || commentSubmitting}
+                className="rounded-full h-8 px-4 text-[13px] bg-[var(--apple-system-blue)] text-white hover:opacity-90">Reply</Button>
+              <Button size="sm" variant="outline" onClick={handleCancelReply}
+                className="rounded-full h-8 px-4 text-[13px] border-[var(--apple-separator)]">Cancel</Button>
             </div>
           </div>
         )}
         {comment.children && comment.children.length > 0 && (
           <div className="mt-3 space-y-2">
             {comment.children.map(child => renderCommentNode(child, depth + 1))}
-          </div>
-        )}
-        {comment.attachments && comment.attachments.length > 0 && (
-          <div className="mt-2 space-y-1">
-            {comment.attachments.map((att, idx) => (
-              <div key={`${att.url}-${idx}`} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <a href={att.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                  {att.name}
-                </a>
-                {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
-              </div>
-            ))}
           </div>
         )}
       </div>
@@ -1506,12 +1447,12 @@ export default function TaskDetailPage() {
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'bug': return <Bug className="h-4 w-4" />
-      case 'feature': return <Layers className="h-4 w-4" />
-      case 'improvement': return <Wrench className="h-4 w-4" />
-      case 'task': return <Target className="h-4 w-4" />
-      case 'subtask': return <Layers className="h-4 w-4" />
-      default: return <Target className="h-4 w-4" />
+      case 'bug': return <Bug className="h-8 w-8" />
+      case 'feature': return <Layers className="h-8 w-8" />
+      case 'improvement': return <Wrench className="h-8 w-8" />
+      case 'task': return <Target className="h-8 w-8" />
+      case 'subtask': return <Layers className="h-8 w-8" />
+      default: return <Target className="h-8 w-8" />
     }
   }
 
@@ -1519,9 +1460,9 @@ export default function TaskDetailPage() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading task...</p>
+          <div className="text-center space-y-3">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-[var(--apple-system-blue)]" />
+            <p className="text-[15px] text-[var(--apple-secondary-label)]">Loading task…</p>
           </div>
         </div>
       </MainLayout>
@@ -1531,14 +1472,16 @@ export default function TaskDetailPage() {
   if (error || !task) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{error || 'Task not found'}</p>
-            <Button onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </div>
+        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+          <XCircle className="h-12 w-12 text-[var(--apple-system-red)]" />
+          <h2 className="text-[22px] font-semibold text-[var(--apple-label)]">{error || 'Task not found'}</h2>
+          <Button
+            onClick={() => router.back()}
+            className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-5 h-9 hover:opacity-90 apple-transition"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Go Back
+          </Button>
         </div>
       </MainLayout>
     )
@@ -1587,280 +1530,324 @@ export default function TaskDetailPage() {
     activeTimerTaskId === task._id.toString()
   )
 
+  const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+    backlog:     { bg: 'bg-slate-50 dark:bg-slate-950/30',    text: 'text-slate-600 dark:text-slate-400',    dot: 'bg-slate-400',    border: 'border-slate-200 dark:border-slate-800' },
+    todo:        { bg: 'bg-gray-50 dark:bg-gray-900/40',      text: 'text-gray-500 dark:text-gray-400',      dot: 'bg-gray-400',     border: 'border-gray-200 dark:border-gray-700' },
+    in_progress: { bg: 'bg-blue-50 dark:bg-blue-950/30',      text: 'text-blue-600 dark:text-blue-400',      dot: 'bg-blue-500',     border: 'border-blue-200 dark:border-blue-800' },
+    review:      { bg: 'bg-yellow-50 dark:bg-yellow-950/30',  text: 'text-yellow-600 dark:text-yellow-400',  dot: 'bg-yellow-500',   border: 'border-yellow-200 dark:border-yellow-800' },
+    testing:     { bg: 'bg-purple-50 dark:bg-purple-950/30',  text: 'text-purple-600 dark:text-purple-400',  dot: 'bg-purple-500',   border: 'border-purple-200 dark:border-purple-800' },
+    done:        { bg: 'bg-emerald-50 dark:bg-emerald-950/30',text: 'text-emerald-600 dark:text-emerald-400',dot: 'bg-emerald-500',  border: 'border-emerald-200 dark:border-emerald-800' },
+    cancelled:   { bg: 'bg-red-50 dark:bg-red-950/30',        text: 'text-red-600 dark:text-red-400',        dot: 'bg-red-500',      border: 'border-red-200 dark:border-red-800' },
+  }
+  const PRIORITY_BADGE: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+    low:      { bg: 'bg-gray-50 dark:bg-gray-900/40',      text: 'text-gray-500 dark:text-gray-400',      dot: 'bg-gray-400',    border: 'border-gray-200 dark:border-gray-700' },
+    medium:   { bg: 'bg-blue-50 dark:bg-blue-950/30',      text: 'text-blue-600 dark:text-blue-400',      dot: 'bg-blue-500',    border: 'border-blue-200 dark:border-blue-800' },
+    high:     { bg: 'bg-orange-50 dark:bg-orange-950/30',  text: 'text-orange-600 dark:text-orange-400',  dot: 'bg-orange-500',  border: 'border-orange-200 dark:border-orange-800' },
+    critical: { bg: 'bg-red-50 dark:bg-red-950/30',        text: 'text-red-600 dark:text-red-400',        dot: 'bg-red-500',     border: 'border-red-200 dark:border-red-800' },
+  }
+  const TYPE_BADGE: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+    bug:        { bg: 'bg-red-50 dark:bg-red-950/30',         text: 'text-red-600 dark:text-red-400',         dot: 'bg-red-500',      border: 'border-red-200 dark:border-red-800' },
+    feature:    { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500',  border: 'border-emerald-200 dark:border-emerald-800' },
+    improvement:{ bg: 'bg-blue-50 dark:bg-blue-950/30',       text: 'text-blue-600 dark:text-blue-400',       dot: 'bg-blue-500',     border: 'border-blue-200 dark:border-blue-800' },
+    task:       { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',       dot: 'bg-gray-400',     border: 'border-gray-200 dark:border-gray-700' },
+    subtask:    { bg: 'bg-purple-50 dark:bg-purple-950/30',   text: 'text-purple-600 dark:text-purple-400',   dot: 'bg-purple-500',   border: 'border-purple-200 dark:border-purple-800' },
+  }
+
+  const renderStatusChip = (cfg: Record<string, { bg: string; text: string; dot: string; border: string }>, key: string, label: string) => {
+    const c = cfg[key] ?? cfg['task'] ?? { bg: 'bg-gray-50', text: 'text-gray-500', dot: 'bg-gray-400', border: 'border-gray-200' }
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[12px] font-medium ${c.bg} ${c.text} ${c.border}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+        {label}
+      </span>
+    )
+  }
+
   return (
     <MainLayout>
-      <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
-        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.back()}
-                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                <h1
-                  className="text-2xl font-semibold leading-snug text-foreground flex items-center gap-3 min-w-0 flex-wrap"
-                  title={`${task.title} ${task.displayId}`}
-                >
-                  <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
-                  <span className="break-words overflow-wrap-anywhere">{task.title}</span>
-                  <span className="inline-block px-3 py-2 bg-slate-800 dark:bg-slate-700 rounded-full text-sm font-mono font-bold text-white flex-shrink-0">
-                    {task.displayId}
-                  </span>
-                </h1>
-                <div className="flex flex-col gap-2 flex-shrink-0 ml-auto w-full sm:w-auto sm:items-end">
-                  <div className="flex flex-row items-stretch sm:items-center gap-2 flex-wrap justify-end">
-                    <Button
-                      variant="outline"
-                      disabled={!editAllowed}
-                      onClick={() => {
-                        if (!editAllowed) return
-                        router.push(`/tasks/${taskId}/edit`)
-                      }}
-                      className="min-h-[36px] w-full sm:w-auto"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      disabled={!deleteAllowed}
-                      onClick={() => {
-                        if (!deleteAllowed) return
-                        setShowDeleteConfirmModal(true)
-                      }}
-                      className="min-h-[36px] w-full sm:w-auto"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  </div>
+      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
 
-                  {isAssignee && (
-                    <div className="flex flex-row items-stretch sm:items-center gap-2 flex-wrap justify-end">
-                      {isRelevantActiveTimer && (
-                        <Badge variant="outline" className="min-h-[36px] inline-flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          {activeTimerDisplay}
-                        </Badge>
-                      )}
-                      {isRelevantActiveTimer && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                onClick={handlePauseResumeTimer}
-                                disabled={stoppingTimer || !!timerActionLoading}
-                                size="icon"
-                                aria-label={
-                                  Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt)
-                                    ? 'Resume timer'
-                                    : 'Pause timer'
-                                }
-                              >
-                                {Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt) ? (
-                                  <Play className="h-4 w-4" />
-                                ) : (
-                                  <Pause className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt)
-                                ? 'Resume'
-                                : 'Pause'}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                      {isRelevantActiveTimer && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="destructive"
-                                onClick={() => setShowStopTimerConfirmModal(true)}
-                                disabled={stoppingTimer || !!timerActionLoading}
-                                size="icon"
-                                aria-label="Stop timer"
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Stop</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                      <Button
-                        onClick={() => setShowStartTimerModal(true)}
-                        disabled={
-                          isActiveTimerLoading ||
-                          hasActiveTimer ||
-                          !currentUserId ||
-                          !currentOrganizationId ||
-                          !task.project?._id ||
-                          !task._id
-                        }
-                        className="min-h-[36px] w-full sm:w-auto"
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        Start Timer
-                      </Button>
+        {/* ── Page Header ─────────────────────────────────────────────────────── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-1.5 text-[14px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-system-blue)] apple-transition font-medium"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+            {/* Title row: icon > task number > title — all inline */}
+            <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
+              <span className="flex-shrink-0" style={{ color: 'var(--apple-card-gradient)' }}>
+                {getTypeIcon(task.type)}
+              </span>
+              <span className="font-apple-mono text-[12px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 text-white" style={{ background: 'var(--apple-card-gradient)' }}>{task.displayId}</span>
+              <h1 className="text-[22px] sm:text-[26px] font-bold tracking-tight text-[var(--apple-label)] leading-tight min-w-0">{task.title}</h1>
+            </div>
+
+            {/* Action buttons — timer row + edit/delete row */}
+            <div className="flex flex-col gap-2 flex-shrink-0">
+              {/* Timer controls (only when relevant) */}
+              {isAssignee && (
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {isRelevantActiveTimer && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-apple-mono text-[var(--apple-label)]">
+                      <Clock className="h-3.5 w-3.5" style={{ color: 'var(--apple-card-gradient)' }} />
+                      {activeTimerDisplay}
                     </div>
                   )}
+                  {isRelevantActiveTimer && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button onClick={handlePauseResumeTimer} disabled={stoppingTimer || !!timerActionLoading}
+                            className="h-9 w-9 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition disabled:opacity-40">
+                            {Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt) ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt) ? 'Resume' : 'Pause'}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  {isRelevantActiveTimer && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button onClick={() => setShowStopTimerConfirmModal(true)} disabled={stoppingTimer || !!timerActionLoading}
+                            className="h-9 w-9 rounded-full border border-[var(--apple-system-red)]/40 bg-[var(--apple-system-red)]/10 flex items-center justify-center text-[var(--apple-system-red)] hover:bg-[var(--apple-system-red)]/20 apple-transition disabled:opacity-40">
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Stop Timer</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  <button onClick={() => setShowStartTimerModal(true)}
+                    disabled={isActiveTimerLoading || hasActiveTimer || !currentUserId || !currentOrganizationId || !task.project?._id || !task._id}
+                    className="inline-flex items-center gap-1.5 rounded-full text-white text-[13px] font-semibold px-3 h-9 hover:opacity-90 apple-transition disabled:opacity-40"
+                    style={{ background: 'var(--apple-card-gradient)' }}>
+                    <Play className="h-3.5 w-3.5" />
+                    Start Timer
+                  </button>
                 </div>
+              )}
+
+              {/* Edit + Delete — separate row, full-width on mobile */}
+              <div className="flex items-center gap-2">
+                <button onClick={() => editAllowed && router.push(`/tasks/${taskId}/edit`)} disabled={!editAllowed}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full text-white text-[13px] font-semibold px-4 h-9 hover:opacity-90 apple-transition disabled:opacity-40"
+                  style={{ background: 'var(--apple-card-gradient)' }}>
+                  <Edit className="h-3.5 w-3.5" />
+                  Edit Task
+                </button>
+                <button onClick={() => deleteAllowed && setShowDeleteConfirmModal(true)} disabled={!deleteAllowed}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full border border-[var(--apple-system-red)]/40 bg-[var(--apple-system-red)]/10 text-[var(--apple-system-red)] text-[13px] font-medium px-4 h-9 hover:bg-[var(--apple-system-red)]/20 apple-transition disabled:opacity-40">
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">Task Details</p>
           </div>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Description</CardTitle>
-              </CardHeader>
-              <CardContent>
+        {/* ── Main Grid ───────────────────────────────────────────────────────── */}
+        <div className="grid gap-6 lg:grid-cols-3">
+
+          {/* Left column — main content */}
+          <div className="lg:col-span-2 space-y-5">
+
+            {/* Description */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">Description</h2>
+              </div>
+              <div className="px-5 py-4">
                 {task.description ? (() => {
-                  const isHtmlDescription = /<(p|br|div|ul|ol|li|strong|em|u|h[1-6]|img|a)(\s|>|\/)/i.test(task.description)
-
-                  return isHtmlDescription ? (
-                    <div
-                      className="task-description max-w-none"
-                      dangerouslySetInnerHTML={{ __html: task.description }}
-                    />
-                  ) : (
-                    <div className="task-description whitespace-pre-line">{task.description}</div>
-                  )
+                  const isHtml = /<(p|br|div|ul|ol|li|strong|em|u|h[1-6]|img|a)(\s|>|\/)/i.test(task.description)
+                  return isHtml
+                    ? <div className="task-description max-w-none" dangerouslySetInnerHTML={{ __html: task.description }} />
+                    : <div className="task-description text-[15px] text-[var(--apple-label)] whitespace-pre-line leading-relaxed">{task.description}</div>
                 })() : (
-                  <p className="text-muted-foreground">No description provided</p>
+                  <p className="text-[15px] text-[var(--apple-tertiary-label)]">No description provided.</p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
+            {/* Related entities */}
             {hasRelatedEntities && (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {sprintDetails?._id && (
-                  <Card
+                  <div
                     role="button"
                     tabIndex={0}
-                    className="cursor-pointer transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    className="text-left rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)] hover:-translate-y-0.5 apple-transition cursor-pointer"
                     onClick={() => handleRelatedNavigation(`/sprints/${sprintDetails._id}`)}
                     onKeyDown={(event) => handleRelatedKeyDown(event, `/sprints/${sprintDetails._id}`)}
-                    aria-label={sprintDetails.name ? `View sprint ${sprintDetails.name}` : 'View sprint details'}
                   >
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Target className="h-4 w-4" />
-                        <span>Sprint</span>
-                      </CardTitle>
-                      <CardDescription>{sprintDetails.name || 'View sprint details'}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm">
-                      {sprintDetails.status && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Status</span>
-                          <Badge variant="outline">{formatToTitleCase(sprintDetails.status)}</Badge>
-                        </div>
-                      )}
-                      {(sprintDetails.startDate || sprintDetails.endDate) && (
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <span>Schedule</span>
-                          <div className="font-medium text-foreground">
-                            {sprintDetails.startDate ? formatDate(sprintDetails.startDate) : 'TBD'}
-                            {' '}
-                            &ndash;
-                            {' '}
-                            {sprintDetails.endDate ? formatDate(sprintDetails.endDate) : 'TBD'}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-4 w-4 text-[var(--apple-system-blue)]" />
+                      <span className="apple-section-label text-[var(--apple-tertiary-label)]">Sprint</span>
+                    </div>
+                    <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">{sprintDetails.name || '—'}</p>
+                    {sprintDetails.status && <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">{formatToTitleCase(sprintDetails.status)}</p>}
+                    {(sprintDetails.startDate || sprintDetails.endDate) && (
+                      <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-1">
+                        {sprintDetails.startDate ? formatDate(sprintDetails.startDate) : 'TBD'} – {sprintDetails.endDate ? formatDate(sprintDetails.endDate) : 'TBD'}
+                      </p>
+                    )}
+                  </div>
                 )}
-
                 {storyDetails?._id && (
-                  <Card
+                  <div
                     role="button"
                     tabIndex={0}
-                    className="cursor-pointer transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    className="text-left rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)] hover:-translate-y-0.5 apple-transition cursor-pointer"
                     onClick={() => handleRelatedNavigation(`/stories/${storyDetails._id}`)}
                     onKeyDown={(event) => handleRelatedKeyDown(event, `/stories/${storyDetails._id}`)}
-                    aria-label={storyDetails.title ? `View story ${storyDetails.title}` : 'View user story'}
                   >
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Layers className="h-4 w-4" />
-                        <span>User Story</span>
-                      </CardTitle>
-                      <CardDescription>{storyDetails.title || 'View story details'}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Status</span>
-                      {storyDetails.status ? (
-                        <Badge variant="outline">{formatToTitleCase(storyDetails.status)}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </CardContent>
-                  </Card>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Layers className="h-4 w-4 text-[var(--apple-system-purple)]" />
+                      <span className="apple-section-label text-[var(--apple-tertiary-label)]">User Story</span>
+                    </div>
+                    <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">{storyDetails.title || '—'}</p>
+                    {storyDetails.status && <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">{formatToTitleCase(storyDetails.status)}</p>}
+                  </div>
                 )}
-
                 {epicDetails?._id && (
-                  <Card
+                  <div
                     role="button"
                     tabIndex={0}
-                    className="cursor-pointer transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    className="text-left rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)] hover:-translate-y-0.5 apple-transition cursor-pointer"
                     onClick={() => handleRelatedNavigation(`/epics/${epicDetails._id}`)}
                     onKeyDown={(event) => handleRelatedKeyDown(event, `/epics/${epicDetails._id}`)}
-                    aria-label={epicDetails.title ? `View epic ${epicDetails.title}` : 'View epic details'}
                   >
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Star className="h-4 w-4" />
-                        <span>Epic</span>
-                      </CardTitle>
-                      <CardDescription>{epicDetails.title || 'View epic details'}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Status</span>
-                      {epicDetails.status ? (
-                        <Badge variant="outline">{formatToTitleCase(epicDetails.status)}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </CardContent>
-                  </Card>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Star className="h-4 w-4 text-[var(--apple-system-orange)]" />
+                      <span className="apple-section-label text-[var(--apple-tertiary-label)]">Epic</span>
+                    </div>
+                    <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">{epicDetails.title || '—'}</p>
+                    {epicDetails.status && <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">{formatToTitleCase(epicDetails.status)}</p>}
+                  </div>
                 )}
               </div>
             )}
 
-            <Card>
-              <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquarePlus className="h-4 w-4" />
-                  <span>Comments</span>
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddComment}
-                  disabled={commentSubmitting || !commentContent.trim()}
-                >
-                  {commentSubmitting ? 'Posting...' : 'Post Comment'}
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            {/* Subtasks */}
+            {task.subtasks && task.subtasks.length > 0 && (() => {
+              const done = task.subtasks.filter(s => s.isCompleted).length
+              const pct = Math.round((done / task.subtasks.length) * 100)
+              return (
+                <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+                  <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">Subtasks</h2>
+                      <span className="text-[13px] text-[var(--apple-secondary-label)] font-apple-mono">{done}/{task.subtasks.length}</span>
+                    </div>
+                    {task.subtasks.length > 0 && (
+                      <div className="mt-2 h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#34C759 0%,#30D158 100%)', boxShadow: pct > 2 ? '0 0 6px rgba(52,199,89,0.40)' : 'none' }} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="divide-y divide-[var(--apple-separator)]">
+                    {task.subtasks.map((subtask, index) => (
+                      <div key={subtask._id || index} className="px-5 py-3 flex items-start gap-3">
+                        <div className="mt-0.5 flex-shrink-0">
+                          {subtask.isCompleted
+                            ? <CheckCircle className="h-4 w-4 text-[var(--apple-system-green)]" />
+                            : <Circle className="h-4 w-4 text-[var(--apple-tertiary-label)]" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-[14px] font-medium ${subtask.isCompleted ? 'line-through text-[var(--apple-tertiary-label)]' : 'text-[var(--apple-label)]'}`}>
+                              {subtask.title}
+                            </span>
+                            {renderStatusChip(STATUS_BADGE, subtask.status, formatToTitleCase(subtask.status))}
+                          </div>
+                          {subtask.description && <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{subtask.description}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Attachments */}
+            {task.attachments && task.attachments.length > 0 && (
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+                <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                  <div className="flex items-center gap-2">
+                    <Paperclip className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+                    <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">Attachments</h2>
+                    <span className="text-[12px] text-[var(--apple-secondary-label)] font-apple-mono">{task.attachments.length}</span>
+                  </div>
+                </div>
+                <div className="px-5 py-4">
+                  <AttachmentList
+                    attachments={attachmentListItems}
+                    onDownload={(attachment) => {
+                      const viewableTypes = ['application/pdf', 'image/', 'text/']
+                      const isViewable = viewableTypes.some(type => attachment.type.startsWith(type))
+                      if (isViewable) { window.open(attachment.url, '_blank') }
+                      else {
+                        const link = document.createElement('a')
+                        link.href = attachment.url
+                        link.download = attachment.name
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                      }
+                    }}
+                    canDelete={false}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Parent task */}
+            {task.parentTask && (
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none px-5 py-4">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+                  <span className="apple-section-label text-[var(--apple-tertiary-label)]">Parent Task</span>
+                  <span className="text-[14px] text-[var(--apple-label)] font-medium ml-1">{task.parentTask.title}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Comments */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageSquarePlus className="h-4 w-4 text-[var(--apple-secondary-label)]" />
+                    <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">Comments</h2>
+                    {commentTree.length > 0 && (
+                      <span className="text-[12px] text-[var(--apple-secondary-label)] font-apple-mono">{commentTree.length}</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleAddComment}
+                    disabled={commentSubmitting || !commentContent.trim()}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--apple-system-blue)] text-white text-[13px] font-semibold px-3 h-8 hover:opacity-90 apple-transition disabled:opacity-40"
+                  >
+                    {commentSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                    {commentSubmitting ? 'Posting…' : 'Post'}
+                  </button>
+                </div>
+              </div>
+              <div className="px-5 py-4 space-y-4">
                 <div ref={commentComposerRef} className="relative">
                   <Textarea
                     ref={commentEditorRef}
                     value={commentContent}
-                    className={suggestionMode && suggestionComposer === 'comment' ? 'ring-2 ring-blue-500/20 border-blue-500/30' : ''}
+                    className={`text-[14px] rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] ${suggestionMode && suggestionComposer === 'comment' ? 'ring-2 ring-[var(--apple-system-blue)]/20 border-[var(--apple-system-blue)]/40' : ''}`}
                     onChange={(e) => handleComposerInput(e.target.value, 'comment', e.target)}
                     onKeyDown={(e) => handleComposerKeyDown(e, 'comment')}
                     onKeyUp={() => scheduleSuggestionPositionUpdate('comment')}
@@ -1870,448 +1857,231 @@ export default function TaskDetailPage() {
                       scheduleSuggestionPositionUpdate('comment')
                     }}
                     onBlur={() => handleComposerBlur('comment')}
-                    placeholder=""
-                    rows={4}
+                    placeholder="Write a comment… Use @ to mention, # to link tasks"
+                    rows={3}
                   />
-                  <div className="mt-2 text-sm text-muted-foreground space-y-1">
-                    <p>Enter your comment and click the <strong>Post Comment</strong> button to submit your comment.</p>
-                    <div className="flex flex-col gap-1">
-                      <p>
-                        Use <code className="bg-muted px-1 py-0.5 rounded text-xs">@</code> to mention team members,
-                        <code className="bg-muted px-1 py-0.5 rounded text-xs ml-1">#</code> to link project tasks.
-                      </p>
-                      {suggestionMode && suggestionComposer === 'comment' && (
-                        <div className="space-y-1">
-                          <p className="text-xs text-blue-600 dark:text-blue-400">
-                            💡 Use ↑↓ arrows to navigate, Enter to select, Esc to close
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Searching for: <code className="bg-muted px-1 rounded text-xs">
-                              {suggestionMode === 'mention' ? '@' : '#'}{suggestionQuery || '...'}
-                            </code>
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
                   <div className="flex items-center gap-2 mt-2">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <div
-                            role="button"
-                            aria-label="Attachments"
-                            className="h-9 w-9 inline-flex items-center justify-center rounded-md border hover:bg-muted cursor-pointer"
-                            onClick={() => commentFileInputRef.current?.click()}
-                          >
-                            <Paperclip className="h-4 w-4" />
+                          <div role="button" aria-label="Attach file"
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] hover:bg-[var(--apple-tertiary-fill)] cursor-pointer apple-transition"
+                            onClick={() => commentFileInputRef.current?.click()}>
+                            <Paperclip className="h-4 w-4 text-[var(--apple-secondary-label)]" />
                           </div>
                         </TooltipTrigger>
-                        <TooltipContent side="top">Attachments</TooltipContent>
+                        <TooltipContent side="top">Attach file</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    <input
-                      ref={commentFileInputRef}
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => handleFileInputChange(e, false)}
-                    />
-                    {commentAttachments.length > 0 && (
-                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        {commentAttachments.map((att, idx) => (
-                          <span key={`${att.url}-${idx}`} className="inline-flex items-center gap-1 rounded border px-2 py-1">
-                            <a className="text-primary hover:underline" href={att.url} target="_blank" rel="noreferrer">
-                              {att.name}
-                            </a>
-                            {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <input ref={commentFileInputRef} type="file" className="hidden" onChange={(e) => handleFileInputChange(e, false)} />
+                    {commentAttachments.map((att, idx) => (
+                      <span key={`${att.url}-${idx}`} className="inline-flex items-center gap-1 rounded-full border border-[var(--apple-separator)] px-2.5 py-1 text-[12px] text-[var(--apple-secondary-label)]">
+                        <a className="text-[var(--apple-system-blue)] hover:underline" href={att.url} target="_blank" rel="noreferrer">{att.name}</a>
+                        {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
+                      </span>
+                    ))}
                   </div>
+                  {suggestionMode && suggestionComposer === 'comment' && (
+                    <p className="mt-1 text-[12px] text-[var(--apple-system-blue)]">
+                      {suggestionMode === 'mention' ? '@' : '#'}{suggestionQuery || '…'} — ↑↓ navigate · Enter select · Esc close
+                    </p>
+                  )}
                   {renderSuggestionMenu('comment')}
                 </div>
 
-                <div className="border-t pt-4">
-                  <h3 className="text-sm font-semibold mb-2 text-foreground">All Comments</h3>
-                  {renderComments}
-
-                  {/* Comments Pagination Controls */}
-                  {commentTree.length > commentsPageSize && (
-                    <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>Items per page:</span>
-                        <select
-                          value={commentsPageSize}
-                          onChange={(e) => {
-                            setCommentsPageSize(parseInt(e.target.value))
-                            setCommentsCurrentPage(1)
-                          }}
-                          className="px-2 py-1 border rounded text-sm bg-background"
-                        >
-                          <option value="5">5</option>
-                          <option value="10">10</option>
-                          <option value="20">20</option>
-                          <option value="50">50</option>
-                        </select>
-                        <span>
-                          Showing {((commentsCurrentPage - 1) * commentsPageSize) + 1} to {Math.min(commentsCurrentPage * commentsPageSize, commentTree.length)} of {commentTree.length}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => setCommentsCurrentPage(commentsCurrentPage - 1)}
-                          disabled={commentsCurrentPage === 1}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Previous
-                        </Button>
-                        <span className="text-sm text-muted-foreground px-2">
-                          Page {commentsCurrentPage} of {commentsTotalPages || 1}
-                        </span>
-                        <Button
-                          onClick={() => setCommentsCurrentPage(commentsCurrentPage + 1)}
-                          disabled={commentsCurrentPage >= commentsTotalPages}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <ConfirmationModal
-              isOpen={!!deleteConfirmId}
-              onClose={() => setDeleteConfirmId(null)}
-              title="Delete comment"
-              description="Are you sure you want to delete this comment?"
-              confirmText="Delete"
-              onConfirm={async () => {
-                if (!deleteConfirmId) return
-                await handleDeleteComment(deleteConfirmId)
-                setDeleteConfirmId(null)
-              }}
-            />
-
-            {task.parentTask && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Parent Task</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center space-x-2">
-                    <Layers className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{task.parentTask.title}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {/* 
-            {task.story && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>User Story</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center space-x-2">
-                    <Target className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{task.story.title}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )} */}
-
-            {task.subtasks && task.subtasks.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Subtasks</CardTitle>
-                  <CardDescription>{task.subtasks.length} {task.subtasks.length === 1 ? 'subtask' : 'subtasks'}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {task.subtasks.map((subtask, index) => (
-                    <div key={subtask._id || index} className="p-3 border rounded-lg">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3">
-                            <div className="mt-1">
-                              {subtask.isCompleted ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <Circle className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className={`font-medium ${subtask.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
-                                  {subtask.title}
-                                </span>
-                                <Badge className={`${getStatusColor(subtask.status)} text-xs flex items-center gap-1`}>
-                                  {getStatusIcon(subtask.status)}
-                                  <span>{formatToTitleCase(subtask.status)}</span>
-                                </Badge>
-                              </div>
-                              {subtask.description && (
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {subtask.description}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          {subtask.isCompleted && (
-                            <Badge variant="outline" className="text-xs text-green-700 border-green-200 bg-green-50">
-                              Completed
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                          <span>Created {formatDateTime(subtask.createdAt)}</span>
-                          <span>Updated {formatDateTime(subtask.updatedAt)}</span>
+                {/* All comments */}
+                {commentTree.length > 0 && (
+                  <div className="space-y-3 pt-4 border-t border-[var(--apple-separator)]">
+                    {renderComments}
+                    {commentTree.length > commentsPageSize && (
+                      <div className="flex items-center justify-between pt-3 border-t border-[var(--apple-separator)]">
+                        <p className="text-[13px] text-[var(--apple-secondary-label)]">
+                          {((commentsCurrentPage - 1) * commentsPageSize) + 1}–{Math.min(commentsCurrentPage * commentsPageSize, commentTree.length)} of {commentTree.length}
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => setCommentsCurrentPage(commentsCurrentPage - 1)} disabled={commentsCurrentPage === 1}
+                            className="h-8 px-3 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition disabled:opacity-40">
+                            Previous
+                          </button>
+                          <span className="text-[13px] text-[var(--apple-secondary-label)] font-apple-mono px-1">{commentsCurrentPage}/{commentsTotalPages || 1}</span>
+                          <button onClick={() => setCommentsCurrentPage(commentsCurrentPage + 1)} disabled={commentsCurrentPage >= commentsTotalPages}
+                            className="h-8 px-3 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition disabled:opacity-40">
+                            Next
+                          </button>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Attachments Section */}
-            {task.attachments && task.attachments.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Paperclip className="h-4 w-4" />
-                    <span>Attachments</span>
-                  </CardTitle>
-                  <CardDescription>{task.attachments.length} {task.attachments.length === 1 ? 'file' : 'files'}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AttachmentList
-                    attachments={attachmentListItems}
-                    onDownload={(attachment) => {
-                      // Open in new tab if it's a viewable file (PDF, images, etc.)
-                      const viewableTypes = ['application/pdf', 'image/', 'text/'];
-                      const isViewable = viewableTypes.some(type => attachment.type.startsWith(type));
-
-                      if (isViewable) {
-                        window.open(attachment.url, '_blank');
-                      } else {
-                        // Download the file
-                        const link = document.createElement('a');
-                        link.href = attachment.url;
-                        link.download = attachment.name;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      }
-                    }}
-                    canDelete={false}
-                  />
-                </CardContent>
-              </Card>
-            )}
+                    )}
+                  </div>
+                )}
+                {commentTree.length === 0 && (
+                  <div className="pt-4 border-t border-[var(--apple-separator)] text-center py-8">
+                    <MessageSquarePlus className="h-8 w-8 mx-auto mb-2 text-[var(--apple-tertiary-label)]" />
+                    <p className="text-[14px] text-[var(--apple-secondary-label)]">No comments yet. Be the first to comment.</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Status</span>
-                  <Badge className={getStatusColor(task.status)}>
-                    {getStatusIcon(task.status)}
-                    <span className="ml-1">{formatToTitleCase(task.status)}</span>
-                  </Badge>
+          {/* ── Right Sidebar ──────────────────────────────────────────────────── */}
+          <div className="space-y-5">
+
+            {/* Properties */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Properties</h2>
+              </div>
+              <div className="px-5 py-1 divide-y divide-[var(--apple-separator)]">
+                {/* Status */}
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Status</span>
+                  {renderStatusChip(STATUS_BADGE, task.status, formatToTitleCase(task.status))}
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Priority</span>
-                  <Badge className={getPriorityColor(task.priority)}>
-                    {formatToTitleCase(task.priority)}
-                  </Badge>
+                {/* Priority */}
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Priority</span>
+                  {renderStatusChip(PRIORITY_BADGE, task.priority, formatToTitleCase(task.priority))}
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Type</span>
-                  <Badge className={getTypeColor(task.type)}>
-                    {getTypeIcon(task.type)}
-                    <span className="ml-1">{formatToTitleCase(task.type)}</span>
-                  </Badge>
+                {/* Type */}
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Type</span>
+                  {renderStatusChip(TYPE_BADGE, task.type, formatToTitleCase(task.type))}
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Project</span>
-                  {task.project?.name ? (
-                    <span
-                      className="font-medium truncate max-w-[200px]"
-                      title={task.project.name && task.project.name.length > 10 ? task.project.name : undefined}
-                    >
-                      {task.project.name && task.project.name.length > 10 ? `${task.project.name.slice(0, 10)}…` : task.project.name}
-                    </span>
-                  ) : (
-                    <span className="font-medium">—</span>
-                  )}
+                {/* Project */}
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Project</span>
+                  <span className="text-[13px] font-medium text-[var(--apple-label)] truncate max-w-[160px]" title={task.project?.name}>{task.project?.name || '—'}</span>
                 </div>
-                {/*                 
-                {task.sprint?.name && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Sprint</span>
-                    <span
-                      className="font-medium truncate max-w-[200px]"
-                      title={task.sprint.name.length > 20 ? task.sprint.name : undefined}
-                    >
-                      {task.sprint.name.length > 20 ? `${task.sprint.name.slice(0, 20)}…` : task.sprint.name}
-                    </span>
-                  </div>
-                )} */}
-
-                {/* {task.story?.title && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Story</span>
-                    <span
-                      className="font-medium truncate max-w-[200px]"
-                      title={task.story.title.length > 20 ? task.story.title : undefined}
-                    >
-                      {task.story.title.length > 20 ? `${task.story.title.slice(0, 20)}…` : task.story.title}
-                    </span>
-                  </div>
-                )}
-                 */}
-                {/* {task.story?.epic?.title && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Epic</span>
-                    <span
-                      className="font-medium truncate max-w-[200px]"
-                      title={task.story.epic.title.length > 20 ? task.story.epic.title : undefined}
-                    >
-                      {task.story.epic.title.length > 20 ? `${task.story.epic.title.slice(0, 20)}…` : task.story.epic.title}
-                    </span>
-                  </div>
-                )} */}
-
-                {task.assignedTo && task.assignedTo.length > 0 && (
-                  <div className="flex flex-col gap-2">
-                    <span className="text-muted-foreground">Assigned To</span>
-                    <div className="flex flex-wrap gap-2">
-                      {task.assignedTo.map((assignee: any, idx) => {
-                        // Handle both string (user ID) and object formats for backward compatibility
-                        let userId: string;
-                        let displayName: string;
-
-                        if (typeof assignee === 'string') {
-                          // New format: assignee is a string (user ID)
-                          userId = assignee;
-                          const userInfo = mentionsList.find(u => u._id === userId);
-                          displayName = userInfo?.name || 'Unknown User';
-                        } else {
-                          // Legacy format: assignee is an object
-                          userId = assignee?.user?._id || assignee?.user || assignee?._id;
-                          const firstName = assignee?.user?.firstName || assignee?.firstName;
-                          const lastName = assignee?.user?.lastName || assignee?.lastName;
-                          displayName = firstName && lastName ? `${firstName} ${lastName}`.trim() : 'Unknown User';
-                        }
-
-                        return (
-                          <Badge key={userId || `assignee-${idx}`} variant="secondary" className="text-xs">
-                            <User className="h-3 w-3 mr-1" />
-                            {displayName}
-                          </Badge>
-                        );
-                      })}
+                {/* Due Date */}
+                {task.dueDate && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-[13px] text-[var(--apple-secondary-label)]">Due Date</span>
+                    <div className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--apple-label)]">
+                      <Calendar className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" />
+                      {formatDate(task.dueDate)}
                     </div>
                   </div>
                 )}
-
-                {task.dueDate && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Due Date</span>
-                    <span className="font-medium">
-                      {formatDate(task.dueDate)}
-                    </span>
-                  </div>
-                )}
-
+                {/* Story points */}
                 {task.storyPoints && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Story Points</span>
-                    <span className="font-medium">{task.storyPoints}</span>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-[13px] text-[var(--apple-secondary-label)]">Story Points</span>
+                    <span className="text-[13px] font-apple-mono font-medium text-[var(--apple-label)]">{task.storyPoints}</span>
                   </div>
                 )}
-
+                {/* Estimated hours */}
                 {task.estimatedHours && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Estimated Hours</span>
-                    <span className="font-medium">{task.estimatedHours}h</span>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-[13px] text-[var(--apple-secondary-label)]">Estimated</span>
+                    <span className="text-[13px] font-apple-mono font-medium text-[var(--apple-label)]">{task.estimatedHours}h</span>
                   </div>
                 )}
-
+                {/* Actual hours */}
                 {task.actualHours != null && task.actualHours > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Actual Hours</span>
-                    <span className="font-medium">{task.actualHours}h</span>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-[13px] text-[var(--apple-secondary-label)]">Actual</span>
+                    <span className="text-[13px] font-apple-mono font-medium text-[var(--apple-label)]">{task.actualHours}h</span>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {task.labels.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Labels</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {task.labels.map((label, index) => (
-                      <Badge key={index} variant="outline">
-                        <Star className="h-3 w-3 mr-1" />
-                        {label}
-                      </Badge>
-                    ))}
+                {/* Labels row inside Properties */}
+                {task.labels.length > 0 && (
+                  <div className="py-3">
+                    <span className="text-[13px] text-[var(--apple-secondary-label)] block mb-2">Labels</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {task.labels.map((label, index) => (
+                        <span key={index} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[12px] text-[var(--apple-label)] font-medium">
+                          <Star className="h-3 w-3" style={{ color: 'var(--apple-card-gradient)' }} />
+                          {label}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
+                )}
+              </div>
+            </div>
+
+            {/* Assignees */}
+            {task.assignedTo && task.assignedTo.length > 0 && (
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+                <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                  <h2 className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Assigned To</h2>
+                </div>
+                <div className="px-5 py-3 space-y-2.5">
+                  {task.assignedTo.map((assignee: any, idx) => {
+                    let userId: string
+                    let displayName: string
+                    if (typeof assignee === 'string') {
+                      userId = assignee
+                      const userInfo = mentionsList.find(u => u._id === userId)
+                      displayName = userInfo?.name || 'Unknown User'
+                    } else {
+                      userId = assignee?.user?._id || assignee?.user || assignee?._id
+                      const firstName = assignee?.user?.firstName || assignee?.firstName
+                      const lastName = assignee?.user?.lastName || assignee?.lastName
+                      displayName = firstName && lastName ? `${firstName} ${lastName}`.trim() : 'Unknown User'
+                    }
+                    const initials = displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+                    return (
+                      <div key={userId || `assignee-${idx}`} className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white font-semibold text-[13px] select-none"
+                          style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 1px 4px var(--apple-chart-glow)' }}>
+                          {initials}
+                        </div>
+                        <span className="text-[13px] text-[var(--apple-label)] font-medium leading-tight">{displayName}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Created By</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Creator</p>
-                  <div className="flex items-center space-x-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">
-                      {task.createdBy.firstName} {task.createdBy.lastName}
-                    </span>
-                  </div>
+            {/* Metadata */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Metadata</h2>
+              </div>
+              <div className="px-5 py-1 divide-y divide-[var(--apple-separator)]">
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Created by</span>
+                  <span className="text-[13px] font-medium text-[var(--apple-label)]">{task.createdBy.firstName} {task.createdBy.lastName}</span>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Created At</p>
-                  <p className="text-sm">
-                    {formatDate(task.createdAt)}
-                  </p>
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Created</span>
+                  <span className="text-[13px] text-[var(--apple-label)]">{formatDate(task.createdAt)}</span>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Updated</span>
+                  <span className="text-[13px] text-[var(--apple-label)]">{formatDate(task.updatedAt)}</span>
+                </div>
+              </div>
+            </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>History</CardTitle>
-              </CardHeader>
-              <CardContent>
+            {/* Activity log */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Activity</h2>
+              </div>
+              <div className="px-5 py-4">
                 <TaskActivityLog taskId={task._id} />
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Delete comment confirmation */}
+      <ConfirmationModal
+        isOpen={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        title="Delete comment"
+        description="Are you sure you want to delete this comment?"
+        confirmText="Delete"
+        onConfirm={async () => {
+          if (!deleteConfirmId) return
+          await handleDeleteComment(deleteConfirmId)
+          setDeleteConfirmId(null)
+        }}
+      />
 
       <StartTimerModal
         open={showStartTimerModal}
@@ -2337,7 +2107,7 @@ export default function TaskDetailPage() {
         description={
           <>
             Are you sure you want to stop the active timer?
-            <span className="block mt-2 text-foreground font-medium">
+            <span className="block mt-2 text-[var(--apple-label)] font-medium">
               {task.project?.name || 'Unknown project'} • {task.title}
             </span>
           </>
@@ -2348,7 +2118,6 @@ export default function TaskDetailPage() {
         isLoading={stoppingTimer}
       />
 
-      {/* Delete Confirmation Modal */}
       <ConfirmationModal
         isOpen={showDeleteConfirmModal}
         onClose={() => setShowDeleteConfirmModal(false)}

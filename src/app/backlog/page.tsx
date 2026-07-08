@@ -41,8 +41,18 @@ import {
   ArrowUp,
   ArrowDown,
   Star,
-  RotateCcw
+  RotateCcw,
+  Layers,
+  BookOpen,
+  ListTodo,
+  X
 } from 'lucide-react'
+import {
+  StatusBadge, PriorityBadge, TypeBadge,
+  PageHeader, TasksEmptyState,
+  PaginationBar, MetaChip, InlineLoader, FullPageLoader,
+  cardShell, TASK_STATUS_CONFIG
+} from '@/components/tasks/TasksShared'
 import { format } from 'date-fns'
 import { DateRange } from 'react-day-picker'
 import { useNotify } from '@/lib/notify'
@@ -128,6 +138,22 @@ function truncateText(value: string, maxLength = 20): string {
   return `${value.slice(0, maxLength - 1)}…`
 }
 
+// Module-level store: survives client-side navigation, resets on full page reload
+const _backlogFilters = {
+  searchQuery: '',
+  typeFilter: 'all',
+  priorityFilter: 'all',
+  statusFilter: 'all',
+  sortBy: 'created',
+  sortOrder: 'desc' as 'asc' | 'desc',
+  projectFilterValue: 'all',
+  assignedToFilter: 'all',
+  assignedByFilter: 'all',
+  createdByFilter: 'all',
+  dateRangeFilter: undefined as DateRange | undefined,
+  createdDateRange: { from: undefined, to: undefined } as { from: Date | undefined; to: Date | undefined },
+}
+
 export default function BacklogPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
 
@@ -171,8 +197,8 @@ export default function BacklogPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [selectedForDelete, setSelectedForDelete] = useState<{ id: string; type: BacklogItem['type']; title: string } | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(_backlogFilters.searchQuery)
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(_backlogFilters.searchQuery)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Helper function to focus filter search inputs
@@ -201,11 +227,11 @@ export default function BacklogPage() {
   const assignedByFilterInputRef = useRef<HTMLInputElement | null>(null)
   const createdByFilterInputRef = useRef<HTMLInputElement | null>(null)
 
-  const [typeFilter, setTypeFilter] = useState('all')
-  const [priorityFilter, setPriorityFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('created')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [typeFilter, setTypeFilter] = useState(_backlogFilters.typeFilter)
+  const [priorityFilter, setPriorityFilter] = useState(_backlogFilters.priorityFilter)
+  const [statusFilter, setStatusFilter] = useState(_backlogFilters.statusFilter)
+  const [sortBy, setSortBy] = useState(_backlogFilters.sortBy)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(_backlogFilters.sortOrder)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
   const [selectedStoryIds, setSelectedStoryIds] = useState<string[]>([])
@@ -223,6 +249,7 @@ export default function BacklogPage() {
   const [removingSprint, setRemovingSprint] = useState(false)
   const [sprintModalMode, setSprintModalMode] = useState<'assign' | 'manage'>('assign')
   const [currentSprintInfo, setCurrentSprintInfo] = useState<{ _id: string; name: string } | null>(null)
+  const [sprintModalProjectId, setSprintModalProjectId] = useState<string | null>(null)
   const [statusChangeModalOpen, setStatusChangeModalOpen] = useState(false)
   const [statusChangeTaskId, setStatusChangeTaskId] = useState<string | null>(null)
   const [statusChangeValue, setStatusChangeValue] = useState<BacklogItem['status']>('backlog')
@@ -233,16 +260,13 @@ export default function BacklogPage() {
   const [assignedByOptions, setAssignedByOptions] = useState<UserSummary[]>([])
   const [createdByOptions, setCreatedByOptions] = useState<UserSummary[]>([])
   const [epicMap, setEpicMap] = useState<Map<string, { _id: string; title: string }>>(new Map())
-  const [projectFilterValue, setProjectFilterValue] = useState('all')
-  const [assignedToFilter, setAssignedToFilter] = useState('all')
-  const [assignedByFilter, setAssignedByFilter] = useState('all')
-  const [createdByFilter, setCreatedByFilter] = useState('all')
+  const [projectFilterValue, setProjectFilterValue] = useState(_backlogFilters.projectFilterValue)
+  const [assignedToFilter, setAssignedToFilter] = useState(_backlogFilters.assignedToFilter)
+  const [assignedByFilter, setAssignedByFilter] = useState(_backlogFilters.assignedByFilter)
+  const [createdByFilter, setCreatedByFilter] = useState(_backlogFilters.createdByFilter)
   const [createdByFilterQuery, setCreatedByFilterQuery] = useState('')
-  const [createdDateRange, setCreatedDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
-    from: undefined,
-    to: undefined
-  })
-  const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>()
+  const [createdDateRange, setCreatedDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>(_backlogFilters.createdDateRange)
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>(_backlogFilters.dateRangeFilter)
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -300,6 +324,22 @@ export default function BacklogPage() {
     setCreatedByFilterQuery('')
   }
 
+
+  // Sync filter state back to module-level store so it survives navigation
+  useEffect(() => {
+    _backlogFilters.searchQuery = searchQuery
+    _backlogFilters.typeFilter = typeFilter
+    _backlogFilters.priorityFilter = priorityFilter
+    _backlogFilters.statusFilter = statusFilter
+    _backlogFilters.sortBy = sortBy
+    _backlogFilters.sortOrder = sortOrder
+    _backlogFilters.projectFilterValue = projectFilterValue
+    _backlogFilters.assignedToFilter = assignedToFilter
+    _backlogFilters.assignedByFilter = assignedByFilter
+    _backlogFilters.createdByFilter = createdByFilter
+    _backlogFilters.dateRangeFilter = dateRangeFilter
+    _backlogFilters.createdDateRange = createdDateRange
+  }, [searchQuery, typeFilter, priorityFilter, statusFilter, sortBy, sortOrder, projectFilterValue, assignedToFilter, assignedByFilter, createdByFilter, dateRangeFilter, createdDateRange])
 
   // Auth initialization - trigger data loading
   useEffect(() => {
@@ -569,12 +609,27 @@ export default function BacklogPage() {
     })
   }
 
+  // Project shared by whatever is currently selected in Select Mode (null if nothing selected yet)
+  const getSelectedProjectId = useCallback(() => {
+    const selectedItem = backlogItems.find(
+      (item) =>
+        (item.type === 'task' && selectedTaskIds.includes(item._id)) ||
+        (item.type === 'story' && selectedStoryIds.includes(item._id))
+    )
+    return selectedItem?.project?._id ?? null
+  }, [backlogItems, selectedTaskIds, selectedStoryIds])
+
   const setTaskSelected = (taskId: string, shouldSelect: boolean) => {
     // Prevent selecting tasks that are already in a sprint
     if (shouldSelect) {
       const task = backlogItems.find(item => item.type === 'task' && item._id === taskId)
       if (task && task.sprint) {
         return // Don't allow selection if task is already in a sprint
+      }
+      const selectedProjectId = getSelectedProjectId()
+      if (selectedProjectId && task?.project?._id !== selectedProjectId) {
+        notifyError({ title: 'Different Project', message: 'Select items from one project only.' })
+        return
       }
     }
     setSelectedTaskIds((prev) => {
@@ -594,6 +649,11 @@ export default function BacklogPage() {
       const story = backlogItems.find(item => item.type === 'story' && item._id === storyId)
       if (story && story.sprint) {
         return // Don't allow selection if story is already in a sprint
+      }
+      const selectedProjectId = getSelectedProjectId()
+      if (selectedProjectId && story?.project?._id !== selectedProjectId) {
+        notifyError({ title: 'Different Project', message: 'Select items from one project only.' })
+        return
       }
     }
     setSelectedStoryIds((prev) => {
@@ -655,6 +715,7 @@ export default function BacklogPage() {
     setTasksFromStories([])
     setSprintModalMode('assign')
     setCurrentSprintInfo(null)
+    setSprintModalProjectId(null) // To ensure project context is reset when modal is closed
   }
 
   const handleCloseSprintModal = () => {
@@ -800,8 +861,19 @@ export default function BacklogPage() {
       return
     }
 
+    // Extract project ID from the selected items
+    let projectId: string | null = null
+    if (uniqueTaskIds.length > 0) {
+      const task = backlogItems.find((item) => item.type === 'task' && item._id === uniqueTaskIds[0])
+      projectId = task?.project?._id ?? null
+    } else if (uniqueStoryIds.length > 0) {
+      const story = backlogItems.find((item) => item.type === 'story' && item._id === uniqueStoryIds[0])
+      projectId = story?.project?._id ?? null
+    }
+
     setTaskIdsForSprint(uniqueTaskIds)
     setStoryIdsForSprint(uniqueStoryIds)
+    setSprintModalProjectId(projectId)  // Store the project ID
     clearSprintSelection()
     setSprintModalMode(mode)
     setCurrentSprintInfo(options?.existingSprint ?? null)
@@ -819,11 +891,18 @@ export default function BacklogPage() {
     setShowSprintModal(true)
   }
 
-  const fetchAvailableSprints = useCallback(async () => {
+  const fetchAvailableSprints = useCallback(async (projectId?: string | null) => {
     setSprintsLoading(true)
     setSprintsError('')
     try {
-      const response = await fetch('/api/sprints?limit=200')
+      // If we have a project ID from the selected items, 
+      // fetch sprints for that project to narrow down options. 
+      // Otherwise, fetch all sprints.
+      const url = projectId
+        ? `/api/sprints?limit=200&projectId=${projectId}`
+        : '/api/sprints?limit=200'
+
+      const response = await fetch(url)
       const data = await response.json()
 
       if (!response.ok || !data.success) {
@@ -852,9 +931,9 @@ export default function BacklogPage() {
 
   useEffect(() => {
     if (showSprintModal) {
-      fetchAvailableSprints()
+      fetchAvailableSprints(sprintModalProjectId)
     }
-  }, [showSprintModal, fetchAvailableSprints])
+  }, [showSprintModal, sprintModalProjectId, fetchAvailableSprints])
 
   useEffect(() => {
     // Remove tasks and stories that are already in a sprint from selection
@@ -941,19 +1020,27 @@ export default function BacklogPage() {
 
   const filteredSprints = useMemo(() => {
     const query = sprintQuery.trim().toLowerCase()
-
-    // Get projects from selected tasks and stories
-    const selectedItems = backlogItems.filter(item =>
-      (item.type === 'task' && selectedTaskIds.includes(item._id)) ||
-      (item.type === 'story' && selectedStoryIds.includes(item._id))
-    )
-    const selectedProjectIds = selectedItems.map(item => item.project?._id).filter(Boolean)
-
+  
+    // Determine which projects to filter by
+    let projectIdsToFilter: string[] = []
+    
+    // Priority 1: Use the stored project from sprint modal context (for "More Actions" selections)
+    if (sprintModalProjectId) {
+      projectIdsToFilter = [sprintModalProjectId]
+    } else {
+      // Priority 2: Get projects from multi-select mode selections
+      const selectedItems = backlogItems.filter(item =>
+        (item.type === 'task' && selectedTaskIds.includes(item._id)) ||
+        (item.type === 'story' && selectedStoryIds.includes(item._id))
+      )
+      projectIdsToFilter = selectedItems.map(item => item.project?._id).filter((id): id is string => Boolean(id))
+    }
+  
     // Filter sprints by selected items' projects
-    let filtered = selectedProjectIds.length > 0
-      ? sprints.filter(sprint => selectedProjectIds.includes(sprint.project?._id ?? ''))
+    let filtered = projectIdsToFilter.length > 0
+      ? sprints.filter(sprint => projectIdsToFilter.includes(sprint.project?._id ?? ''))
       : sprints
-
+  
     // Apply search filter
     if (query) {
       filtered = filtered.filter((sprint) => {
@@ -962,9 +1049,9 @@ export default function BacklogPage() {
         return nameMatch || projectMatch
       })
     }
-
+  
     return filtered
-  }, [sprints, sprintQuery, selectedTaskIds, selectedStoryIds, backlogItems])
+  }, [sprints, sprintQuery, selectedTaskIds, selectedStoryIds, sprintModalProjectId, backlogItems])
 
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
@@ -1047,6 +1134,24 @@ export default function BacklogPage() {
     const sprint = sprints.find((item) => item._id === selectedSprintId)
     if (!sprint) {
       setSprintsError('Selected sprint is no longer available.')
+      return
+    }
+
+    // Defense in depth: ensure every item being assigned belongs to the sprint's project
+    const involvedProjectIds = new Set<string>()
+    taskIdsForSprint.forEach((taskId) => {
+      const task = backlogItems.find((item) => item.type === 'task' && item._id === taskId)
+      if (task?.project?._id) involvedProjectIds.add(task.project._id)
+    })
+    storyIdsForSprint.forEach((storyId) => {
+      const story = backlogItems.find((item) => item.type === 'story' && item._id === storyId)
+      if (story?.project?._id) involvedProjectIds.add(story.project._id)
+    })
+    tasksFromStories.forEach((task) => {
+      if (task.project?._id) involvedProjectIds.add(task.project._id)
+    })
+    if (involvedProjectIds.size > 1 || (sprint.project?._id && involvedProjectIds.size === 1 && !involvedProjectIds.has(sprint.project._id))) {
+      setSprintsError('Selected items must all belong to the sprint\'s project.')
       return
     }
 
@@ -1460,9 +1565,21 @@ export default function BacklogPage() {
     const newTaskIds: string[] = [...selectedTaskIds]
     const newStoryIds: string[] = [...selectedStoryIds]
 
+    // Lock to a single project: whatever is already selected, or the first
+    // selectable item on the page if nothing is selected yet.
+    let lockedProjectId = getSelectedProjectId()
+    let skippedOtherProject = false
+
     // displayedItems is already the current page only (from API pagination)
     displayedItems.forEach((item) => {
       if ((item.type === 'task' || item.type === 'story') && !item.sprint) {
+        if (!lockedProjectId) {
+          lockedProjectId = item.project?._id ?? null
+        }
+        if (lockedProjectId && item.project?._id !== lockedProjectId) {
+          skippedOtherProject = true
+          return
+        }
         if (item.type === 'task' && !newTaskIds.includes(item._id)) {
           newTaskIds.push(item._id)
         } else if (item.type === 'story' && !newStoryIds.includes(item._id)) {
@@ -1473,6 +1590,10 @@ export default function BacklogPage() {
 
     setSelectedTaskIds(newTaskIds)
     setSelectedStoryIds(newStoryIds)
+
+    if (skippedOtherProject) {
+      notifyError({ title: 'Different Project', message: 'Other-project items were skipped.' })
+    }
   }
 
   const deselectAll = () => {
@@ -1504,81 +1625,169 @@ export default function BacklogPage() {
   if (loading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading backlog...</p>
-          </div>
-        </div>
+        <FullPageLoader label="Loading backlog..." />
       </MainLayout>
     )
   }
 
   return (
     <MainLayout>
-      <div className="space-y-8 sm:space-y-10">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Product Backlog</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">Manage your product backlog and sprint planning</p>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSearchQuery('');
-                setDebouncedSearchQuery('');
-                fetchBacklogItems();
-              }}
-              disabled={loading}
-              className="w-full sm:w-auto"
-              title="Refresh backlog items"
-            >
-              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
-              Refresh
-            </Button>
-            <PermissionGate permission={Permission.EPIC_CREATE}>
-              <Button variant="outline" onClick={() => router.push('/epics/create-epic')} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                New Epic
-              </Button>
-            </PermissionGate>
-            <PermissionGate permission={Permission.STORY_CREATE}>
-              <Button variant="outline" onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                New Story
-              </Button>
-            </PermissionGate>
-            {canCreateTask && (
-              <Button onClick={() => router.push('/tasks/create-new-task')} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                New Task
-              </Button>
-            )}
-          </div>
+      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
+
+        {/* Page Header */}
+        <PageHeader
+          title="Product Backlog"
+          subtitle="Manage your product backlog and sprint planning"
+          icon={List}
+          actions={
+            <div className="flex flex-wrap items-center gap-2 w-full sm:contents">
+              <PermissionGate permission={Permission.EPIC_CREATE}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/epics/create-epic')}
+                  className="rounded-full h-9 border-[var(--apple-separator)] text-[13px] flex-1 sm:flex-none"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+                  New Epic
+                </Button>
+              </PermissionGate>
+              <PermissionGate permission={Permission.STORY_CREATE}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/stories/create-story')}
+                  className="rounded-full h-9 border-[var(--apple-separator)] text-[13px] flex-1 sm:flex-none"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+                  New Story
+                </Button>
+              </PermissionGate>
+              {canCreateTask && (
+                <Button
+                  size="sm"
+                  onClick={() => router.push('/tasks/create-new-task')}
+                  className="rounded-full h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px] w-full sm:w-auto"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+                  New Task
+                </Button>
+              )}
+            </div>
+          }
+        />
+
+
+        {/* ── Filter Toolbar ───────────────────────────────────────────────── */}
+        <div className="rounded-[var(--apple-radius-lg)] bg-[var(--apple-quaternary-fill)] border border-[var(--apple-separator)] p-3 sm:p-4 space-y-2 sm:space-y-3">
+
+        {/* Row 1: Search (50%) + Status (25%) + Priority (25%) — Desktop */}
+        <div className="hidden sm:flex items-center gap-2">
+            <div className="relative w-1/2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                <input
+                    ref={searchInputRef}
+                    placeholder="Search backlog..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                />
+                {searchQuery && (
+                    <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
+                        aria-label="Clear search"
+                    >
+                        <X className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                )}
+            </div>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-1/4 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                    <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    {availableStatusOptions.map((status: string) => (
+                      <SelectItem key={status} value={status}>
+                        {formatToTitleCase(status.replace('_', ' '))}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="w-1/4 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                    <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+            </Select>
         </div>
 
+        {/* Row 1: Mobile layout (stack) */}
+        <div className="flex sm:hidden flex-col gap-2">
+            <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+                <input
+                    placeholder="Search backlog..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                />
+                {searchQuery && (
+                    <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
+                        aria-label="Clear search"
+                    >
+                        <X className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                )}
+            </div>
+            <div className="flex gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-1/2 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                        <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        {availableStatusOptions.map((status: string) => (
+                          <SelectItem key={status} value={status}>
+                            {formatToTitleCase(status.replace('_', ' '))}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <SelectTrigger className="w-1/2 h-10 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                        <SelectValue placeholder="Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Priority</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        </div>
 
-        {/* Search and Filters */}
-        <div className="space-y-3">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              ref={searchInputRef}
-              placeholder="Search backlog..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 w-full"
-            />
-          </div>
-          {/* Filter options - compact grid layout */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+        {/* Row 2: Secondary Filters (Grid 20% each on Desktop, 2 cols on mobile) */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {/* 1. Projects */}
             <Select value={projectFilterValue} onValueChange={setProjectFilterValue} onOpenChange={(open) => {
               if (open) focusSearchInput(projectFilterInputRef.current)
             }}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Project" />
+              <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
+                <SelectValue placeholder="All Projects" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
                 <div className="p-2">
@@ -1592,12 +1801,12 @@ export default function BacklogPage() {
                     onKeyDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                     placeholder="Search projects"
-                    className="mb-2"
+                    className="mb-2 h-8 text-[13px]"
                   />
                   <div className="max-h-56 overflow-y-auto">
                     <SelectItem value="all">All Projects</SelectItem>
                     {filteredProjectOptions.length === 0 ? (
-                      <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No matching projects</div>
                     ) : (
                       filteredProjectOptions.map((project) => (
                         <SelectItem key={project._id} value={project._id}>
@@ -1609,46 +1818,26 @@ export default function BacklogPage() {
                 </div>
               </SelectContent>
             </Select>
+
+            {/* 2. Types */}
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="epic">Epics</SelectItem>
-                <SelectItem value="story">Stories</SelectItem>
-                <SelectItem value="task">Tasks</SelectItem>
-              </SelectContent>
+                <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="epic">Epics</SelectItem>
+                  <SelectItem value="story">Stories</SelectItem>
+                  <SelectItem value="task">Tasks</SelectItem>
+                </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                {availableStatusOptions.map((status: string) => (
-                  <SelectItem key={status} value={status}>
-                    {formatToTitleCase(status.replace('_', ' '))}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery(''); }} onOpenChange={(open) => {
+
+            {/* 3. Assignees */}
+            <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery('') }} onOpenChange={(open) => {
               if (open) focusSearchInput(assignedToFilterInputRef.current)
             }}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Assignee" />
+              <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
+                <SelectValue placeholder="All Assignees" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
                 <div className="p-2">
@@ -1662,12 +1851,12 @@ export default function BacklogPage() {
                     onKeyDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                     placeholder="Search assignees"
-                    className="mb-2"
+                    className="mb-2 h-8 text-[13px]"
                   />
                   <div className="max-h-56 overflow-y-auto">
                     <SelectItem value="all">All Assignees</SelectItem>
                     {filteredAssignedToOptions.length === 0 ? (
-                      <div className="px-2 py-1 text-xs text-muted-foreground">No matching members</div>
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No matching members</div>
                     ) : (
                       filteredAssignedToOptions.map((member) => (
                         <SelectItem key={member._id} value={member._id}>
@@ -1679,11 +1868,13 @@ export default function BacklogPage() {
                 </div>
               </SelectContent>
             </Select>
+
+            {/* 4. Creators */}
             <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
               if (open) focusSearchInput(createdByFilterInputRef.current)
             }}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Creator" />
+              <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
+                <SelectValue placeholder="All Creators" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
                 <div className="p-2">
@@ -1697,12 +1888,12 @@ export default function BacklogPage() {
                     onKeyDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                     placeholder="Search creators"
-                    className="mb-2"
+                    className="mb-2 h-8 text-[13px]"
                   />
                   <div className="max-h-56 overflow-y-auto">
                     <SelectItem value="all">All Creators</SelectItem>
                     {filteredCreatedByOptions.length === 0 ? (
-                      <div className="px-2 py-1 text-xs text-muted-foreground">No matching members</div>
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No matching members</div>
                     ) : (
                       filteredCreatedByOptions.map((member) => (
                         <SelectItem key={member._id} value={member._id}>
@@ -1714,8 +1905,62 @@ export default function BacklogPage() {
                 </div>
               </SelectContent>
             </Select>
+
+            {/* 5. Date Range (Combined in a flex container to fit within 1 grid column) */}
+            <div className="flex items-center gap-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-9 flex-1 px-2 rounded-full border-[var(--apple-separator)] bg-background text-[13px] justify-start",
+                        !createdDateRange.from && "text-[var(--apple-tertiary-label)]"
+                      )}
+                    >
+                      <Calendar className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
+                      <span className="truncate">{createdDateRange.from ? format(createdDateRange.from, "MMM d") : "From"}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 z-[10050]" align="end">
+                    <DateRangeCalendar
+                      mode="single"
+                      selected={createdDateRange.from}
+                      onSelect={(date) => handleCreatedDateChange('from', date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-9 flex-1 px-2 rounded-full border-[var(--apple-separator)] bg-background text-[13px] justify-start",
+                        !createdDateRange.to && "text-[var(--apple-tertiary-label)]"
+                      )}
+                    >
+                      <span className="truncate">{createdDateRange.to ? format(createdDateRange.to, "MMM d") : "To"}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 z-[10050]" align="end">
+                    <DateRangeCalendar
+                      mode="single"
+                      selected={createdDateRange.to}
+                      onSelect={(date) => handleCreatedDateChange('to', date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+            </div>
+        </div>
+
+        {/* Row 2.5: Additional Sorting options that didn't fit in 5 cols (Optional, keeping it flex wrap) */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="text-[12px] text-[var(--apple-secondary-label)]">Sort by:</span>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="h-8 w-32 rounded-full border-[var(--apple-separator)] bg-transparent text-[12px]">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
@@ -1732,149 +1977,131 @@ export default function BacklogPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="w-full"
-                    aria-label={sortOrder === 'asc' ? 'Click to sort descending' : 'Click to sort ascending'}
+                    className="h-8 w-8 p-0 rounded-full border-[var(--apple-separator)] bg-transparent"
+                    aria-label={sortOrder === 'asc' ? 'Sort descending' : 'Sort ascending'}
                   >
-                    {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                    {sortOrder === 'asc' ? <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.5} /> : <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.5} />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{sortOrder === 'asc' ? 'Click to sort descending' : 'Click to sort ascending'}</p>
+                  <p>{sortOrder === 'asc' ? 'Sort descending' : 'Sort ascending'}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          </div>
-          {/* Date range filters */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center">Created Date Range:</Label>
-            <div className="flex gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal text-sm",
-                      !createdDateRange.from && "text-muted-foreground"
-                    )}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {createdDateRange.from ? format(createdDateRange.from, "PPP") : "From"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <DateRangeCalendar
-                    mode="single"
-                    selected={createdDateRange.from}
-                    onSelect={(date) => handleCreatedDateChange('from', date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal text-sm",
-                      !createdDateRange.to && "text-muted-foreground"
-                    )}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {createdDateRange.to ? format(createdDateRange.to, "PPP") : "To"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <DateRangeCalendar
-                    mode="single"
-                    selected={createdDateRange.to}
-                    onSelect={(date) => handleCreatedDateChange('to', date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-          {/* Item count and reset filters */}
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {totalCount} item{totalCount !== 1 ? 's' : ''} found
-            </p>
-            {hasActiveFilters && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={resetFilters}
-                      className="text-xs"
-                      aria-label="Reset all filters"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      Reset Filters
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Reset filters</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+        {/* Row 3: Active Filters & Clear */}
+        {hasActiveFilters && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[var(--apple-separator)]">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[12px] font-medium text-[var(--apple-secondary-label)] uppercase tracking-wider mr-1">
+                        Active Filters:
+                    </span>
+                    {searchQuery && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Search: {searchQuery}
+                            <button onClick={() => setSearchQuery('')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                    {typeFilter !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Type: {formatToTitleCase(typeFilter)}
+                            <button onClick={() => setTypeFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                    {statusFilter !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Status: {formatToTitleCase(statusFilter.replace('_', ' '))}
+                            <button onClick={() => setStatusFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                    {priorityFilter !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Priority: {formatToTitleCase(priorityFilter)}
+                            <button onClick={() => setPriorityFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                    {projectFilterValue !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Project: {projectOptions.find(p => p._id === projectFilterValue)?.name || 'Selected'}
+                            <button onClick={() => setProjectFilterValue('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                    {assignedToFilter !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Assignee: {assignedToOptions.find(p => p._id === assignedToFilter)?.firstName || 'Selected'}
+                            <button onClick={() => setAssignedToFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                    {createdByFilter !== 'all' && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Creator: {createdByOptions.find(p => p._id === createdByFilter)?.firstName || 'Selected'}
+                            <button onClick={() => setCreatedByFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                    {(createdDateRange.from || createdDateRange.to) && (
+                        <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            Date: {createdDateRange.from ? format(createdDateRange.from, "MMM d") : ""} - {createdDateRange.to ? format(createdDateRange.to, "MMM d") : ""}
+                            <button onClick={() => setCreatedDateRange({from: undefined, to: undefined})} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
+                        </Badge>
+                    )}
+                </div>
+                <Button
+                    variant="ghost"
+                    onClick={resetFilters}
+                    className="h-8 px-3 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] rounded-full"
+                >
+                    Clear All
+                </Button>
+            </div>
+        )}
+
+        </div>
+
+        {/* Select / Bulk Actions Row */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant={selectMode ? 'secondary' : 'outline'}
               size="sm"
               onClick={handleSelectModeToggle}
-              className="w-full sm:w-auto"
               disabled={!canManageSprints}
               title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
+              className="rounded-full h-9 text-[13px] border-[var(--apple-separator)]"
             >
-              <List className="h-4 w-4 mr-2" />
-              {selectMode ? 'Cancel Selection' : 'Add to Sprint'}
+              <List className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+              {selectMode ? 'Cancel Selection' : 'Select Mode'}
             </Button>
             {selectMode && (
               <>
                 <Button
-                  size="sm"
-                  onClick={() => handleOpenSprintModal(selectedTaskIds, selectedStoryIds)}
-                  disabled={(selectedTaskCount === 0 && selectedStoryCount === 0) || assigningSprint}
-                  className="w-full sm:w-auto"
-                >
-                  {assigningSprint ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Kanban className="h-4 w-4 mr-2" />
-                  )}
-                  {assigningSprint ? 'Processing...' : 'Add Selected to Sprint'}
-                </Button>
-                <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={allSelectableItemsSelected ? deselectAll : selectAll}
-                  className="w-full sm:w-auto"
+                  className="rounded-full h-9 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
                 >
                   {allSelectableItemsSelected ? 'Deselect All' : 'Select All'}
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearSelection}
-                  disabled={selectedTaskCount === 0}
-                  className="w-full sm:w-auto"
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
+                {(selectedTaskCount > 0 || selectedStoryCount > 0) && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleOpenSprintModal(selectedTaskIds, selectedStoryIds)}
+                    disabled={(selectedTaskCount === 0 && selectedStoryCount === 0) || assigningSprint}
+                    className="rounded-full h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px]"
+                  >
+                    {assigningSprint ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Kanban className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+                    )}
+                    {assigningSprint ? 'Processing…' : 'Add to Sprint'}
+                  </Button>
+                )}
               </>
             )}
           </div>
           {selectMode && (
-            <div className="text-sm text-muted-foreground w-full sm:w-auto text-left sm:text-right">
+            <div className="text-[13px] text-[var(--apple-secondary-label)] sm:ml-auto">
               {(() => {
                 const parts: string[] = []
                 if (selectedStoryCount > 0) {
@@ -1889,37 +2116,78 @@ export default function BacklogPage() {
           )}
         </div>
         {selectMode && (
-          <p className="text-xs text-muted-foreground">
-            Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included.
-            <span className="block mt-1 text-amber-600 dark:text-amber-400">
-              Note: Items already in a sprint cannot be selected.
-            </span>
+          <p className="text-[12px] text-[var(--apple-secondary-label)] -mt-2">
+            Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included.{' '}
+            <span className="text-[var(--apple-system-orange)]">Items already in a sprint cannot be selected.</span>
           </p>
         )}
 
         {/* Backlog Items */}
-        <div className="space-y-4">
-          {displayedItems.map((item) => {
+        <div className="space-y-2">
+          {searching && displayedItems.length === 0 ? (
+            <InlineLoader label="Updating..." />
+          ) : displayedItems.length === 0 ? (
+            <TasksEmptyState
+              icon={<ListTodo className="h-8 w-8" />}
+              title="Backlog is empty"
+              description={hasActiveFilters ? "No items match your current filters. Try adjusting or resetting them." : "Your backlog is clean. Create a new epic, story, or task to get started."}
+              action={
+                hasActiveFilters ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetFilters}
+                    className="rounded-full border-[var(--apple-separator)] text-[13px]"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+                    Reset Filters
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+          displayedItems.map((item) => {
 
             const isTask = item.type === 'task'
             const isStory = item.type === 'story'
+            const isEpic = item.type === 'epic'
             const isTaskSelected = isTask && selectedTaskIds.includes(item._id)
             const isStorySelected = isStory && selectedStoryIds.includes(item._id)
             const isSelected = isTaskSelected || isStorySelected
             const isInSprint = !!(item.sprint && item.sprint._id)
             const showCheckbox = selectMode && (isTask || isStory)
-            const canSelect = !isInSprint // Can only select if not already in a sprint
+            const canSelect = !isInSprint
+
+            // Type icon
+            const typeIconNode = isEpic
+              ? <Layers className="h-5 w-5 flex-shrink-0 mt-0.5 text-violet-500 dark:text-violet-400" strokeWidth={1.5} />
+              : isStory
+                ? <BookOpen className="h-5 w-5 flex-shrink-0 mt-0.5 text-[var(--apple-system-blue)]" strokeWidth={1.5} />
+                : <ListTodo className="h-5 w-5 flex-shrink-0 mt-0.5 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+
+            // Epic label for stories
+            const epicLabel = (() => {
+              if (!item.epic) return null
+              if (typeof item.epic === 'string') {
+                const epicData = epicMap.get(item.epic)
+                return epicData ? epicData.title : null
+              }
+              const epicObj = item.epic as { _id: string; name?: string; title?: string }
+              return epicObj.title || epicObj.name || null
+            })()
 
             return (
-              <Card
+              <div
                 key={item._id}
                 className={cn(
-                  'hover:shadow-md transition-shadow cursor-pointer',
-                  showCheckbox && isSelected && 'border-primary/60 bg-primary/5',
-                  showCheckbox && !canSelect && 'opacity-60'
+                  'card-fade-in group flex items-start gap-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card mb-2',
+                  'apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:-translate-y-px',
+                  selectMode ? 'cursor-default' : 'cursor-pointer',
+                  showCheckbox && isSelected && 'border-[var(--apple-system-blue)]/60 bg-[var(--apple-system-blue)]/5',
+                  showCheckbox && !canSelect && 'opacity-60',
+                  item.sprint && !isSelected && 'opacity-80'
                 )}
                 onClick={(e) => {
-                  // Don't navigate if clicking on checkbox, dropdown, or buttons
                   const target = e.target as HTMLElement
                   if (
                     target.closest('button') ||
@@ -1929,352 +2197,250 @@ export default function BacklogPage() {
                   ) {
                     return
                   }
-                  // Navigate based on item type
                   if (isTask) {
                     router.push(`/tasks/${item._id}`)
                   } else if (isStory) {
                     router.push(`/stories/${item._id}`)
-                  } else if (item.type === 'epic') {
+                  } else if (isEpic) {
                     router.push(`/epics/${item._id}`)
                   }
                 }}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    {showCheckbox && (
-                      <Checkbox
-                        checked={isSelected}
-                        disabled={!canSelect}
-                        onCheckedChange={(checked) => {
-                          if (!canSelect) return // Prevent selection if already in sprint
-                          if (isTask) {
-                            setTaskSelected(item._id, Boolean(checked))
-                          } else if (isStory) {
-                            setStorySelected(item._id, Boolean(checked))
-                          }
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label={canSelect ? `Select ${item.title}` : `${item.title} is already in a sprint and cannot be selected`}
-                        className="mt-1"
-                        title={!canSelect ? `This ${item.type} is already in a sprint and cannot be selected` : undefined}
-                      />
+                {/* Checkbox */}
+                {showCheckbox && (
+                  <Checkbox
+                    checked={isSelected}
+                    disabled={!canSelect}
+                    onCheckedChange={(checked) => {
+                      if (!canSelect) return
+                      if (isTask) {
+                        setTaskSelected(item._id, Boolean(checked))
+                      } else if (isStory) {
+                        setStorySelected(item._id, Boolean(checked))
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={canSelect ? `Select ${item.title}` : `${item.title} is already in a sprint`}
+                    className="mt-1 flex-shrink-0"
+                    title={!canSelect ? `This ${item.type} is already in a sprint and cannot be selected` : undefined}
+                  />
+                )}
+
+                {/* Type icon */}
+                {typeIconNode}
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  {/* Row 1: Title + displayId + sprint badge */}
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="text-[15px] font-semibold text-[var(--apple-label)] truncate leading-snug">
+                      {item.title}
+                    </span>
+                    {item.displayId && (
+                      <span
+                        className="text-[11px] font-apple-mono text-[var(--apple-tertiary-label)] bg-[var(--apple-quaternary-fill)] rounded px-1.5 py-0.5 flex-shrink-0"
+                        title={`ID: ${item.displayId}`}
+                      >
+                        #{item.displayId}
+                      </span>
                     )}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
-                      <div className="flex-1 min-w-0 w-full">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-medium text-foreground text-sm sm:text-base truncate">
-                            {item.title}
-                          </h3>
-                          <Badge className={cn(getStatusColor(item.status), "flex-shrink-0 font-semibold")}>
-                            {formatToTitleCase(item.status.replace('_', ' '))}
-                          </Badge>
-                          {/* Display displayId for tasks only */}
-                          {item.type === 'task' && item.displayId && (
-                            <Badge className="bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200 ml-1 font-mono text-xs" title={`Task ID: ${item.displayId}`}>
-                              #{item.displayId}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <Badge className={getTypeColor(item.type)}>
-                            {formatToTitleCase(item.type)}
-                          </Badge>
-                          <Badge className={getPriorityColor(item.priority)}>
-                            {formatToTitleCase(item.priority)}
-                          </Badge>
-                          {item?.epic && (
-                            <Badge
-                              variant="outline"
-                              className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900"
-                            >
-                              {(() => {
-                                if (typeof item.epic === 'string') {
-                                  const epicData = epicMap.get(item.epic)
-                                  return epicData ? formatToTitleCase(epicData.title) : formatToTitleCase('Epic')
-                                }
-                                const epicObj = item.epic as { _id: string; name?: string; title?: string }
-                                return formatToTitleCase(epicObj.title || epicObj.name || 'Epic')
-                              })()}
-                            </Badge>
-                          )}
-                          {item.sprint && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge
-                                    variant="outline"
-                                    className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900 cursor-default"
-                                  >
-                                    {truncateText(formatToTitleCase(item.sprint.name), 18)}
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{formatToTitleCase(item.sprint.name)}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
-                        {/* <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
-                                    {item.description }
-                                  </p>
-                                </TooltipTrigger>
-                                {(item.description && item.description.length > 0) && (
-                                  <TooltipContent>
-                                    <p className="max-w-xs break-words">{item.description}</p>
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                            </TooltipProvider> */}
-                        <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-                          {item.assignedTo && item.assignedTo.length > 0
-                            ? item.assignedTo.map((assignment: any) => {
-                              // Try to get user data from populated user field first, then from denormalized fields
-                              const firstName = assignment?.user?.firstName || assignment?.firstName;
-                              const lastName = assignment?.user?.lastName || assignment?.lastName;
-                              if (firstName && lastName) {
-                                return `${firstName} ${lastName}`;
-                              }
-                              return 'Unknown User';
-                            }).join(', ')
-                            : 'Not assigned'}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                          <div className="flex items-center space-x-1">
-                            <Target className="h-3 w-3 sm:h-4 sm:w-4" />
-                            {item.project?.name ? (
-                              <span
-                                className="truncate"
-                                title={
-                                  item.project.name && item.project.name.length > 10
-                                    ? item.project.name
-                                    : undefined
-                                }
-                              >
-                                {item.project.name && item.project.name.length > 10
-                                  ? `${item.project.name.slice(0, 10)}…`
-                                  : item.project.name}
-                              </span>
-                            ) : (
-                              <span className="truncate italic text-muted-foreground">
-                                Project deleted or unavailable
-                              </span>
-                            )}
-                          </div>
-                          {item.dueDate && (
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>Due {formatDate(item.dueDate)}</span>
-                            </div>
-                          )}
-                          {item.storyPoints && (
-                            <div className="flex items-center space-x-1">
-                              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>{item.storyPoints} points</span>
-                            </div>
-                          )}
-                          {item.estimatedHours && (
-                            <div className="flex items-center space-x-1">
-                              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>{item.estimatedHours}h estimated</span>
-                            </div>
-                          )}
-                          {item.labels.length > 0 && (
-                            <div className="flex items-center space-x-1">
-                              <Star className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span className="truncate">
-                                {truncateText(item.labels.join(', '), 30)}
-                              </span>
-                            </div>
-                          )}
-                          {item.createdBy && (
-                            <div className="flex items-center space-x-1">
-                              <span className="text-muted-foreground">Created by:</span>
-                              <span className="font-medium">
-                                {(() => {
-                                  const firstName = item.createdBy?.firstName;
-                                  const lastName = item.createdBy?.lastName;
-                                  if (firstName && lastName) {
-                                    return `${firstName} ${lastName}`;
-                                  }
-                                  return 'Unknown User';
-                                })()}
-                              </span>
-                            </div>
-                          )}
-                          {item.createdAt && (
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>Created {formatDate(item.createdAt)}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2 flex-shrink-0">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="flex-shrink-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]"
-                          >
-                            {/* View */}
-                            {item.type === 'task' && (
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/tasks/${item._id}`)}
-                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                <span>View Task</span>
-                              </DropdownMenuItem>
-                            )}
-                            {item.type === 'story' && (
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/stories/${item._id}`)}
-                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                <span>View Story</span>
-                              </DropdownMenuItem>
-                            )}
-                            {item.type === 'epic' && (
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/epics/${item._id}`)}
-                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                <span>View Epic</span>
-                              </DropdownMenuItem>
-                            )}
-
-                            {/* Edit */}
-                            {item.type === 'task' && canEditTask(item) && (
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/tasks/${item._id}/edit`)}
-                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                <span>Edit Task</span>
-                              </DropdownMenuItem>
-                            )}
-                            {item.type === 'story' && canEditStory(item) && (
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/stories/${item._id}/edit`)}
-                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                <span>Edit Story</span>
-                              </DropdownMenuItem>
-                            )}
-                            {item.type === 'epic' && canEditEpic(item) && (
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/epics/${item._id}/edit`)}
-                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                <span>Edit Epic</span>
-                              </DropdownMenuItem>
-                            )}
-
-                            {(item.type === 'task' || item.type === 'story') && !item.sprint && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  if (item.type === 'task') {
-                                    handleOpenSprintModal([item._id], [], { mode: 'assign' })
-                                  } else if (item.type === 'story') {
-                                    handleOpenSprintModal([], [item._id], { mode: 'assign' })
-                                  }
-                                }}
-                                disabled={!canManageSprints}
-                                className={cn(
-                                  'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
-                                  !canManageSprints && 'opacity-50 cursor-not-allowed'
-                                )}
-                                title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
-                              >
-                                <Kanban className="h-4 w-4 mr-2" />
-                                <span>Add to Sprint</span>
-                              </DropdownMenuItem>
-                            )}
-                            {(item.type === 'task' || item.type === 'story') && item.sprint && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  if (item.type === 'task') {
-                                    handleOpenSprintModal([item._id], [], {
-                                      mode: 'manage',
-                                      existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
-                                    })
-                                  } else if (item.type === 'story') {
-                                    handleOpenSprintModal([], [item._id], {
-                                      mode: 'manage',
-                                      existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
-                                    })
-                                  }
-                                }}
-                                disabled={!canManageSprints}
-                                className={cn(
-                                  'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
-                                  !canManageSprints && 'opacity-50 cursor-not-allowed'
-                                )}
-                                title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
-                              >
-                                <Kanban className="h-4 w-4 mr-2" />
-                                <span>Manage Sprint</span>
-                              </DropdownMenuItem>
-                            )}
-
-                            {item.type === 'task' && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  if (!item.sprint) return
-                                  openStatusChangeModal(item)
-                                }}
-                                disabled={!item.sprint}
-                                className={cn(
-                                  'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
-                                  !item.sprint && 'opacity-50 cursor-not-allowed'
-                                )}
-                                title={!item.sprint ? 'Assign the task to a sprint to change its status' : undefined}
-                              >
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                <span>Change Status</span>
-                              </DropdownMenuItem>
-                            )}
-
-                            {/* Delete - only for Admin */}
-                            {false && ((item.type === 'task' && canDeleteTask(item)) ||
-                              (item.type === 'story' && canDeleteStory(item)) ||
-                              (item.type === 'epic' && canDeleteEpic(item))) && (
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteClick(item)}
-                                  className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  <span>
-                                    Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                                  </span>
-                                </DropdownMenuItem>
-                              )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
+                    {item.sprint && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex-shrink-0">
+                        In Sprint: {truncateText(item.sprint.name, 22)}
+                      </span>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
+
+                  {/* Row 2: Type + Status + Priority badges */}
+                  <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                    <TypeBadge type={item.type} size="sm" />
+                    <StatusBadge status={item.status} size="sm" />
+                    <PriorityBadge priority={item.priority} size="sm" />
+                  </div>
+
+                  {/* Row 3: MetaChips */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {item.project?.name ? (
+                      <MetaChip icon={<Target className="h-3 w-3" strokeWidth={1.5} />} label={item.project.name} title={item.project.name} />
+                    ) : (
+                      <MetaChip icon={<Target className="h-3 w-3" strokeWidth={1.5} />} label="No project" className="italic" />
+                    )}
+                    {epicLabel && isStory && (
+                      <MetaChip icon={<Layers className="h-3 w-3" strokeWidth={1.5} />} label={epicLabel} title={epicLabel} />
+                    )}
+                    {item.dueDate && (
+                      <MetaChip icon={<Calendar className="h-3 w-3" strokeWidth={1.5} />} label={`Due ${formatDate(item.dueDate)}`} />
+                    )}
+                    {item.storyPoints ? (
+                      <MetaChip icon={<BarChart3 className="h-3 w-3" strokeWidth={1.5} />} label={`${item.storyPoints} pts`} />
+                    ) : null}
+                    {item.estimatedHours ? (
+                      <MetaChip icon={<Clock className="h-3 w-3" strokeWidth={1.5} />} label={`${item.estimatedHours}h`} />
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Right: Actions dropdown */}
+                <div className="flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 apple-transition">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-[var(--apple-radius-sm)] hover:bg-[var(--apple-quaternary-fill)]"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="min-w-[172px] py-2 rounded-[var(--apple-radius-md)] shadow-lg border border-[var(--apple-separator)] bg-background z-[10000]"
+                    >
+                      {/* View */}
+                      {item.type === 'task' && (
+                        <DropdownMenuItem
+                          onClick={() => router.push(`/tasks/${item._id}`)}
+                          className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                        >
+                          <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                          <span>View Task</span>
+                        </DropdownMenuItem>
+                      )}
+                      {item.type === 'story' && (
+                        <DropdownMenuItem
+                          onClick={() => router.push(`/stories/${item._id}`)}
+                          className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                        >
+                          <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                          <span>View Story</span>
+                        </DropdownMenuItem>
+                      )}
+                      {item.type === 'epic' && (
+                        <DropdownMenuItem
+                          onClick={() => router.push(`/epics/${item._id}`)}
+                          className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                        >
+                          <Eye className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                          <span>View Epic</span>
+                        </DropdownMenuItem>
+                      )}
+
+                      {/* Edit */}
+                      {item.type === 'task' && canEditTask(item) && (
+                        <DropdownMenuItem
+                          onClick={() => router.push(`/tasks/${item._id}/edit`)}
+                          className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                        >
+                          <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                          <span>Edit Task</span>
+                        </DropdownMenuItem>
+                      )}
+                      {item.type === 'story' && canEditStory(item) && (
+                        <DropdownMenuItem
+                          onClick={() => router.push(`/stories/${item._id}/edit`)}
+                          className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                        >
+                          <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                          <span>Edit Story</span>
+                        </DropdownMenuItem>
+                      )}
+                      {item.type === 'epic' && canEditEpic(item) && (
+                        <DropdownMenuItem
+                          onClick={() => router.push(`/epics/${item._id}/edit`)}
+                          className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                        >
+                          <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                          <span>Edit Epic</span>
+                        </DropdownMenuItem>
+                      )}
+
+                      {(item.type === 'task' || item.type === 'story') && !item.sprint && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (item.type === 'task') {
+                              handleOpenSprintModal([item._id], [], { mode: 'assign' })
+                            } else if (item.type === 'story') {
+                              handleOpenSprintModal([], [item._id], { mode: 'assign' })
+                            }
+                          }}
+                          disabled={!canManageSprints}
+                          className={cn(
+                            'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                            !canManageSprints && 'opacity-50 cursor-not-allowed'
+                          )}
+                          title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
+                        >
+                          <Kanban className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                          <span>Add to Sprint</span>
+                        </DropdownMenuItem>
+                      )}
+                      {(item.type === 'task' || item.type === 'story') && item.sprint && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (item.type === 'task') {
+                              handleOpenSprintModal([item._id], [], {
+                                mode: 'manage',
+                                existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
+                              })
+                            } else if (item.type === 'story') {
+                              handleOpenSprintModal([], [item._id], {
+                                mode: 'manage',
+                                existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
+                              })
+                            }
+                          }}
+                          disabled={!canManageSprints}
+                          className={cn(
+                            'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                            !canManageSprints && 'opacity-50 cursor-not-allowed'
+                          )}
+                          title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
+                        >
+                          <Kanban className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                          <span>Manage Sprint</span>
+                        </DropdownMenuItem>
+                      )}
+
+                      {item.type === 'task' && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (!item.sprint) return
+                            openStatusChangeModal(item)
+                          }}
+                          disabled={!item.sprint}
+                          className={cn(
+                            'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                            !item.sprint && 'opacity-50 cursor-not-allowed'
+                          )}
+                          title={!item.sprint ? 'Assign the task to a sprint to change its status' : undefined}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                          <span>Change Status</span>
+                        </DropdownMenuItem>
+                      )}
+
+                      {/* Delete - only for Admin */}
+                      {false && ((item.type === 'task' && canDeleteTask(item)) ||
+                        (item.type === 'story' && canDeleteStory(item)) ||
+                        (item.type === 'epic' && canDeleteEpic(item))) && (
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteClick(item)}
+                            className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                            <span>
+                              Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                            </span>
+                          </DropdownMenuItem>
+                        )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
             )
-          })}
+          })
+          )}
         </div>
 
         <ConfirmationModal
@@ -2342,7 +2508,7 @@ export default function BacklogPage() {
                     </>
                   ) : (
                     <>
-                      <Kanban className="h-4 w-4 mr-2" />
+                      <Kanban className="h-4 w-4 mr-2" strokeWidth={1.5} />
                       {sprintModalMode === 'manage' ? 'Update Sprint' : 'Add to Sprint'}
                     </>
                   )}
@@ -2580,7 +2746,7 @@ export default function BacklogPage() {
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
+                    <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
                     Update Status
                   </>
                 )}
@@ -2618,55 +2784,20 @@ export default function BacklogPage() {
           </div>
         </ResponsiveDialog>
 
-        {/* Pagination Controls */}
+        {/* Pagination */}
         {totalCount > 0 && (
-          <Card className="mt-6">
-            <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Items per page:</span>
-                  <Select value={pageSize.toString()} onValueChange={(value) => {
-                    setPageSize(parseInt(value))
-                    setCurrentPage(1)
-                  }}>
-                    <SelectTrigger className="w-20 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <span>
-                    Showing {pageStartIndex} to {pageEndIndex} of {totalCount}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1 || loading}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm text-muted-foreground px-2">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= totalPages || loading}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setCurrentPage(1)
+            }}
+            loading={loading || searching}
+          />
         )}
       </div>
     </MainLayout>

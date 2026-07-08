@@ -1,326 +1,217 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Area,
-  AreaChart
+import {
+  AreaChart, Area, BarChart, Bar, LineChart, Line,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import { 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown,
-  AlertCircle,
-  Target
-} from 'lucide-react'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface BudgetAnalysisReportProps {
+  overview: {
+    totalBudget: number; totalSpent: number; totalRevenue: number; netProfit: number
+    budgetUtilization: number; profitMargin: number
+  }
   budgetBreakdown: {
-    category: string
-    budgeted: number
-    spent: number
-    remaining: number
-    utilizationRate: number
+    category: string; budgeted: number; spent: number; remaining: number; utilizationRate: number
   }[]
   monthlyTrends: {
-    month: string
-    budget: number
-    spent: number
-    revenue: number
-    profit: number
+    month: string; budget: number; spent: number; revenue: number; profit: number
   }[]
   filters: any
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
+const APPLE_COLORS = ['var(--apple-chart-color)','#34C759','#FF9500','#BF5AF2','#FF453A','#30B0C7']
 
-export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }: BudgetAnalysisReportProps) {
+const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px] min-w-[140px]">
+      {label && <p className="font-semibold text-[var(--apple-label)] mb-2">{label}</p>}
+      {payload.map((item: any, i: number) => (
+        <div key={i} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+            <span className="text-[var(--apple-secondary-label)]">{item.name}</span>
+          </div>
+          <span className="font-semibold font-apple-mono text-[var(--apple-label)]">
+            {formatValue ? formatValue(item.value) : item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+      <div className="mb-4">
+        <p className="text-[17px] font-semibold tracking-tight">{title}</p>
+        {subtitle && <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+export function BudgetAnalysisReport({ overview, budgetBreakdown, monthlyTrends, filters }: BudgetAnalysisReportProps) {
   const { formatCurrency } = useOrgCurrency()
 
-  // Calculate budget metrics
-  const totalBudgeted = budgetBreakdown.reduce((sum, item) => sum + item.budgeted, 0)
-  const totalSpent = budgetBreakdown.reduce((sum, item) => sum + item.spent, 0)
-  const totalRemaining = budgetBreakdown.reduce((sum, item) => sum + item.remaining, 0)
-  const averageUtilization = budgetBreakdown.length > 0 
-    ? budgetBreakdown.reduce((sum, item) => sum + item.utilizationRate, 0) / budgetBreakdown.length 
+  const totalBudgeted = overview.totalBudget
+  const totalSpent = overview.totalSpent
+  const totalRemaining = overview.totalBudget - overview.totalSpent
+  const avgUtilization = budgetBreakdown.length > 0
+    ? budgetBreakdown.reduce((s, i) => s + i.utilizationRate, 0) / budgetBreakdown.length
     : 0
 
-  // Prepare data for charts
-  const categoryData = budgetBreakdown.map((item, index) => ({
-    name: item.category,
-    budgeted: item.budgeted,
-    spent: item.spent,
-    remaining: item.remaining,
-    utilization: item.utilizationRate,
-    color: COLORS[index % COLORS.length]
+  const barData = budgetBreakdown.map((item) => ({
+    name: item.category.length > 10 ? item.category.slice(0, 10) + '…' : item.category,
+    Budgeted: item.budgeted,
+    Spent: item.spent,
   }))
 
-  const utilizationData = budgetBreakdown.map(item => ({
-    category: item.category,
-    utilization: item.utilizationRate,
-    budgeted: item.budgeted,
-    spent: item.spent
+  const utilizationData = budgetBreakdown.map((item) => ({
+    name: item.category.length > 10 ? item.category.slice(0, 10) + '…' : item.category,
+    Utilization: item.utilizationRate,
   }))
 
-  const monthlyBudgetData = monthlyTrends.map(trend => ({
-    month: trend.month,
-    budget: trend.budget,
-    spent: trend.spent,
-    variance: trend.budget - trend.spent,
-    utilization: trend.budget > 0 ? (trend.spent / trend.budget) * 100 : 0
+  const monthlyData = monthlyTrends.map(t => ({
+    month: t.month,
+    Budget: t.budget,
+    Spent: t.spent,
+    Variance: t.budget - t.spent,
   }))
 
   return (
-    <div className="space-y-8">
-      {/* Budget Analysis Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Budgeted</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold break-words">
-              {formatCurrency(totalBudgeted)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Across all categories
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Spent</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold break-words">
-              {formatCurrency(totalSpent)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {totalBudgeted > 0 ? ((totalSpent / totalBudgeted) * 100).toFixed(1) : 0}% of budget
-            </p>
-            <Progress value={totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Remaining Budget</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold break-words">
-              {formatCurrency(totalRemaining)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Available to spend
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Average Utilization</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {averageUtilization.toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Across categories
-            </p>
-            <Progress value={averageUtilization} className="mt-2" />
-          </CardContent>
-        </Card>
+      {/* ── Stats Strip ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Budgeted',  value: formatCurrency(totalBudgeted),  sub: 'Across all categories',                                                                  color: 'var(--apple-chart-color)' },
+          { label: 'Total Spent',     value: formatCurrency(totalSpent),      sub: `${totalBudgeted > 0 ? ((totalSpent/totalBudgeted)*100).toFixed(1) : '0.0'}% of budget`, color: '#FF453A' },
+          { label: 'Remaining',       value: formatCurrency(totalRemaining),  sub: 'Available to spend',                                                                     color: totalRemaining >= 0 ? '#34C759' : '#FF453A' },
+          { label: 'Avg Utilization', value: `${avgUtilization.toFixed(1)}%`, sub: 'Across categories',                                                             color: 'var(--apple-chart-color)' },
+        ].map(s => (
+          <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
+            <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
+            <p className="text-[20px] font-bold font-apple-mono tracking-tight" style={{ color: s.color }}>{s.value}</p>
+            <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{s.sub}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-        {/* Budget vs Spent by Category */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Budget vs Spent by Category</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Budget allocation vs actual spending</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={categoryData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
-                <Bar dataKey="budgeted" fill="#8884d8" name="Budgeted" />
-                <Bar dataKey="spent" fill="#82ca9d" name="Spent" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* ── Charts ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Budget Utilization by Category */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Budget Utilization by Category</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Percentage of budget used by category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={utilizationData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value}%`, 'Utilization']} />
-                <Bar dataKey="utilization" fill="#FFBB28" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Grouped bar: budget vs spent */}
+        <ChartCard title="Budget vs Spent" subtitle="Planned allocation against actual spending by category">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={barData} barCategoryGap="30%" barGap={4} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
+              <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <Bar dataKey="Budgeted" fill="var(--apple-chart-color)" radius={[6,6,0,0]} maxBarSize={32} />
+              <Bar dataKey="Spent"    fill="#FF453A"                  radius={[6,6,0,0]} maxBarSize={32} />
+              <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        {/* Monthly Budget Trends */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Monthly Budget Trends</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Budget and spending over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={monthlyBudgetData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
-                <Area 
-                  type="monotone" 
-                  dataKey="budget" 
-                  stackId="1" 
-                  stroke="#8884d8" 
-                  fill="#8884d8" 
-                  fillOpacity={0.6}
-                  name="Budget"
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="spent" 
-                  stackId="2" 
-                  stroke="#82ca9d" 
-                  fill="#82ca9d" 
-                  fillOpacity={0.6}
-                  name="Spent"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Bar: utilization by category */}
+        <ChartCard title="Utilization by Category" subtitle="Percentage of budget used per category">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={utilizationData} barCategoryGap="35%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, (dataMax: number) => Math.max(100, Math.ceil(dataMax / 10) * 10)]} />
+              <Tooltip content={<AppleTooltip formatValue={(v: number) => `${Number(v).toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+              <Bar dataKey="Utilization" fill="var(--apple-chart-color)" radius={[6,6,0,0]} maxBarSize={40} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        {/* Budget Variance Analysis */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Budget Variance Analysis</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Monthly budget vs actual spending variance</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={monthlyBudgetData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Variance']} />
-                <Line 
-                  type="monotone" 
-                  dataKey="variance" 
-                  stroke="#FF8042" 
-                  strokeWidth={2}
-                  name="Budget Variance"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="utilization" 
-                  stroke="#FFBB28" 
-                  strokeWidth={2}
-                  name="Utilization %"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Area: monthly budget trends */}
+        <ChartCard title="Monthly Budget Trends" subtitle="Budget and spending over time">
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="ba-area-budget" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FF453A" stopOpacity={0.18} /><stop offset="100%" stopColor="#FF453A" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
+              <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
+              <Area type="monotone" dataKey="Budget" stroke="var(--apple-chart-color)" strokeWidth={2} fill="var(--apple-chart-color)" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
+              <Area type="monotone" dataKey="Spent"  stroke="#FF453A"                  strokeWidth={2} fill="url(#ba-area-budget)"        dot={false} activeDot={{ r: 4 }} />
+              <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        {/* Line: variance — green = under budget (positive) */}
+        <ChartCard title="Budget Variance Analysis" subtitle="Monthly budget vs actual variance">
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatCurrency(v).replace(/\.00$/, '')} />
+              <Tooltip content={<AppleTooltip formatValue={formatCurrency} />} cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }} />
+              <Line type="monotone" dataKey="Variance" stroke="#34C759" strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: '#34C759' }} strokeLinecap="round" />
+              <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-[12px] text-[var(--apple-secondary-label)]">{v}</span>} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
 
-      {/* Budget Category Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base sm:text-lg">Budget Category Analysis</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Detailed breakdown of budget performance by category</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-5">
-            {budgetBreakdown.map((category, index) => (
-              <div key={category.category} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
-                <div className="flex-1 min-w-0 w-full sm:w-auto">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
-                    <div className="flex items-center space-x-2">
-                      <div 
-                        className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0" 
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                      />
-                      <h3 className="font-semibold text-sm sm:text-base truncate">{category.category}</h3>
-                    </div>
-                    <Badge variant={category.utilizationRate > 80 ? 'destructive' : 
-                                   category.utilizationRate > 60 ? 'default' : 'secondary'} className="flex-shrink-0">
-                      {category.utilizationRate.toFixed(1)}% used
-                    </Badge>
-                    {category.utilizationRate > 100 && (
-                      <Badge variant="destructive" className="flex items-center space-x-1 flex-shrink-0">
-                        <AlertCircle className="h-3 w-3" />
-                        <span className="text-xs sm:text-sm">Over Budget</span>
-                      </Badge>
+      {/* ── Category Detail Table ── */}
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+        <div className="px-5 pt-5 pb-4 border-b border-[var(--apple-separator)]">
+          <p className="text-[17px] font-semibold">Budget Category Analysis</p>
+          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Detailed performance breakdown by category</p>
+        </div>
+        <div className="divide-y divide-[var(--apple-separator)]">
+          {budgetBreakdown.map((cat, i) => {
+            const pct = Math.min(100, cat.utilizationRate)
+            const color = pct > 85 ? '#FF453A' : pct > 65 ? '#FF9F0A' : '#34C759'
+            const isOver = cat.utilizationRate > 100
+            return (
+              <div key={cat.category} className="px-5 py-4 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: APPLE_COLORS[i % APPLE_COLORS.length] }} />
+                    <p className="text-[15px] font-semibold">{cat.category}</p>
+                    {isOver && (
+                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400">
+                        Over budget
+                      </span>
                     )}
                   </div>
-                  
-                  <div className="mt-3 space-y-2">
-                    <div>
-                      <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
-                        <span>Budget Utilization</span>
-                        <span className="flex-shrink-0 ml-2">{category.utilizationRate.toFixed(1)}%</span>
-                      </div>
-                      <Progress value={Math.min(100, category.utilizationRate)} className="h-2" />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 text-xs sm:text-sm">
-                      <div>
-                        <div className="text-muted-foreground">Budgeted</div>
-                      <div className="font-medium break-words">{formatCurrency(category.budgeted)}</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Spent</div>
-                      <div className="font-medium break-words">{formatCurrency(category.spent)}</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Remaining</div>
-                      <div className={`font-medium break-words ${category.remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {formatCurrency(category.remaining)}
-                        </div>
-                      </div>
-                    </div>
+                  <span className="text-[13px] font-semibold font-apple-mono" style={{ color }}>{cat.utilizationRate.toFixed(1)}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden mb-3">
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[13px]">
+                  <div>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)] uppercase tracking-[0.06em] font-semibold">Budgeted</p>
+                    <p className="font-semibold font-apple-mono mt-0.5">{formatCurrency(cat.budgeted)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)] uppercase tracking-[0.06em] font-semibold">Spent</p>
+                    <p className="font-semibold font-apple-mono mt-0.5" style={{ color }}>{formatCurrency(cat.spent)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-[var(--apple-tertiary-label)] uppercase tracking-[0.06em] font-semibold">Remaining</p>
+                    <p className={`font-semibold font-apple-mono mt-0.5 ${cat.remaining < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                      {formatCurrency(cat.remaining)}
+                    </p>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

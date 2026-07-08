@@ -37,7 +37,9 @@ import {
     Trash2,
     X,
     RotateCcw,
-    Upload
+    Upload,
+    ListTodo,
+    CheckSquare
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -59,6 +61,13 @@ import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
 import CreateTaskModal from './CreateTaskModal'
 // Removed bulk upload import
 // import BulkUploadModal from './BulkUploadModal'
+import {
+    StatusBadge, PriorityBadge, TypeBadge,
+    PageHeader, SectionLabel, TasksEmptyState,
+    PaginationBar, ViewSwitcher, MetaChip, FilterChip,
+    InlineLoader, FullPageLoader,
+    cardShell, cardHover, TASK_STATUS_CONFIG, PRIORITY_CONFIG
+} from './TasksShared'
 type KanbanBoardComponentProps = {
     projectId: string
     filters?: {
@@ -148,6 +157,18 @@ interface TasksClientProps {
 
 const TASKS_MODULE_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
 
+// Module-level store: survives client-side navigation, resets on full page reload
+const _myTasksFilters = {
+    searchQuery: '',
+    statusFilter: 'all',
+    priorityFilter: 'all',
+    typeFilter: 'all',
+    projectFilter: 'all',
+    assignedToFilter: 'all',
+    createdByFilter: 'all',
+    dateRangeFilter: undefined as DateRange | undefined,
+}
+
 export default function TasksClient({
     initialTasks,
     initialPagination,
@@ -165,6 +186,10 @@ export default function TasksClient({
     const canViewAssignedProjects = hasPermission(Permission.TASK_VIEW_ASSIGNED_PROJECTS)
     const canFilterUsers = canViewAllTasks || canViewAssignedProjects
     const canCreateTask = hasPermission(Permission.TASK_CREATE)
+    
+    // Detect if user has QA Engineer custom role
+    const isQAEngineer = user?.customRole?.name === 'QA Engineer' || 
+                         permissions?.customRole?.name === 'QA Engineer'
 
     const [tasks, setTasks] = useState<Task[]>(initialTasks)
     const [pagination, setPagination] = useState(initialPagination)
@@ -174,20 +199,20 @@ export default function TasksClient({
         typeof initialPagination?.total === 'number' ? initialPagination.total : initialTasks?.length || 0
     )
     const [loading, setLoading] = useState(false)
-    const [searchQuery, setSearchQuery] = useState(initialFilters.search || '')
-    const [statusFilter, setStatusFilter] = useState(initialFilters.status || 'all')
-    const [priorityFilter, setPriorityFilter] = useState(initialFilters.priority || 'all')
-    const [typeFilter, setTypeFilter] = useState(initialFilters.type || 'all')
-    const [projectFilter, setProjectFilter] = useState(initialFilters.project || 'all')
-    const [assignedToFilter, setAssignedToFilter] = useState(initialFilters.assignedTo || 'all')
-    const [createdByFilter, setCreatedByFilter] = useState(initialFilters.createdBy || 'all')
+    const [searchQuery, setSearchQuery] = useState(initialFilters.search || _myTasksFilters.searchQuery)
+    const [statusFilter, setStatusFilter] = useState(initialFilters.status || _myTasksFilters.statusFilter)
+    const [priorityFilter, setPriorityFilter] = useState(initialFilters.priority || _myTasksFilters.priorityFilter)
+    const [typeFilter, setTypeFilter] = useState(initialFilters.type || _myTasksFilters.typeFilter)
+    const [projectFilter, setProjectFilter] = useState(initialFilters.project || _myTasksFilters.projectFilter)
+    const [assignedToFilter, setAssignedToFilter] = useState(initialFilters.assignedTo || _myTasksFilters.assignedToFilter)
+    const [createdByFilter, setCreatedByFilter] = useState(initialFilters.createdBy || _myTasksFilters.createdByFilter)
     const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>(
         initialFilters.createdAtFrom || initialFilters.createdAtTo
             ? {
                 from: initialFilters.createdAtFrom ? new Date(initialFilters.createdAtFrom) : undefined,
                 to: initialFilters.createdAtTo ? new Date(initialFilters.createdAtTo) : undefined,
             }
-            : undefined
+            : _myTasksFilters.dateRangeFilter
     )
     const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([])
     const [assignedToOptions, setAssignedToOptions] = useState<UserSummary[]>([])
@@ -196,7 +221,7 @@ export default function TasksClient({
     const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
     const [createdByFilterQuery, setCreatedByFilterQuery] = useState('')
     const [selectedProjectDetails, setSelectedProjectDetails] = useState<any>(null)
-    const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list')
+    const [viewMode, setViewMode] = useState<'list' | 'grid' | 'kanban'>('list')
     const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
     const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -230,6 +255,18 @@ export default function TasksClient({
         // Trigger a fresh fetch with reset filters
         fetchTasks(true, '')
     }
+
+    // Sync filter state back to module-level store so it survives navigation
+    useEffect(() => {
+        _myTasksFilters.searchQuery = searchQuery
+        _myTasksFilters.statusFilter = statusFilter
+        _myTasksFilters.priorityFilter = priorityFilter
+        _myTasksFilters.typeFilter = typeFilter
+        _myTasksFilters.projectFilter = projectFilter
+        _myTasksFilters.assignedToFilter = assignedToFilter
+        _myTasksFilters.createdByFilter = createdByFilter
+        _myTasksFilters.dateRangeFilter = dateRangeFilter
+    }, [searchQuery, statusFilter, priorityFilter, typeFilter, projectFilter, assignedToFilter, createdByFilter, dateRangeFilter])
 
     // Handle date range changes with validation and auto-correction
     const handleDateRangeChange = useCallback((range: DateRange | undefined) => {
@@ -295,36 +332,49 @@ export default function TasksClient({
         const assignedToMap = new Map<string, UserSummary>()
         const createdByMap = new Map<string, UserSummary>()
 
-        tasks.forEach((task) => {
-            if (task.project?._id) {
-                projectMap.set(task.project._id, {
-                    _id: task.project._id,
-                    name: task.project.name,
-                })
+        // For QA users, only include current user in the options
+        if (isQAEngineer && user) {
+            const currentUserSummary: UserSummary = {
+                _id: user.id || '',
+                firstName: user.firstName || '',
+                lastName: user.lastName || '',
+                email: user.email || ''
             }
-            if (task.assignedTo && Array.isArray(task.assignedTo)) {
-                task.assignedTo.forEach((assignee) => {
-                    const userId = assignee.user?._id || assignee.user || assignee._id || assignee;
-                    const userData = assignee.user || assignee;
-                    if (userId && userData) {
-                        assignedToMap.set(userId.toString(), {
-                            _id: userId.toString(),
-                            firstName: userData.firstName || '',
-                            lastName: userData.lastName || '',
-                            email: userData.email || '',
-                        })
-                    }
-                })
-            }
-            if (task.createdBy?._id) {
-                createdByMap.set(task.createdBy._id, {
-                    _id: task.createdBy._id,
-                    firstName: task.createdBy.firstName,
-                    lastName: task.createdBy.lastName,
-                    email: task.createdBy.email,
-                })
-            }
-        })
+            assignedToMap.set(currentUserSummary._id, currentUserSummary)
+            createdByMap.set(currentUserSummary._id, currentUserSummary)
+        } else {
+            // For non-QA users, extract from tasks as normal
+            tasks.forEach((task) => {
+                if (task.project?._id) {
+                    projectMap.set(task.project._id, {
+                        _id: task.project._id,
+                        name: task.project.name,
+                    })
+                }
+                if (task.assignedTo && Array.isArray(task.assignedTo)) {
+                    task.assignedTo.forEach((assignee) => {
+                        const userId = assignee.user?._id || assignee.user || assignee._id || assignee;
+                        const userData = assignee.user || assignee;
+                        if (userId && userData) {
+                            assignedToMap.set(userId.toString(), {
+                                _id: userId.toString(),
+                                firstName: userData.firstName || '',
+                                lastName: userData.lastName || '',
+                                email: userData.email || '',
+                            })
+                        }
+                    })
+                }
+                if (task.createdBy?._id) {
+                    createdByMap.set(task.createdBy._id, {
+                        _id: task.createdBy._id,
+                        firstName: task.createdBy.firstName,
+                        lastName: task.createdBy.lastName,
+                        email: task.createdBy.email,
+                    })
+                }
+            })
+        }
 
         setProjectOptions((prev) => {
             const combined = new Map<string, ProjectSummary>()
@@ -352,7 +402,7 @@ export default function TasksClient({
                 )
             })
         }
-    }, [tasks, canFilterUsers])
+    }, [tasks, canFilterUsers, isQAEngineer, user])
 
     // Load projects from API for filter dropdown
     useEffect(() => {
@@ -429,6 +479,19 @@ export default function TasksClient({
     }, [projectOptions, projectFilterQuery])
 
     const filteredAssignedToOptions = useMemo(() => {
+        // For QA users, only show current user
+        if (isQAEngineer && user) {
+            let options = assignedToOptions.filter(opt => opt._id === user.id)
+            
+            const query = assignedToFilterQuery.trim().toLowerCase()
+            if (!query) return options
+            return options.filter((member) =>
+                `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+                member.email.toLowerCase().includes(query)
+            )
+        }
+
+        // For non-QA users, apply normal filtering including project members
         let options = assignedToOptions
 
         // Filter by project members if a specific project is selected
@@ -452,9 +515,22 @@ export default function TasksClient({
             `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
             member.email.toLowerCase().includes(query)
         )
-    }, [assignedToOptions, assignedToFilterQuery, selectedProjectDetails])
+    }, [assignedToOptions, assignedToFilterQuery, selectedProjectDetails, isQAEngineer, user])
 
     const filteredCreatedByOptions = useMemo(() => {
+        // For QA users, only show current user
+        if (isQAEngineer && user) {
+            let options = createdByOptions.filter(opt => opt._id === user.id)
+            
+            const query = createdByFilterQuery.trim().toLowerCase()
+            if (!query) return options
+            return options.filter((member) =>
+                `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+                member.email.toLowerCase().includes(query)
+            )
+        }
+
+        // For non-QA users, apply normal filtering including project members
         let options = createdByOptions
 
         // Filter by project members if a specific project is selected
@@ -478,7 +554,7 @@ export default function TasksClient({
             `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
             member.email.toLowerCase().includes(query)
         )
-    }, [createdByOptions, createdByFilterQuery, selectedProjectDetails])
+    }, [createdByOptions, createdByFilterQuery, selectedProjectDetails, isQAEngineer, user])
 
     // Fetch project details when project filter changes
     useEffect(() => {
@@ -956,660 +1032,1241 @@ export default function TasksClient({
     const shouldShowInlineLoader = loading && tasks.length > 0
 
     return (
-        <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground truncate">My Tasks</h1>
-                    <p className="text-sm sm:text-base text-muted-foreground">Manage and track your assigned tasks</p>
-                </div>
-                {canCreateTask && (
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <Button onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto flex-shrink-0">
+        <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
+
+            {/* ── Page Header ─────────────────────────────────────────────────── */}
+            <PageHeader
+                title="My Tasks"
+                subtitle="Manage and track your assigned tasks"
+                icon={CheckSquare}
+                actions={
+                    canCreateTask ? (
+                        <Button
+                            onClick={() => setShowCreateTaskModal(true)}
+                            className="rounded-full bg-[var(--apple-system-blue)] text-white px-4 py-2 text-[15px] font-semibold hover:opacity-90 apple-transition"
+                        >
                             <Plus className="h-4 w-4 mr-2" />
                             New Task
                         </Button>
-                    </div>
-                )}
+                    ) : undefined
+                }
+            />
+
+            {/* ── Filter Toolbar ───────────────────────────────────────────────── */}
+            <div className="rounded-[var(--apple-radius-lg)] bg-[var(--apple-quaternary-fill)] border border-[var(--apple-separator)] p-3 sm:p-4 space-y-2 sm:space-y-3">
+
+            {/* Row 1: Search (50%) + Status (25%) + Priority (25%) — Desktop */}
+            <div className="hidden sm:flex items-center gap-2">
+                <div className="relative w-1/2">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" />
+                    <input
+                        placeholder="Search tasks..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                    />
+                    {searchQuery && (
+                        <button
+                            type="button"
+                            onClick={() => { setSearchQuery(''); fetchTasks(true, '') }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
+                            aria-label="Clear search"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-10 w-1/4 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                        <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        {availableStatusOptions.map((status: string) => (
+                            <SelectItem key={status} value={status}>
+                                {formatToTitleCase(status.replace('_', ' '))}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <SelectTrigger className="h-10 w-1/4 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                        <SelectValue placeholder="Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Priority</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
 
+            {/* Row 1: Mobile — Search full width + status/priority side-by-side */}
+            <div className="sm:hidden flex flex-col gap-2">
+                <div className="relative w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--apple-tertiary-label)]" />
+                    <input
+                        placeholder="Search tasks..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-9 h-10 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:outline-none focus:border-[var(--apple-system-blue)] focus:ring-2 focus:ring-[var(--apple-system-blue)]/20 apple-transition text-[var(--apple-label)]"
+                    />
+                    {searchQuery && (
+                        <button
+                            type="button"
+                            onClick={() => { setSearchQuery(''); fetchTasks(true, '') }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] apple-transition"
+                            aria-label="Clear search"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="h-10 flex-1 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                            <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Status</SelectItem>
+                            {availableStatusOptions.map((status: string) => (
+                                <SelectItem key={status} value={status}>
+                                    {formatToTitleCase(status.replace('_', ' '))}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                        <SelectTrigger className="h-10 flex-1 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                            <SelectValue placeholder="Priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Priority</SelectItem>
+                            <SelectItem value="low">Low</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="high">High</SelectItem>
+                            <SelectItem value="critical">Critical</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
 
-            <Card className="overflow-x-hidden">
-                <CardHeader>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle>All Tasks</CardTitle>
-                                <CardDescription>
-                                    {totalCount} task{totalCount !== 1 ? 's' : ''} found
-                                </CardDescription>
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-2 sm:gap-4">
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            {/* Row 2: Project + Type + Assignee + Creator + Date range — Desktop: 20% each, Mobile: 2-col grid */}
+            <div className="hidden sm:grid sm:grid-cols-5 gap-2">
+                {/* Project filter with search */}
+                <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
+                    if (open) focusSearchInput(projectFilterInputRef.current)
+                }}>
+                    <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                        <SelectValue placeholder="All Projects" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                            <div className="relative mb-2">
                                 <Input
-                                    placeholder="Search tasks..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10 w-full"
+                                    ref={projectFilterInputRef}
+                                    value={projectFilterQuery}
+                                    onChange={(e) => setProjectFilterQuery(e.target.value)}
+                                    placeholder="Search projects"
+                                    className="pr-10"
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()}
                                 />
-                                {searchQuery && (
+                                {projectFilterQuery && (
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setSearchQuery('')
-                                            fetchTasks(true, '')
+                                        onClick={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            setProjectFilterQuery('')
+                                            setProjectFilter('all')
                                         }}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-foreground"
-                                        aria-label="Clear search"
+                                        className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                                        aria-label="Clear project filter"
                                     >
                                         <X className="h-4 w-4" />
                                     </button>
                                 )}
                             </div>
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
-                                <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
-                                    if (open) focusSearchInput(projectFilterInputRef.current)
-                                }}>
-                                    <SelectTrigger className="w-full sm:w-40">
-                                        <SelectValue placeholder="Project" />
-                                    </SelectTrigger>
-                                    <SelectContent className="z-[10050] p-0">
-                                        <div className="p-2">
-                                            <div className="relative mb-2">
-                                                <Input
-                                                    ref={projectFilterInputRef}
-                                                    value={projectFilterQuery}
-                                                    onChange={(e) => setProjectFilterQuery(e.target.value)}
-                                                    placeholder="Search projects"
-                                                    className="pr-10"
-                                                    onKeyDown={(e) => e.stopPropagation()}
-                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                />
-                                                {projectFilterQuery && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.preventDefault()
-                                                            e.stopPropagation()
-                                                            setProjectFilterQuery('')
-                                                            setProjectFilter('all')
-                                                        }}
-                                                        className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                                                        aria-label="Clear project filter"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <div className="max-h-56 overflow-y-auto">
-                                                <SelectItem value="all">All Projects</SelectItem>
-                                                {filteredProjectOptions.length === 0 ? (
-                                                    <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                                                ) : (
-                                                    filteredProjectOptions.map((project) => (
-                                                        <SelectItem key={project._id} value={project._id}>
-                                                            {project.name}
-                                                        </SelectItem>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
-                                    </SelectContent>
-                                </Select>
-                                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                    <SelectTrigger className="w-full sm:w-40">
-                                        <SelectValue placeholder="Status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Status</SelectItem>
-                                        {availableStatusOptions.map((status: string) => (
-                                            <SelectItem key={status} value={status}>
-                                                {formatToTitleCase(status.replace('_', ' '))}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                                    <SelectTrigger className="w-full sm:w-40">
-                                        <SelectValue placeholder="Priority" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Priority</SelectItem>
-                                        <SelectItem value="low">Low</SelectItem>
-                                        <SelectItem value="medium">Medium</SelectItem>
-                                        <SelectItem value="high">High</SelectItem>
-                                        <SelectItem value="critical">Critical</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                                    <SelectTrigger className="w-full sm:w-40">
-                                        <SelectValue placeholder="Type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Types</SelectItem>
-                                        <SelectItem value="bug">Bug</SelectItem>
-                                        <SelectItem value="feature">Feature</SelectItem>
-                                        <SelectItem value="improvement">Improvement</SelectItem>
-                                        <SelectItem value="task">Task</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-                                {canFilterUsers && (
-                                    <>
-                                        <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
-                                            if (open) focusSearchInput(assignedToFilterInputRef.current)
-                                        }}>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Assigned To" />
-                                            </SelectTrigger>
-                                            <SelectContent className="z-[10050] p-0">
-                                                <div className="p-2">
-                                                    <div className="relative mb-2">
-                                                        <Input
-                                                            ref={assignedToFilterInputRef}
-                                                            value={assignedToFilterQuery}
-                                                            onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                                                            placeholder="Search assignees"
-                                                            className="pr-10"
-                                                            onKeyDown={(e) => e.stopPropagation()}
-                                                            onMouseDown={(e) => e.stopPropagation()}
-                                                        />
-                                                        {assignedToFilterQuery && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.preventDefault()
-                                                                    e.stopPropagation()
-                                                                    setAssignedToFilterQuery('')
-                                                                    setAssignedToFilter('all')
-                                                                }}
-                                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                                                                aria-label="Clear assignee filter"
-                                                            >
-                                                                <X className="h-4 w-4" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="max-h-56 overflow-y-auto">
-                                                        <SelectItem value="all">All Assignees</SelectItem>
-                                                        {filteredAssignedToOptions.length === 0 ? (
-                                                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
-                                                        ) : (
-                                                            filteredAssignedToOptions.map((member) => (
-                                                                <SelectItem key={member._id} value={member._id}>
-                                                                    {member.firstName} {member.lastName}
-                                                                </SelectItem>
-                                                            ))
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </SelectContent>
-                                        </Select>
-                                        <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
-                                            if (open) focusSearchInput(createdByFilterInputRef.current)
-                                        }}>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Created By" />
-                                            </SelectTrigger>
-                                            <SelectContent className="z-[10050] p-0">
-                                                <div className="p-2">
-                                                    <div className="relative mb-2">
-                                                        <Input
-                                                            ref={createdByFilterInputRef}
-                                                            value={createdByFilterQuery}
-                                                            onChange={(e) => setCreatedByFilterQuery(e.target.value)}
-                                                            placeholder="Search creators"
-                                                            className="pr-10"
-                                                            onKeyDown={(e) => e.stopPropagation()}
-                                                            onMouseDown={(e) => e.stopPropagation()}
-                                                        />
-                                                        {createdByFilterQuery && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.preventDefault()
-                                                                    e.stopPropagation()
-                                                                    setCreatedByFilterQuery('')
-                                                                    setCreatedByFilter('all')
-                                                                }}
-                                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                                                                aria-label="Clear creator filter"
-                                                            >
-                                                                <X className="h-4 w-4" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="max-h-56 overflow-y-auto">
-                                                        <SelectItem value="all">All Creators</SelectItem>
-                                                        {filteredCreatedByOptions.length === 0 ? (
-                                                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
-                                                        ) : (
-                                                            filteredCreatedByOptions.map((member) => (
-                                                                <SelectItem key={member._id} value={member._id}>
-                                                                    {member.firstName} {member.lastName}
-                                                                </SelectItem>
-                                                            ))
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </SelectContent>
-                                        </Select>
-                                    </>
+                            <div className="max-h-56 overflow-y-auto">
+                                <SelectItem value="all">All Projects</SelectItem>
+                                {filteredProjectOptions.length === 0 ? (
+                                    <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                                ) : (
+                                    filteredProjectOptions.map((project) => (
+                                        <SelectItem key={project._id} value={project._id}>
+                                            {project.name}
+                                        </SelectItem>
+                                    ))
                                 )}
-                                <div className="flex flex-col gap-2">
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                className={cn(
-                                                    'w-full justify-start text-left font-normal',
-                                                    !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
-                                                )}
-                                            >
-                                                <Calendar className="mr-2 h-4 w-4" />
-                                                {dateRangeFilter?.from ? (
-                                                    dateRangeFilter.to ? (
-                                                        `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
-                                                    ) : (
-                                                        `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
-                                                    )
-                                                ) : (
-                                                    'Select date range'
-                                                )}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <DateRangeCalendar
-                                                initialFocus
-                                                mode="range"
-                                                defaultMonth={dateRangeFilter?.from}
-                                                selected={dateRangeFilter}
-                                                onSelect={handleDateRangeChange}
-                                                numberOfMonths={2}
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
-                                    <div className="flex justify-end">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setDateRangeFilter(undefined)}
-                                            disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
-                                            className="h-8 text-xs"
-                                        >
-                                            Clear dates
-                                        </Button>
-                                    </div>
-                                </div>
-                                <div className="flex justify-end w-full md:col-span-2 xl:col-span-3">
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={resetFilters}
-                                                    className="text-xs"
-                                                    aria-label="Reset all filters"
-                                                >
-                                                    <RotateCcw className="h-4 w-4 mr-1" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Reset filters</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                </div>
                             </div>
                         </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
+                    </SelectContent>
+                </Select>
 
-                    <Tabs
-                        value={viewMode}
-                        onValueChange={(value) => {
-                            const v = value as 'list' | 'kanban'
-                            setViewMode(v)
-                            // When returning to list view, force a fresh fetch to avoid stale/empty data
-                            if (v === 'list') {
-                                setTasks([])
-                                setPagination({})
-                                fetchTasks(true)
-                            }
-                        }}
-                    >
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="list">List View</TabsTrigger>
-                            <TabsTrigger value="kanban">Kanban View</TabsTrigger>
-                        </TabsList>
+                {/* Type filter */}
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                        <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="bug">Bug</SelectItem>
+                        <SelectItem value="feature">Feature</SelectItem>
+                        <SelectItem value="improvement">Improvement</SelectItem>
+                        <SelectItem value="task">Task</SelectItem>
+                    </SelectContent>
+                </Select>
 
-
-                        <TabsContent value="list" className="space-y-4">
-                            {shouldShowInitialLoader ? (
-                                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                                    <Loader2 className="h-6 w-6 animate-spin mb-3" />
-                                    <p className="text-sm font-medium">Loading tasks...</p>
-                                    <p className="text-xs text-muted-foreground/80">Please wait while we fetch your workspace.</p>
-                                </div>
-                            ) : (
-                                <>
-                                    {shouldShowInlineLoader && (
-                                        <div className="flex items-center justify-center py-8 text-muted-foreground">
-                                            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                                            <span className="text-sm">Refreshing tasks...</span>
-                                        </div>
-                                    )}
-                                    <div
-                                        ref={parentRef}
-                                        className="h-[400px] sm:h-[500px] md:h-[600px] overflow-auto overflow-x-hidden"
-                                    >
-                                        <div
-                                            style={{
-                                                height: `${rowVirtualizer.getTotalSize()}px`,
-                                                width: '100%',
-                                                position: 'relative',
-                                            }}
-                                        >
-                                            {tasks.length > 0 ? (
-                                                rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                                                    const task = tasks[virtualRow.index]
-                                                    return (
-                                                        <div
-                                                            key={virtualRow.key}
-                                                            style={{
-                                                                position: 'absolute',
-                                                                top: 0,
-                                                                left: 0,
-                                                                width: '100%',
-                                                                height: `${virtualRow.size}px`,
-                                                                transform: `translateY(${virtualRow.start}px)`,
-                                                            }}
-                                                        >
-                                                            <Card
-                                                                className="hover:shadow-md transition-shadow m-2 cursor-pointer"
-                                                                onClick={(e) => {
-                                                                    // Don't navigate if clicking on select, dropdown, or buttons
-                                                                    const target = e.target as HTMLElement
-                                                                    if (
-                                                                        target.closest('button') ||
-                                                                        target.closest('[role="combobox"]') ||
-                                                                        target.closest('[role="menuitem"]') ||
-                                                                        target.closest('.dropdown-menu') ||
-                                                                        target.closest('[data-radix-popper-content-wrapper]')
-                                                                    ) {
-                                                                        return
-                                                                    }
-                                                                    router.push(`/tasks/${task._id}`)
-                                                                }}
-                                                            >
-                                                                <CardContent className="p-3 sm:p-4">
-                                                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
-                                                                        <div className="flex-1 min-w-0 w-full">
-                                                                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2 min-w-0">
-                                                                                <div className="flex-1 min-w-0">
-                                                                                    <TooltipProvider delayDuration={150}>
-                                                                                        <Tooltip>
-                                                                                            <TooltipTrigger asChild>
-                                                                                                <h3
-                                                                                                    className="font-medium text-sm sm:text-base text-foreground truncate"
-                                                                                                >
-                                                                                                    {task.title}
-                                                                                                </h3>
-                                                                                            </TooltipTrigger>
-                                                                                            <TooltipContent side="top" align="start" className="max-w-xs break-words">
-                                                                                                {task.title}
-                                                                                            </TooltipContent>
-                                                                                        </Tooltip>
-                                                                                    </TooltipProvider>
-                                                                                </div>
-                                                                                <div className="flex flex-wrap items-center gap-1 sm:gap-2 flex-shrink-0">
-                                                                                    {task.displayId && (
-                                                                                        <Badge variant="outline" className="text-xs">{task.displayId}</Badge>
-                                                                                    )}
-                                                                                    <Select
-                                                                                        value={task.status}
-                                                                                        onValueChange={(value) =>
-                                                                                            handleInlineStatusChange(task, value as Task['status'])
-                                                                                        }
-                                                                                        disabled={statusUpdatingId === task._id || !task.sprint}
-                                                                                    //onClick={(e) => e.stopPropagation()}
-                                                                                    >
-                                                                                        <SelectTrigger className="h-7 w-full sm:w-[150px] text-xs">
-                                                                                            <SelectValue placeholder="Status" />
-                                                                                        </SelectTrigger>
-                                                                                        <SelectContent className="z-[10050]">
-                                                                                            {getStatusesForTask(task).map((status) => (
-                                                                                                <SelectItem key={status} value={status} className="text-xs">
-                                                                                                    <div className="flex items-center gap-2">
-                                                                                                        {getStatusIcon(status)}
-                                                                                                        <span>{formatToTitleCase(status)}</span>
-                                                                                                    </div>
-                                                                                                </SelectItem>
-                                                                                            ))}
-                                                                                        </SelectContent>
-                                                                                    </Select>
-                                                                                    <Badge className={`${getPriorityColor(task.priority)} text-xs`}>
-                                                                                        {formatToTitleCase(task.priority)}
-                                                                                    </Badge>
-                                                                                    <Badge className={`${getTypeColor(task.type)} text-xs`}>
-                                                                                        {formatToTitleCase(task.type)}
-                                                                                    </Badge>
-                                                                                </div>
-                                                                            </div>
-                                                                            {/* <TooltipProvider>
-                                                                              <Tooltip>
-                                                                                <TooltipTrigger asChild>
-                                                                                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
-                                                                                    {task.description}
-                                                                                  </p>
-                                                                                </TooltipTrigger>
-                                                                                {(task.description && task.description.length > 0) && (
-                                                                                  <TooltipContent>
-                                                                                    <p className="max-w-xs break-words">{task.description}</p>
-                                                                                  </TooltipContent>
-                                                                                )}
-                                                                              </Tooltip>
-                                                                            </TooltipProvider> */}
-                                                                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                                                                                <div className="flex items-center space-x-1 min-w-0">
-                                                                                    <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                                                                    <span
-                                                                                        className="truncate max-w-[100px] sm:max-w-[150px] md:max-w-none"
-                                                                                        title={task?.project?.name && task.project.name.length > 10 ? task.project.name : undefined}
-                                                                                    >
-                                                                                        {task?.project?.name && task.project.name.length > 10 ? `${task.project.name.slice(0, 10)}…` : task?.project?.name}
-                                                                                    </span>
-                                                                                </div>
-                                                                                {task?.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
-                                                                                    <div className="flex items-center flex-shrink-0">
-                                                                                        {(task.assignedTo as any[]).map((assignee: any, idx: number, arr: any[]) => {
-                                                                                            const userData = assignee.user || assignee;
-                                                                                            const displayName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User';
-                                                                                            return (
-                                                                                                <div key={userData._id || idx} title={displayName} style={{ marginLeft: idx === 0 ? 0 : -6, zIndex: arr.length - idx }}>
-                                                                                                    <GravatarAvatar
-                                                                                                        user={{
-                                                                                                            avatar: userData.avatar,
-                                                                                                            firstName: userData.firstName,
-                                                                                                            lastName: userData.lastName,
-                                                                                                            email: userData.email
-                                                                                                        }}
-                                                                                                        size={24}
-                                                                                                        className="border-2 border-background"
-                                                                                                    />
-                                                                                                </div>
-                                                                                            );
-                                                                                        })}
-                                                                                    </div>
-                                                                                )}
-                                                                                {task?.dueDate && (
-                                                                                    <div className="flex items-center space-x-1 flex-shrink-0">
-                                                                                        <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                                                                        <span className="whitespace-nowrap">Due {formatDate(task?.dueDate)}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {task?.storyPoints && (
-                                                                                    <div className="flex items-center space-x-1 flex-shrink-0">
-                                                                                        <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                                                                        <span>{task?.storyPoints} pts</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {task?.estimatedHours && (
-                                                                                    <div className="flex items-center space-x-1 flex-shrink-0">
-                                                                                        <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                                                                        <span>{task?.estimatedHours}h</span>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2">
-                                                                            <DropdownMenu>
-                                                                                <DropdownMenuTrigger asChild>
-                                                                                    <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                                    </Button>
-                                                                                </DropdownMenuTrigger>
-                                                                                <DropdownMenuContent align="end">
-                                                                                    <DropdownMenuItem onClick={(e) => {
-                                                                                        e.stopPropagation()
-                                                                                        router.push(`/tasks/${task._id}`)
-                                                                                    }}>
-                                                                                        <Eye className="h-4 w-4 mr-2" />
-                                                                                        View Task
-                                                                                    </DropdownMenuItem>
-                                                                                    <DropdownMenuItem
-                                                                                        disabled={!canEditTask(task)}
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation()
-                                                                                            if (!canEditTask(task)) return
-                                                                                            router.push(`/tasks/${task._id}/edit`)
-                                                                                        }}>
-                                                                                        <Edit className="h-4 w-4 mr-2" />
-                                                                                        Edit Task
-                                                                                    </DropdownMenuItem>
-                                                                                    <>
-                                                                                        <DropdownMenuSeparator />
-                                                                                        <DropdownMenuItem
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation()
-                                                                                                if (!canDeleteTask(task)) return
-                                                                                                handleDeleteClick(task)
-                                                                                            }}
-                                                                                            disabled={!canDeleteTask(task)}
-                                                                                            className="text-destructive focus:text-destructive"
-                                                                                        >
-                                                                                            <Trash2 className="h-4 w-4 mr-2" />
-                                                                                            Delete Task
-                                                                                        </DropdownMenuItem>
-                                                                                    </>
-                                                                                </DropdownMenuContent>
-                                                                            </DropdownMenu>
-                                                                        </div>
-                                                                    </div>
-                                                                </CardContent>
-                                                            </Card>
-                                                        </div>
-                                                    )
-                                                })
-                                            ) : (
-                                                !loading && (
-                                                    <div className="flex items-center justify-center h-40">
-                                                        <div className="text-center text-muted-foreground">
-                                                            No tasks found.
-                                                        </div>
-                                                    </div>
-                                                )
-                                            )}
-                                        </div>
-                                        {/* Pagination Controls */}
-                                        {tasks.length > 0 && (
-                                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
-                                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                    <span>Items per page:</span>
-                                                    <Select value={pageSize.toString()} onValueChange={(value) => handlePageSizeChange(parseInt(value))}>
-                                                        <SelectTrigger className="w-20 h-8">
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="10">10</SelectItem>
-                                                            <SelectItem value="20">20</SelectItem>
-                                                            <SelectItem value="50">50</SelectItem>
-                                                            <SelectItem value="100">100</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <span>
-                                                        Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Button
-                                                        onClick={() => handlePageChange(currentPage - 1)}
-                                                        disabled={currentPage === 1 || loading}
-                                                        variant="outline"
-                                                        size="sm"
-                                                    >
-                                                        Previous
-                                                    </Button>
-                                                    <span className="text-sm text-muted-foreground px-2">
-                                                        Page {currentPage} of {totalPages || 1}
-                                                    </span>
-                                                    <Button
-                                                        onClick={() => handlePageChange(currentPage + 1)}
-                                                        disabled={currentPage >= totalPages || loading}
-                                                        variant="outline"
-                                                        size="sm"
-                                                    >
-                                                        Next
-                                                    </Button>
-                                                </div>
-                                            </div>
+                {/* Assigned To / Created By — only for users with permission */}
+                {canFilterUsers ? (
+                    <>
+                        <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
+                            if (open) focusSearchInput(assignedToFilterInputRef.current)
+                        }}>
+                            <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                                <SelectValue placeholder="All Assignees" />
+                            </SelectTrigger>
+                            <SelectContent className="z-[10050] p-0">
+                                <div className="p-2">
+                                    <div className="relative mb-2">
+                                        <Input
+                                            ref={assignedToFilterInputRef}
+                                            value={assignedToFilterQuery}
+                                            onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                                            placeholder="Search assignees"
+                                            className="pr-10"
+                                            onKeyDown={(e) => e.stopPropagation()}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                        />
+                                        {assignedToFilterQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.preventDefault()
+                                                    e.stopPropagation()
+                                                    setAssignedToFilterQuery('')
+                                                    setAssignedToFilter('all')
+                                                }}
+                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                                                aria-label="Clear assignee filter"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
                                         )}
                                     </div>
-                                </>
-                            )}
-                        </TabsContent>
-
-                        <TabsContent value="kanban" className="space-y-4">
-                            {shouldShowInitialLoader ? (
-                                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                                    <Loader2 className="h-6 w-6 animate-spin mb-3" />
-                                    <p className="text-sm font-medium">Loading tasks...</p>
-                                    <p className="text-xs text-muted-foreground/80">Please wait while we fetch your workspace.</p>
+                                    <div className="max-h-56 overflow-y-auto">
+                                        <SelectItem value="all">All Assignees</SelectItem>
+                                        {filteredAssignedToOptions.length === 0 ? (
+                                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
+                                        ) : (
+                                            filteredAssignedToOptions.map((member) => (
+                                                <SelectItem key={member._id} value={member._id}>
+                                                    {member.firstName} {member.lastName}
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </div>
                                 </div>
-                            ) : (
-                                <>
-                                    {shouldShowInlineLoader && (
-                                        <div className="flex items-center justify-center py-8 text-muted-foreground">
-                                            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                                            <span className="text-sm">Refreshing board...</span>
-                                        </div>
-                                    )}
-                                    <KanbanBoard
-                                        projectId={projectFilter}
-                                        filters={kanbanFilters}
-                                        onProjectChange={setProjectFilter}
-                                        onCreateTask={() => setShowCreateTaskModal(true)}
-                                        onEditTask={handleKanbanEditTask}
-                                        onDeleteTask={handleKanbanDeleteTask}
-                                    />
-                                    {tasks.length === 0 && !loading && (
-                                        <div className="flex items-center justify-center h-40">
-                                            <div className="text-center text-muted-foreground">
-                                                No tasks found.
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </TabsContent>
-                    </Tabs>
-                </CardContent>
-            </Card>
+                            </SelectContent>
+                        </Select>
 
+                        <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
+                            if (open) focusSearchInput(createdByFilterInputRef.current)
+                        }}>
+                            <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                                <SelectValue placeholder="All Creators" />
+                            </SelectTrigger>
+                            <SelectContent className="z-[10050] p-0">
+                                <div className="p-2">
+                                    <div className="relative mb-2">
+                                        <Input
+                                            ref={createdByFilterInputRef}
+                                            value={createdByFilterQuery}
+                                            onChange={(e) => setCreatedByFilterQuery(e.target.value)}
+                                            placeholder="Search creators"
+                                            className="pr-10"
+                                            onKeyDown={(e) => e.stopPropagation()}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                        />
+                                        {createdByFilterQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.preventDefault()
+                                                    e.stopPropagation()
+                                                    setCreatedByFilterQuery('')
+                                                    setCreatedByFilter('all')
+                                                }}
+                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                                                aria-label="Clear creator filter"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="max-h-56 overflow-y-auto">
+                                        <SelectItem value="all">All Creators</SelectItem>
+                                        {filteredCreatedByOptions.length === 0 ? (
+                                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
+                                        ) : (
+                                            filteredCreatedByOptions.map((member) => (
+                                                <SelectItem key={member._id} value={member._id}>
+                                                    {member.firstName} {member.lastName}
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Date range picker */}
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        'inline-flex items-center gap-1.5 h-10 px-3 w-full rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium apple-transition',
+                                        dateRangeFilter?.from
+                                            ? 'text-[var(--apple-label)]'
+                                            : 'text-[var(--apple-secondary-label)]'
+                                    )}
+                                >
+                                    <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                                    <span className="truncate">
+                                        {dateRangeFilter?.from ? (
+                                            dateRangeFilter.to
+                                                ? `${format(dateRangeFilter.from, 'LLL dd')} – ${format(dateRangeFilter.to, 'LLL dd')}`
+                                                : `${format(dateRangeFilter.from, 'LLL dd')} – …`
+                                        ) : (
+                                            'Date Range'
+                                        )}
+                                    </span>
+                                    {(dateRangeFilter?.from || dateRangeFilter?.to) && (
+                                        <span
+                                            role="button"
+                                            aria-label="Clear date range"
+                                            onClick={(e) => { e.stopPropagation(); setDateRangeFilter(undefined) }}
+                                            className="ml-auto text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </span>
+                                    )}
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <DateRangeCalendar
+                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={dateRangeFilter?.from}
+                                    selected={dateRangeFilter}
+                                    onSelect={handleDateRangeChange}
+                                    numberOfMonths={2}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </>
+                ) : (
+                    <>
+                        {/* No user filters: empty slots + date range */}
+                        <div />
+                        <div />
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        'inline-flex items-center gap-1.5 h-9 px-3 w-full rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium apple-transition',
+                                        dateRangeFilter?.from
+                                            ? 'text-[var(--apple-label)]'
+                                            : 'text-[var(--apple-secondary-label)]'
+                                    )}
+                                >
+                                    <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                                    <span className="truncate">
+                                        {dateRangeFilter?.from ? (
+                                            dateRangeFilter.to
+                                                ? `${format(dateRangeFilter.from, 'LLL dd')} – ${format(dateRangeFilter.to, 'LLL dd')}`
+                                                : `${format(dateRangeFilter.from, 'LLL dd')} – …`
+                                        ) : (
+                                            'Date Range'
+                                        )}
+                                    </span>
+                                    {(dateRangeFilter?.from || dateRangeFilter?.to) && (
+                                        <span
+                                            role="button"
+                                            aria-label="Clear date range"
+                                            onClick={(e) => { e.stopPropagation(); setDateRangeFilter(undefined) }}
+                                            className="ml-auto text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </span>
+                                    )}
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <DateRangeCalendar
+                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={dateRangeFilter?.from}
+                                    selected={dateRangeFilter}
+                                    onSelect={handleDateRangeChange}
+                                    numberOfMonths={2}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </>
+                )}
+            </div>
+
+            {/* Row 2: Mobile — scrollable horizontal row of secondary filters */}
+            <div className="sm:hidden grid grid-cols-2 gap-2">
+                <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
+                    if (open) focusSearchInput(projectFilterInputRef.current)
+                }}>
+                    <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                        <SelectValue placeholder="All Projects" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                            <div className="relative mb-2">
+                                <Input
+                                    ref={projectFilterInputRef}
+                                    value={projectFilterQuery}
+                                    onChange={(e) => setProjectFilterQuery(e.target.value)}
+                                    placeholder="Search projects"
+                                    className="pr-10"
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                />
+                                {projectFilterQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            setProjectFilterQuery('')
+                                            setProjectFilter('all')
+                                        }}
+                                        className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                                        aria-label="Clear project filter"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="max-h-56 overflow-y-auto">
+                                <SelectItem value="all">All Projects</SelectItem>
+                                {filteredProjectOptions.length === 0 ? (
+                                    <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                                ) : (
+                                    filteredProjectOptions.map((project) => (
+                                        <SelectItem key={project._id} value={project._id}>
+                                            {project.name}
+                                        </SelectItem>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </SelectContent>
+                </Select>
+
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                        <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="bug">Bug</SelectItem>
+                        <SelectItem value="feature">Feature</SelectItem>
+                        <SelectItem value="improvement">Improvement</SelectItem>
+                        <SelectItem value="task">Task</SelectItem>
+                    </SelectContent>
+                </Select>
+
+                {canFilterUsers && (
+                    <>
+                        <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
+                            if (open) focusSearchInput(assignedToFilterInputRef.current)
+                        }}>
+                            <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                                <SelectValue placeholder="All Assignees" />
+                            </SelectTrigger>
+                            <SelectContent className="z-[10050] p-0">
+                                <div className="p-2">
+                                    <div className="relative mb-2">
+                                        <Input
+                                            ref={assignedToFilterInputRef}
+                                            value={assignedToFilterQuery}
+                                            onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                                            placeholder="Search assignees"
+                                            className="pr-10"
+                                            onKeyDown={(e) => e.stopPropagation()}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                        />
+                                        {assignedToFilterQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.preventDefault()
+                                                    e.stopPropagation()
+                                                    setAssignedToFilterQuery('')
+                                                    setAssignedToFilter('all')
+                                                }}
+                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                                                aria-label="Clear assignee filter"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="max-h-56 overflow-y-auto">
+                                        <SelectItem value="all">All Assignees</SelectItem>
+                                        {filteredAssignedToOptions.length === 0 ? (
+                                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
+                                        ) : (
+                                            filteredAssignedToOptions.map((member) => (
+                                                <SelectItem key={member._id} value={member._id}>
+                                                    {member.firstName} {member.lastName}
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </SelectContent>
+                        </Select>
+
+                        <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
+                            if (open) focusSearchInput(createdByFilterInputRef.current)
+                        }}>
+                            <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
+                                <SelectValue placeholder="All Creators" />
+                            </SelectTrigger>
+                            <SelectContent className="z-[10050] p-0">
+                                <div className="p-2">
+                                    <div className="relative mb-2">
+                                        <Input
+                                            ref={createdByFilterInputRef}
+                                            value={createdByFilterQuery}
+                                            onChange={(e) => setCreatedByFilterQuery(e.target.value)}
+                                            placeholder="Search creators"
+                                            className="pr-10"
+                                            onKeyDown={(e) => e.stopPropagation()}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                        />
+                                        {createdByFilterQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.preventDefault()
+                                                    e.stopPropagation()
+                                                    setCreatedByFilterQuery('')
+                                                    setCreatedByFilter('all')
+                                                }}
+                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                                                aria-label="Clear creator filter"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="max-h-56 overflow-y-auto">
+                                        <SelectItem value="all">All Creators</SelectItem>
+                                        {filteredCreatedByOptions.length === 0 ? (
+                                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
+                                        ) : (
+                                            filteredCreatedByOptions.map((member) => (
+                                                <SelectItem key={member._id} value={member._id}>
+                                                    {member.firstName} {member.lastName}
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </SelectContent>
+                        </Select>
+                    </>
+                )}
+
+                {/* Date range — spans full width on mobile */}
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <button
+                            type="button"
+                            className={cn(
+                                'inline-flex items-center gap-1.5 h-9 px-3 w-full col-span-2 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium apple-transition',
+                                dateRangeFilter?.from
+                                    ? 'text-[var(--apple-label)]'
+                                    : 'text-[var(--apple-secondary-label)]'
+                            )}
+                        >
+                            <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="truncate">
+                                {dateRangeFilter?.from ? (
+                                    dateRangeFilter.to
+                                        ? `${format(dateRangeFilter.from, 'LLL dd')} – ${format(dateRangeFilter.to, 'LLL dd')}`
+                                        : `${format(dateRangeFilter.from, 'LLL dd')} – …`
+                                ) : (
+                                    'Date Range'
+                                )}
+                            </span>
+                            {(dateRangeFilter?.from || dateRangeFilter?.to) && (
+                                <span
+                                    role="button"
+                                    aria-label="Clear date range"
+                                    onClick={(e) => { e.stopPropagation(); setDateRangeFilter(undefined) }}
+                                    className="ml-auto text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)]"
+                                >
+                                    <X className="h-3 w-3" />
+                                </span>
+                            )}
+                        </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                        <DateRangeCalendar
+                            initialFocus
+                            mode="range"
+                            defaultMonth={dateRangeFilter?.from}
+                            selected={dateRangeFilter}
+                            onSelect={handleDateRangeChange}
+                            numberOfMonths={1}
+                        />
+                    </PopoverContent>
+                </Popover>
+            </div>
+
+            {/* Row 3: Active filter chips + Clear all on the right */}
+            {hasActiveFilters && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <SectionLabel className="mr-1">Active:</SectionLabel>
+                    <FilterChip
+                        label={`Search: "${searchQuery}"`}
+                        active={searchQuery !== ''}
+                        onClear={() => { setSearchQuery(''); fetchTasks(true, '') }}
+                    />
+                    <FilterChip
+                        label={`Status: ${formatToTitleCase(statusFilter.replace('_', ' '))}`}
+                        active={statusFilter !== 'all'}
+                        onClear={() => setStatusFilter('all')}
+                    />
+                    <FilterChip
+                        label={`Priority: ${formatToTitleCase(priorityFilter)}`}
+                        active={priorityFilter !== 'all'}
+                        onClear={() => setPriorityFilter('all')}
+                    />
+                    <FilterChip
+                        label={`Type: ${formatToTitleCase(typeFilter)}`}
+                        active={typeFilter !== 'all'}
+                        onClear={() => setTypeFilter('all')}
+                    />
+                    <FilterChip
+                        label={`Project: ${projectOptions.find(p => p._id === projectFilter)?.name ?? projectFilter}`}
+                        active={projectFilter !== 'all'}
+                        onClear={() => { setProjectFilter('all'); setProjectFilterQuery('') }}
+                    />
+                    {canFilterUsers && (
+                        <>
+                            <FilterChip
+                                label={`Assigned: ${assignedToOptions.find(u => u._id === assignedToFilter)
+                                    ? `${assignedToOptions.find(u => u._id === assignedToFilter)!.firstName} ${assignedToOptions.find(u => u._id === assignedToFilter)!.lastName}`
+                                    : assignedToFilter}`}
+                                active={assignedToFilter !== 'all'}
+                                onClear={() => { setAssignedToFilter('all'); setAssignedToFilterQuery('') }}
+                            />
+                            <FilterChip
+                                label={`Created by: ${createdByOptions.find(u => u._id === createdByFilter)
+                                    ? `${createdByOptions.find(u => u._id === createdByFilter)!.firstName} ${createdByOptions.find(u => u._id === createdByFilter)!.lastName}`
+                                    : createdByFilter}`}
+                                active={createdByFilter !== 'all'}
+                                onClear={() => { setCreatedByFilter('all'); setCreatedByFilterQuery('') }}
+                            />
+                        </>
+                    )}
+                    <FilterChip
+                        label={`Date: ${dateRangeFilter?.from ? format(dateRangeFilter.from, 'MMM d') : ''}${dateRangeFilter?.to ? ` – ${format(dateRangeFilter.to, 'MMM d')}` : ''}`}
+                        active={dateRangeFilter !== undefined}
+                        onClear={() => setDateRangeFilter(undefined)}
+                    />
+                    <button
+                        type="button"
+                        onClick={resetFilters}
+                        className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+                    >
+                        <RotateCcw className="h-3 w-3" />
+                        Clear filters
+                    </button>
+                </div>
+            )}
+
+            </div>
+
+            {/* ── View Controls bar ─────────────────────────────────────────────── */}
+            <div className="flex items-center justify-between gap-3">
+                <p className="text-[13px] text-[var(--apple-secondary-label)] font-apple-mono">
+                    {totalCount} task{totalCount !== 1 ? 's' : ''}
+                </p>
+                <ViewSwitcher
+                    value={viewMode}
+                    onChange={(v) => {
+                        setViewMode(v)
+                        if (v === 'list' || v === 'grid') {
+                            setTasks([])
+                            setPagination({})
+                            fetchTasks(true)
+                        }
+                    }}
+                    options={['list', 'grid', 'kanban']}
+                />
+            </div>
+
+            {/* ── List View ─────────────────────────────────────────────────────── */}
+            {(viewMode === 'list') && (
+                <div className="space-y-2">
+                    {shouldShowInitialLoader ? (
+                        <FullPageLoader label="Loading tasks..." />
+                    ) : (
+                        <>
+                            {shouldShowInlineLoader && <InlineLoader label="Refreshing tasks..." />}
+                            {tasks.length > 0 ? (
+                                <>
+                                    <div className="space-y-2">
+                                        {tasks.map((task) => {
+                                            const statusCfg = TASK_STATUS_CONFIG[task.status] ?? TASK_STATUS_CONFIG['backlog']
+                                            return (
+                                                <div
+                                                    key={task._id}
+                                                    className={cn(
+                                                        'card-fade-in group flex flex-col sm:flex-row sm:items-start gap-3 px-3 sm:px-4 py-3 sm:py-3.5 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
+                                                        'hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.32)]',
+                                                        'hover:-translate-y-px apple-transition cursor-pointer'
+                                                    )}
+                                                    onClick={(e) => {
+                                                        const target = e.target as HTMLElement
+                                                        if (
+                                                            target.closest('button') ||
+                                                            target.closest('[role="combobox"]') ||
+                                                            target.closest('[role="menuitem"]') ||
+                                                            target.closest('.dropdown-menu') ||
+                                                            target.closest('[data-radix-popper-content-wrapper]')
+                                                        ) return
+                                                        router.push(`/tasks/${task._id}`)
+                                                    }}
+                                                >
+                                                    {/* Left: status dot circle */}
+                                                    <div
+                                                        className={cn(
+                                                            'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 hidden sm:flex',
+                                                            statusCfg.bg
+                                                        )}
+                                                    >
+                                                        <span className={cn('h-2.5 w-2.5 rounded-full flex-shrink-0', statusCfg.dot, 'status-pulse')} />
+                                                    </div>
+
+                                                    {/* Middle: title + meta */}
+                                                    <div className="flex-1 min-w-0 space-y-1.5">
+                                                        {/* Title row */}
+                                                        <div className="flex items-center gap-2">
+                                                            {/* Mobile-only: inline status dot */}
+                                                            <div
+                                                                className={cn(
+                                                                    'flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center sm:hidden',
+                                                                    statusCfg.bg
+                                                                )}
+                                                            >
+                                                                <span className={cn('h-2 w-2 rounded-full flex-shrink-0', statusCfg.dot, 'status-pulse')} />
+                                                            </div>
+                                                            <TooltipProvider delayDuration={150}>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <span className="text-[14px] sm:text-[15px] font-semibold text-[var(--apple-label)] truncate">
+                                                                            {task.title}
+                                                                        </span>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent side="top" align="start" className="max-w-xs break-words">
+                                                                        {task.title}
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                            {task.displayId && (
+                                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[11px] font-apple-mono text-[var(--apple-tertiary-label)] flex-shrink-0">
+                                                                    {task.displayId}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Badges row — visible on mobile below title */}
+                                                        <div className="flex flex-wrap items-center gap-1.5 sm:hidden">
+                                                            <StatusBadge status={task.status} />
+                                                            <PriorityBadge priority={task.priority} />
+                                                            <TypeBadge type={task.type} />
+                                                        </div>
+
+                                                        {/* Meta chips row */}
+                                                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                                            {task.project?.name && (
+                                                                <MetaChip
+                                                                    icon={<Target className="h-3 w-3" />}
+                                                                    label={task.project.name}
+                                                                    title={task.project.name}
+                                                                />
+                                                            )}
+                                                            {task.dueDate && (
+                                                                <MetaChip
+                                                                    icon={<Calendar className="h-3 w-3" />}
+                                                                    label={`Due ${formatDate(task.dueDate)}`}
+                                                                />
+                                                            )}
+                                                            {task.storyPoints != null && (
+                                                                <MetaChip
+                                                                    icon={<BarChart3 className="h-3 w-3" />}
+                                                                    label={`${task.storyPoints} pts`}
+                                                                />
+                                                            )}
+                                                            {task.estimatedHours != null && (
+                                                                <MetaChip
+                                                                    icon={<Clock className="h-3 w-3" />}
+                                                                    label={`${task.estimatedHours}h`}
+                                                                />
+                                                            )}
+                                                            {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
+                                                                <div className="flex items-center flex-shrink-0">
+                                                                    {(task.assignedTo as any[]).map((assignee: any, idx: number, arr: any[]) => {
+                                                                        const userData = assignee.user || assignee
+                                                                        const displayName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User'
+                                                                        return (
+                                                                            <div key={userData._id || idx} title={displayName} style={{ marginLeft: idx === 0 ? 0 : -6, zIndex: arr.length - idx }}>
+                                                                                <GravatarAvatar
+                                                                                    user={{
+                                                                                        avatar: userData.avatar,
+                                                                                        firstName: userData.firstName,
+                                                                                        lastName: userData.lastName,
+                                                                                        email: userData.email
+                                                                                    }}
+                                                                                    size={22}
+                                                                                    className="border-2 border-background"
+                                                                                />
+                                                                            </div>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Right: badges + inline status select + actions — desktop only */}
+                                                    <div className="hidden sm:flex flex-shrink-0 items-center gap-2 flex-wrap justify-end">
+                                                        <StatusBadge status={task.status} />
+                                                        <PriorityBadge priority={task.priority} />
+                                                        <TypeBadge type={task.type} />
+
+                                                        {/* Inline status change */}
+                                                        <Select
+                                                            value={task.status}
+                                                            onValueChange={(value) =>
+                                                                handleInlineStatusChange(task, value as Task['status'])
+                                                            }
+                                                            disabled={statusUpdatingId === task._id || !task.sprint}
+                                                        >
+                                                            <SelectTrigger
+                                                                className="h-7 w-[130px] text-[11px] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-sm)]"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <SelectValue placeholder="Status" />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="z-[10050]">
+                                                                {getStatusesForTask(task).map((status) => (
+                                                                    <SelectItem key={status} value={status} className="text-xs">
+                                                                        <div className="flex items-center gap-2">
+                                                                            {getStatusIcon(status)}
+                                                                            <span>{formatToTitleCase(status)}</span>
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+
+                                                        {/* Actions dropdown */}
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 apple-transition rounded-[var(--apple-radius-sm)]"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    router.push(`/tasks/${task._id}`)
+                                                                }}>
+                                                                    <Eye className="h-4 w-4 mr-2" />
+                                                                    View Task
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem
+                                                                    disabled={!canEditTask(task)}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        if (!canEditTask(task)) return
+                                                                        router.push(`/tasks/${task._id}/edit`)
+                                                                    }}
+                                                                >
+                                                                    <Edit className="h-4 w-4 mr-2" />
+                                                                    Edit Task
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        if (!canDeleteTask(task)) return
+                                                                        handleDeleteClick(task)
+                                                                    }}
+                                                                    disabled={!canDeleteTask(task)}
+                                                                    className="text-destructive focus:text-destructive"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4 mr-2" />
+                                                                    Delete Task
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+
+                                                    {/* Mobile actions row */}
+                                                    <div className="flex sm:hidden items-center justify-between pt-2 border-t border-[var(--apple-separator)]">
+                                                        <Select
+                                                            value={task.status}
+                                                            onValueChange={(value) =>
+                                                                handleInlineStatusChange(task, value as Task['status'])
+                                                            }
+                                                            disabled={statusUpdatingId === task._id || !task.sprint}
+                                                        >
+                                                            <SelectTrigger
+                                                                className="h-7 w-[120px] text-[11px] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-sm)]"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <SelectValue placeholder="Status" />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="z-[10050]">
+                                                                {getStatusesForTask(task).map((status) => (
+                                                                    <SelectItem key={status} value={status} className="text-xs">
+                                                                        <div className="flex items-center gap-2">
+                                                                            {getStatusIcon(status)}
+                                                                            <span>{formatToTitleCase(status)}</span>
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)]"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    router.push(`/tasks/${task._id}`)
+                                                                }}>
+                                                                    <Eye className="h-4 w-4 mr-2" />
+                                                                    View Task
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem
+                                                                    disabled={!canEditTask(task)}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        if (!canEditTask(task)) return
+                                                                        router.push(`/tasks/${task._id}/edit`)
+                                                                    }}
+                                                                >
+                                                                    <Edit className="h-4 w-4 mr-2" />
+                                                                    Edit Task
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        if (!canDeleteTask(task)) return
+                                                                        handleDeleteClick(task)
+                                                                    }}
+                                                                    disabled={!canDeleteTask(task)}
+                                                                    className="text-destructive focus:text-destructive"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4 mr-2" />
+                                                                    Delete Task
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+
+                                    {/* Pagination — outside scroll container, in page flow */}
+                                    <PaginationBar
+                                        currentPage={currentPage}
+                                        totalPages={totalPages}
+                                        totalCount={totalCount}
+                                        pageSize={pageSize}
+                                        onPageChange={handlePageChange}
+                                        onPageSizeChange={handlePageSizeChange}
+                                        loading={loading}
+                                        className="mt-4"
+                                    />
+                                </>
+                            ) : (
+                                !loading && (
+                                    <TasksEmptyState
+                                        icon={<ListTodo className="h-10 w-10" />}
+                                        title="No tasks found"
+                                        description="Try adjusting your filters or create a new task."
+                                        action={
+                                            canCreateTask ? (
+                                                <Button onClick={() => setShowCreateTaskModal(true)}>New Task</Button>
+                                            ) : undefined
+                                        }
+                                    />
+                                )
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
+            {/* ── Grid View ─────────────────────────────────────────────────────── */}
+            {viewMode === 'grid' && (
+                <div className="space-y-4">
+                    {shouldShowInitialLoader ? (
+                        <FullPageLoader label="Loading tasks..." />
+                    ) : (
+                        <>
+                            {shouldShowInlineLoader && <InlineLoader label="Refreshing tasks..." />}
+                            {tasks.length > 0 ? (
+                                <>
+                                    <div className="grid gap-4 sm:gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 animate-in fade-in-0 duration-300">
+                                        {tasks.map((task) => {
+                                            const statusCfg = TASK_STATUS_CONFIG[task.status] ?? TASK_STATUS_CONFIG['backlog']
+                                            return (
+                                                <div
+                                                    key={task._id}
+                                                    className={cn('card-fade-in', cardShell, cardHover, 'p-4 space-y-3')}
+                                                    onClick={(e) => {
+                                                        const target = e.target as HTMLElement
+                                                        if (
+                                                            target.closest('button') ||
+                                                            target.closest('[role="combobox"]') ||
+                                                            target.closest('[role="menuitem"]') ||
+                                                            target.closest('[data-radix-popper-content-wrapper]')
+                                                        ) return
+                                                        router.push(`/tasks/${task._id}`)
+                                                    }}
+                                                >
+                                                    {/* Card header: title + priority badge + actions */}
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex-1 min-w-0 space-y-1">
+                                                            <h3 className="text-[14px] font-semibold text-[var(--apple-label)] line-clamp-2 leading-snug">
+                                                                {task.title}
+                                                            </h3>
+                                                            {task.displayId && (
+                                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[11px] font-apple-mono text-[var(--apple-tertiary-label)]">
+                                                                    {task.displayId}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                                            <PriorityBadge priority={task.priority} />
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-7 w-7 p-0 rounded-[var(--apple-radius-sm)]"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuItem onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        router.push(`/tasks/${task._id}`)
+                                                                    }}>
+                                                                        <Eye className="h-4 w-4 mr-2" />
+                                                                        View Task
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem
+                                                                        disabled={!canEditTask(task)}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation()
+                                                                            if (!canEditTask(task)) return
+                                                                            router.push(`/tasks/${task._id}/edit`)
+                                                                        }}
+                                                                    >
+                                                                        <Edit className="h-4 w-4 mr-2" />
+                                                                        Edit Task
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation()
+                                                                            if (!canDeleteTask(task)) return
+                                                                            handleDeleteClick(task)
+                                                                        }}
+                                                                        disabled={!canDeleteTask(task)}
+                                                                        className="text-destructive focus:text-destructive"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4 mr-2" />
+                                                                        Delete Task
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Status badge */}
+                                                    <div className="flex items-center gap-2">
+                                                        <StatusBadge status={task.status} />
+                                                        <TypeBadge type={task.type} />
+                                                    </div>
+
+                                                    {/* Description (1 line clamp) */}
+                                                    {task.description && (
+                                                        <p className="text-[13px] text-[var(--apple-secondary-label)] line-clamp-1">
+                                                            {task.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim()}
+                                                        </p>
+                                                    )}
+
+                                                    {/* Meta row */}
+                                                    <div className="flex flex-wrap items-center gap-3">
+                                                        {task.project?.name && (
+                                                            <MetaChip
+                                                                icon={<Target className="h-3 w-3" />}
+                                                                label={task.project.name}
+                                                                title={task.project.name}
+                                                            />
+                                                        )}
+                                                        {task.dueDate && (
+                                                            <MetaChip
+                                                                icon={<Calendar className="h-3 w-3" />}
+                                                                label={`Due ${formatDate(task.dueDate)}`}
+                                                            />
+                                                        )}
+                                                        {task.storyPoints != null && (
+                                                            <MetaChip
+                                                                icon={<BarChart3 className="h-3 w-3" />}
+                                                                label={`${task.storyPoints} pts`}
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    {/* Footer: assignee avatars */}
+                                                    {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
+                                                        <div className="flex items-center pt-1 border-t border-[var(--apple-separator)]">
+                                                            <div className="flex items-center">
+                                                                {(task.assignedTo as any[]).slice(0, 4).map((assignee: any, idx: number, arr: any[]) => {
+                                                                    const userData = assignee.user || assignee
+                                                                    const displayName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User'
+                                                                    return (
+                                                                        <div key={userData._id || idx} title={displayName} style={{ marginLeft: idx === 0 ? 0 : -6, zIndex: arr.length - idx }}>
+                                                                            <GravatarAvatar
+                                                                                user={{
+                                                                                    avatar: userData.avatar,
+                                                                                    firstName: userData.firstName,
+                                                                                    lastName: userData.lastName,
+                                                                                    email: userData.email
+                                                                                }}
+                                                                                size={22}
+                                                                                className="border-2 border-background"
+                                                                            />
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                            {(task.assignedTo as any[]).length > 4 && (
+                                                                <span className="ml-1.5 text-[11px] text-[var(--apple-tertiary-label)]">
+                                                                    +{(task.assignedTo as any[]).length - 4}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                    <PaginationBar
+                                        currentPage={currentPage}
+                                        totalPages={totalPages}
+                                        totalCount={totalCount}
+                                        pageSize={pageSize}
+                                        onPageChange={handlePageChange}
+                                        onPageSizeChange={handlePageSizeChange}
+                                        loading={loading}
+                                    />
+                                </>
+                            ) : (
+                                !loading && (
+                                    <TasksEmptyState
+                                        icon={<ListTodo className="h-10 w-10" />}
+                                        title="No tasks found"
+                                        description="Try adjusting your filters or create a new task."
+                                        action={
+                                            canCreateTask ? (
+                                                <Button onClick={() => setShowCreateTaskModal(true)}>New Task</Button>
+                                            ) : undefined
+                                        }
+                                    />
+                                )
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
+            {/* ── Kanban View ───────────────────────────────────────────────────── */}
+            {viewMode === 'kanban' && (
+                <div className="space-y-4">
+                    {shouldShowInitialLoader ? (
+                        <FullPageLoader label="Loading tasks..." />
+                    ) : (
+                        <>
+                            {shouldShowInlineLoader && <InlineLoader label="Refreshing board..." />}
+                            <KanbanBoard
+                                projectId={projectFilter}
+                                filters={kanbanFilters}
+                                onProjectChange={setProjectFilter}
+                                onCreateTask={() => setShowCreateTaskModal(true)}
+                                onEditTask={handleKanbanEditTask}
+                                onDeleteTask={handleKanbanDeleteTask}
+                            />
+                            {tasks.length === 0 && !loading && (
+                                <TasksEmptyState
+                                    icon={<ListTodo className="h-10 w-10" />}
+                                    title="No tasks found"
+                                    description="Try adjusting your filters or create a new task."
+                                    action={
+                                        canCreateTask ? (
+                                            <Button onClick={() => setShowCreateTaskModal(true)}>New Task</Button>
+                                        ) : undefined
+                                    }
+                                />
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
+            {/* ── Modals ────────────────────────────────────────────────────────── */}
             {showCreateTaskModal && (
                 <CreateTaskModal
                     isOpen={showCreateTaskModal}
@@ -1619,7 +2276,6 @@ export default function TasksClient({
                 />
             )}
 
-            {/* Delete Confirmation Modal */}
             <ConfirmationModal
                 isOpen={showDeleteConfirmModal}
                 onClose={() => {

@@ -30,7 +30,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if user has permission to cancel invitations
-    if (!['admin', 'project_manager'].includes(user.role)) {
+    // Admin, Project Manager, and HR can cancel invitations
+    if (!['admin', 'project_manager', 'human_resource'].includes(user.role)) {
       return NextResponse.json(
         { error: 'Insufficient permissions' },
         { status: 403 }

@@ -426,9 +426,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   }
 
   const handleTaskCreated = () => {
-    fetchTasks() // Refresh the task list
+    fetchTasks()
     setShowCreateModal(false)
-    notifySuccess({ title: 'Success', message: 'Task created successfully' })
   }
 
   const handleCreateTaskClick = () => {

@@ -3,26 +3,39 @@
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useEffect, useMemo, useState } from 'react'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Progress } from '@/components/ui/Progress'
-import { Badge } from '@/components/ui/Badge'
-import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission } from '@/lib/permissions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
-import { 
-  BarChart, 
-  Download, 
-  TrendingUp, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
-  Clock,
-  Target,
-  Users,
-  FileText
+import {
+  BarChart3, Download, TrendingUp, CheckCircle, XCircle,
+  AlertCircle, Clock, Target, FileText, Activity
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+const EXEC_STATUS_CONFIG = {
+  passed:  { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800', label: 'Passed',  bar: 'linear-gradient(90deg,#34C759,#30D158)', icon: CheckCircle },
+  failed:  { bg: 'bg-red-50 dark:bg-red-950/30',         text: 'text-red-600 dark:text-red-400',         dot: 'bg-red-500',    border: 'border-red-200 dark:border-red-800',   label: 'Failed',  bar: 'linear-gradient(90deg,#FF3B30,#FF453A)', icon: XCircle },
+  blocked: { bg: 'bg-amber-50 dark:bg-amber-950/30',     text: 'text-amber-600 dark:text-amber-400',     dot: 'bg-amber-500',  border: 'border-amber-200 dark:border-amber-800', label: 'Blocked', bar: 'linear-gradient(90deg,#FF9500,#FFD60A)', icon: AlertCircle },
+  skipped: { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',       dot: 'bg-gray-400',   border: 'border-gray-200 dark:border-gray-700',  label: 'Skipped', bar: 'linear-gradient(90deg,#8E8E93,#AEAEB2)', icon: Clock },
+} as const
+
+function GradientProgress({ value, gradient, glow }: { value: number; gradient: string; glow: string }) {
+  return (
+    <div className="relative h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+      {value > 2 && (
+        <div className="progress-bar-animated absolute inset-y-0 left-0 rounded-full overflow-hidden" style={{
+          width: `${value}%`,
+          background: gradient,
+          boxShadow: `0 0 8px ${glow}`,
+          transformOrigin: 'left'
+        }}>
+          <span className="progress-shimmer absolute inset-0" />
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function TestReportsPage() {
   const { setItems } = useBreadcrumb()
@@ -33,11 +46,7 @@ export default function TestReportsPage() {
   const { formatDate } = useDateTime()
 
   useEffect(() => {
-    // Set breadcrumb
-    setItems([
-      { label: 'Test Management', href: '/test-management' },
-      { label: 'Test Reports' }
-    ])
+    setItems([{ label: 'Test Management', href: '/test-management' }, { label: 'Test Reports' }])
   }, [setItems])
 
   useEffect(() => {
@@ -60,13 +69,9 @@ export default function TestReportsPage() {
         else setExecutions([])
         if (projectsRes.ok && projectsData?.success && Array.isArray(projectsData.data)) setProjects(projectsData.data)
         else setProjects([])
-      } catch (e) {
-        setCases([])
-        setExecutions([])
-        setProjects([])
-      } finally {
-        setLoading(false)
-      }
+      } catch {
+        setCases([]); setExecutions([]); setProjects([])
+      } finally { setLoading(false) }
     }
     fetchData()
   }, [])
@@ -78,315 +83,281 @@ export default function TestReportsPage() {
     const blocked = executions.filter(e => e.status === 'blocked').length
     const actionable = passed + failed
     const passRate = actionable === 0 ? 0 : Math.round((passed / actionable) * 100)
-    // Execution rate: unique executed test cases vs total test cases
-    const uniqueExecutedCases = new Set(
-      executions
-        .map(e => (e?.testCase?._id || e?.testCase))
-        .filter(Boolean)
-        .map(String)
-    ).size
+    const uniqueExecutedCases = new Set(executions.map(e => String(e?.testCase?._id || e?.testCase)).filter(Boolean)).size
     const executionRate = totalTestCases === 0 ? 0 : Math.round((uniqueExecutedCases / totalTestCases) * 100)
     return { totalTestCases, passed, failed, blocked, passRate, executionRate }
   }, [cases, executions])
 
   const projectStats = useMemo(() => {
     return projects.map(project => {
-      const projectId = project._id || project.id
-      
-      // Get test cases for this project
-      const projectCases = cases.filter(c => 
-        (c.project?._id || c.project) === projectId
-      )
-      
-      // Get test executions for this project
-      const projectExecutions = executions.filter(e => 
-        (e.project?._id || e.project) === projectId
-      )
-      
-      // Calculate statistics
+      const pid = project._id || project.id
+      const projectCases = cases.filter(c => (c.project?._id || c.project) === pid)
+      const projectExecutions = executions.filter(e => (e.project?._id || e.project) === pid)
       const totalCases = projectCases.length
       const executed = projectExecutions.length
       const passed = projectExecutions.filter(e => e.status === 'passed').length
       const failed = projectExecutions.filter(e => e.status === 'failed').length
       const blocked = projectExecutions.filter(e => e.status === 'blocked').length
-      
-      // Calculate pass rate (only for executed tests)
       const actionable = passed + failed
       const passRate = actionable === 0 ? 0 : Math.round((passed / actionable) * 100)
-      
-      return {
-        name: project.name,
-        totalCases,
-        executed,
-        passed,
-        failed,
-        blocked,
-        passRate
-      }
-    }).filter(project => project.totalCases > 0) // Only show projects with test cases
+      return { name: project.name, totalCases, executed, passed, failed, blocked, passRate }
+    }).filter(p => p.totalCases > 0)
   }, [projects, cases, executions])
 
   const recentExecutions = useMemo(() => {
-    return executions
-      .slice(0, 10) // Get latest 10 executions
-      .map(execution => ({
-        testCase: execution.testCase?.title || 'Unknown Test Case',
-        project: execution.project?.name || 'Unknown Project',
-        status: execution.status,
-        executedBy: execution.executedBy ? 
-          `${execution.executedBy.firstName || ''} ${execution.executedBy.lastName || ''}`.trim() || 
-          execution.executedBy.email || 'Unknown User' : 'Unknown User',
-        executedAt: execution.executedAt || execution.createdAt
-      }))
+    return executions.slice(0, 10).map(execution => ({
+      testCase: execution.testCase?.title || 'Unknown Test Case',
+      project: execution.project?.name || 'Unknown Project',
+      status: execution.status as keyof typeof EXEC_STATUS_CONFIG,
+      executedBy: execution.executedBy
+        ? (`${execution.executedBy.firstName || ''} ${execution.executedBy.lastName || ''}`.trim() || execution.executedBy.email || 'Unknown')
+        : 'Unknown',
+      executedAt: execution.executedAt || execution.createdAt
+    }))
   }, [executions])
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'passed': return <CheckCircle className="h-4 w-4 text-green-500" />
-      case 'failed': return <XCircle className="h-4 w-4 text-red-500" />
-      case 'blocked': return <AlertCircle className="h-4 w-4 text-yellow-500" />
-      default: return <AlertCircle className="h-4 w-4 text-gray-500" />
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'passed': return 'bg-green-100 text-green-800'
-      case 'failed': return 'bg-red-100 text-red-800'
-      case 'blocked': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
+  const SUMMARY_STATS = [
+    {
+      label: 'Total Test Cases',
+      value: loading ? null : summary.totalTestCases,
+      sub: 'Across all projects',
+      icon: FileText,
+      gradient: 'var(--apple-card-gradient)',
+      glow: 'var(--apple-chart-glow)',
+    },
+    {
+      label: 'Execution Rate',
+      value: loading ? null : `${summary.executionRate}%`,
+      sub: 'Cases executed at least once',
+      icon: TrendingUp,
+      gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
+      glow: 'rgba(0,122,255,0.25)',
+      progress: summary.executionRate,
+    },
+    {
+      label: 'Pass Rate',
+      value: loading ? null : `${summary.passRate}%`,
+      sub: 'Passed vs. actionable runs',
+      icon: CheckCircle,
+      gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)',
+      glow: 'rgba(52,199,89,0.25)',
+      progress: summary.passRate,
+    },
+    {
+      label: 'Failed Tests',
+      value: loading ? null : summary.failed,
+      sub: loading ? '—' : `${summary.blocked} blocked`,
+      icon: XCircle,
+      gradient: 'var(--apple-card-gradient)',
+      glow: 'var(--apple-chart-glow)',
+    },
+  ]
 
   const buildCsv = (headers: string[], rows: (string | number | null | undefined)[][]) => {
     const escape = (val: any) => {
       if (val === null || val === undefined) return ''
       const s = String(val)
-      if (s.includes('"') || s.includes(',') || s.includes('\n')) {
-        return '"' + s.replace(/"/g, '""') + '"'
-      }
-      return s
+      return (s.includes('"') || s.includes(',') || s.includes('\n')) ? '"' + s.replace(/"/g, '""') + '"' : s
     }
-    const lines = [headers.map(escape).join(',')]
-    for (const row of rows) lines.push(row.map(escape).join(','))
-    return lines.join('\n')
+    return [[...headers.map(escape)], ...rows.map(r => r.map(escape))].map(r => r.join(',')).join('\n')
   }
 
   const handleExport = () => {
-    const parts: string[] = []
-    // Summary
-    parts.push('# Summary')
-    parts.push(buildCsv(
-      ['metric', 'value'],
-      [
+    const parts = [
+      '# Summary',
+      buildCsv(['metric', 'value'], [
         ['totalTestCases', summary.totalTestCases],
-        ['executed_unique_cases', Math.round((summary.executionRate / 100) * summary.totalTestCases)],
-        ['passed', summary.passed],
-        ['failed', summary.failed],
-        ['blocked', summary.blocked],
-        ['passRate', `${summary.passRate}%`],
-        ['executionRate', `${summary.executionRate}%`],
-      ]
-    ))
-    parts.push('')
-    // Project Stats
-    parts.push('# Project Statistics')
-    parts.push(buildCsv(
-      ['name', 'totalCases', 'executed', 'passed', 'failed', 'blocked', 'passRate'],
-      projectStats.map(p => [p.name, p.totalCases, p.executed, p.passed, p.failed, p.blocked, `${p.passRate}%`])
-    ))
-    parts.push('')
-    // Recent Executions
-    parts.push('# Recent Executions')
-    parts.push(buildCsv(
-      ['testCase', 'project', 'status', 'executedBy', 'executedAt'],
-      recentExecutions.map(e => [e.testCase, e.project, e.status, e.executedBy, new Date(e.executedAt).toISOString()])
-    ))
-
-    const csv = parts.join('\n') + '\n'
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+        ['passed', summary.passed], ['failed', summary.failed], ['blocked', summary.blocked],
+        ['passRate', `${summary.passRate}%`], ['executionRate', `${summary.executionRate}%`],
+      ]),
+      '', '# Project Statistics',
+      buildCsv(['name', 'totalCases', 'executed', 'passed', 'failed', 'blocked', 'passRate'],
+        projectStats.map(p => [p.name, p.totalCases, p.executed, p.passed, p.failed, p.blocked, `${p.passRate}%`])),
+      '', '# Recent Executions',
+      buildCsv(['testCase', 'project', 'status', 'executedBy', 'executedAt'],
+        recentExecutions.map(e => [e.testCase, e.project, e.status, e.executedBy, new Date(e.executedAt).toISOString()])),
+    ]
+    const blob = new Blob([parts.join('\n') + '\n'], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
-    a.download = `test-reports-${new Date().toISOString().split('T')[0]}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    a.href = url; a.download = `test-reports-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
   }
 
   return (
     <MainLayout>
       <PermissionGate permission={Permission.TEST_MANAGE}>
         <div className="space-y-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Test Reports</h1>
-              <p className="text-muted-foreground">
-                Comprehensive test execution reports and analytics
-              </p>
+
+          {/* ── Page Header ── */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <BarChart3 className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+              <div>
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">Test Reports</h1>
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                  Comprehensive test execution reports and analytics
+                </p>
+              </div>
             </div>
-            <Button onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" />
-              Export Report
+            <Button
+              onClick={handleExport}
+              className="w-full sm:w-auto h-9 gap-1.5 rounded-[var(--apple-radius-sm)] apple-transition"
+              style={{ background: 'var(--apple-card-gradient)' }}
+            >
+              <Download className="h-4 w-4" strokeWidth={1.5} />
+              <span className="text-[13px]">Export CSV</span>
             </Button>
           </div>
 
-        {/* Summary Cards */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Test Cases</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loading ? '—' : summary.totalTestCases}</div>
-              <p className="text-xs text-muted-foreground">
-                Across all projects
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Execution Rate</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loading ? '—' : `${summary.executionRate}%`}</div>
-              <Progress value={summary.executionRate} className="mt-2" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pass Rate</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loading ? '—' : `${summary.passRate}%`}</div>
-              <Progress value={summary.passRate} className="mt-2" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Failed Tests</CardTitle>
-              <XCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loading ? '—' : summary.failed}</div>
-              <p className="text-xs text-muted-foreground">
-                {loading ? '—' : `${summary.blocked} blocked`}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Project Statistics */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Project Test Statistics</CardTitle>
-            <CardDescription>
-              Test execution statistics by project
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="text-muted-foreground">Loading project statistics...</div>
-              </div>
-            ) : projectStats.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Target className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Test Data Found</h3>
-                <p className="text-muted-foreground max-w-md">
-                  There are no projects with test cases available. Create test cases for your projects to see statistics here.
-                </p>
-              </div>
-            ) : (
-            <div className="space-y-5">
-                {projectStats.map((project, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">{project.name}</h4>
-                      <Badge variant="outline">{project.passRate}% Pass Rate</Badge>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <Target className="h-4 w-4 text-muted-foreground" />
-                        <span>Total: {project.totalCases}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span>Executed: {project.executed}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span>Passed: {project.passed}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <XCircle className="h-4 w-4 text-red-500" />
-                        <span>Failed: {project.failed}</span>
-                      </div>
-                    </div>
-                    <Progress value={project.passRate} className="mt-2" />
+          {/* ── Summary Stats Bar ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {SUMMARY_STATS.map((stat) => (
+              <div key={stat.label} className="card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 apple-transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[12px] text-[var(--apple-tertiary-label)]">{stat.label}</p>
+                  <stat.icon className="h-4 w-4 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+                </div>
+                {loading ? (
+                  <div className="h-7 w-16 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                ) : (
+                  <p className="text-[26px] font-bold font-apple-mono tabular-nums tracking-tight text-[var(--apple-label)] leading-none">{stat.value}</p>
+                )}
+                {stat.progress !== undefined && !loading && (
+                  <div className="mt-2">
+                    <GradientProgress value={stat.progress} gradient={stat.gradient} glow={stat.glow} />
                   </div>
-                ))}
+                )}
+                <p className="text-[11px] text-[var(--apple-tertiary-label)] mt-1.5">{stat.sub}</p>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            ))}
+          </div>
 
-        {/* Recent Executions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Test Executions</CardTitle>
-            <CardDescription>
-              Latest test execution results
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="text-muted-foreground">Loading recent executions...</div>
-              </div>
-            ) : recentExecutions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Test Executions Found</h3>
-                <p className="text-muted-foreground max-w-md">
-                  There are no test executions available. Execute some test cases to see recent activity here.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentExecutions.map((execution, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      {getStatusIcon(execution.status)}
-                      <div>
-                        <p className="font-medium">{execution.testCase}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {execution.project} • {execution.executedBy}
-                        </p>
+          {/* ── Project Statistics ── */}
+          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+              <p className="text-[17px] font-semibold text-[var(--apple-label)]">Project Test Statistics</p>
+              <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">Execution breakdown per project</p>
+            </div>
+            <div className="px-5 py-4">
+              {loading ? (
+                <div className="space-y-5">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="h-4 w-36 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                        <div className="h-5 w-20 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
                       </div>
+                      <div className="h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge className={getStatusColor(execution.status)}>
-                        {execution.status.charAt(0).toUpperCase() + execution.status.slice(1)}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
+                  ))}
+                </div>
+              ) : projectStats.length === 0 ? (
+                <div className="py-12 flex flex-col items-center gap-3 text-center text-[var(--apple-tertiary-label)]">
+                  <Target className="h-10 w-10 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+                  <div>
+                    <p className="text-[15px] font-medium text-[var(--apple-label)]">No Test Data Found</p>
+                    <p className="text-[13px] text-[var(--apple-secondary-label)] mt-1 max-w-xs">
+                      Create test cases for your projects to see statistics here.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {projectStats.map((project, index) => (
+                    <div key={index} className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[15px] font-semibold text-[var(--apple-label)]">{project.name}</p>
+                        <span className={cn('inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border',
+                          project.passRate >= 80 ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800' :
+                          project.passRate >= 50 ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800' :
+                          'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800'
+                        )}>
+                          {project.passRate}% pass
+                        </span>
+                      </div>
+                      <GradientProgress
+                        value={project.passRate}
+                        gradient={project.passRate >= 80 ? 'linear-gradient(90deg,#34C759,#30D158)' : project.passRate >= 50 ? 'linear-gradient(90deg,#FF9500,#FFD60A)' : 'linear-gradient(90deg,#FF3B30,#FF453A)'}
+                        glow={project.passRate >= 80 ? 'rgba(52,199,89,0.3)' : project.passRate >= 50 ? 'rgba(255,149,0,0.3)' : 'rgba(255,59,48,0.3)'}
+                      />
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { label: 'Total Cases', value: project.totalCases, icon: Target, color: 'text-[var(--apple-tertiary-label)]' },
+                          { label: 'Executed', value: project.executed, icon: Activity, color: 'text-[var(--apple-tertiary-label)]' },
+                          { label: 'Passed', value: project.passed, icon: CheckCircle, color: 'text-emerald-500' },
+                          { label: 'Failed', value: project.failed, icon: XCircle, color: 'text-red-500' },
+                        ].map(({ label, value, icon: Icon, color }) => (
+                          <div key={label} className="flex items-center gap-1.5">
+                            <Icon className={cn('h-3.5 w-3.5 flex-shrink-0', color)} />
+                            <span className="text-[12px] text-[var(--apple-secondary-label)]">{label}:</span>
+                            <span className="text-[12px] font-semibold font-apple-mono text-[var(--apple-label)]">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {index < projectStats.length - 1 && <div className="border-b border-[var(--apple-separator)]" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Recent Executions Timeline ── */}
+          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+              <p className="text-[17px] font-semibold text-[var(--apple-label)]">Recent Test Executions</p>
+              <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">Latest 10 executions across all projects</p>
+            </div>
+            <div className="divide-y divide-[var(--apple-separator)]">
+              {loading ? (
+                [...Array(4)].map((_, i) => (
+                  <div key={i} className="px-5 py-3 flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3.5 w-48 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                      <div className="h-3 w-32 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                    </div>
+                    <div className="h-5 w-16 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                  </div>
+                ))
+              ) : recentExecutions.length === 0 ? (
+                <div className="px-5 py-12 flex flex-col items-center gap-3 text-center text-[var(--apple-tertiary-label)]">
+                  <Clock className="h-8 w-8 opacity-40" />
+                  <div>
+                    <p className="text-[15px] font-medium text-[var(--apple-label)]">No Test Executions Found</p>
+                    <p className="text-[13px] text-[var(--apple-secondary-label)] mt-1">Execute some test cases to see recent activity here.</p>
+                  </div>
+                </div>
+              ) : recentExecutions.map((execution, index) => {
+                const cfg = EXEC_STATUS_CONFIG[execution.status] ?? EXEC_STATUS_CONFIG.skipped
+                const Icon = cfg.icon
+                return (
+                  <div key={index} className="px-5 py-3 flex items-center gap-3 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                    <div className={cn('flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center', cfg.bg)}>
+                      <Icon className={cn('h-3.5 w-3.5', cfg.text)} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-[var(--apple-label)] truncate">{execution.testCase}</p>
+                      <p className="text-[11px] text-[var(--apple-tertiary-label)] mt-0.5 truncate">
+                        {execution.project} · {execution.executedBy}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border animate-[badge-border-pulse_3s_ease-in-out_infinite]', cfg.bg, cfg.text, cfg.border)}>
+                        <span className={cn('w-1.5 h-1.5 rounded-full animate-[status-pulse_2.4s_ease-in-out_infinite]', cfg.dot)} />
+                        {cfg.label}
+                      </span>
+                      <span className="text-[11px] text-[var(--apple-tertiary-label)] whitespace-nowrap hidden sm:block">
                         {formatDate(execution.executedAt)}
                       </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
       </PermissionGate>
     </MainLayout>
   )

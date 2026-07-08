@@ -4,21 +4,20 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Badge } from '@/components/ui/Badge'
-import { formatToTitleCase } from '@/lib/utils'
-import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
+import { cn, formatToTitleCase } from '@/lib/utils'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
-
 import { useNotify } from '@/lib/notify'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { PermissionGate, PermissionButton } from '@/lib/permissions/permission-components'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PageContent } from '@/components/ui/PageContent'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
@@ -26,24 +25,30 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import {
   Plus,
   Search,
-  Filter,
   MoreHorizontal,
   Calendar,
   Users,
   DollarSign,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  Pause,
-  XCircle,
-  Play,
-  Loader2,
   Settings,
   Edit,
   Trash2,
-  Eye
+  Eye,
+  FolderOpen,
+  LayoutGrid,
+  List,
+  ChevronLeft,
+  ChevronRight,
+  CheckSquare,
 } from 'lucide-react'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Project {
   _id: string
@@ -83,9 +88,547 @@ interface Project {
   createdAt: string
 }
 
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+
+const PROJECT_PALETTE = [
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+  { gradient: 'var(--apple-card-gradient)', glow: 'var(--apple-chart-glow)' },
+]
+
+const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+  draft:     { bg: 'bg-orange-50 dark:bg-orange-950/30',   text: 'text-orange-600 dark:text-orange-400',   dot: 'bg-orange-500',   border: 'border-orange-200 dark:border-orange-800' },
+  planning:  { bg: 'bg-blue-50 dark:bg-blue-950/30',       text: 'text-blue-600 dark:text-blue-400',       dot: 'bg-blue-500',     border: 'border-blue-200 dark:border-blue-800' },
+  active:    { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500',  border: 'border-emerald-200 dark:border-emerald-800' },
+  on_hold:   { bg: 'bg-amber-50 dark:bg-amber-950/30',     text: 'text-amber-600 dark:text-amber-400',     dot: 'bg-amber-500',    border: 'border-amber-200 dark:border-amber-800' },
+  completed: { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',       dot: 'bg-gray-400',     border: 'border-gray-200 dark:border-gray-700' },
+  cancelled: { bg: 'bg-red-50 dark:bg-red-950/30',         text: 'text-red-600 dark:text-red-400',         dot: 'bg-red-500',      border: 'border-red-200 dark:border-red-800' },
+}
+
+const PRIORITY_CONFIG: Record<string, { bg: string; text: string; border: string }> = {
+  low:      { bg: 'bg-gray-50 dark:bg-gray-900/40',      text: 'text-gray-500 dark:text-gray-400',     border: 'border-gray-200 dark:border-gray-700' },
+  medium:   { bg: 'bg-blue-50 dark:bg-blue-950/30',      text: 'text-blue-600 dark:text-blue-400',     border: 'border-blue-200 dark:border-blue-800' },
+  high:     { bg: 'bg-orange-50 dark:bg-orange-950/30',  text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-800' },
+  critical: { bg: 'bg-red-50 dark:bg-red-950/30',        text: 'text-red-600 dark:text-red-400',       border: 'border-red-200 dark:border-red-800' },
+}
+
+// ─── Atoms ────────────────────────────────────────────────────────────────────
+
+function ProjectAvatar({
+  name,
+  gradient,
+  size = 'md',
+}: {
+  name: string
+  gradient: string
+  size?: 'sm' | 'md' | 'lg'
+}) {
+  const initials = name
+    .split(' ')
+    .slice(0, 2)
+    .map((w: string) => w[0]?.toUpperCase() ?? '')
+    .join('')
+  const sizeClasses = {
+    sm: 'h-8 w-8 text-xs rounded-[var(--apple-radius-sm)]',
+    md: 'h-10 w-10 text-sm rounded-[var(--apple-radius-sm)]',
+    lg: 'h-12 w-12 text-base rounded-[var(--apple-radius-md)]',
+  }
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-center flex-shrink-0 text-white font-bold select-none',
+        sizeClasses[size],
+      )}
+      style={{ background: gradient }}
+    >
+      {initials}
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center justify-center gap-1.5 px-2 py-0.5',
+        'rounded-full text-xs font-semibold border whitespace-nowrap',
+        'w-[104px]', 
+        cfg.bg, cfg.text, cfg.border,
+      )}
+      style={{ animation: 'badge-border-pulse 2s ease-in-out infinite' }}
+    >
+      <span
+        className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', cfg.dot)}
+        style={{ animation: 'status-pulse 2s ease-in-out infinite' }}
+      />
+      {formatToTitleCase(status)}
+    </span>
+  )
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  const cfg = PRIORITY_CONFIG[priority] ?? PRIORITY_CONFIG.low
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center px-2.5 py-0.5',
+        'rounded-full text-xs font-medium border whitespace-nowrap',
+        cfg.bg, cfg.text, cfg.border,
+      )}
+    >
+      {formatToTitleCase(priority)}
+    </span>
+  )
+}
+
+function GradientProgress({
+  value,
+  gradient,
+  glow,
+}: {
+  value: number
+  gradient: string
+  glow: string
+}) {
+  const pct = Math.min(Math.max(value, 0), 100)
+  return (
+    <div className="flex items-center gap-2 w-full">
+      <div className="relative flex-1 h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full overflow-hidden progress-bar-animated"
+          style={{
+            width: `${pct}%`,
+            background: gradient,
+            boxShadow: pct > 2 ? `0 0 8px ${glow}, 0 1px 3px ${glow}` : 'none',
+            transformOrigin: 'left',
+          }}
+        >
+          {pct > 2 && <span aria-hidden className="progress-shimmer absolute inset-0" />}
+        </div>
+      </div>
+      <span className="text-xs font-apple-mono font-semibold text-[var(--apple-secondary-label)] w-9 text-right flex-shrink-0 tabular-nums">
+        {pct}%
+      </span>
+    </div>
+  )
+}
+
+// ─── Skeletons ────────────────────────────────────────────────────────────────
+
+function GridCardSkeleton() {
+  return (
+    <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+      <div className="h-0.5 bg-[var(--apple-tertiary-fill)]" />
+      <div className="p-5 space-y-4">
+        <div className="flex items-start justify-between">
+          <div className="h-10 w-10 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] animate-pulse" />
+          <div className="h-4 w-16 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+        </div>
+        <div className="space-y-1.5">
+          <div className="h-5 w-3/4 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+          <div className="flex gap-2">
+            <div className="h-5 w-20 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+            <div className="h-5 w-16 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <div className="h-[6px] w-full rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+          <div className="h-3 w-28 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+        </div>
+        <div className="pt-3 border-t border-[var(--apple-separator)] flex justify-between">
+          <div className="h-3 w-16 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+          <div className="h-3 w-20 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ListRowSkeleton() {
+  return (
+    <div
+      className={cn(
+        'grid gap-x-4 items-center px-5 py-3.5',
+        'border-b border-[var(--apple-separator)] last:border-0',
+        LIST_COLS,
+      )}
+    >
+      <div className="h-10 w-10 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] animate-pulse" />
+      <div className="h-4 w-36 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+      <div className="h-[6px] w-full rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+      <div className="h-5 w-20 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+      <div className="h-5 w-16 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+      <div className="h-4 w-8 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+      <div className="h-7 w-7 rounded-lg bg-[var(--apple-tertiary-fill)] animate-pulse" />
+    </div>
+  )
+}
+
+// ─── Empty State ──────────────────────────────────────────────────────────────
+
+function EmptyState({
+  hasFilters,
+  onClearFilters,
+  onCreateProject,
+}: {
+  hasFilters: boolean
+  onClearFilters: () => void
+  onCreateProject: () => void
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 gap-5 text-center">
+      <div
+        className="h-16 w-16 rounded-[var(--apple-radius-lg)] flex items-center justify-center shadow-sm"
+        style={{ background: 'var(--apple-card-gradient)' }}
+      >
+        <FolderOpen className="h-8 w-8 text-white" />
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-[17px] font-semibold text-[var(--apple-label)]">
+          {hasFilters ? 'No matching projects' : 'No projects yet'}
+        </p>
+        <p className="text-[15px] text-[var(--apple-secondary-label)] max-w-[280px]">
+          {hasFilters
+            ? 'Try adjusting your search or filters to find what you\'re looking for.'
+            : 'Create your first project to start tracking work with your team.'}
+        </p>
+      </div>
+      {hasFilters ? (
+        <Button variant="outline" size="sm" onClick={onClearFilters} className="apple-transition">
+          Clear filters
+        </Button>
+      ) : (
+        <PermissionGate permission={Permission.PROJECT_CREATE}>
+          <Button size="sm" onClick={onCreateProject} className="apple-transition">
+            <Plus className="h-4 w-4 mr-1.5" />
+            Create Project
+          </Button>
+        </PermissionGate>
+      )}
+    </div>
+  )
+}
+
+// ─── Context Menu ─────────────────────────────────────────────────────────────
+
+function ProjectContextMenu({
+  project,
+  isAdmin,
+  onDelete,
+  onNavigate,
+}: {
+  project: Project
+  isAdmin: boolean
+  onDelete: (id: string) => void
+  onNavigate: (path: string) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0 flex-shrink-0 text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+          <span className="sr-only">More options</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation()
+            onNavigate(`/projects/${project._id}`)
+          }}
+        >
+          <Eye className="h-4 w-4 mr-2" />
+          View Project
+        </DropdownMenuItem>
+        <PermissionGate permission={Permission.PROJECT_UPDATE} projectId={project._id}>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation()
+              onNavigate(`/projects/${project._id}?tab=settings`)
+            }}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation()
+              onNavigate(`/projects/create?edit=${project._id}`)
+            }}
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Project
+          </DropdownMenuItem>
+        </PermissionGate>
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation()
+              if (!isAdmin) return
+              onDelete(project._id)
+            }}
+            disabled={!isAdmin}
+            title={!isAdmin ? 'Only admins can delete projects' : undefined}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Project
+          </DropdownMenuItem>
+        </>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+// ─── Grid Card ────────────────────────────────────────────────────────────────
+
+function ProjectGridCard({
+  project,
+  index,
+  isAdmin,
+  onDelete,
+  onNavigate,
+  formatDate,
+  formatCurrency,
+  orgCurrency,
+}: {
+  project: Project
+  index: number
+  isAdmin: boolean
+  onDelete: (id: string) => void
+  onNavigate: (path: string) => void
+  formatDate: (d: string) => string
+  formatCurrency: (amount: number, currency: string) => string
+  orgCurrency: string
+}) {
+  const palette = PROJECT_PALETTE[index % PROJECT_PALETTE.length]
+  const pct = project.progress?.completionPercentage || 0
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onNavigate(`/projects/${project._id}`)}
+      onKeyDown={(e) => e.key === 'Enter' && onNavigate(`/projects/${project._id}`)}
+      className={cn(
+        'card-fade-in group rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
+        'shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none',
+        'apple-transition cursor-pointer overflow-hidden flex flex-col',
+        'hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)]',
+        'hover:-translate-y-0.5',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)] focus-visible:ring-offset-2',
+      )}
+    >
+      {/* Gradient accent bar */}
+      <div className="h-[3px] w-full flex-shrink-0" style={{ background: palette.gradient }} />
+
+      <div className="p-4 flex flex-col gap-3">
+        {/* Row 1: Avatar + Name + Badges + Actions side-by-side */}
+        <div className="flex items-start gap-3">
+          <ProjectAvatar name={project.name} gradient={palette.gradient} size="md" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <h3
+                className="text-[15px] font-semibold leading-tight text-[var(--apple-label)] group-hover:text-[var(--apple-system-blue)] apple-transition truncate"
+                title={project.name}
+              >
+                {project.name}
+              </h3>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {typeof project.projectNumber !== 'undefined' && (
+                  <span className="text-[11px] font-apple-mono text-[var(--apple-tertiary-label)]">
+                    #{project.projectNumber}
+                  </span>
+                )}
+                {project.isDraft && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)] font-medium">
+                    Draft
+                  </span>
+                )}
+                <ProjectContextMenu
+                  project={project}
+                  isAdmin={isAdmin}
+                  onDelete={onDelete}
+                  onNavigate={onNavigate}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              <StatusBadge status={project.status} />
+              <PriorityBadge priority={project.priority} />
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Progress bar */}
+        <GradientProgress value={pct} gradient={palette.gradient} glow={palette.glow} />
+
+        {/* Row 3: Meta — tasks + team + date + budget (no border separator) */}
+        <div className="flex items-center gap-3 flex-wrap text-[13px] text-[var(--apple-secondary-label)]">
+          {project.progress?.totalTasks > 0 && (
+            <span className="flex items-center gap-1">
+              <CheckSquare className="h-3 w-3 flex-shrink-0" />
+              <span className="font-apple-mono tabular-nums">
+                {project.progress.tasksCompleted}/{project.progress.totalTasks}
+              </span>
+            </span>
+          )}
+          <span className="flex items-center gap-1">
+            <Users className="h-3 w-3 flex-shrink-0" />
+            <span className="font-apple-mono tabular-nums">{project.teamMembers.length}</span>
+          </span>
+          {project.budget && (
+            <span className="flex items-center gap-0.5 font-apple-mono tabular-nums">
+              <DollarSign className="h-3 w-3 flex-shrink-0" />
+              {formatCurrency(project.budget.total, project.budget.currency || orgCurrency)}
+            </span>
+          )}
+          {project.endDate && (
+            <span className="flex items-center gap-1 ml-auto text-[var(--apple-tertiary-label)] flex-shrink-0">
+              <Calendar className="h-3 w-3 flex-shrink-0" />
+              <span className="whitespace-nowrap">{formatDate(project.endDate)}</span>
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── List Header + Row ────────────────────────────────────────────────────────
+//
+// Both use the same 7-column grid template so every data cell sits directly
+// below its heading with zero extra layout work:
+//
+//   40px   |  1fr        |  160px    |  auto   |  auto    |  auto  |  32px
+//   avatar |  name       |  progress |  status |  priority|  team  |  menu
+//
+
+const LIST_COLS = 'grid-cols-[auto_1fr_3fr_1fr_1fr_auto_32px]'
+
+function ListHeader() {
+  return (
+    <div
+      className={cn(
+        'grid gap-x-4 items-center px-5 py-2.5',
+        'border-b border-[var(--apple-separator)]',
+        'bg-[var(--apple-tertiary-fill)]',
+        LIST_COLS,
+      )}
+    >
+      {/* spacer — avatar column */}
+      <div />
+      <span className="apple-section-label">Project</span>
+      <span className="apple-section-label">Progress</span>
+      <span className="apple-section-label">Status</span>
+      <span className="apple-section-label">Priority</span>
+      <span className="apple-section-label">Team</span>
+      {/* spacer — menu column */}
+      <div />
+    </div>
+  )
+}
+
+function ProjectListRow({
+  project,
+  index,
+  isAdmin,
+  onDelete,
+  onNavigate,
+}: {
+  project: Project
+  index: number
+  isAdmin: boolean
+  onDelete: (id: string) => void
+  onNavigate: (path: string) => void
+}) {
+  const palette = PROJECT_PALETTE[index % PROJECT_PALETTE.length]
+  const pct = project.progress?.completionPercentage || 0
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onNavigate(`/projects/${project._id}`)}
+      onKeyDown={(e) => e.key === 'Enter' && onNavigate(`/projects/${project._id}`)}
+      className={cn(
+        'group grid gap-x-4 items-center px-5 py-3.5',
+        'border-b border-[var(--apple-separator)] last:border-0',
+        'cursor-pointer apple-transition',
+        'hover:bg-[var(--apple-quaternary-fill)]',
+        'focus-visible:outline-none focus-visible:bg-[var(--apple-quaternary-fill)]',
+        LIST_COLS,
+      )}
+    >
+      {/* 1 — Avatar */}
+      <ProjectAvatar name={project.name} gradient={palette.gradient} size="md" />
+
+      {/* 2 — Name */}
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[15px] font-semibold text-[var(--apple-label)] group-hover:text-[var(--apple-system-blue)] apple-transition truncate"
+            title={project.name}
+          >
+            {project.name}
+          </span>
+          {typeof project.projectNumber !== 'undefined' && (
+            <span className="text-[11px] font-apple-mono text-[var(--apple-tertiary-label)] flex-shrink-0">
+              #{project.projectNumber}
+            </span>
+          )}
+          {project.isDraft && (
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)] font-medium flex-shrink-0">
+              Draft
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 3 — Progress */}
+      <GradientProgress value={pct} gradient={palette.gradient} glow={palette.glow} />
+
+      {/* 4 — Status */}
+      <div className="flex-shrink-0">
+        <StatusBadge status={project.status} />
+      </div>
+
+      {/* 5 — Priority */}
+      <div className="flex-shrink-0">
+        <PriorityBadge priority={project.priority} />
+      </div>
+
+      {/* 6 — Team count */}
+      <div className="flex items-center gap-1 text-[13px] text-[var(--apple-secondary-label)] flex-shrink-0">
+        <Users className="h-3.5 w-3.5 flex-shrink-0" />
+        <span className="font-apple-mono tabular-nums">{project.teamMembers.length}</span>
+      </div>
+
+      {/* 7 — Context menu */}
+      <ProjectContextMenu
+        project={project}
+        isAdmin={isAdmin}
+        onDelete={onDelete}
+        onNavigate={onNavigate}
+      />
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function ProjectsPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
-
   const router = useRouter()
   const searchParams = useSearchParams()
   const { organization } = useOrganization()
@@ -93,7 +636,10 @@ export default function ProjectsPage() {
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { formatDate } = useDateTime()
   const orgCurrency = organization?.currency || 'USD'
-  const isAdmin = typeof user?.role === 'string' && ['admin', 'super_admin', 'superadmin'].includes(user.role.toLowerCase())
+  const isAdmin =
+    typeof user?.role === 'string' &&
+    ['admin', 'super_admin', 'superadmin'].includes(user.role.toLowerCase())
+
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [searching, setSearching] = useState(false)
@@ -111,8 +657,6 @@ export default function ProjectsPage() {
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-
-  // Auth initialization - trigger data loading
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       setLoading(false)
@@ -123,51 +667,34 @@ export default function ProjectsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated])
 
-  // Seed filters from URL search params on mount
   useEffect(() => {
     const q = searchParams.get('search') || ''
     const s = searchParams.get('status') || 'all'
     const p = searchParams.get('priority') || 'all'
     setSearchQuery(q)
-    setDebouncedSearchQuery(q) // Also set debounced query for immediate search
+    setDebouncedSearchQuery(q)
     setStatusFilter(s)
     setPriorityFilter(p)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Refetch projects when filters or pagination change
   useEffect(() => {
-    if (!loading) {
-      fetchProjects()
-    }
+    if (!loading) fetchProjects()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearchQuery, statusFilter, priorityFilter, currentPage, pageSize])
 
-  // Debounce search query to avoid excessive API calls
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery)
-    }, 300) // 300ms delay
-
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300)
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // Refresh projects when page regains focus (user returns from another page)
   useEffect(() => {
-    const handleFocus = () => {
-      if (!loading) {
-        fetchProjects()
-      }
-    }
-
+    const handleFocus = () => { if (!loading) fetchProjects() }
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !loading) {
-        fetchProjects()
-      }
+      if (document.visibilityState === 'visible' && !loading) fetchProjects()
     }
-
     window.addEventListener('focus', handleFocus)
     document.addEventListener('visibilitychange', handleVisibilityChange)
-
     return () => {
       window.removeEventListener('focus', handleFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -175,32 +702,35 @@ export default function ProjectsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
 
+  // Force grid view on mobile — list view is desktop-only
+  useEffect(() => {
+    const syncViewMode = () => {
+      if (window.innerWidth < 640) setViewMode('grid')
+    }
+    syncViewMode()
+    window.addEventListener('resize', syncViewMode)
+    return () => window.removeEventListener('resize', syncViewMode)
+  }, [])
+
   const fetchProjects = async () => {
     try {
-      // Only show full loading state on initial load
-      if (isInitialLoad) {
-        setLoading(true)
-      } else {
-        setSearching(true)
-      }
+      if (isInitialLoad) setLoading(true)
+      else setSearching(true)
       const params = new URLSearchParams()
       if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       params.set('page', currentPage.toString())
       params.set('limit', pageSize.toString())
-
       const response = await fetch(`/api/projects?${params.toString()}`)
       const data = await response.json()
-
       if (data.success) {
-
         setProjects(data.data)
         setTotalCount(data.pagination?.total || data.data.length)
       } else {
         notifyError({ title: 'Error', message: data.error || 'Failed to fetch projects' })
       }
-    } catch (err) {
+    } catch {
       notifyError({ title: 'Error', message: 'Failed to fetch projects' })
     } finally {
       if (isInitialLoad) {
@@ -219,17 +749,12 @@ export default function ProjectsPage() {
 
   const handleDeleteConfirm = async () => {
     if (!projectToDelete) return
-
     try {
       setIsDeleting(true)
-      const response = await fetch(`/api/projects/${projectToDelete}`, {
-        method: 'DELETE'
-      })
-
+      const response = await fetch(`/api/projects/${projectToDelete}`, { method: 'DELETE' })
       const data = await response.json()
-
       if (data.success) {
-        setProjects(projects.filter(p => p._id !== projectToDelete))
+        setProjects(projects.filter((p) => p._id !== projectToDelete))
         setDeleteModalOpen(false)
         setProjectToDelete(null)
         notifySuccess({ title: 'Success', message: 'Project deleted successfully.' })
@@ -249,50 +774,49 @@ export default function ProjectsPage() {
     setProjectToDelete(null)
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'draft': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900'
-      case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
-      case 'on_hold': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
-      case 'completed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    }
+  const hasFilters =
+    searchQuery !== '' || statusFilter !== 'all' || priorityFilter !== 'all'
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setDebouncedSearchQuery('')
+    setStatusFilter('all')
+    setPriorityFilter('all')
+    setCurrentPage(1)
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'draft': return <Edit className="h-4 w-4" />
-      case 'planning': return <Calendar className="h-4 w-4" />
-      case 'active': return <Play className="h-4 w-4" />
-      case 'on_hold': return <Pause className="h-4 w-4" />
-      case 'completed': return <CheckCircle className="h-4 w-4" />
-      case 'cancelled': return <XCircle className="h-4 w-4" />
-      default: return <Calendar className="h-4 w-4" />
-    }
-  }
+  const navigate = (path: string) => router.push(path)
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    }
-  }
-
+  // ─── Loading skeleton ───────────────────────────────────────────────────────
 
   if (loading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading projects...</p>
+        <PageContent>
+          <div className="space-y-6">
+            {/* Header skeleton */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="h-8 w-28 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+                <div className="h-4 w-44 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+              </div>
+              <div className="h-9 w-32 bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-md)] animate-pulse" />
+            </div>
+            {/* Toolbar skeleton */}
+            <div className="flex gap-2.5">
+              <div className="flex-1 h-10 bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-md)] animate-pulse" />
+              <div className="h-10 w-32 bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-md)] animate-pulse" />
+              <div className="h-10 w-32 bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-md)] animate-pulse" />
+              <div className="h-10 w-20 bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-md)] animate-pulse" />
+            </div>
+            {/* Grid skeleton */}
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <GridCardSkeleton key={i} />
+              ))}
+            </div>
           </div>
-        </div>
+        </PageContent>
       </MainLayout>
     )
   }
@@ -300,448 +824,265 @@ export default function ProjectsPage() {
   return (
     <MainLayout>
       <PageContent>
-        <div className="space-y-6 sm:space-y-8 lg:space-y-10">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Projects</h1>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage and track your projects</p>
+        <div className="space-y-6">
+
+          {/* ─── Page Header ─────────────────────────────────────────────── */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <FolderOpen className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+              <div>
+                <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">
+                  Projects
+                </h1>
+                <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                  {searching ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--apple-system-blue)] animate-pulse" />
+                      Searching...
+                    </span>
+                  ) : totalCount > 0 ? (
+                    `${totalCount} project${totalCount !== 1 ? 's' : ''}`
+                  ) : (
+                    'Manage and track your projects'
+                  )}
+                </p>
+              </div>
             </div>
             <PermissionGate permission={Permission.PROJECT_CREATE}>
               <Button
                 onClick={() => router.push('/projects/create')}
-                className="flex items-center justify-center gap-2 w-full sm:w-auto text-sm sm:text-base hover:bg-primary/90 hover:shadow-lg transition-all duration-200"
+                className="flex items-center gap-2 text-sm font-medium apple-transition w-full sm:w-auto text-white hover:opacity-90"
+                style={{ background: 'var(--apple-card-gradient)' }}
               >
                 <Plus className="h-4 w-4" />
-                <span className="sm:inline">Create New Project</span>
-                <span className="sm:hidden">New Project</span>
+                New Project
               </Button>
             </PermissionGate>
           </div>
 
-
-          {/* Search and Filters */}
-          <div className="space-y-3">
-            {/* Search bar */}
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              <Input
+          {/* ─── Toolbar ─────────────────────────────────────────────────── */}
+          <div className="flex flex-col sm:flex-row gap-2.5">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--apple-tertiary-label)] pointer-events-none" />
+              <input
                 ref={searchInputRef}
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-full text-sm sm:text-base"
+                className={cn(
+                  'w-full pl-9 pr-4 h-10 rounded-[var(--apple-radius-md)]',
+                  'bg-[var(--apple-tertiary-fill)] border border-transparent',
+                  'text-[15px] text-[var(--apple-label)] placeholder:text-[var(--apple-tertiary-label)]',
+                  'focus:outline-none focus:ring-2 focus:ring-[var(--apple-system-blue)] focus:ring-offset-0 focus:border-transparent',
+                  'apple-transition',
+                )}
               />
             </div>
-            {/* Filter options - compact grid layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full text-sm">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="planning">Planning</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="on_hold">On Hold</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-full text-sm">
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priority</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {/* Project count */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {totalCount} project{totalCount !== 1 ? 's' : ''} found
-              </p>
+
+            {/* Status filter */}
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => {
+                setStatusFilter(v)
+                setCurrentPage(1)
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-[140px] h-10 text-sm">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="planning">Planning</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="on_hold">On Hold</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Priority filter */}
+            <Select
+              value={priorityFilter}
+              onValueChange={(v) => {
+                setPriorityFilter(v)
+                setCurrentPage(1)
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-[140px] h-10 text-sm">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priority</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* View toggle — hidden on mobile, list view is desktop-only */}
+            <div className="hidden sm:flex items-center rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] overflow-hidden bg-[var(--apple-tertiary-fill)] flex-shrink-0">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={cn(
+                  'flex items-center justify-center h-10 w-10 apple-transition',
+                  viewMode === 'grid'
+                    ? 'bg-card text-[var(--apple-label)] shadow-sm'
+                    : 'text-[var(--apple-tertiary-label)] hover:text-[var(--apple-secondary-label)]',
+                )}
+                aria-label="Grid view"
+                aria-pressed={viewMode === 'grid'}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  'flex items-center justify-center h-10 w-10 apple-transition',
+                  viewMode === 'list'
+                    ? 'bg-card text-[var(--apple-label)] shadow-sm'
+                    : 'text-[var(--apple-tertiary-label)] hover:text-[var(--apple-secondary-label)]',
+                )}
+                aria-label="List view"
+                aria-pressed={viewMode === 'list'}
+              >
+                <List className="h-4 w-4" />
+              </button>
             </div>
           </div>
 
-          {/* Projects View */}
-          <div>
-            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
-              <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
-                <TabsTrigger value="grid" className="text-xs sm:text-sm">Grid View</TabsTrigger>
-                <TabsTrigger value="list" className="text-xs sm:text-sm">List View</TabsTrigger>
-              </TabsList>
-
-
-              <TabsContent value="grid" className="space-y-4 mt-0">
-                <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {projects.map((project) => (
-                    <Card
-                      key={project._id}
-                      className="hover:shadow-md transition-shadow cursor-pointer flex flex-col"
-                      onClick={() => router.push(`/projects/${project._id}`)}
-                    >
-                      <CardHeader className="p-4 sm:p-6 pb-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="space-y-1.5 min-w-0 flex-1">
-                            <div className="flex items-start gap-2 min-w-0">
-                              <div className="flex-1 min-w-0">
-                                <CardTitle className="text-base sm:text-lg truncate" title={project.name}>
-                                  {project.name}
-                                </CardTitle>
-                              </div>
-                              <div className="flex flex-shrink-0 items-center gap-1.5 flex-wrap">
-                                {typeof project.projectNumber !== 'undefined' && (
-                                  <Badge variant="outline" className="text-xs hover:bg-transparent dark:hover:bg-transparent">#{project.projectNumber}</Badge>
-                                )}
-                                {project.isDraft && (
-                                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900 text-xs">
-                                    Draft
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            {/* <CardDescription className="line-clamp-2 text-xs sm:text-sm" title={project.description}>
-                            {project.description || 'No description'}
-                          </CardDescription> */}
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 flex-shrink-0"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">More options</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation()
-                                router.push(`/projects/${project._id}`)
-                              }}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Project
-                              </DropdownMenuItem>
-                              <PermissionGate permission={Permission.PROJECT_UPDATE} projectId={project._id}>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/projects/${project._id}?tab=settings`)
-                                }}>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  Settings
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/projects/create?edit=${project._id}`)
-                                }}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Project
-                                </DropdownMenuItem>
-                              </PermissionGate>
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (!isAdmin) return
-                                    handleDeleteClick(project._id)
-                                  }}
-                                  disabled={!isAdmin}
-                                  title={!isAdmin ? 'Only admins can delete projects' : undefined}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete Project
-                                </DropdownMenuItem>
-                              </>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-4 sm:p-6 pt-0 space-y-3 sm:space-y-4 flex-1 flex flex-col">
-                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                          <Badge className={`${getStatusColor(project.status)} text-xs`}>
-                            <span className="hidden sm:inline">{getStatusIcon(project.status)}</span>
-                            <span className="sm:ml-1">{formatToTitleCase(project.status)}</span>
-                          </Badge>
-                          <Badge className={`${getPriorityColor(project.priority)} text-xs`}>
-                            {formatToTitleCase(project.priority)}
-                          </Badge>
-                        </div>
-
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center justify-between text-xs sm:text-sm">
-                            <span className="text-muted-foreground">Progress</span>
-                            <span className="font-medium">{project.progress?.completionPercentage || 0}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 sm:h-2.5 overflow-hidden">
-                            <div
-                              className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-300 ease-out"
-                              style={{
-                                width: `${Math.min(100, Math.max(0, project.progress?.completionPercentage || 0))}%`,
-                                minWidth: (project.progress?.completionPercentage || 0) > 0 ? '2px' : '0px'
-                              }}
-                            />
-                          </div>
-                          {project.progress && project.progress.totalTasks > 0 && (
-                            <p className="text-xs text-muted-foreground">
-                              {project.progress.tasksCompleted} of {project.progress.totalTasks} tasks completed
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center space-x-1.5">
-                            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                            <span>{project.teamMembers.length} {project.teamMembers.length === 1 ? 'member' : 'members'}</span>
-                          </div>
-                          {project.budget && (
-                            <div className="flex items-center space-x-1.5">
-                              <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                              <span className="whitespace-nowrap">
-                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm pt-1">
-                          <div className="flex items-center space-x-1.5 text-gray-500 dark:text-gray-400">
-                            <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                            <span className="whitespace-nowrap">{formatDate(project.startDate)}</span>
-                          </div>
-                          {project.endDate && (
-                            <div className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm whitespace-nowrap">
-                              Due {formatDate(project.endDate)}
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="list" className="space-y-4">
-                <div className="space-y-4">
-                  {projects.map((project) => (
-                    <Card
-                      key={project._id}
-                      className="hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => router.push(`/projects/${project._id}`)}
-                    >
-                      <CardContent className="p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                          {/* Main Content */}
-                          <div className="flex-1 min-w-0">
-                            {/* Title and Badges Row */}
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-medium text-base sm:text-lg truncate" title={project.name}>
-                                  {project.name}
-                                </h3>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                                {typeof project.projectNumber !== 'undefined' && (
-                                  <Badge variant="outline" className="text-xs hover:bg-transparent dark:hover:bg-transparent">#{project.projectNumber}</Badge>
-                                )}
-                                {project.isDraft && (
-                                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900 text-xs">
-                                    Draft
-                                  </Badge>
-                                )}
-                                <Badge className={`${getStatusColor(project.status)} text-xs`}>
-                                  <span className="hidden sm:inline">{getStatusIcon(project.status)}</span>
-                                  <span className="sm:ml-1">{formatToTitleCase(project.status)}</span>
-                                </Badge>
-                                <Badge className={`${getPriorityColor(project.priority)} text-xs`}>
-                                  {formatToTitleCase(project.priority)}
-                                </Badge>
-                              </div>
-                            </div>
-
-                            {/* Description */}
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2" title={project.description}>
-                              {project.description || 'No description'}
-                            </p>
-
-                            {/* Metadata - Wraps on mobile */}
-                            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                              <div className="flex items-center space-x-1.5">
-                                <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                                <span>{project.teamMembers.length} {project.teamMembers.length === 1 ? 'member' : 'members'}</span>
-                              </div>
-                              <div className="flex items-center space-x-1.5">
-                                <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                                <span className="whitespace-nowrap">{formatDate(project.startDate)}</span>
-                              </div>
-                              {project.budget && (
-                                <div className="flex items-center space-x-1.5">
-                                  <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                                  <span className="whitespace-nowrap">
-                                    {formatCurrency(project.budget.total, project.budget.currency || orgCurrency)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Progress and Actions - Stacks on mobile */}
-                          <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-2 flex-shrink-0">
-                            {/* Progress Section */}
-                            <div className="flex items-center gap-2 sm:flex-col sm:items-end">
-                              <div className="text-sm font-medium whitespace-nowrap">{project.progress?.completionPercentage || 0}%</div>
-                              <div className="w-24 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2 sm:h-2.5 overflow-hidden">
-                                <div
-                                  className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-300 ease-out"
-                                  style={{
-                                    width: `${Math.min(100, Math.max(0, project.progress?.completionPercentage || 0))}%`,
-                                    minWidth: (project.progress?.completionPercentage || 0) > 0 ? '2px' : '0px'
-                                  }}
-                                />
-                              </div>
-                              {project.progress && project.progress.totalTasks > 0 && (
-                                <p className="text-xs text-muted-foreground hidden sm:block mt-1">
-                                  {project.progress.tasksCompleted}/{project.progress.totalTasks}
-                                </p>
-                              )}
-                            </div>
-
-                            {/* Dropdown Menu */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 flex-shrink-0"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                  <span className="sr-only">More options</span>
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/projects/${project._id}`)
-                                }}>
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Project
-                                </DropdownMenuItem>
-                                <PermissionGate permission={Permission.PROJECT_UPDATE} projectId={project._id}>
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation()
-                                    router.push(`/projects/${project._id}?tab=settings`)
-                                  }}>
-                                    <Settings className="h-4 w-4 mr-2" />
-                                    Settings
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation()
-                                    router.push(`/projects/create?edit=${project._id}`)
-                                  }}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Project
-                                  </DropdownMenuItem>
-                                </PermissionGate>
-                                <>\n                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      if (!isAdmin) return
-                                      handleDeleteClick(project._id)
-                                    }}
-                                      disabled={!isAdmin}
-                                      title={!isAdmin ? 'Only admins can delete projects' : undefined}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete Project
-                                  </DropdownMenuItem>
-                                </>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-
-                        {/* Task Progress Info - Mobile only */}
-                        {project.progress && project.progress.totalTasks > 0 && (
-                          <div className="mt-2 sm:hidden">
-                            <p className="text-xs text-muted-foreground">
-                              {project.progress.tasksCompleted} of {project.progress.totalTasks} tasks completed
-                            </p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </TabsContent>
-            </Tabs>
-
-            {/* Pagination Controls */}
-            {projects.length > 0 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Items per page:</span>
-                  <Select value={pageSize.toString()} onValueChange={(value) => {
-                    setPageSize(parseInt(value))
-                    setCurrentPage(1)
-                  }}>
-                    <SelectTrigger className="w-20 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <span>
-                    {`Showing ${totalCount === 0 ? 0 : ((currentPage - 1) * pageSize) + 1} to ${Math.min(currentPage * pageSize, totalCount)} of ${totalCount}`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1 || loading}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm text-muted-foreground px-2">
-                    Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}
-                  </span>
-                  <Button
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= Math.ceil(totalCount / pageSize) || loading}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Next
-                  </Button>
-                </div>
+          {/* ─── Content ─────────────────────────────────────────────────── */}
+          {searching ? (
+            /* Searching skeleton */
+            viewMode === 'grid' ? (
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <GridCardSkeleton key={i} />
+                ))}
               </div>
-            )}
-          </div>
+            ) : (
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+                <ListHeader />
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <ListRowSkeleton key={i} />
+                ))}
+              </div>
+            )
+          ) : projects.length === 0 ? (
+            <EmptyState
+              hasFilters={hasFilters}
+              onClearFilters={clearFilters}
+              onCreateProject={() => router.push('/projects/create')}
+            />
+          ) : viewMode === 'grid' ? (
+            /* ─── Grid View ─── */
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {projects.map((project, i) => (
+                <ProjectGridCard
+                  key={project._id}
+                  project={project}
+                  index={i}
+                  isAdmin={isAdmin}
+                  onDelete={handleDeleteClick}
+                  onNavigate={navigate}
+                  formatDate={formatDate}
+                  formatCurrency={formatCurrency}
+                  orgCurrency={orgCurrency}
+                />
+              ))}
+            </div>
+          ) : (
+            /* ─── List View ─── */
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+              <ListHeader />
+              {projects.map((project, i) => (
+                <ProjectListRow
+                  key={project._id}
+                  project={project}
+                  index={i}
+                  isAdmin={isAdmin}
+                  onDelete={handleDeleteClick}
+                  onNavigate={navigate}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* ─── Pagination ──────────────────────────────────────────────── */}
+          {projects.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+              <div className="flex items-center gap-2 text-[13px] text-[var(--apple-secondary-label)]">
+                <span>Per page:</span>
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(v) => {
+                    setPageSize(parseInt(v))
+                    setCurrentPage(1)
+                  }}
+                >
+                  <SelectTrigger className="w-16 h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-[var(--apple-tertiary-label)] tabular-nums font-apple-mono text-xs">
+                  {totalCount === 0
+                    ? '0'
+                    : `${((currentPage - 1) * pageSize) + 1}–${Math.min(currentPage * pageSize, totalCount)}`}{' '}
+                  of {totalCount}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1 || loading}
+                  className={cn(
+                    'flex items-center justify-center h-8 w-8 rounded-[var(--apple-radius-sm)]',
+                    'border border-[var(--apple-separator)] bg-card',
+                    'text-[var(--apple-label)] apple-transition',
+                    'hover:bg-[var(--apple-quaternary-fill)]',
+                    'disabled:opacity-40 disabled:cursor-not-allowed',
+                  )}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="px-3 text-[13px] text-[var(--apple-secondary-label)] font-apple-mono tabular-nums">
+                  {currentPage} / {Math.ceil(totalCount / pageSize) || 1}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage >= Math.ceil(totalCount / pageSize) || loading}
+                  className={cn(
+                    'flex items-center justify-center h-8 w-8 rounded-[var(--apple-radius-sm)]',
+                    'border border-[var(--apple-separator)] bg-card',
+                    'text-[var(--apple-label)] apple-transition',
+                    'hover:bg-[var(--apple-quaternary-fill)]',
+                    'disabled:opacity-40 disabled:cursor-not-allowed',
+                  )}
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* ─── Delete Confirmation ──────────────────────────────────────── */}
         <ConfirmationModal
           isOpen={deleteModalOpen}
           onClose={handleDeleteCancel}
           onConfirm={handleDeleteConfirm}
           title="Delete Project"
-          description={`Are you sure you want to delete "${projects.find(p => p._id === projectToDelete)?.name || 'this project'}"? This action cannot be undone.`}
+          description={`Are you sure you want to delete "${projects.find((p) => p._id === projectToDelete)?.name || 'this project'}"? This action cannot be undone.`}
           confirmText="Delete"
           cancelText="Cancel"
           variant="destructive"
