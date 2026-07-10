@@ -2140,13 +2140,6 @@ export default function TasksClient({
                                                         <TypeBadge type={task.type} />
                                                     </div>
 
-                                                    {/* Description (1 line clamp) */}
-                                                    {task.description && (
-                                                        <p className="text-[13px] text-[var(--apple-secondary-label)] line-clamp-1">
-                                                            {task.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim()}
-                                                        </p>
-                                                    )}
-
                                                     {/* Meta row */}
                                                     <div className="flex flex-wrap items-center gap-3">
                                                         {task.project?.name && (
@@ -2172,7 +2165,7 @@ export default function TasksClient({
 
                                                     {/* Footer: assignee avatars */}
                                                     {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
-                                                        <div className="flex items-center pt-1 border-t border-[var(--apple-separator)]">
+                                                        <div className="flex items-center pt-1">
                                                             <div className="flex items-center">
                                                                 {(task.assignedTo as any[]).slice(0, 4).map((assignee: any, idx: number, arr: any[]) => {
                                                                     const userData = assignee.user || assignee
