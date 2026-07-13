@@ -1,3 +1,11 @@
+## [1.41.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.0...v1.41.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* remove description display from task component for cleaner UI ([e6c6e4e](https://github.com/EchonLabs/kanvaro.com/commit/e6c6e4e036669ae7ab243aac91b6bc93997fa154))
+* update button styles in Timer and TimeTrackingPage for consistency and improved UI ([647b827](https://github.com/EchonLabs/kanvaro.com/commit/647b827e66a8062a6089d8124b559d6848610de8))
+
 # [1.41.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.40.1...v1.41.0) (2026-07-07)
 
 

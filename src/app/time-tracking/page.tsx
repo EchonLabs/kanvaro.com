@@ -176,8 +176,7 @@ export default function TimeTrackingPage() {
           </div>
           <Button
             onClick={() => router.push('/time-tracking/timer')}
-            className="h-9 px-4 rounded-[var(--apple-radius-md)] text-[15px] font-medium flex-shrink-0"
-            style={{ background: 'var(--apple-card-gradient)' }}
+            className="h-9 px-4 rounded-[var(--apple-radius-md)] text-[15px] font-medium flex-shrink-0 bg-black dark:bg-white text-white dark:text-black hover:opacity-90"
           >
             <Play className="h-4 w-4 mr-2" strokeWidth={1.5} />
             Start Timer
@@ -328,8 +327,7 @@ export default function TimeTrackingPage() {
                   </div>
                   <Button
                     onClick={() => router.push('/time-tracking/timer')}
-                    className="h-9 px-5 rounded-[var(--apple-radius-md)] text-[15px] font-medium"
-                    style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
+                    className="h-9 px-5 rounded-[var(--apple-radius-md)] text-[15px] font-medium bg-black dark:bg-white text-white dark:text-black hover:opacity-90"
                   >
                     <Play className="h-4 w-4 mr-2" strokeWidth={1.5} />
                     Start Timer

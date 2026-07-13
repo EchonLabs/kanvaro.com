@@ -504,8 +504,7 @@ export function Timer({
               <button
                 onClick={handleResumeTimer}
                 disabled={isLoading}
-                className="flex-1 h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 2px 8px rgba(52,199,89,0.30)' }}
+                className="flex-[4] h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold bg-black dark:bg-white text-white dark:text-black apple-transition disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-90"
               >
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Play className="h-4 w-4" strokeWidth={1.5} fill="none" />}
                 Resume
@@ -514,8 +513,7 @@ export function Timer({
               <button
                 onClick={handlePauseTimer}
                 disabled={isLoading}
-                className="flex-1 h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', boxShadow: '0 2px 8px rgba(255,149,0,0.30)' }}
+                className="flex-[4] h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold bg-black dark:bg-white text-white dark:text-black apple-transition disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-90"
               >
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Pause className="h-4 w-4" strokeWidth={1.5} fill="none" />}
                 Pause
@@ -524,8 +522,7 @@ export function Timer({
             <button
               onClick={() => setShowStopConfirmation(true)}
               disabled={isLoading}
-              className="flex-1 h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
-              style={{ background: 'linear-gradient(135deg,#FF3B30 0%,#FF453A 100%)', boxShadow: '0 2px 8px rgba(255,59,48,0.30)' }}
+              className="flex-[1] h-10 rounded-[var(--apple-radius-md)] text-[15px] font-semibold bg-[#FF3B30] text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#FF453A]"
             >
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Square className="h-4 w-4" strokeWidth={1.5} fill="none" />}
               Stop
@@ -584,8 +581,7 @@ export function Timer({
           (!description.trim()) ||
           (!allowOvertime && !!maxDailyHours && dailyHoursLogged >= maxDailyHours)
         }
-        className="w-full h-11 rounded-[var(--apple-radius-md)] text-[16px] font-semibold text-white apple-transition disabled:opacity-50 flex items-center justify-center gap-2"
-        style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)', boxShadow: '0 2px 8px rgba(0,122,255,0.30)' }}
+        className="w-full h-11 rounded-[var(--apple-radius-md)] text-[16px] font-semibold bg-black dark:bg-white text-white dark:text-black apple-transition disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-90"
       >
         {isLoading ? <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} /> : <Play className="h-5 w-5" strokeWidth={1.5} fill="none" />}
         {isLoading ? 'Starting…' : 'Start Timer'}
