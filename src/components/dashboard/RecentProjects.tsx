@@ -5,6 +5,8 @@ import { cn, formatToTitleCase } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { ArrowRight, FolderOpen, TrendingUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -172,6 +174,8 @@ function ProjectRowSkeleton() {
 
 export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
   const router = useRouter()
+  const { hasPermission } = usePermissions()
+  const canCreateProject = hasPermission(Permission.PROJECT_CREATE)
 
   /* ── Loading ── */
   if (isLoading) {
@@ -206,9 +210,11 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <FolderOpen className="h-8 w-8 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
             <p className="text-[15px] font-medium text-[var(--apple-secondary-label)]">No projects yet</p>
-            <Button size="sm" onClick={() => router.push('/projects/create')}>
-              Create Your First Project
-            </Button>
+            {canCreateProject && (
+              <Button size="sm" onClick={() => router.push('/projects/create')}>
+                Create Your First Project
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
