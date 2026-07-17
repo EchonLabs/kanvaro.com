@@ -1,15 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
 import { formatToTitleCase } from '@/lib/utils'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useNotify } from '@/lib/notify'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
@@ -17,22 +13,13 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import {
   ArrowLeft,
   Calendar,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  Play,
-  XCircle,
-  Target,
-  Zap,
-  BarChart3,
   User,
   Loader2,
   Edit,
   Trash2,
-  Plus,
   Star,
-  Layers,
-  BookOpen
+  BookOpen,
+  XCircle
 } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -104,6 +91,18 @@ export default function EpicDetailPage() {
   const totalPages = Math.ceil(stories.length / pageSize)
 
   const { hasPermission } = usePermissions()
+
+  const handleStoryNavigation = (path: string) => {
+    if (!path) return
+    router.push(path)
+  }
+
+  const handleStoryKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, path: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      handleStoryNavigation(path)
+    }
+  }
 
   useEffect(() => {
     // Set breadcrumb immediately on mount
@@ -193,40 +192,6 @@ export default function EpicDetailPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
-      case 'testing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
-      case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'todo': return <Target className="h-4 w-4" />
-      case 'in_progress': return <Play className="h-4 w-4" />
-      case 'review': return <AlertTriangle className="h-4 w-4" />
-      case 'testing': return <Zap className="h-4 w-4" />
-      case 'done': return <CheckCircle className="h-4 w-4" />
-      case 'cancelled': return <XCircle className="h-4 w-4" />
-      default: return <Target className="h-4 w-4" />
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    }
-  }
-
   const isCreator = (epic: Epic) => {
     const creatorId = (epic as any)?.createdBy?._id || (epic as any)?.createdBy?.id
     return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
@@ -241,14 +206,40 @@ export default function EpicDetailPage() {
   const editAllowed = epic ? canEditEpic(epic) : false
   const deleteAllowed = epic ? canDeleteEpic(epic) : false
 
+  // Status / priority / story-status chip color maps (Apple HIG style), mirroring the Task detail page
+  const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+    todo:        { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',       dot: 'bg-gray-400',    border: 'border-gray-200 dark:border-gray-700' },
+    in_progress: { bg: 'bg-blue-50 dark:bg-blue-950/30',       text: 'text-blue-600 dark:text-blue-400',       dot: 'bg-blue-500',    border: 'border-blue-200 dark:border-blue-800' },
+    review:      { bg: 'bg-yellow-50 dark:bg-yellow-950/30',   text: 'text-yellow-600 dark:text-yellow-400',   dot: 'bg-yellow-500',  border: 'border-yellow-200 dark:border-yellow-800' },
+    testing:     { bg: 'bg-purple-50 dark:bg-purple-950/30',   text: 'text-purple-600 dark:text-purple-400',   dot: 'bg-purple-500',  border: 'border-purple-200 dark:border-purple-800' },
+    done:        { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800' },
+    cancelled:   { bg: 'bg-red-50 dark:bg-red-950/30',         text: 'text-red-600 dark:text-red-400',         dot: 'bg-red-500',     border: 'border-red-200 dark:border-red-800' },
+  }
+  const PRIORITY_BADGE: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+    low:      { bg: 'bg-gray-50 dark:bg-gray-900/40',     text: 'text-gray-500 dark:text-gray-400',     dot: 'bg-gray-400',   border: 'border-gray-200 dark:border-gray-700' },
+    medium:   { bg: 'bg-blue-50 dark:bg-blue-950/30',     text: 'text-blue-600 dark:text-blue-400',     dot: 'bg-blue-500',   border: 'border-blue-200 dark:border-blue-800' },
+    high:     { bg: 'bg-orange-50 dark:bg-orange-950/30', text: 'text-orange-600 dark:text-orange-400', dot: 'bg-orange-500', border: 'border-orange-200 dark:border-orange-800' },
+    critical: { bg: 'bg-red-50 dark:bg-red-950/30',       text: 'text-red-600 dark:text-red-400',       dot: 'bg-red-500',    border: 'border-red-200 dark:border-red-800' },
+  }
+
+  const renderStatusChip = (cfg: Record<string, { bg: string; text: string; dot: string; border: string }>, key: string, label: string) => {
+    const c = cfg[key] ?? { bg: 'bg-gray-50', text: 'text-gray-500', dot: 'bg-gray-400', border: 'border-gray-200' }
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[12px] font-medium ${c.bg} ${c.text} ${c.border}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+        {label}
+      </span>
+    )
+  }
+
   // Loading states
   if (loading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading epic...</p>
+          <div className="text-center space-y-3">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-[var(--apple-system-blue)]" />
+            <p className="text-[15px] text-[var(--apple-secondary-label)]">Loading epic…</p>
           </div>
         </div>
       </MainLayout>
@@ -258,14 +249,13 @@ export default function EpicDetailPage() {
   if (error || !epic) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{error || 'Epic not found'}</p>
-            <Button onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </div>
+        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+          <XCircle className="h-12 w-12 text-[var(--apple-system-red)]" />
+          <h2 className="text-[22px] font-semibold text-[var(--apple-label)]">{error || 'Epic not found'}</h2>
+          <Button onClick={() => router.back()} className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-5 h-9 hover:opacity-90 apple-transition">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Go Back
+          </Button>
         </div>
       </MainLayout>
     )
@@ -273,333 +263,331 @@ export default function EpicDetailPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
-        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.back()}
-                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                <h1
-                  className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere"
-                  title={epic?.title}
-                >
-                  <Layers className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-purple-600 flex-shrink-0" />
-                  <span className="break-words overflow-wrap-anywhere">{epic?.title}</span>
-                </h1>
-                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto">
-                  {editAllowed && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        router.push(`/epics/${epicId}/edit`)
-                      }}
-                      className="min-h-[36px] w-full sm:w-auto"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                  )}
-                  {deleteAllowed && (
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        setShowDeleteConfirmModal(true)
-                      }}
-                      className="min-h-[36px] w-full sm:w-auto"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  )}
-                </div>
+      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
+
+        {/* ── Page Header ─────────────────────────────────────────────────────── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-1.5 text-[14px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-system-blue)] apple-transition font-medium"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+            {/* Title row: icon > title — all inline */}
+            <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
+              <Star className="h-8 w-8 flex-shrink-0" style={{ color: 'var(--apple-card-gradient)' }} />
+              <h1 className="text-[22px] sm:text-[26px] font-bold tracking-tight text-[var(--apple-label)] leading-tight min-w-0">{epic.title}</h1>
+            </div>
+
+            {/* Edit + Delete */}
+            <div className="flex flex-col gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <button onClick={() => editAllowed && router.push(`/epics/${epicId}/edit`)} disabled={!editAllowed}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full text-white text-[13px] font-semibold px-4 h-9 hover:opacity-90 apple-transition disabled:opacity-40"
+                  style={{ background: 'var(--apple-card-gradient)' }}>
+                  <Edit className="h-3.5 w-3.5" />
+                  Edit Epic
+                </button>
+                <button onClick={() => deleteAllowed && handleDeleteClick()} disabled={!deleteAllowed}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full border border-[var(--apple-system-red)]/40 bg-[var(--apple-system-red)]/10 text-[var(--apple-system-red)] text-[13px] font-medium px-4 h-9 hover:bg-[var(--apple-system-red)]/20 apple-transition disabled:opacity-40">
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">Epic Details</p>
           </div>
         </div>
 
-        <div className="grid gap-8 grid-cols-1 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-8">
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Description</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0">
-                <p className="text-sm sm:text-base text-muted-foreground break-words">
-                  {epic?.description || 'No description provided'}
-                </p>
-              </CardContent>
-            </Card>
+        {/* ── Main Grid ───────────────────────────────────────────────────────── */}
+        <div className="grid gap-6 lg:grid-cols-3">
 
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Progress</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Epic completion status</CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs sm:text-sm">
-                    <span className="text-muted-foreground">Overall Progress</span>
-                    <span className="font-medium">{epic?.progress?.completionPercentage || 0}%</span>
+          {/* Left column — main content */}
+          <div className="lg:col-span-2 space-y-5">
+
+            {/* Description */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">Description</h2>
+              </div>
+              <div className="px-5 py-4">
+                {epic.description ? (() => {
+                  const isHtml = /<(p|br|div|ul|ol|li|strong|em|u|h[1-6]|img|a)(\s|>|\/)/i.test(epic.description)
+                  return isHtml
+                    ? <div className="task-description max-w-none" dangerouslySetInnerHTML={{ __html: epic.description }} />
+                    : <div className="task-description text-[15px] text-[var(--apple-label)] whitespace-pre-line leading-relaxed">{epic.description}</div>
+                })() : (
+                  <p className="text-[15px] text-[var(--apple-tertiary-label)]">No description provided.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Progress */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">Progress</h2>
+                <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Epic completion status</p>
+              </div>
+              <div className="px-5 py-4 space-y-4">
+                <div>
+                  <div className="flex items-center justify-between text-[13px] mb-1.5">
+                    <span className="text-[var(--apple-secondary-label)]">Overall Progress</span>
+                    <span className="font-medium text-[var(--apple-label)]">{epic.progress?.completionPercentage || 0}%</span>
                   </div>
-                  <Progress value={epic?.progress?.completionPercentage || 0} className="h-1.5 sm:h-2" />
+                  <div className="h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${epic.progress?.completionPercentage || 0}%`, background: 'linear-gradient(90deg,#34C759 0%,#30D158 100%)' }}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs sm:text-sm">
-                      <span className="text-muted-foreground">Stories</span>
-                      <span className="font-medium">
-                        {epic?.progress?.storiesCompleted || 0} / {epic?.progress?.totalStories || 0}
+                  <div>
+                    <div className="flex items-center justify-between text-[13px] mb-1.5">
+                      <span className="text-[var(--apple-secondary-label)]">Stories</span>
+                      <span className="font-medium text-[var(--apple-label)]">
+                        {epic.progress?.storiesCompleted || 0} / {epic.progress?.totalStories || 0}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
+                    <div className="h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
                       <div
-                        className="bg-blue-600 h-1.5 sm:h-2 rounded-full"
+                        className="h-full rounded-full transition-all duration-500"
                         style={{
-                          width: `${epic?.progress?.totalStories ?
-                            ((epic?.progress?.storiesCompleted / epic?.progress?.totalStories) * 100) : 0}%`
+                          width: `${epic.progress?.totalStories ? ((epic.progress.storiesCompleted / epic.progress.totalStories) * 100) : 0}%`,
+                          background: 'linear-gradient(90deg,#0A84FF 0%,#409CFF 100%)'
                         }}
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs sm:text-sm">
-                      <span className="text-muted-foreground">Story Points</span>
-                      <span className="font-medium">
-                        {epic?.progress?.storyPointsCompleted || 0} / {epic?.progress?.totalStoryPoints || 0}
+                  <div>
+                    <div className="flex items-center justify-between text-[13px] mb-1.5">
+                      <span className="text-[var(--apple-secondary-label)]">Story Points</span>
+                      <span className="font-medium text-[var(--apple-label)]">
+                        {epic.progress?.storyPointsCompleted || 0} / {epic.progress?.totalStoryPoints || 0}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
+                    <div className="h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
                       <div
-                        className="bg-green-600 h-1.5 sm:h-2 rounded-full"
+                        className="h-full rounded-full transition-all duration-500"
                         style={{
-                          width: `${epic?.progress?.totalStoryPoints ?
-                            ((epic?.progress?.storyPointsCompleted / epic?.progress?.totalStoryPoints) * 100) : 0}%`
+                          width: `${epic.progress?.totalStoryPoints ? ((epic.progress.storyPointsCompleted / epic.progress.totalStoryPoints) * 100) : 0}%`,
+                          background: 'linear-gradient(90deg,#34C759 0%,#30D158 100%)'
                         }}
                       />
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
-                  Stories ({stories.length})
-                </CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Stories under this epic</CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0">
+            {/* Stories */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[15px] font-semibold text-[var(--apple-label)] flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" style={{ color: 'var(--apple-card-gradient)' }} />
+                    Stories ({stories.length})
+                  </h2>
+                </div>
+                <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Stories under this epic</p>
+              </div>
+              <div className="px-5 py-4">
                 {storiesLoading ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    <Loader2 className="h-5 w-5 animate-spin text-[var(--apple-secondary-label)]" />
                   </div>
                 ) : stories.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No stories found for this epic.</p>
+                  <p className="text-[14px] text-[var(--apple-tertiary-label)] text-center py-8">No stories found for this epic.</p>
                 ) : (
                   <div className="space-y-3">
                     {paginatedStories.map((story: any) => (
-                      <Card
+                      <div
                         key={story._id}
-                        className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-blue-500"
-                        onClick={() => router.push(`/stories/${story._id}`)}
+                        role="button"
+                        tabIndex={0}
+                        className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)] hover:-translate-y-0.5 apple-transition cursor-pointer"
+                        onClick={() => handleStoryNavigation(`/stories/${story._id}`)}
+                        onKeyDown={(event) => handleStoryKeyDown(event, `/stories/${story._id}`)}
                       >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-sm sm:text-base text-foreground mb-1 truncate" title={story.title}>
-                                {story.title}
-                              </h4>
-                              {story.description && (
-                                <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-2">
-                                  {story.description}
-                                </p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-[14px] font-semibold text-[var(--apple-label)] mb-1 truncate" title={story.title}>
+                              {story.title}
+                            </h4>
+                            {story.description && (
+                              <p className="text-[13px] text-[var(--apple-secondary-label)] line-clamp-2 mb-2">
+                                {story.description}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {renderStatusChip(STATUS_BADGE, story.status, formatToTitleCase(story.status))}
+                              {renderStatusChip(PRIORITY_BADGE, story.priority, formatToTitleCase(story.priority))}
+                              {story.storyPoints && (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[12px] text-[var(--apple-label)] font-medium font-apple-mono">
+                                  {story.storyPoints} pts
+                                </span>
                               )}
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge className={`${getStatusColor(story.status)} text-xs`}>
-                                  {getStatusIcon(story.status)}
-                                  <span className="ml-1">{formatToTitleCase(story.status)}</span>
-                                </Badge>
-                                <Badge className={`${getPriorityColor(story.priority)} text-xs`}>
-                                  {formatToTitleCase(story.priority)}
-                                </Badge>
-                                {story.storyPoints && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {story.storyPoints} pts
-                                  </Badge>
-                                )}
-                              </div>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
-              </CardContent>
+              </div>
 
               {/* Pagination Controls */}
               {stories.length > pageSize && (
-                <Card className="mt-4">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>Items per page:</span>
-                        <select
-                          value={pageSize}
-                          onChange={(e) => {
-                            setPageSize(parseInt(e.target.value))
-                            setCurrentPage(1)
-                          }}
-                          className="px-2 py-1 border rounded text-sm bg-background"
-                        >
-                          <option value="5">5</option>
-                          <option value="10">10</option>
-                          <option value="50">50</option>
-                          <option value="100">100</option>
-                        </select>
-                        <span>
-                          Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, stories.length)} of {stories.length}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => setCurrentPage(currentPage - 1)}
-                          disabled={currentPage === 1 || storiesLoading}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Previous
-                        </Button>
-                        <span className="text-sm text-muted-foreground px-2">
-                          Page {currentPage} of {totalPages || 1}
-                        </span>
-                        <Button
-                          onClick={() => setCurrentPage(currentPage + 1)}
-                          disabled={currentPage >= totalPages || storiesLoading}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Next
-                        </Button>
-                      </div>
+                <div className="px-5 py-4 border-t border-[var(--apple-separator)]">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 text-[13px] text-[var(--apple-secondary-label)]">
+                      <span>Items per page:</span>
+                      <select
+                        value={pageSize}
+                        onChange={(e) => {
+                          setPageSize(parseInt(e.target.value))
+                          setCurrentPage(1)
+                        }}
+                        className="px-2 py-1 border border-[var(--apple-separator)] rounded-[var(--apple-radius-sm)] text-[13px] bg-card text-[var(--apple-label)]"
+                      >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                      </select>
+                      <span>
+                        Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, stories.length)} of {stories.length}
+                      </span>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        disabled={currentPage === 1 || storiesLoading}
+                        className="h-8 px-3 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition disabled:opacity-40"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-[13px] text-[var(--apple-secondary-label)] px-2">
+                        Page {currentPage} of {totalPages || 1}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        disabled={currentPage >= totalPages || storiesLoading}
+                        className="h-8 px-3 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
-            </Card>
+            </div>
           </div>
 
-          <div className="space-y-8">
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0 space-y-3 sm:space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Status</span>
-                  <Badge className={`${getStatusColor(epic?.status)} text-xs`}>
-                    {getStatusIcon(epic?.status)}
-                    <span className="ml-1">{formatToTitleCase(epic?.status)}</span>
-                  </Badge>
-                </div>
+          {/* ── Right Sidebar ──────────────────────────────────────────────────── */}
+          <div className="space-y-5">
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Priority</span>
-                  <Badge className={`${getPriorityColor(epic?.priority)} text-xs`}>
-                    {formatToTitleCase(epic?.priority)}
-                  </Badge>
+            {/* Properties */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Properties</h2>
+              </div>
+              <div className="px-5 py-1 divide-y divide-[var(--apple-separator)]">
+                {/* Status */}
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Status</span>
+                  {renderStatusChip(STATUS_BADGE, epic.status, formatToTitleCase(epic.status))}
                 </div>
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Project</span>
-                  <span
-                    className="text-xs sm:text-sm font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left"
-                    title={epic?.project?.name && epic?.project?.name.length > 10 ? epic?.project?.name : undefined}
-                  >
-                    {epic?.project?.name && epic?.project?.name.length > 10 ? `${epic?.project?.name.slice(0, 10)}…` : epic?.project?.name}
+                {/* Priority */}
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Priority</span>
+                  {renderStatusChip(PRIORITY_BADGE, epic.priority, formatToTitleCase(epic.priority))}
+                </div>
+                {/* Project */}
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Project</span>
+                  <span className="text-[13px] font-medium text-[var(--apple-label)] truncate max-w-[160px]" title={epic.project?.name}>
+                    {epic.project?.name || '—'}
                   </span>
                 </div>
-
-                {epic?.assignedTo && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Assigned To</span>
-                    <span className="text-xs sm:text-sm font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left">
-                      {epic?.assignedTo?.firstName} {epic?.assignedTo?.lastName}
+                {/* Assigned To */}
+                {epic.assignedTo && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-[13px] text-[var(--apple-secondary-label)]">Assigned To</span>
+                    <span className="text-[13px] font-medium text-[var(--apple-label)] truncate max-w-[160px]">
+                      {epic.assignedTo.firstName} {epic.assignedTo.lastName}
                     </span>
                   </div>
                 )}
-
-                {epic?.dueDate && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Due Date</span>
-                    <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                      {formatDate(epic?.dueDate)}
-                    </span>
+                {/* Due Date */}
+                {epic.dueDate && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-[13px] text-[var(--apple-secondary-label)]">Due Date</span>
+                    <div className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--apple-label)]">
+                      <Calendar className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" />
+                      {formatDate(epic.dueDate)}
+                    </div>
                   </div>
                 )}
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Story Points</span>
-                  <span className="text-xs sm:text-sm font-medium">
-                    {epic?.progress?.totalStoryPoints ?? 0}
+                {/* Story Points */}
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Story Points</span>
+                  <span className="text-[13px] font-apple-mono font-medium text-[var(--apple-label)]">
+                    {epic.progress?.totalStoryPoints ?? 0}
                   </span>
                 </div>
-
-                {epic?.estimatedHours && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Estimated Hours</span>
-                    <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{epic?.estimatedHours}h</span>
+                {/* Estimated Hours */}
+                {epic.estimatedHours && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-[13px] text-[var(--apple-secondary-label)]">Estimated</span>
+                    <span className="text-[13px] font-apple-mono font-medium text-[var(--apple-label)]">{epic.estimatedHours}h</span>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            {epic?.tags?.length > 0 && (
-              <Card className="overflow-x-hidden">
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-base sm:text-lg">Tags</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-6 pt-0">
-                  <div className="flex flex-wrap gap-2">
-                    {epic?.tags?.map((label, index) => (
-                      <Badge key={index} variant="outline" className="text-xs hover:bg-transparent dark:hover:bg-transparent">
-                        <Star className="h-3 w-3 mr-1" />
+            {/* Tags */}
+            {epic.tags?.length > 0 && (
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+                <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                  <h2 className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Tags</h2>
+                </div>
+                <div className="px-5 py-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    {epic.tags.map((label, index) => (
+                      <span key={index} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[12px] text-[var(--apple-label)] font-medium">
+                        <Star className="h-3 w-3" style={{ color: 'var(--apple-card-gradient)' }} />
                         {label}
-                      </Badge>
+                      </span>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
 
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Created By</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0">
-                <div className="flex items-center space-x-2">
-                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                  <span className="text-xs sm:text-sm truncate">
-                    {epic?.createdBy?.firstName} {epic?.createdBy?.lastName}
+            {/* Created By / Metadata */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Created By</h2>
+              </div>
+              <div className="px-5 py-4">
+                <div className="flex items-center gap-2">
+                  <User className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] flex-shrink-0" />
+                  <span className="text-[13px] text-[var(--apple-label)] font-medium truncate">
+                    {epic.createdBy?.firstName} {epic.createdBy?.lastName}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatDate(epic?.createdAt)}
+                <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-1">
+                  {formatDate(epic.createdAt)}
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
       </div>
