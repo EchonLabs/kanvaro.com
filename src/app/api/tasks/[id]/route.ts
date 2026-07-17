@@ -1087,11 +1087,10 @@ export async function DELETE(
     const organizationId = user.organization
     const taskId = params.id
 
-    const roleStr = typeof user.role === 'string' ? user.role : ''
-    const isAdmin = ['admin', 'super_admin', 'superadmin'].includes(roleStr.toLowerCase())
-    if (!isAdmin) {
+    const canDeleteTask = await PermissionService.hasPermission(userId, Permission.TASK_DELETE)
+    if (!canDeleteTask) {
       return NextResponse.json(
-        { error: 'Only Admins can delete tasks' },
+        { error: 'You do not have permission to delete tasks' },
         { status: 403 }
       )
     }

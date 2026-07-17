@@ -78,7 +78,8 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
     try {
       const today = new Date()
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-      const startOfWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+      const startOfWeek = new Date(startOfDay)
+      startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay())
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
 
       const [todayResponse, weekResponse, monthResponse] = await Promise.all([
@@ -471,13 +472,13 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
               </div>
               <div className="text-center px-2 py-2">
                 <div className="text-sm font-bold font-apple-mono text-[var(--apple-system-blue)] leading-tight tabular-nums">
-                  {formatDuration(timeStats.weekDuration)}
+                  {formatDuration(timeStats.weekDuration + (activeTimer ? runningTimerMinutes : 0))}
                 </div>
                 <div className="apple-section-label mt-0.5">Week</div>
               </div>
               <div className="text-center px-2 py-2">
                 <div className="text-sm font-bold font-apple-mono text-[var(--apple-system-green)] leading-tight tabular-nums">
-                  {formatDuration(timeStats.monthDuration)}
+                  {formatDuration(timeStats.monthDuration + (activeTimer ? runningTimerMinutes : 0))}
                 </div>
                 <div className="apple-section-label mt-0.5">Month</div>
               </div>
