@@ -190,4 +190,16 @@ const TimeTrackingSettingsSchema = new Schema<ITimeTrackingSettings>({
 TimeTrackingSettingsSchema.index({ organization: 1, project: 1 }, { unique: true, sparse: true })
 TimeTrackingSettingsSchema.index({ organization: 1 })
 
+// A session sits inside a day, and a day sits inside a week, so the outer limit can never be
+// set below the inner one — otherwise the inner limit would be unreachable in practice.
+TimeTrackingSettingsSchema.pre('validate', function (next) {
+  if (this.maxWeeklyHours < this.maxDailyHours) {
+    return next(new Error(`maxWeeklyHours (${this.maxWeeklyHours}) can't be lower than maxDailyHours (${this.maxDailyHours}): a week must be able to fit at least one full day at the daily limit.`))
+  }
+  if (this.maxSessionHours > this.maxDailyHours) {
+    return next(new Error(`maxSessionHours (${this.maxSessionHours}) can't be higher than maxDailyHours (${this.maxDailyHours}): a single session can't exceed a day's total.`))
+  }
+  next()
+})
+
 export const TimeTrackingSettings = mongoose.models.TimeTrackingSettings || mongoose.model<ITimeTrackingSettings>('TimeTrackingSettings', TimeTrackingSettingsSchema)

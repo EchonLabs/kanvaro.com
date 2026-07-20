@@ -243,6 +243,34 @@ export function OrganizationSettings() {
   )
   const hasRegistrationChanges = !savedRegistration.current || formData.defaultUserRole !== savedRegistration.current
   const hasTimeTrackingChanges = !savedTimeTracking.current || JSON.stringify(formData.timeTracking) !== JSON.stringify(savedTimeTracking.current)
+
+  /* Cross-field validation for time tracking limits: a session sits inside a day, and a day
+     sits inside a week, so the outer limit can never be set lower than the inner one — doing
+     so would make the daily/session limit impossible to actually reach. */
+  const timeTrackingLimitErrors = useMemo(() => {
+    const daily = parseInt(formData.timeTracking.maxDailyHours as any)
+    const weekly = parseInt(formData.timeTracking.maxWeeklyHours as any)
+    const session = parseInt(formData.timeTracking.maxSessionHours as any)
+    const errs: { maxDailyHours?: string; maxWeeklyHours?: string; maxSessionHours?: string } = {}
+
+    if (isNaN(daily) || daily <= 0) {
+      errs.maxDailyHours = 'Must be at least 1 hour.'
+    }
+    if (isNaN(weekly) || weekly <= 0) {
+      errs.maxWeeklyHours = 'Must be at least 1 hour.'
+    }
+    if (isNaN(session) || session <= 0) {
+      errs.maxSessionHours = 'Must be at least 1 hour.'
+    }
+    if (!errs.maxDailyHours && !errs.maxWeeklyHours && weekly < daily) {
+      errs.maxWeeklyHours = `Can't be lower than the daily limit (${daily}h) — a week contains several days, so its cap must be able to fit at least one full day at the daily limit.`
+    }
+    if (!errs.maxDailyHours && !errs.maxSessionHours && session > daily) {
+      errs.maxSessionHours = `Can't be higher than the daily limit (${daily}h) — a single session is part of a day's total, so it can't exceed it.`
+    }
+    return errs
+  }, [formData.timeTracking.maxDailyHours, formData.timeTracking.maxWeeklyHours, formData.timeTracking.maxSessionHours])
+  const hasTimeTrackingLimitErrors = Object.keys(timeTrackingLimitErrors).length > 0
   const hasNotificationChanges = !savedNotifications.current || (
     notificationRetentionInput !== savedNotifications.current.retentionDays.toString() ||
     (formData.notifications?.autoCleanup ?? true) !== savedNotifications.current.autoCleanup
@@ -403,6 +431,10 @@ export function OrganizationSettings() {
   }
 
   const handleSaveTimeTrackingSettings = async () => {
+    // Save button is already disabled while hasTimeTrackingLimitErrors is true; this is a
+    // last-resort guard rather than the primary feedback mechanism (that's the inline field
+    // errors below, updated in realtime as the user types).
+    if (hasTimeTrackingLimitErrors) return
     setSavingTimeTracking(true)
     try {
       const response = await fetch('/api/time-tracking/settings', {
@@ -774,20 +806,20 @@ export function OrganizationSettings() {
             )}
 
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Max Daily Hrs" htmlFor="maxDailyHours">
+              <Field label="Max Daily Hrs" htmlFor="maxDailyHours" error={timeTrackingLimitErrors.maxDailyHours} hint="Max hours loggable in a single day">
                 <Input id="maxDailyHours" type="number" value={formData.timeTracking.maxDailyHours}
                   onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, maxDailyHours: e.target.value } })}
-                  min="1" max="24" />
+                  min="1" max="24" aria-invalid={!!timeTrackingLimitErrors.maxDailyHours} />
               </Field>
-              <Field label="Max Weekly Hrs" htmlFor="maxWeeklyHours">
+              <Field label="Max Weekly Hrs" htmlFor="maxWeeklyHours" error={timeTrackingLimitErrors.maxWeeklyHours} hint="Must be at least the daily limit">
                 <Input id="maxWeeklyHours" type="number" value={formData.timeTracking.maxWeeklyHours}
                   onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, maxWeeklyHours: e.target.value } })}
-                  min="1" max="168" />
+                  min="1" max="168" aria-invalid={!!timeTrackingLimitErrors.maxWeeklyHours} />
               </Field>
-              <Field label="Max Session Hrs" htmlFor="maxSessionHours">
+              <Field label="Max Session Hrs" htmlFor="maxSessionHours" error={timeTrackingLimitErrors.maxSessionHours} hint="Can't exceed the daily limit">
                 <Input id="maxSessionHours" type="number" value={formData.timeTracking.maxSessionHours}
                   onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, maxSessionHours: e.target.value } })}
-                  min="1" max="24" />
+                  min="1" max="24" aria-invalid={!!timeTrackingLimitErrors.maxSessionHours} />
               </Field>
             </div>
 
@@ -899,7 +931,7 @@ export function OrganizationSettings() {
         )}
 
         <div className="flex justify-end pt-2">
-          <SaveButton loading={savingTimeTracking} disabled={!hasTimeTrackingChanges} onClick={handleSaveTimeTrackingSettings} label="Save Time Tracking" />
+          <SaveButton loading={savingTimeTracking} disabled={!hasTimeTrackingChanges || hasTimeTrackingLimitErrors} onClick={handleSaveTimeTrackingSettings} label="Save Time Tracking" />
         </div>
       </SectionCard>
 

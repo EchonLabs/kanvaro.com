@@ -195,6 +195,38 @@ console.log('userfsdfsdf',user.organization)
     if (settings.roundingRules !== undefined) updateFields.roundingRules = settings.roundingRules
     if (settings.notifications !== undefined) updateFields.notifications = settings.notifications
 
+    // Cross-field validation for hour limits: a session is part of a day, and a day is part of
+    // a week, so the outer limit can never be set below the inner one — otherwise the inner
+    // limit would be unreachable in practice. Merge with existing values since PUT may only
+    // send a subset of fields.
+    const existingSettings = await TimeTrackingSettings.findOne({ organization: organizationId, project: null })
+    const effectiveDaily = updateFields.maxDailyHours ?? existingSettings?.maxDailyHours ?? 12
+    const effectiveWeekly = updateFields.maxWeeklyHours ?? existingSettings?.maxWeeklyHours ?? 60
+    const effectiveSession = updateFields.maxSessionHours ?? existingSettings?.maxSessionHours ?? 8
+
+    if (effectiveDaily <= 0 || effectiveWeekly <= 0 || effectiveSession <= 0) {
+      return NextResponse.json(
+        { error: 'Max Daily Hours, Max Weekly Hours, and Max Session Hours must all be at least 1.' },
+        { status: 400 }
+      )
+    }
+    if (effectiveWeekly < effectiveDaily) {
+      return NextResponse.json(
+        {
+          error: `Max Weekly Hours (${effectiveWeekly}) can't be lower than Max Daily Hours (${effectiveDaily}). A week contains several days, so its cap must be able to fit at least one full day at the daily limit — otherwise the daily limit could never actually be used.`
+        },
+        { status: 400 }
+      )
+    }
+    if (effectiveSession > effectiveDaily) {
+      return NextResponse.json(
+        {
+          error: `Max Session Hours (${effectiveSession}) can't be higher than Max Daily Hours (${effectiveDaily}). A single session is part of a day's total and can't exceed it.`
+        },
+        { status: 400 }
+      )
+    }
+
     // Update or create the TimeTrackingSettings document
     const timeTrackingSettings = await TimeTrackingSettings.findOneAndUpdate(
       {
@@ -207,7 +239,8 @@ console.log('userfsdfsdf',user.organization)
       {
         new: true,
         upsert: true,
-        setDefaultsOnInsert: true
+        setDefaultsOnInsert: true,
+        runValidators: true
       }
     )
 
