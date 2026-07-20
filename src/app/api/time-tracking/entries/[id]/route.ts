@@ -199,17 +199,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Time entry not found' }, { status: 404 })
     }
 
-    // Authorization: owners can delete their own entry (subject to time-based rules);
-    // non-owners can delete only if they have delete permission AND are allowed to view that user's logs.
+    // Authorization: deleting a time entry always requires the delete permission
+    // (own entries included) — only roles granted TIME_TRACKING_DELETE (e.g. Admin, HR) may delete.
     const ownerId = timeEntry.user?.toString()
     const isOwner = ownerId === requesterId
 
-    if (!isOwner) {
-      const canDelete = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_DELETE)
-      if (!canDelete) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
+    const canDelete = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_DELETE)
+    if (!canDelete) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
+    if (!isOwner) {
       const hasViewAll = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_VIEW_ALL)
       const hasViewAssigned = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_VIEW_ASSIGNED)
 
