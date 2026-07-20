@@ -117,6 +117,9 @@ export function TimeLogs({
     const entryUserId = entry?.user?._id || entry?.user?.id || entry?.userId
     return userId && entryUserId && userId.toString() === entryUserId.toString()
   }
+  // Whether the current user has any edit/delete capability on time logs at all,
+  // used to decide whether to render the actions (three-dot) menu.
+  const canManageAnyTimeEntry = canUpdateTime || canDeleteTime
 
 
   // Debug timezone and DateTimeProvider
@@ -1516,11 +1519,6 @@ export function TimeLogs({
     setShowDeleteDialog(true)
   }
 
-  const isEntryOwnedByViewer = useCallback((entry: TimeEntry) => {
-    const entryUserId = entry?.user?._id
-    return !!resolvedUserId && !!entryUserId && entryUserId === resolvedUserId
-  }, [resolvedUserId])
-
   const handleConfirmDelete = async () => {
     if (!entryToDelete) return
 
@@ -2637,36 +2635,38 @@ export function TimeLogs({
                           onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
                         />
                       )}
-                      <DropdownMenu.Root>
-                        <DropdownMenu.Trigger asChild>
-                          <button
-                            className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] apple-transition"
-                            disabled={!(!entry.__isActive && (canUpdateTime || canDeleteTime) && canEditTimeEntry(entry))}
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </button>
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Portal>
-                          <DropdownMenu.Content className="min-w-[120px] bg-popover rounded-[var(--apple-radius-md)] p-1 shadow-lg border border-[var(--apple-separator)] z-50">
-                            {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
-                              <DropdownMenu.Item
-                                className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] hover:bg-accent cursor-pointer outline-none text-foreground"
-                                onSelect={() => handleEdit(entry)}
-                              >
-                                <Edit className="mr-2 h-3.5 w-3.5" />Edit
-                              </DropdownMenu.Item>
-                            )}
-                            {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && isEntryOwnedByViewer(entry) && (
-                              <DropdownMenu.Item
-                                className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] text-destructive hover:bg-destructive/10 cursor-pointer outline-none"
-                                onSelect={() => handleDeleteClick(entry)}
-                              >
-                                <Trash2 className="mr-2 h-3.5 w-3.5" />Delete
-                              </DropdownMenu.Item>
-                            )}
-                          </DropdownMenu.Content>
-                        </DropdownMenu.Portal>
-                      </DropdownMenu.Root>
+                      {canManageAnyTimeEntry && (
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button
+                              className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] apple-transition disabled:opacity-30"
+                              disabled={!(!entry.__isActive && (canUpdateTime || canDeleteTime) && canEditTimeEntry(entry))}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content className="min-w-[120px] bg-popover rounded-[var(--apple-radius-md)] p-1 shadow-lg border border-[var(--apple-separator)] z-50">
+                              {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
+                                <DropdownMenu.Item
+                                  className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] hover:bg-accent cursor-pointer outline-none text-foreground"
+                                  onSelect={() => handleEdit(entry)}
+                                >
+                                  <Edit className="mr-2 h-3.5 w-3.5" />Edit
+                                </DropdownMenu.Item>
+                              )}
+                              {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && (
+                                <DropdownMenu.Item
+                                  className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] text-destructive hover:bg-destructive/10 cursor-pointer outline-none"
+                                  onSelect={() => handleDeleteClick(entry)}
+                                >
+                                  <Trash2 className="mr-2 h-3.5 w-3.5" />Delete
+                                </DropdownMenu.Item>
+                              )}
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      )}
                     </div>
                   </div>
                   <div className="text-[13px] text-[var(--apple-secondary-label)]">
@@ -2825,36 +2825,38 @@ export function TimeLogs({
                   </div>
                   {/* Col 7: Actions menu */}
                   <div className="flex items-center justify-end">
-                    <DropdownMenu.Root>
-                      <DropdownMenu.Trigger asChild>
-                        <button
-                          className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] apple-transition disabled:opacity-30"
-                          disabled={!(!entry.__isActive && (canUpdateTime || canDeleteTime) && canEditTimeEntry(entry))}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
-                      </DropdownMenu.Trigger>
-                      <DropdownMenu.Portal>
-                        <DropdownMenu.Content className="min-w-[120px] bg-popover rounded-[var(--apple-radius-md)] p-1 shadow-lg border border-[var(--apple-separator)] z-50">
-                          {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
-                            <DropdownMenu.Item
-                              className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] hover:bg-accent cursor-pointer outline-none text-foreground"
-                              onSelect={() => handleEdit(entry)}
-                            >
-                              <Edit className="mr-2 h-3.5 w-3.5" />Edit
-                            </DropdownMenu.Item>
-                          )}
-                          {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && isEntryOwnedByViewer(entry) && (
-                            <DropdownMenu.Item
-                              className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] text-destructive hover:bg-destructive/10 cursor-pointer outline-none"
-                              onSelect={() => handleDeleteClick(entry)}
-                            >
-                              <Trash2 className="mr-2 h-3.5 w-3.5" />Delete
-                            </DropdownMenu.Item>
-                          )}
-                        </DropdownMenu.Content>
-                      </DropdownMenu.Portal>
-                    </DropdownMenu.Root>
+                    {canManageAnyTimeEntry && (
+                      <DropdownMenu.Root>
+                        <DropdownMenu.Trigger asChild>
+                          <button
+                            className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] apple-transition disabled:opacity-30"
+                            disabled={!(!entry.__isActive && (canUpdateTime || canDeleteTime) && canEditTimeEntry(entry))}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content className="min-w-[120px] bg-popover rounded-[var(--apple-radius-md)] p-1 shadow-lg border border-[var(--apple-separator)] z-50">
+                            {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
+                              <DropdownMenu.Item
+                                className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] hover:bg-accent cursor-pointer outline-none text-foreground"
+                                onSelect={() => handleEdit(entry)}
+                              >
+                                <Edit className="mr-2 h-3.5 w-3.5" />Edit
+                              </DropdownMenu.Item>
+                            )}
+                            {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && (
+                              <DropdownMenu.Item
+                                className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] text-destructive hover:bg-destructive/10 cursor-pointer outline-none"
+                                onSelect={() => handleDeleteClick(entry)}
+                              >
+                                <Trash2 className="mr-2 h-3.5 w-3.5" />Delete
+                              </DropdownMenu.Item>
+                            )}
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
+                    )}
                   </div>
                 </div>
               </div>
