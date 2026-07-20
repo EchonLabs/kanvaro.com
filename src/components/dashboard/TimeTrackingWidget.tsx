@@ -472,13 +472,13 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
               </div>
               <div className="text-center px-2 py-2">
                 <div className="text-sm font-bold font-apple-mono text-[var(--apple-system-blue)] leading-tight tabular-nums">
-                  {formatDuration(timeStats.weekDuration + (activeTimer ? runningTimerMinutes : 0))}
+                  {formatDuration(timeStats.weekDuration)}
                 </div>
                 <div className="apple-section-label mt-0.5">Week</div>
               </div>
               <div className="text-center px-2 py-2">
                 <div className="text-sm font-bold font-apple-mono text-[var(--apple-system-green)] leading-tight tabular-nums">
-                  {formatDuration(timeStats.monthDuration + (activeTimer ? runningTimerMinutes : 0))}
+                  {formatDuration(timeStats.monthDuration)}
                 </div>
                 <div className="apple-section-label mt-0.5">Month</div>
               </div>
