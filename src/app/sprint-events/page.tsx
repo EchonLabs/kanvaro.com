@@ -457,8 +457,6 @@ export default function SprintEventsPage() {
           title="Sprint Events"
           subtitle="Plan and track your sprint ceremonies"
           icon={Calendar}
-          iconGradient="var(--apple-card-gradient)"
-          iconGlow="var(--apple-chart-glow)"
           actions={
             <PermissionGate permission={Permission.SPRINT_EVENT_VIEW_ALL}>
               <Button
