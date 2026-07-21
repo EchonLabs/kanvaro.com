@@ -1,3 +1,23 @@
+## [1.41.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.1...v1.41.2) (2026-07-21)
+
+
+### Bug Fixes
+
+* add permission checks for creating projects and tasks in RecentProjects and RecentTasks components ([17615b2](https://github.com/EchonLabs/kanvaro.com/commit/17615b224ba2f148030bcfdcde6cac105846b35a))
+* add taskType property to BacklogItem interface and update TypeBadge rendering ([2405816](https://github.com/EchonLabs/kanvaro.com/commit/2405816f98874606d4227777ff1a132a680280ff))
+* add validation for first and last name length across member-related APIs and components ([0d0907b](https://github.com/EchonLabs/kanvaro.com/commit/0d0907b6699848d2d6891c0fc58fca4981411689))
+* changed ui and layout of the pages to follow the current design of the project. ([29c1f9d](https://github.com/EchonLabs/kanvaro.com/commit/29c1f9dfa01c532d7514706b97c1b267c5b71d81))
+* enhance time entry deletion permissions and management capabilities in TimeLogs component ([104edec](https://github.com/EchonLabs/kanvaro.com/commit/104edec7efd453629d72abf7d8f0557e4b6bb293))
+* enhance timer stop functionality to ensure time entries are saved correctly ([8635c36](https://github.com/EchonLabs/kanvaro.com/commit/8635c362251d4c92da3932c47b22fbf7fbb398bc))
+* implement cross-field validation for time tracking limits in settings and organization components ([84d4a9a](https://github.com/EchonLabs/kanvaro.com/commit/84d4a9a7f00aa8ee367fbcd0b5ef9be6a478d3c0))
+* improve date validation logic and synchronization in AddSprintEventModal ([a9359cf](https://github.com/EchonLabs/kanvaro.com/commit/a9359cfb87f554db76d9ef4150f44da46f84a1a1))
+* remove running timer minutes from week and month duration calculations in TimeTrackingWidget ([b3d9952](https://github.com/EchonLabs/kanvaro.com/commit/b3d9952615a68bebd4183ddef72563f7f3af88d6))
+* restore permission checks for member deletion and update confirmation message for member removal ([c82da98](https://github.com/EchonLabs/kanvaro.com/commit/c82da9841e9f74bcc7ab4d991f9920123fe630c4))
+* restore SPRINT_DELETE permission for roles and adjust project permission checks ([8155204](https://github.com/EchonLabs/kanvaro.com/commit/8155204b402c2b1929fdecdda5c88b427986d6ed))
+* simplify button rendering for creating new sprints based on permission ([da413e8](https://github.com/EchonLabs/kanvaro.com/commit/da413e82748bac529858bcda66bc45afea85041f))
+* update date calculations for start of week in multiple components and restore TASK_DELETE permission for roles ([422db6d](https://github.com/EchonLabs/kanvaro.com/commit/422db6d556b0e08bfbc7c62e3ccccf78bd39d021))
+* update time entry deletion logic to require delete permission for all users and integrate ConfirmationModal for deletion confirmation ([e2cdeea](https://github.com/EchonLabs/kanvaro.com/commit/e2cdeeacbdbc6047a6a901881a4f480afb85a98d))
+
 ## [1.41.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.0...v1.41.1) (2026-07-10)
 
 
