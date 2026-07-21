@@ -184,6 +184,19 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    if (updates.firstName !== undefined && updates.firstName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'First name must be at least 2 characters' },
+        { status: 400 }
+      )
+    }
+    if (updates.lastName !== undefined && updates.lastName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'Last name must be at least 2 characters' },
+        { status: 400 }
+      )
+    }
+
     // Update member
     Object.assign(member, updates)
     await member.save()

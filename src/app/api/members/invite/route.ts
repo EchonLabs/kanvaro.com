@@ -49,6 +49,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate first/last name length when provided
+    if (firstName && firstName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'First name must be at least 2 characters' },
+        { status: 400 }
+      )
+    }
+    if (lastName && lastName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'Last name must be at least 2 characters' },
+        { status: 400 }
+      )
+    }
+
     // Check if user has permission to invite members
     const [hasTeamInvite, hasUserInvite] = await Promise.all([
       PermissionService.hasPermission(userId, Permission.TEAM_INVITE),

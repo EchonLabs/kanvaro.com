@@ -70,6 +70,11 @@ export function InviteMemberModal({ onClose, onInvite }: InviteMemberModalProps)
       return
     }
 
+    if (formData.firstName.trim().length < 2 || formData.lastName.trim().length < 2) {
+      setError('First name and last name must be at least 2 characters')
+      return
+    }
+
     setLoading(true)
     try {
       const result = await onInvite(formData)
