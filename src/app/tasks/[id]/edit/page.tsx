@@ -784,7 +784,7 @@ export default function EditTaskPage() {
         setOriginalAssignedTo(updatedAssignees)
         notifySuccess({ title: 'Task Updated', message: 'Task updated successfully' })
         setTimeout(() => {
-          router.push('/tasks?success=Task%20updated%20successfully')
+          router.push('/tasks')
         }, 1200)
       } else {
         notifyError({ title: 'Failed to Save Task', message: data.error || 'Failed to save task' })
