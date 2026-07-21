@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/Dialog'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules, focusSearchInput, truncateText } from '@/lib/utils'
 import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permission-context'
@@ -117,6 +118,9 @@ export function TimeLogs({
     const entryUserId = entry?.user?._id || entry?.user?.id || entry?.userId
     return userId && entryUserId && userId.toString() === entryUserId.toString()
   }
+  // Whether the current user has any edit/delete capability on time logs at all,
+  // used to decide whether to render the actions (three-dot) menu.
+  const canManageAnyTimeEntry = canUpdateTime || canDeleteTime
 
 
   // Debug timezone and DateTimeProvider
@@ -295,6 +299,7 @@ export function TimeLogs({
   const [isEditing, setIsEditing] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [entryToDelete, setEntryToDelete] = useState<TimeEntry | null>(null)
+  const [isDeletingEntry, setIsDeletingEntry] = useState(false)
   const [editInitial, setEditInitial] = useState<{
     projectId: string
     taskId: string
@@ -1180,26 +1185,6 @@ export function TimeLogs({
   }, [authResolving, loadTimeEntries, loadActiveTimer, refreshKey])
 
 
-  const handleDeleteEntry = async (entryId: string) => {
-    if (!confirm('Are you sure you want to delete this time entry?')) return
-
-    try {
-      const response = await fetch(`/api/time-tracking/entries/${entryId}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        loadTimeEntries()
-        onTimeEntryUpdate?.()
-      } else {
-        const data = await response.json()
-        setError(data.error || 'Failed to delete time entry')
-      }
-    } catch (error) {
-      setError('Failed to delete time entry')
-    }
-  }
-
   const handleApproveEntries = async (action: 'approve' | 'reject', entryId?: string) => {
     const entryIds = entryId ? [entryId] : selectedEntries
     if (entryIds.length === 0) return
@@ -1516,14 +1501,10 @@ export function TimeLogs({
     setShowDeleteDialog(true)
   }
 
-  const isEntryOwnedByViewer = useCallback((entry: TimeEntry) => {
-    const entryUserId = entry?.user?._id
-    return !!resolvedUserId && !!entryUserId && entryUserId === resolvedUserId
-  }, [resolvedUserId])
-
   const handleConfirmDelete = async () => {
     if (!entryToDelete) return
 
+    setIsDeletingEntry(true)
     try {
       const response = await fetch(`/api/time-tracking/entries/${entryToDelete._id}`, {
         method: 'DELETE'
@@ -1541,6 +1522,7 @@ export function TimeLogs({
       console.error('Error deleting time entry:', error)
       showToast({ type: 'error', title: 'Failed to delete time entry' })
     } finally {
+      setIsDeletingEntry(false)
       setShowDeleteDialog(false)
       setEntryToDelete(null)
     }
@@ -2637,36 +2619,38 @@ export function TimeLogs({
                           onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
                         />
                       )}
-                      <DropdownMenu.Root>
-                        <DropdownMenu.Trigger asChild>
-                          <button
-                            className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] apple-transition"
-                            disabled={!(!entry.__isActive && (canUpdateTime || canDeleteTime) && canEditTimeEntry(entry))}
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </button>
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Portal>
-                          <DropdownMenu.Content className="min-w-[120px] bg-popover rounded-[var(--apple-radius-md)] p-1 shadow-lg border border-[var(--apple-separator)] z-50">
-                            {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
-                              <DropdownMenu.Item
-                                className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] hover:bg-accent cursor-pointer outline-none text-foreground"
-                                onSelect={() => handleEdit(entry)}
-                              >
-                                <Edit className="mr-2 h-3.5 w-3.5" />Edit
-                              </DropdownMenu.Item>
-                            )}
-                            {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && isEntryOwnedByViewer(entry) && (
-                              <DropdownMenu.Item
-                                className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] text-destructive hover:bg-destructive/10 cursor-pointer outline-none"
-                                onSelect={() => handleDeleteClick(entry)}
-                              >
-                                <Trash2 className="mr-2 h-3.5 w-3.5" />Delete
-                              </DropdownMenu.Item>
-                            )}
-                          </DropdownMenu.Content>
-                        </DropdownMenu.Portal>
-                      </DropdownMenu.Root>
+                      {canManageAnyTimeEntry && (
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button
+                              className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] apple-transition disabled:opacity-30"
+                              disabled={!(!entry.__isActive && (canUpdateTime || canDeleteTime) && canEditTimeEntry(entry))}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content className="min-w-[120px] bg-popover rounded-[var(--apple-radius-md)] p-1 shadow-lg border border-[var(--apple-separator)] z-50">
+                              {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
+                                <DropdownMenu.Item
+                                  className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] hover:bg-accent cursor-pointer outline-none text-foreground"
+                                  onSelect={() => handleEdit(entry)}
+                                >
+                                  <Edit className="mr-2 h-3.5 w-3.5" />Edit
+                                </DropdownMenu.Item>
+                              )}
+                              {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && (
+                                <DropdownMenu.Item
+                                  className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] text-destructive hover:bg-destructive/10 cursor-pointer outline-none"
+                                  onSelect={() => handleDeleteClick(entry)}
+                                >
+                                  <Trash2 className="mr-2 h-3.5 w-3.5" />Delete
+                                </DropdownMenu.Item>
+                              )}
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      )}
                     </div>
                   </div>
                   <div className="text-[13px] text-[var(--apple-secondary-label)]">
@@ -2825,36 +2809,38 @@ export function TimeLogs({
                   </div>
                   {/* Col 7: Actions menu */}
                   <div className="flex items-center justify-end">
-                    <DropdownMenu.Root>
-                      <DropdownMenu.Trigger asChild>
-                        <button
-                          className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] apple-transition disabled:opacity-30"
-                          disabled={!(!entry.__isActive && (canUpdateTime || canDeleteTime) && canEditTimeEntry(entry))}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
-                      </DropdownMenu.Trigger>
-                      <DropdownMenu.Portal>
-                        <DropdownMenu.Content className="min-w-[120px] bg-popover rounded-[var(--apple-radius-md)] p-1 shadow-lg border border-[var(--apple-separator)] z-50">
-                          {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
-                            <DropdownMenu.Item
-                              className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] hover:bg-accent cursor-pointer outline-none text-foreground"
-                              onSelect={() => handleEdit(entry)}
-                            >
-                              <Edit className="mr-2 h-3.5 w-3.5" />Edit
-                            </DropdownMenu.Item>
-                          )}
-                          {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && isEntryOwnedByViewer(entry) && (
-                            <DropdownMenu.Item
-                              className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] text-destructive hover:bg-destructive/10 cursor-pointer outline-none"
-                              onSelect={() => handleDeleteClick(entry)}
-                            >
-                              <Trash2 className="mr-2 h-3.5 w-3.5" />Delete
-                            </DropdownMenu.Item>
-                          )}
-                        </DropdownMenu.Content>
-                      </DropdownMenu.Portal>
-                    </DropdownMenu.Root>
+                    {canManageAnyTimeEntry && (
+                      <DropdownMenu.Root>
+                        <DropdownMenu.Trigger asChild>
+                          <button
+                            className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] apple-transition disabled:opacity-30"
+                            disabled={!(!entry.__isActive && (canUpdateTime || canDeleteTime) && canEditTimeEntry(entry))}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content className="min-w-[120px] bg-popover rounded-[var(--apple-radius-md)] p-1 shadow-lg border border-[var(--apple-separator)] z-50">
+                            {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
+                              <DropdownMenu.Item
+                                className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] hover:bg-accent cursor-pointer outline-none text-foreground"
+                                onSelect={() => handleEdit(entry)}
+                              >
+                                <Edit className="mr-2 h-3.5 w-3.5" />Edit
+                              </DropdownMenu.Item>
+                            )}
+                            {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && (
+                              <DropdownMenu.Item
+                                className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] text-destructive hover:bg-destructive/10 cursor-pointer outline-none"
+                                onSelect={() => handleDeleteClick(entry)}
+                              >
+                                <Trash2 className="mr-2 h-3.5 w-3.5" />Delete
+                              </DropdownMenu.Item>
+                            )}
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
+                    )}
                   </div>
                 </div>
               </div>
@@ -3714,30 +3700,16 @@ export function TimeLogs({
       </Dialog>
 
 
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Delete Time Entry</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this time entry? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmDelete}
-            >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmationModal
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Time Entry"
+        description="Are you sure you want to delete this time entry? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+        isLoading={isDeletingEntry}
+      />
 
       {/* HR Manual Time Log Modal */}
       <HRManualTimeLogModal

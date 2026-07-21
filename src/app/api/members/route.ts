@@ -184,6 +184,19 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    if (updates.firstName !== undefined && updates.firstName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'First name must be at least 2 characters' },
+        { status: 400 }
+      )
+    }
+    if (updates.lastName !== undefined && updates.lastName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'Last name must be at least 2 characters' },
+        { status: 400 }
+      )
+    }
+
     // Update member
     Object.assign(member, updates)
     await member.save()
@@ -247,48 +260,8 @@ export async function DELETE(request: NextRequest) {
     }
 
 
-    // TEMPORARY: Allow all authenticated users to test the API
-    // TODO: Restore proper permission checking after debugging
-    const hasDeletePermission = true
-
-    // Original permission checking code (commented out for now):
-    /*
-    // Check if user has permission to delete/remove members
-    const [hasTeamRemovePermission, hasUserDeactivatePermission] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TEAM_REMOVE),
-      PermissionService.hasPermission(userId, Permission.USER_DEACTIVATE)
-    ])
-
-    // Get detailed user permissions for debugging
-    const userPermissions = await PermissionService.getUserPermissions(userId)
-    console.log('Member deletion debug:', {
-      userId,
-      userRole: userPermissions.userRole,
-      globalPermissions: userPermissions.globalPermissions,
-      hasTeamRemovePermission,
-      hasUserDeactivatePermission,
-      requiredPermissions: [Permission.TEAM_REMOVE, Permission.USER_DEACTIVATE]
-    })
-
-    // Fallback: Check user role directly from database
-    const userDoc = await User.findById(userId).select('role')
-    const userRole = userDoc?.role
-    console.log('Direct user role check:', { userRole })
-
-    // Allow deletion if user has admin-level roles or the required permissions
-    const allowedRoles = ['super_admin', 'admin', 'human_resource', 'project_manager']
-    const hasRoleBasedPermission = allowedRoles.includes(userRole)
-
-    const hasDeletePermission = hasTeamRemovePermission || hasUserDeactivatePermission || hasRoleBasedPermission
-
-    console.log('Final permission check:', {
-      hasTeamRemovePermission,
-      hasUserDeactivatePermission,
-      hasRoleBasedPermission,
-      allowedRoles,
-      userRole,
-      hasDeletePermission
-    })
+    // Check if user has permission to remove members
+    const hasDeletePermission = await PermissionService.hasPermission(userId, Permission.TEAM_REMOVE)
 
     if (!hasDeletePermission) {
       return NextResponse.json(
@@ -296,7 +269,6 @@ export async function DELETE(request: NextRequest) {
         { status: 403 }
       )
     }
-    */
 
     // Find member
     const member = await User.findOne({
@@ -322,14 +294,27 @@ export async function DELETE(request: NextRequest) {
     }
 
 
-    // Deactivate member instead of deleting
-    member.isActive = false
-    await member.save()
+    if (member.role === 'admin') {
+      const canManageAdminUsers = await PermissionService.hasPermission(userId, Permission.USER_MANAGE_ROLES)
+      if (!canManageAdminUsers) {
+        return NextResponse.json(
+          { error: 'You do not have permission to remove administrator accounts' },
+          { status: 403 }
+        )
+      }
+    }
 
+    // Remove member from any project team member lists
+    await Project.updateMany(
+      { organization: organizationId, 'teamMembers.memberId': memberId },
+      { $pull: { teamMembers: { memberId } } }
+    )
+
+    await User.deleteOne({ _id: memberId, organization: organizationId })
 
     return NextResponse.json({
       success: true,
-      message: 'Member removed successfully'
+      message: 'Member deleted successfully'
     })
 
   } catch (error) {

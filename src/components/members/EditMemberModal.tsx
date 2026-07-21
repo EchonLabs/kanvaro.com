@@ -112,6 +112,11 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
       return
     }
 
+    if (formData.firstName.trim().length < 2 || formData.lastName.trim().length < 2) {
+      setError('First name and last name must be at least 2 characters')
+      return
+    }
+
     // Prevent role change to admin if user doesn't have permission
     if (formData.role === 'admin' && !canEditAdminUsers) {
       setError('You do not have permission to assign or change users to admin role')

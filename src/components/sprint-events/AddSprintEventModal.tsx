@@ -309,75 +309,86 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     }
   }, [formData.projectId, projectId, fetchSprints])
 
-  // Date validation function
-  const validateDate = useCallback((date: Date) => {
-    setDateError('')
-
-    if (!selectedSprint || !selectedSprint.startDate || !selectedSprint.endDate) {
-      return true // Allow if sprint details not loaded yet
-    }
-
+  // Single source of truth for which dates are selectable, shared by the
+  // Calendar's `disabled` matcher and the validation error message. Computing
+  // this in one place keeps them from drifting out of sync (which previously
+  // caused impossible states: a range with zero selectable days, or an
+  // auto-picked date that validation immediately rejected).
+  //
+  // For an ongoing/upcoming sprint we still block past dates (safety rail
+  // against fat-fingering a past date by mistake). But if the sprint's own
+  // window has already fully elapsed - an old/overdue sprint that just
+  // hasn't been marked completed - intersecting with "today or later" would
+  // leave no selectable day at all. In that case we drop the past-date
+  // restriction and fall back to the sprint's raw window so users can still
+  // backfill an event that already happened.
+  const getAllowedDateRange = useCallback((): { min: Date | null; max: Date | null } => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    const selected = new Date(date)
-    selected.setHours(0, 0, 0, 0)
+    if (!selectedSprint || !selectedSprint.startDate || !selectedSprint.endDate) {
+      // No sprint chosen yet - just keep the default "no past dates" rail.
+      return { min: today, max: null }
+    }
 
     const sprintStart = new Date(selectedSprint.startDate)
     sprintStart.setHours(0, 0, 0, 0)
 
     const sprintEnd = new Date(selectedSprint.endDate)
-    sprintEnd.setHours(23, 59, 59, 999)
+    sprintEnd.setHours(0, 0, 0, 0)
 
-    // Check if date is in the past
-    if (selected < today) {
-      setDateError('Date cannot be in the past')
-      return false
-    }
-
-    // Special validation for Sprint Review: must be AFTER sprint end date
     if (formData.eventType === 'review') {
+      // Sprint Review must be after the sprint ends; there is no upper bound.
+      // Always allow it right after sprint end - even if that's in the past -
+      // so a review for a long-finished sprint can still be logged.
       const dayAfterSprintEnd = new Date(selectedSprint.endDate)
       dayAfterSprintEnd.setDate(dayAfterSprintEnd.getDate() + 1)
       dayAfterSprintEnd.setHours(0, 0, 0, 0)
-
-      if (selected < dayAfterSprintEnd) {
-        setDateError(`Sprint Review must be scheduled after the sprint ends (after ${format(sprintEnd, 'MMM dd, yyyy')})`)
-        return false
-      }
-      // No upper limit for Sprint Review
-      return true
+      return { min: dayAfterSprintEnd, max: null }
     }
 
-    // For other event types, validate within sprint dates
-    // Check if date is before sprint start
-    if (selected < sprintStart) {
-      setDateError(`Date must be on or after sprint start date (${format(sprintStart, 'MMM dd, yyyy')})`)
-      return false
-    }
-
-    // Check if date is after sprint end
-    if (selected > sprintEnd) {
-      setDateError(`Date must be on or before sprint end date (${format(sprintEnd, 'MMM dd, yyyy')})`)
-      return false
-    }
-
-    return true
+    // Other event types must fall within the sprint's own date range.
+    const min = sprintEnd < today ? sprintStart : (sprintStart > today ? sprintStart : today)
+    return { min, max: sprintEnd }
   }, [selectedSprint, formData.eventType])
 
-  const handleDateSelect = (date: Date | undefined) => {
-    if (!date) {
-      setSelectedDate(undefined)
+  // Pure date validation function - no side effects / state updates.
+  // Must never be called during render (that causes "too many re-renders"
+  // React error #301); only from effects or event handlers.
+  const getDateValidationError = useCallback((date: Date): string => {
+    const { min, max } = getAllowedDateRange()
+    if (!min && !max) {
+      return '' // No sprint constraints loaded yet
+    }
+
+    const selected = new Date(date)
+    selected.setHours(0, 0, 0, 0)
+
+    if (min && selected < min) {
+      return formData.eventType === 'review'
+        ? `Sprint Review must be scheduled on or after ${format(min, 'MMM dd, yyyy')}`
+        : `Date must be on or after ${format(min, 'MMM dd, yyyy')}`
+    }
+
+    if (max && selected > max) {
+      return `Date must be on or before sprint end date (${format(max, 'MMM dd, yyyy')})`
+    }
+
+    return ''
+  }, [getAllowedDateRange, formData.eventType])
+
+  // Keep dateError in sync with the selected date via an effect, instead of
+  // setting state as a side effect of a "validate" call inside render.
+  useEffect(() => {
+    if (!selectedDate) {
       setDateError('')
       return
     }
+    setDateError(getDateValidationError(selectedDate))
+  }, [selectedDate, getDateValidationError])
 
-    if (validateDate(date)) {
-      setSelectedDate(date)
-    } else {
-      // Still set the date but show error
-      setSelectedDate(date)
-    }
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date)
   }
 
   // Validate end time is after start time and prevent past times
@@ -581,20 +592,20 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     calculateDuration()
   }, [formData.startTime, formData.endTime, startTimeError, endTimeError])
 
-  // Auto-set date for Sprint Review events
-  useEffect(() => {
-    if (formData.eventType === 'review' && selectedSprint && selectedSprint.endDate) {
-      const dayAfterSprintEnd = new Date(selectedSprint.endDate)
-      dayAfterSprintEnd.setDate(dayAfterSprintEnd.getDate() + 1)
-      dayAfterSprintEnd.setHours(0, 0, 0, 0)
+  // Note: dates are never auto-assigned for any event type, including
+  // Sprint Review. Auto-picking used to force the date field to a fixed
+  // value the user couldn't change, and for sprints that had already ended
+  // it silently picked a past date that validation then rejected. The
+  // calendar's `disabled` matcher (driven by getAllowedDateRange) now
+  // enforces the same constraint interactively instead, and defaultMonth
+  // opens the calendar on the right month as a convenience.
 
-      // If no date is selected, or if the current date is not valid for review, auto-set it
-      if (!selectedDate || (selectedDate && selectedDate < dayAfterSprintEnd)) {
-        setSelectedDate(dayAfterSprintEnd)
-        setDateError('') // Clear any existing date errors
-      }
-    }
-  }, [formData.eventType, selectedSprint, selectedDate])
+  // Reset the selected date whenever the constraints that govern it change,
+  // since a date valid under the old sprint/event type may not be valid
+  // under the new one.
+  useEffect(() => {
+    setSelectedDate(undefined)
+  }, [formData.sprintId, formData.eventType])
 
   // Update selectedSprint when sprintId changes
   useEffect(() => {
@@ -624,7 +635,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
         formData.duration >= MIN_DURATION_MINUTES && formData.duration <= MAX_DURATION_MINUTES)
 
     // Check date validation - date must be valid if selected
-    const hasValidDate = !dateError || (selectedDate && (!selectedSprint || validateDate(selectedDate)))
+    const hasValidDate = !!selectedDate && !dateError
 
     return !!(hasRequiredFields && hasValidTime && hasValidDate)
   }
@@ -940,29 +951,14 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                         mode="single"
                         selected={selectedDate}
                         onSelect={handleDateSelect}
+                        defaultMonth={getAllowedDateRange().min ?? selectedDate ?? undefined}
                         disabled={(date) => {
-                          const today = new Date()
-                          today.setHours(0, 0, 0, 0)
                           const checkDate = new Date(date)
                           checkDate.setHours(0, 0, 0, 0)
 
-                          // Disable past dates
-                          if (checkDate < today) {
-                            return true
-                          }
-
-                          // Disable dates outside sprint range if sprint is selected
-                          if (selectedSprint && selectedSprint.startDate && selectedSprint.endDate) {
-                            const sprintStart = new Date(selectedSprint.startDate)
-                            sprintStart.setHours(0, 0, 0, 0)
-                            const sprintEnd = new Date(selectedSprint.endDate)
-                            sprintEnd.setHours(23, 59, 59, 999)
-
-                            if (checkDate < sprintStart || checkDate > sprintEnd) {
-                              return true
-                            }
-                          }
-
+                          const { min, max } = getAllowedDateRange()
+                          if (min && checkDate < min) return true
+                          if (max && checkDate > max) return true
                           return false
                         }}
                         initialFocus

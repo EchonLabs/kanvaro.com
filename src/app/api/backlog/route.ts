@@ -525,6 +525,7 @@ export async function GET(request: NextRequest) {
         // assignedTo is already an array of populated user objects
         return {
           ...taskObj,
+          taskType: taskObj.type,
           type: 'task'
         }
       }),

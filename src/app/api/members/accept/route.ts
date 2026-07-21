@@ -44,6 +44,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!firstName || firstName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'First name must be at least 2 characters' },
+        { status: 400 }
+      )
+    }
+    if (!lastName || lastName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'Last name must be at least 2 characters' },
+        { status: 400 }
+      )
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 

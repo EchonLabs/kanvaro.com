@@ -861,18 +861,15 @@ const [searchQuery, setSearchQuery] = useState('')
           subtitle="Manage your agile sprints and iterations"
           icon={Zap}
           actions={
-            <Button
-              onClick={() => {
-                if (!canCreateSprint) return
-                router.push('/sprints/create')
-              }}
-              disabled={!canCreateSprint}
-              title={!canCreateSprint ? 'You need sprint:create permission to create a sprint.' : undefined}
-              className="w-full sm:w-auto rounded-full bg-[var(--apple-system-blue)] text-white hover:opacity-90 apple-transition"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Sprint
-            </Button>
+            canCreateSprint ? (
+              <Button
+                onClick={() => router.push('/sprints/create')}
+                className="w-full sm:w-auto rounded-full bg-[var(--apple-system-blue)] text-white hover:opacity-90 apple-transition"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Sprint
+              </Button>
+            ) : undefined
           }
         />
 

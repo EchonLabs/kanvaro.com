@@ -199,10 +199,36 @@ export async function DELETE(
       return NextResponse.json({ error: 'Time entry not found' }, { status: 404 })
     }
 
-    // Requirement: all users (including PM/HR/Admin) can delete ONLY their own time logs.
+    // Authorization: deleting a time entry always requires the delete permission
+    // (own entries included) — only roles granted TIME_TRACKING_DELETE (e.g. Admin, HR) may delete.
     const ownerId = timeEntry.user?.toString()
-    if (ownerId !== requesterId) {
+    const isOwner = ownerId === requesterId
+
+    const canDelete = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_DELETE)
+    if (!canDelete) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (!isOwner) {
+      const hasViewAll = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_VIEW_ALL)
+      const hasViewAssigned = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_VIEW_ASSIGNED)
+
+      if (!hasViewAll) {
+        if (!hasViewAssigned) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
+        const target = await User.findById(ownerId).select('organization projectManager humanResourcePartner')
+        const sameOrg = target && target.organization && target.organization.toString() === timeEntry.organization?.toString()
+        const isAssigned = target && (
+          (target.projectManager && target.projectManager.toString() === requesterId) ||
+          (target.humanResourcePartner && target.humanResourcePartner.toString() === requesterId)
+        )
+
+        if (!sameOrg || !isAssigned) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
     }
 
     // Check if time entry is already approved

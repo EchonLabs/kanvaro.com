@@ -1033,7 +1033,7 @@ export default function MembersPage() {
         onClose={() => { if (removingMember) return; setShowRemoveConfirm(false); setMemberToRemove(null) }}
         onConfirm={confirmRemoveMember}
         title="Remove member"
-        description={memberToRemove ? `Are you sure you want to remove ${memberToRemove.firstName} ${memberToRemove.lastName}? They will be deactivated and removed from the team.` : 'Are you sure you want to remove this member?'}
+        description={memberToRemove ? `Are you sure you want to remove ${memberToRemove.firstName} ${memberToRemove.lastName}? This will permanently delete their account and cannot be undone.` : 'Are you sure you want to remove this member?'}
         confirmText="Remove"
         cancelText="Cancel"
         variant="destructive"

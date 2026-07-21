@@ -78,7 +78,8 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
     try {
       const today = new Date()
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-      const startOfWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+      const startOfWeek = new Date(startOfDay)
+      startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay())
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
 
       const [todayResponse, weekResponse, monthResponse] = await Promise.all([
