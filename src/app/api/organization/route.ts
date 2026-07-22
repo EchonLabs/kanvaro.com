@@ -422,6 +422,40 @@ export async function PUT(request: NextRequest) {
     // Only set timeTracking fields if timeTracking object exists
     const timeTracking = normalized.timeTracking
     if (timeTracking) {
+      // Cross-field validation: a session sits inside a day, and a day sits inside a week, so
+      // the outer limit can never be set below the inner one — otherwise the inner limit would
+      // be unreachable in practice. Merge with the existing org values since only a subset of
+      // fields may have been sent.
+      const existingTimeTracking = isConfigured
+        ? (await Organization.findOne())?.settings?.timeTracking
+        : undefined
+      const effectiveDaily = timeTracking.maxDailyHours ?? existingTimeTracking?.maxDailyHours ?? 12
+      const effectiveWeekly = timeTracking.maxWeeklyHours ?? existingTimeTracking?.maxWeeklyHours ?? 60
+      const effectiveSession = timeTracking.maxSessionHours ?? existingTimeTracking?.maxSessionHours ?? 8
+
+      if (effectiveDaily <= 0 || effectiveWeekly <= 0 || effectiveSession <= 0) {
+        return NextResponse.json(
+          { error: 'Max Daily Hours, Max Weekly Hours, and Max Session Hours must all be at least 1.' },
+          { status: 400 }
+        )
+      }
+      if (effectiveWeekly < effectiveDaily) {
+        return NextResponse.json(
+          {
+            error: `Max Weekly Hours (${effectiveWeekly}) can't be lower than Max Daily Hours (${effectiveDaily}). A week contains several days, so its cap must be able to fit at least one full day at the daily limit — otherwise the daily limit could never actually be used.`
+          },
+          { status: 400 }
+        )
+      }
+      if (effectiveSession > effectiveDaily) {
+        return NextResponse.json(
+          {
+            error: `Max Session Hours (${effectiveSession}) can't be higher than Max Daily Hours (${effectiveDaily}). A single session is part of a day's total and can't exceed it.`
+          },
+          { status: 400 }
+        )
+      }
+
       setIfDefined('settings.timeTracking.allowTimeTracking', timeTracking.allowTimeTracking)
       setIfDefined('settings.timeTracking.allowManualTimeSubmission', timeTracking.allowManualTimeSubmission)
       setIfDefined('settings.timeTracking.requireApproval', timeTracking.requireApproval)

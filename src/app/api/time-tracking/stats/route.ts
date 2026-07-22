@@ -22,7 +22,8 @@ export async function GET(request: NextRequest) {
 
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const startOfWeek = new Date(startOfDay)
+    startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay())
 
     // Get today's stats
     const todayStats = await TimeEntry.aggregate([

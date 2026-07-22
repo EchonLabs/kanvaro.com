@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
@@ -27,16 +26,12 @@ import {
   AlertTriangle,
   Play,
   XCircle,
-  Target,
   BarChart3,
   User,
   Loader2,
   Edit,
   Trash2,
-  Users,
-  TrendingUp,
   List,
-  PauseCircle,
   Gauge,
   Zap,
   ChevronDown,
@@ -850,24 +845,21 @@ export default function SprintDetailPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
-      case 'completed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-    }
+  const SPRINT_STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+    planning:  { bg: 'bg-blue-50 dark:bg-blue-950/30',     text: 'text-blue-600 dark:text-blue-400',     dot: 'bg-blue-500',    border: 'border-blue-200 dark:border-blue-800' },
+    active:    { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800' },
+    completed: { bg: 'bg-gray-50 dark:bg-gray-900/40',     text: 'text-gray-500 dark:text-gray-400',     dot: 'bg-gray-400',    border: 'border-gray-200 dark:border-gray-700' },
+    cancelled: { bg: 'bg-red-50 dark:bg-red-950/30',       text: 'text-red-600 dark:text-red-400',       dot: 'bg-red-500',     border: 'border-red-200 dark:border-red-800' },
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'planning': return <Calendar className="h-4 w-4" />
-      case 'active': return <Play className="h-4 w-4" />
-      case 'completed': return <CheckCircle className="h-4 w-4" />
-      case 'cancelled': return <XCircle className="h-4 w-4" />
-      default: return <Calendar className="h-4 w-4" />
-    }
+  const renderStatusChip = (cfg: Record<string, { bg: string; text: string; dot: string; border: string }>, key: string, label: string) => {
+    const c = cfg[key] ?? { bg: 'bg-gray-50', text: 'text-gray-500', dot: 'bg-gray-400', border: 'border-gray-200' }
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[12px] font-medium ${c.bg} ${c.text} ${c.border}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+        {label}
+      </span>
+    )
   }
 
   const getDaysRemaining = () => {
@@ -882,9 +874,9 @@ export default function SprintDetailPage() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading sprint...</p>
+          <div className="text-center space-y-3">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-[var(--apple-system-blue)]" />
+            <p className="text-[15px] text-[var(--apple-secondary-label)]">Loading sprint…</p>
           </div>
         </div>
       </MainLayout>
@@ -894,14 +886,16 @@ export default function SprintDetailPage() {
   if (error || !sprint) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{error || 'Sprint not found'}</p>
-            <Button onClick={() => router.push('/sprints')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Sprints
-            </Button>
-          </div>
+        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+          <XCircle className="h-12 w-12 text-[var(--apple-system-red)]" />
+          <h2 className="text-[22px] font-semibold text-[var(--apple-label)]">{error || 'Sprint not found'}</h2>
+          <Button
+            onClick={() => router.back()}
+            className="rounded-full bg-[var(--apple-system-blue)] text-white text-[15px] font-semibold px-5 h-9 hover:opacity-90 apple-transition"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Go Back
+          </Button>
         </div>
       </MainLayout>
     )
@@ -909,182 +903,186 @@ export default function SprintDetailPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
-        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/sprints')}
-                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                <h1 className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere">
-                  <Zap className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
-                  <span className="break-words overflow-wrap-anywhere" title={sprint?.name}>{sprint?.name}</span>
-                </h1>
-                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto">
-                  {sprint?.status === 'planning' && canStartSprint && (
-                    <Button
-                      variant="default"
+      <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
+
+        {/* ── Page Header ─────────────────────────────────────────────────────── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-1.5 text-[14px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-system-blue)] apple-transition font-medium"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+            <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
+              <Zap className="h-8 w-8 flex-shrink-0" style={{ color: 'var(--apple-card-gradient)' }} />
+              <h1 className="text-[22px] sm:text-[26px] font-bold tracking-tight text-[var(--apple-label)] leading-tight min-w-0">{sprint.name}</h1>
+            </div>
+
+            <div className="flex flex-col gap-2 flex-shrink-0">
+              {((sprint.status === 'planning' && canStartSprint) || (sprint.status === 'active' && canCompleteSprint)) && (
+                <div className="flex items-center gap-2 justify-end">
+                  {sprint.status === 'planning' && canStartSprint && (
+                    <button
                       onClick={handleStartSprint}
                       disabled={startingSprint}
-                      className="min-h-[36px] w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-full text-white text-[13px] font-semibold px-4 h-9 hover:opacity-90 apple-transition disabled:opacity-40"
+                      style={{ background: 'linear-gradient(90deg,#34C759 0%,#30D158 100%)' }}
                     >
-                      {startingSprint ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Play className="h-4 w-4 mr-2" />
-                      )}
-                      {startingSprint ? 'Starting...' : 'Start Sprint'}
-                    </Button>
+                      {startingSprint ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                      {startingSprint ? 'Starting…' : 'Start Sprint'}
+                    </button>
                   )}
-                  {sprint?.status === 'active' && canCompleteSprint && (
-                    <Button
-                      variant="default"
+                  {sprint.status === 'active' && canCompleteSprint && (
+                    <button
                       onClick={handleCompleteSprintClick}
                       disabled={completingSprint}
-                      className="min-h-[36px] w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-full text-white text-[13px] font-semibold px-4 h-9 hover:opacity-90 apple-transition disabled:opacity-40"
+                      style={{ background: 'linear-gradient(90deg,#34C759 0%,#30D158 100%)' }}
                     >
-                      {completingSprint ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <CheckSquare className="h-4 w-4 mr-2" />
-                      )}
-                      {completingSprint ? 'Completing...' : 'Complete Sprint'}
-                    </Button>
-                  )}
-                  {canEditSprint && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        router.push(`/sprints/${sprintId}/edit`)
-                      }}
-                      className="min-h-[36px] w-full sm:w-auto"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                  )}
-                  {canDeleteSprint && (
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        setShowDeleteConfirm(true)
-                      }}
-                      className="min-h-[36px] w-full sm:w-auto"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
+                      {completingSprint ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckSquare className="h-3.5 w-3.5" />}
+                      {completingSprint ? 'Completing…' : 'Complete Sprint'}
+                    </button>
                   )}
                 </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                {canEditSprint && (
+                  <button
+                    onClick={() => router.push(`/sprints/${sprintId}/edit`)}
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full text-white text-[13px] font-semibold px-4 h-9 hover:opacity-90 apple-transition disabled:opacity-40"
+                    style={{ background: 'var(--apple-card-gradient)' }}
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                )}
+                {canDeleteSprint && (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full border border-[var(--apple-system-red)]/40 bg-[var(--apple-system-red)]/10 text-[var(--apple-system-red)] text-[13px] font-medium px-4 h-9 hover:bg-[var(--apple-system-red)]/20 apple-transition disabled:opacity-40"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </button>
+                )}
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">Sprint Details</p>
           </div>
         </div>
 
-        <div className="grid gap-8 grid-cols-1 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-8">
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Description</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0">
-                <p className="text-sm sm:text-base text-muted-foreground break-words">
-                  {sprint?.description || 'No description provided'}
-                </p>
-              </CardContent>
-            </Card>
+        {/* ── Main Grid ───────────────────────────────────────────────────────── */}
+        <div className="grid gap-6 lg:grid-cols-3">
 
-            {sprint?.goal && (
-              <Card className="overflow-x-hidden">
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-base sm:text-lg">Sprint Goal</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-6 pt-0">
-                  <p className="text-sm sm:text-base text-muted-foreground break-words">{sprint?.goal}</p>
-                </CardContent>
-              </Card>
+          {/* Left column — main content */}
+          <div className="lg:col-span-2 space-y-5">
+
+            {/* Description */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">Description</h2>
+              </div>
+              <div className="px-5 py-4">
+                {sprint.description ? (() => {
+                  const isHtml = /<(p|br|div|ul|ol|li|strong|em|u|h[1-6]|img|a)(\s|>|\/)/i.test(sprint.description)
+                  return isHtml
+                    ? <div className="task-description max-w-none" dangerouslySetInnerHTML={{ __html: sprint.description }} />
+                    : <div className="task-description text-[15px] text-[var(--apple-label)] whitespace-pre-line leading-relaxed">{sprint.description}</div>
+                })() : (
+                  <p className="text-[15px] text-[var(--apple-tertiary-label)]">No description provided.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Sprint Goal */}
+            {sprint.goal && (
+              <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+                <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                  <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">Sprint Goal</h2>
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-[15px] text-[var(--apple-label)] whitespace-pre-line leading-relaxed">{sprint.goal}</p>
+                </div>
+              </div>
             )}
 
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Progress</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  {sprint?.progress?.totalTasks
+            {/* Progress */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">Progress</h2>
+                <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
+                  {sprint.progress?.totalTasks
                     ? `${sprint.progress.tasksCompleted} of ${sprint.progress.totalTasks} tasks completed`
                     : 'No tasks have been assigned to this sprint yet.'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0 space-y-6">
+                </p>
+              </div>
+              <div className="px-5 py-4 space-y-5">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs sm:text-sm">
-                    <span className="text-muted-foreground">Overall Progress</span>
-                    <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
+                  <div className="flex items-center justify-between text-[13px]">
+                    <span className="text-[var(--apple-secondary-label)]">Overall Progress</span>
+                    <span className="font-semibold font-apple-mono text-[var(--apple-label)]">{sprint.progress?.completionPercentage || 0}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                  <div className="mt-2 h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
                     <div
-                      className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                      className="h-full rounded-full transition-all duration-500"
                       style={{
-                        width: `${Math.min(100, Math.max(0, sprint?.progress?.completionPercentage || 0))}%`,
-                        minWidth: sprint?.progress?.completionPercentage && sprint.progress.completionPercentage > 0 ? '2px' : '0'
+                        width: `${Math.min(100, Math.max(0, sprint.progress?.completionPercentage || 0))}%`,
+                        background: 'linear-gradient(90deg,#34C759 0%,#30D158 100%)'
                       }}
                     />
                   </div>
                 </div>
-                <br />
 
-
-                {sprint?.progress?.totalTasks ? (
+                {sprint.progress?.totalTasks ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                      <div className="rounded-lg border bg-background p-3">
-                        <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3">
+                        <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-[var(--apple-secondary-label)]">
                           <span>Tasks Completed</span>
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-3.5 w-3.5 text-[var(--apple-system-green)]" />
                         </div>
-                        <p className="mt-2 text-lg font-semibold">
+                        <p className="mt-2 text-[17px] font-semibold font-apple-mono text-[var(--apple-label)]">
                           {sprint.progress.tasksCompleted} / {sprint.progress.totalTasks}
                         </p>
                       </div>
-                      <div className="rounded-lg border bg-background p-3">
-                        <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
+                      <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3">
+                        <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-[var(--apple-secondary-label)]">
                           <span>Story Points Burned</span>
-                          <BarChart3 className="h-4 w-4 text-blue-500" />
+                          <BarChart3 className="h-3.5 w-3.5 text-[var(--apple-system-blue)]" />
                         </div>
-                        <p className="mt-2 text-lg font-semibold">
+                        <p className="mt-2 text-[17px] font-semibold font-apple-mono text-[var(--apple-label)]">
                           {sprint.progress.storyPointsCompleted || 0} / {sprint.progress.totalStoryPoints || 0}
                         </p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="rounded-lg border bg-background p-3">
-                        <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3">
+                        <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-[var(--apple-secondary-label)]">
                           <span>Estimated Hours</span>
-                          <Clock className="h-4 w-4 text-primary" />
+                          <Clock className="h-3.5 w-3.5" style={{ color: 'var(--apple-card-gradient)' }} />
                         </div>
-                        <p className="mt-2 text-lg font-semibold">
+                        <p className="mt-2 text-[17px] font-semibold font-apple-mono text-[var(--apple-label)]">
                           {sprint.progress.estimatedHours || 0}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-1">
                           {Math.max((sprint.progress.estimatedHours || 0) - (sprint.progress.actualHours || 0), 0)}h remaining
                         </p>
                       </div>
-                      <div className="rounded-lg border bg-background p-3">
-                        <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
+                      <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3">
+                        <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-[var(--apple-secondary-label)]">
                           <span>Actual Hours</span>
-                          <Gauge className="h-4 w-4 text-orange-500" />
+                          <Gauge className="h-3.5 w-3.5 text-[var(--apple-system-orange)]" />
                         </div>
-                        <p className="mt-2 text-lg font-semibold">
+                        <p className="mt-2 text-[17px] font-semibold font-apple-mono text-[var(--apple-label)]">
                           {sprint.progress.actualHours || 0}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-1">
                           {(sprint.progress.actualHours || 0) > (sprint.progress.estimatedHours || 0)
                             ? 'Over capacity'
                             : 'On track'}
@@ -1092,69 +1090,66 @@ export default function SprintDetailPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Task Breakdown</p>
+                    <div className="space-y-2.5">
+                      <p className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Task Breakdown</p>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {/* Total card */}
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-3 py-2">
+                          <div className="flex items-center justify-between text-[11px] text-[var(--apple-secondary-label)]">
                             <span>Total</span>
                             <List className="h-3.5 w-3.5" />
                           </div>
-                          <p className="mt-1 text-base font-semibold">{sprintTasks.length}</p>
+                          <p className="mt-1 text-[15px] font-semibold font-apple-mono text-[var(--apple-label)]">{sprintTasks.length}</p>
                         </div>
-                        {/* Dynamic status cards based on project's custom statuses */}
                         {taskBreakdownByStatus.map(({ status, label, count, color }) => (
-                          <div key={status} className="rounded-md border bg-background px-3 py-2">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div key={status} className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-3 py-2">
+                            <div className="flex items-center justify-between text-[11px] text-[var(--apple-secondary-label)]">
                               <span className="truncate">{label}</span>
                               <Badge className={`${color || DEFAULT_TASK_STATUS_BADGE_MAP[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'} h-3.5 px-1.5 text-[10px] [&:hover]:!bg-[inherit]`}>
                                 {count}
                               </Badge>
                             </div>
-                            <p className="mt-1 text-base font-semibold">{count}</p>
+                            <p className="mt-1 text-[15px] font-semibold font-apple-mono text-[var(--apple-label)]">{count}</p>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
                 ) : null}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Sprint Tasks</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  {sprintTasks.length} task{sprintTasks.length === 1 ? '' : 's'} {sprint?.status === 'completed' ? '(including completed and spillover tasks)' : ''}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
+            {/* Sprint Tasks */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">Sprint Tasks</h2>
+                <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
+                  {sprintTasks.length} task{sprintTasks.length === 1 ? '' : 's'} {sprint.status === 'completed' ? '(including completed and spillover tasks)' : ''}
+                </p>
+              </div>
+              <div className="px-5 py-4">
                 {sprintTasks.length === 0 ? (
-                  <p className="text-sm sm:text-base text-muted-foreground">
-                    No tasks {sprint?.status === 'completed' ? 'were' : 'are currently'} assigned to this sprint.
+                  <p className="text-[15px] text-[var(--apple-tertiary-label)]">
+                    No tasks {sprint.status === 'completed' ? 'were' : 'are currently'} assigned to this sprint.
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    {paginatedSprintTasks.map(task => {
-                      return (
+                    {paginatedSprintTasks.map(task => (
                       <div
                         key={task._id}
                         onClick={() => router.push(`/tasks/${task._id}`)}
-                        className={`rounded-lg border bg-background p-3 sm:p-4 space-y-3 cursor-pointer hover:shadow-md transition-shadow ${task.archived ? 'border-dashed opacity-90' : ''
-                          }`}
+                        className={`rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 space-y-3 cursor-pointer hover:shadow-[0_4px_16px_rgba(0,0,0,0.09)] hover:-translate-y-0.5 apple-transition ${task.archived ? 'border-dashed opacity-90' : ''}`}
                       >
                         <div className="flex items-start gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               {task?.displayId && (
-                                <Badge variant="outline" className="text-xs">#{task.displayId}</Badge>
+                                <span className="font-apple-mono text-[11px] font-semibold px-2 py-0.5 rounded-full border border-[var(--apple-separator)] text-[var(--apple-secondary-label)]">#{task.displayId}</span>
                               )}
-                              <h4 className="font-medium text-sm sm:text-base truncate flex-1" title={task.title}>
+                              <h4 className="text-[14px] font-semibold text-[var(--apple-label)] truncate flex-1" title={task.title}>
                                 {task?.title || 'Untitled Task'}
                               </h4>
                             </div>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-[12px] text-[var(--apple-tertiary-label)]">
                               {(() => {
                                 if (!task?.assignedTo || !Array.isArray(task.assignedTo) || task.assignedTo.length === 0) {
                                   return 'Unassigned';
@@ -1178,54 +1173,54 @@ export default function SprintDetailPage() {
                               })()}
                             </p>
                             {task.movedToSprint && (
-                              <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
+                              <p className="text-[12px] font-medium text-orange-600 dark:text-orange-400 mt-1">
                                 Moved to: {task.movedToSprint.name}
                               </p>
                             )}
                             {task.movedToBacklog && (
-                              <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
+                              <p className="text-[12px] font-medium text-orange-600 dark:text-orange-400 mt-1">
                                 Moved to backlog
                               </p>
                             )}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge variant="outline" className="text-[11px] uppercase hover:bg-transparent dark:hover:bg-transparent">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[var(--apple-separator)] text-[12px] font-medium text-[var(--apple-secondary-label)] uppercase">
                             {formatToTitleCase(task.priority)}
-                          </Badge>
+                          </span>
                           {task.archived && (
-                            <Badge variant="secondary" className="text-[11px] uppercase hover:bg-secondary dark:hover:bg-secondary">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--apple-quaternary-fill)] text-[12px] font-medium text-[var(--apple-secondary-label)] uppercase">
                               Archived
-                            </Badge>
+                            </span>
                           )}
                           {task.movedToSprint && (
-                            <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20 text-[12px] font-medium text-orange-700 dark:text-orange-400">
                               Spillover
-                            </Badge>
+                            </span>
                           )}
                           {task.movedToBacklog && (
-                            <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
-                              backlog
-                            </Badge>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20 text-[12px] font-medium text-orange-700 dark:text-orange-400">
+                              Backlog
+                            </span>
                           )}
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Badge className={`${getTaskStatusBadgeClass(task.status)} text-[11px]`}>
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[12px] font-medium ${getTaskStatusBadgeClass(task.status)}`}>
                             {formatTaskStatusLabel(task.status)}
-                          </Badge>
+                          </span>
                         </div>
 
                         {!task.movedToSprint && !task.movedToBacklog && (
                           <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-[12px] text-[var(--apple-secondary-label)]">Status</Label>
                             <Select
                               value={task.status}
                               onValueChange={(value) => handleTaskStatusChange(task._id, value)}
                               disabled={taskStatusUpdating === task._id || task.archived}
                             >
-                              <SelectTrigger className="text-sm">
+                              <SelectTrigger className="text-[13px] rounded-[var(--apple-radius-md)] border-[var(--apple-separator)]">
                                 <SelectValue placeholder="Select status" />
                               </SelectTrigger>
                               <SelectContent>
@@ -1237,188 +1232,194 @@ export default function SprintDetailPage() {
                               </SelectContent>
                             </Select>
                             {task.archived && (
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-[12px] text-[var(--apple-tertiary-label)]">
                                 This task is archived and no longer appears on active boards.
                               </p>
                             )}
                           </div>
                         )}
                         {task.movedToSprint && (
-                          <div className="rounded-md border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800 p-2">
-                            <p className="text-xs text-muted-foreground">
+                          <div className="rounded-[var(--apple-radius-md)] border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20 p-2">
+                            <p className="text-[12px] text-[var(--apple-secondary-label)]">
                               This task has been moved to <span className="font-medium text-orange-700 dark:text-orange-400">{task.movedToSprint.name}</span>
                             </p>
                           </div>
                         )}
                         {task.movedToBacklog && (
-                          <div className="rounded-md border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800 p-2">
-                            <p className="text-xs text-muted-foreground">
+                          <div className="rounded-[var(--apple-radius-md)] border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20 p-2">
+                            <p className="text-[12px] text-[var(--apple-secondary-label)]">
                               This task has been moved to <span className="font-medium text-orange-700 dark:text-orange-400">backlog</span>
                             </p>
                           </div>
                         )}
                       </div>
-                      )
-                    })}
+                    ))}
                   </div>
                 )}
-              </CardContent>
 
-              {/* Pagination Controls */}
-              {sprintTasks.length > sprintTasksPageSize && (
-                <Card className="mt-4">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>Items per page:</span>
-                        <select
-                          value={sprintTasksPageSize}
-                          onChange={(e) => {
-                            setSprintTasksPageSize(parseInt(e.target.value))
-                            setSprintTasksCurrentPage(1)
-                          }}
-                          className="px-2 py-1 border rounded text-sm bg-background"
-                        >
-                          <option value="5">5</option>
-                          <option value="10">10</option>
-                          <option value="50">50</option>
-                          <option value="100">100</option>
-                        </select>
-                        <span>
-                          Showing {((sprintTasksCurrentPage - 1) * sprintTasksPageSize) + 1} to {Math.min(sprintTasksCurrentPage * sprintTasksPageSize, sprintTasks.length)} of {sprintTasks.length}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => setSprintTasksCurrentPage(sprintTasksCurrentPage - 1)}
-                          disabled={sprintTasksCurrentPage === 1}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Previous
-                        </Button>
-                        <span className="text-sm text-muted-foreground px-2">
-                          Page {sprintTasksCurrentPage} of {sprintTasksTotalPages || 1}
-                        </span>
-                        <Button
-                          onClick={() => setSprintTasksCurrentPage(sprintTasksCurrentPage + 1)}
-                          disabled={sprintTasksCurrentPage >= sprintTasksTotalPages}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Next
-                        </Button>
-                      </div>
+                {/* Pagination Controls */}
+                {sprintTasks.length > sprintTasksPageSize && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-[var(--apple-separator)]">
+                    <div className="flex items-center gap-2 text-[13px] text-[var(--apple-secondary-label)]">
+                      <span>Items per page:</span>
+                      <select
+                        value={sprintTasksPageSize}
+                        onChange={(e) => {
+                          setSprintTasksPageSize(parseInt(e.target.value))
+                          setSprintTasksCurrentPage(1)
+                        }}
+                        className="px-2 py-1 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] text-[13px] bg-[var(--apple-quaternary-fill)]"
+                      >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                      </select>
+                      <span>
+                        Showing {((sprintTasksCurrentPage - 1) * sprintTasksPageSize) + 1} to {Math.min(sprintTasksCurrentPage * sprintTasksPageSize, sprintTasks.length)} of {sprintTasks.length}
+                      </span>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-            </Card>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setSprintTasksCurrentPage(sprintTasksCurrentPage - 1)}
+                        disabled={sprintTasksCurrentPage === 1}
+                        className="h-8 px-3 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition disabled:opacity-40"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-[13px] text-[var(--apple-secondary-label)] font-apple-mono px-1">
+                        {sprintTasksCurrentPage}/{sprintTasksTotalPages || 1}
+                      </span>
+                      <button
+                        onClick={() => setSprintTasksCurrentPage(sprintTasksCurrentPage + 1)}
+                        disabled={sprintTasksCurrentPage >= sprintTasksTotalPages}
+                        className="h-8 px-3 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-8">
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0 space-y-3 sm:space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Status</span>
-                  <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
-                    {getStatusIcon(sprint?.status)}
-                    <span className="ml-1">{formatToTitleCase(sprint?.status)}</span>
-                  </Badge>
+          {/* ── Right Sidebar ──────────────────────────────────────────────────── */}
+          <div className="space-y-5">
+
+            {/* Details */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Details</h2>
+              </div>
+              <div className="px-5 py-1 divide-y divide-[var(--apple-separator)]">
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Status</span>
+                  {renderStatusChip(SPRINT_STATUS_BADGE, sprint.status, formatToTitleCase(sprint.status))}
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Project</span>
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Project</span>
                   <span
-                    className="text-xs sm:text-sm font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left"
-                    title={sprint?.project?.name && sprint?.project?.name.length > 10 ? sprint?.project?.name : undefined}
+                    className="text-[13px] font-medium text-[var(--apple-label)] truncate max-w-[160px]"
+                    title={sprint.project?.name}
                   >
-                    {sprint?.project?.name && sprint?.project?.name.length > 10 ? `${sprint?.project?.name.slice(0, 10)}…` : sprint?.project?.name}
+                    {sprint.project?.name || '—'}
                   </span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Duration</span>
-                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                    {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Duration</span>
+                  <span className="text-[13px] font-apple-mono font-medium text-[var(--apple-label)]">
+                    {Math.ceil((new Date(sprint.endDate).getTime() - new Date(sprint.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
                   </span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Start Date</span>
-                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                    {formatDate(sprint?.startDate)}
-                  </span>
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Start Date</span>
+                  <div className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--apple-label)]">
+                    <Calendar className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" />
+                    {formatDate(sprint.startDate)}
+                  </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">End Date</span>
-                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                    {formatDate(sprint?.endDate)}
-                  </span>
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">End Date</span>
+                  <div className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--apple-label)]">
+                    <Calendar className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)]" />
+                    {formatDate(sprint.endDate)}
+                  </div>
                 </div>
 
                 {getDaysRemaining() > 0 && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Days Remaining</span>
-                    <span className="text-xs sm:text-sm font-medium text-orange-600 whitespace-nowrap">{getDaysRemaining()}</span>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-[13px] text-[var(--apple-secondary-label)]">Days Remaining</span>
+                    <span className="text-[13px] font-apple-mono font-semibold text-[var(--apple-system-orange)]">{getDaysRemaining()}</span>
                   </div>
                 )}
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Capacity</span>
-                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{sprint?.capacity}h</span>
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Capacity</span>
+                  <span className="text-[13px] font-apple-mono font-medium text-[var(--apple-label)]">{sprint.capacity}h</span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Velocity</span>
-                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{sprint?.velocity}</span>
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Velocity</span>
+                  <span className="text-[13px] font-apple-mono font-medium text-[var(--apple-label)]">{sprint.velocity}</span>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Team Members</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">{sprint?.teamMembers?.length} members</CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0">
-                <div className="space-y-2">
-                  {sprint?.teamMembers?.map((member, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-xs sm:text-sm truncate">
-                        {member.firstName} {member.lastName}
-                      </span>
+            {/* Team Members */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Team Members</h2>
+                <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{sprint.teamMembers?.length || 0} members</p>
+              </div>
+              <div className="px-5 py-3 space-y-2.5">
+                {sprint.teamMembers && sprint.teamMembers.length > 0 ? sprint.teamMembers.map((member, index) => {
+                  const displayName = `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'Unknown User'
+                  const initials = displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+                  return (
+                    <div key={member._id || index} className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white font-semibold text-[13px] select-none"
+                        style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 1px 4px var(--apple-chart-glow)' }}>
+                        {initials}
+                      </div>
+                      <span className="text-[13px] text-[var(--apple-label)] font-medium leading-tight">{displayName}</span>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  )
+                }) : (
+                  <p className="text-[13px] text-[var(--apple-tertiary-label)]">No team members assigned.</p>
+                )}
+              </div>
+            </div>
 
-            <Card className="overflow-x-hidden">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Created By</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0">
-                <div className="flex items-center space-x-2">
-                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                  <span className="text-xs sm:text-sm truncate">
-                    {sprint?.createdBy?.firstName} {sprint?.createdBy?.lastName}
-                  </span>
+            {/* Created By */}
+            <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--apple-separator)]">
+                <h2 className="text-[13px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-tertiary-label)]">Created By</h2>
+              </div>
+              <div className="px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white font-semibold text-[13px] select-none"
+                    style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 1px 4px var(--apple-chart-glow)' }}>
+                    {`${sprint.createdBy?.firstName || ''} ${sprint.createdBy?.lastName || ''}`.trim().split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || <User className="h-4 w-4" />}
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium text-[var(--apple-label)] leading-tight">
+                      {sprint.createdBy?.firstName} {sprint.createdBy?.lastName}
+                    </p>
+                    <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{formatDate(sprint.createdAt)}</p>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatDate(sprint?.createdAt)}
-                </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
         <ConfirmationModal
           isOpen={showDeleteConfirm}
           onClose={() => setShowDeleteConfirm(false)}
@@ -1760,7 +1761,6 @@ export default function SprintDetailPage() {
             )}
           </div>
         </ResponsiveDialog>
-      </div>
     </MainLayout>
   )
 }

@@ -86,6 +86,7 @@ interface BacklogItem {
   displayId: string
   description: string
   type: 'epic' | 'story' | 'task'
+  taskType?: string
   priority: string
   status: string
   project?: ProjectSummary | null
@@ -2253,7 +2254,7 @@ export default function BacklogPage() {
 
                   {/* Row 2: Type + Status + Priority badges */}
                   <div className="flex items-center gap-1.5 flex-wrap mb-2">
-                    <TypeBadge type={item.type} size="sm" />
+                    <TypeBadge type={isTask ? (item.taskType || 'task') : item.type} size="sm" />
                     <StatusBadge status={item.status} size="sm" />
                     <PriorityBadge priority={item.priority} size="sm" />
                   </div>

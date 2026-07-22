@@ -6,6 +6,8 @@ import { ArrowRight, Calendar, CheckSquare, User } from 'lucide-react'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 interface RecentTasksProps {
   tasks?: any[]
@@ -57,6 +59,8 @@ function PriorityBadge({ priority }: { priority: string }) {
 export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
   const router = useRouter()
   const { formatDate } = useDateTime()
+  const { hasPermission } = usePermissions()
+  const canCreateTask = hasPermission(Permission.TASK_CREATE)
 
   if (isLoading) {
     return (
@@ -110,13 +114,15 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
             <p className="text-[14px] font-semibold text-[var(--apple-label)]">No tasks yet</p>
             <p className="text-[12px] text-[var(--apple-secondary-label)]">Tasks assigned to you will appear here.</p>
           </div>
-          <button
-            onClick={() => router.push('/tasks/create-new-task')}
-            className="mt-1 text-[12px] font-medium apple-transition hover:opacity-70"
-            style={{ color: 'var(--apple-chart-to)' }}
-          >
-            Create a task →
-          </button>
+          {canCreateTask && (
+            <button
+              onClick={() => router.push('/tasks/create-new-task')}
+              className="mt-1 text-[12px] font-medium apple-transition hover:opacity-70"
+              style={{ color: 'var(--apple-chart-to)' }}
+            >
+              Create a task →
+            </button>
+          )}
         </div>
       </div>
     )
