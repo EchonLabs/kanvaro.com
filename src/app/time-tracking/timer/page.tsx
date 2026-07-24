@@ -945,10 +945,6 @@ export default function TimerPage() {
 
   if (!user) return null
 
-  const dailyPct = timeTrackingSettings?.maxDailyHours
-    ? Math.min(100, (dailyHoursLogged / timeTrackingSettings.maxDailyHours) * 100)
-    : 0
-
   return (
     <MainLayout>
       <div className="space-y-6 view-transition-container">
@@ -1266,47 +1262,6 @@ export default function TimerPage() {
               )}
             </div>
           </div>
-
-        {/* ── Today's Progress ─────────────────────────────────────────── */}
-        {timeTrackingSettings?.maxDailyHours && dailyHoursLogged > 0 && (
-          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Clock
-                  className="h-4 w-4 flex-shrink-0"
-                  strokeWidth={1.5}
-                  style={{ color: dailyHoursLogged >= timeTrackingSettings.maxDailyHours ? 'var(--apple-system-red)' : 'var(--apple-chart-to)' }}
-                />
-                <div>
-                  <p className="text-[15px] font-semibold text-[var(--apple-label)]">Today's Progress</p>
-                  <p className="text-[12px] text-[var(--apple-secondary-label)]">Daily time logged</p>
-                </div>
-              </div>
-              <p className="text-[13px] font-semibold font-apple-mono tabular-nums text-[var(--apple-label)]">
-                {dailyHoursLogged.toFixed(1)}h
-                <span className="text-[var(--apple-tertiary-label)] font-normal"> / {timeTrackingSettings.maxDailyHours}h</span>
-              </p>
-            </div>
-            <div className="p-5">
-              <div className="h-[6px] rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700 relative overflow-hidden"
-                  style={{
-                    width: `${dailyPct}%`,
-                    background: dailyHoursLogged >= timeTrackingSettings.maxDailyHours
-                      ? 'linear-gradient(135deg,#FF3B30 0%,#FF453A 100%)'
-                      : 'var(--apple-card-gradient)',
-                    boxShadow: dailyHoursLogged >= timeTrackingSettings.maxDailyHours
-                      ? '0 2px 8px rgba(255,59,48,0.20)'
-                      : '0 2px 8px var(--apple-chart-glow)'
-                  }}
-                >
-                  <span className="progress-shimmer absolute inset-0" />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ── Time Logs ────────────────────────────────────────────────── */}
         {user && (
