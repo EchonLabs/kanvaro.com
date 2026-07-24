@@ -1,3 +1,10 @@
+## [1.41.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.2...v1.41.3) (2026-07-24)
+
+
+### Bug Fixes
+
+* remove unused daily progress calculation and related UI elements from TimerPage ([d5afe0a](https://github.com/EchonLabs/kanvaro.com/commit/d5afe0a4fff5ae14d4601943d4b3bd20119d0956))
+
 ## [1.41.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.1...v1.41.2) (2026-07-21)
 
 
