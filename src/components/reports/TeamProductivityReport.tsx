@@ -1,438 +1,318 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Area,
-  AreaChart
+import {
+  BarChart, Bar, AreaChart, Area, LineChart, Line,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import { 
-  TrendingUp, 
-  Target,
-  Clock,
-  Activity,
-  Zap
-} from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar'
+import { Zap } from 'lucide-react'
 
 interface TeamMember {
-  _id: string
-  firstName: string
-  lastName: string
-  email: string
-  role: string
-  department: string
-  avatar?: string
+  _id: string; firstName: string; lastName: string; email: string
+  role: string; department: string; avatar?: string
   stats: {
-    tasksCompleted: number
-    totalTasks: number
-    completionRate: number
-    hoursLogged: number
-    averageSessionLength: number
-    productivityScore: number
-    workloadScore: number
+    tasksCompleted: number; totalTasks: number; completionRate: number
+    hoursLogged: number; averageSessionLength: number; productivityScore: number; workloadScore: number
   }
-  recentActivity: {
-    date: string
-    activity: string
-    type: 'task' | 'time' | 'project'
-  }[]
+}
+
+interface ProductivityTrend {
+  date?: string
+  productivity?: number
+  workload?: number
+  hours?: number
+  completionRate?: number
+  tasksCompleted?: number
+  period?: string
+  averageProductivity?: number
+  averageCompletionRate?: number
+  totalTasksCompleted?: number
+  totalHoursLogged?: number
 }
 
 interface TeamProductivityReportProps {
   members: TeamMember[]
-  productivityTrends: {
-    date: string
-    productivity: number
-    workload: number
-    hours: number
-  }[]
+  productivityTrends: ProductivityTrend[]
   filters: any
 }
 
+
+const AppleTooltip = ({ active, payload, label, formatValue }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px] min-w-[148px]">
+      {label && <p className="font-semibold text-[var(--apple-label)] mb-2">{label}</p>}
+      {payload.map((item: any, i: number) => (
+        <div key={i} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+            <span className="text-[var(--apple-secondary-label)]">{item.name}</span>
+          </div>
+          <span className="font-semibold font-apple-mono text-[var(--apple-label)]">
+            {formatValue ? formatValue(item.value) : item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-5">
+      <div className="mb-4">
+        <p className="text-[17px] font-semibold tracking-tight">{title}</p>
+        {subtitle && <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export function TeamProductivityReport({ members, productivityTrends, filters }: TeamProductivityReportProps) {
-  // Calculate productivity metrics
-  const averageProductivity = members.length > 0 
-    ? members.reduce((sum, member) => sum + member.stats.productivityScore, 0) / members.length 
-    : 0
-  const totalHoursLogged = members.reduce((sum, member) => sum + member.stats.hoursLogged, 0)
-  const totalTasksCompleted = members.reduce((sum, member) => sum + member.stats.tasksCompleted, 0)
-  const averageSessionLength = members.length > 0 
-    ? members.reduce((sum, member) => sum + member.stats.averageSessionLength, 0) / members.length 
-    : 0
+  const avgProd = members.length > 0 ? members.reduce((s, m) => s + m.stats.productivityScore, 0) / members.length : 0
+  const totalHours = members.reduce((s, m) => s + m.stats.hoursLogged, 0)
+  const avgSession = members.length > 0 ? members.reduce((s, m) => s + m.stats.averageSessionLength, 0) / members.length : 0
+  const totalTasks = members.reduce((s, m) => s + m.stats.tasksCompleted, 0)
 
-  // Prepare data for charts
-  const productivityData = members.map(member => ({
-    name: `${member.firstName} ${member.lastName}`.length > 15 
-      ? `${member.firstName} ${member.lastName}`.substring(0, 15) + '...' 
-      : `${member.firstName} ${member.lastName}`,
-    productivity: member.stats.productivityScore,
-    tasks: member.stats.tasksCompleted,
-    hours: member.stats.hoursLogged,
-    completion: member.stats.completionRate,
-    sessionLength: member.stats.averageSessionLength
+  // Show one label per week on 30-day trend to avoid crowding
+  const trendData = productivityTrends.map((t, i) => ({
+    period: i % 7 === 0 ? (t.period ?? t.date ?? '').slice(5) : '', // MM-DD only
+    fullDate: t.period ?? t.date ?? '',
+    'Productivity': t.averageProductivity ?? t.productivity ?? 0,
+    'Tasks Done': t.totalTasksCompleted ?? t.tasksCompleted ?? 0,
   }))
 
-  const departmentProductivity = members.reduce((acc, member) => {
-    if (!acc[member.department]) {
-      acc[member.department] = {
-        department: member.department,
-        members: 0,
-        totalProductivity: 0,
-        totalHours: 0,
-        totalTasks: 0
-      }
-    }
-    acc[member.department].members += 1
-    acc[member.department].totalProductivity += member.stats.productivityScore
-    acc[member.department].totalHours += member.stats.hoursLogged
-    acc[member.department].totalTasks += member.stats.tasksCompleted
-    return acc
-  }, {} as Record<string, any>)
-
-  const departmentData = Object.values(departmentProductivity).map((dept: any) => ({
-    department: dept.department,
-    members: dept.members,
-    avgProductivity: dept.members > 0 ? dept.totalProductivity / dept.members : 0,
-    totalHours: dept.totalHours,
-    totalTasks: dept.totalTasks,
-    productivityPerHour: dept.totalHours > 0 ? dept.totalTasks / dept.totalHours : 0
+  const hoursTrendData = productivityTrends.map((t, i) => ({
+    period: i % 7 === 0 ? (t.period ?? t.date ?? '').slice(5) : '',
+    fullDate: t.period ?? t.date ?? '',
+    'Hours': parseFloat((t.totalHoursLogged ?? t.hours ?? 0).toFixed(2)),
   }))
 
-  const productivityTrendsData = productivityTrends.map(trend => ({
-    date: trend.date,
-    productivity: trend.productivity,
-    workload: trend.workload,
-    hours: trend.hours,
-    efficiency: trend.hours > 0 ? trend.productivity / trend.hours : 0
-  }))
-
-  const topPerformers = members
+  const memberData = [...members]
     .sort((a, b) => b.stats.productivityScore - a.stats.productivityScore)
-    .slice(0, 3)
+    .map(m => ({
+      name: `${m.firstName} ${m.lastName.charAt(0)}.`,
+      Productivity: m.stats.productivityScore,
+    }))
+
+  const maxH = Math.max(...members.map(m => m.stats.hoursLogged), 1)
 
   return (
-    <div className="space-y-8">
-      {/* Productivity Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Avg Productivity</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {averageProductivity.toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Team productivity score
-            </p>
-            <Progress value={averageProductivity} className="mt-2" />
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Hours</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold break-words">
-              {totalHoursLogged.toFixed(0)}h
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Logged across team
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Tasks Completed</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {totalTasksCompleted}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Total completed tasks
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Avg Session</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {averageSessionLength.toFixed(1)}h
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Average session length
-            </p>
-          </CardContent>
-        </Card>
+      {/* ── Stats Strip ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Avg Productivity', value: `${avgProd.toFixed(1)}%`, sub: 'Team average', color: '#34C759' },
+          { label: 'Total Hours', value: `${totalHours.toFixed(0)}h`, sub: 'All sessions logged', color: 'var(--apple-chart-color)' },
+          { label: 'Avg Session', value: `${avgSession.toFixed(1)}h`, sub: 'Per work session', color: '#FF9500' },
+          { label: 'Total Tasks', value: String(totalTasks), sub: 'Completed in period', color: 'var(--apple-chart-color)' },
+        ].map(s => (
+          <div key={s.label} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4">
+            <p className="apple-section-label text-[var(--apple-secondary-label)] mb-1.5">{s.label}</p>
+            <p className="text-[24px] font-bold font-apple-mono tracking-tight" style={{ color: s.color }}>{s.value}</p>
+            <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-0.5">{s.sub}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-        {/* Individual Productivity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Individual Productivity</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Productivity scores by team member</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={productivityData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value}%`, 'Productivity']} />
-                <Bar dataKey="productivity" fill="#00C49F" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* ── Charts ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Department Productivity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Department Productivity</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Average productivity by department</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={departmentData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="department" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value}%`, 'Productivity']} />
-                <Bar dataKey="avgProductivity" fill="#0088FE" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Productivity Trends */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Productivity Trends</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Team productivity over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={productivityTrendsData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
-                <Area 
-                  type="monotone" 
-                  dataKey="productivity" 
-                  stackId="1" 
-                  stroke="#00C49F" 
-                  fill="#00C49F" 
-                  fillOpacity={0.6}
-                  name="Productivity"
+        {/* Area — productivity trend (30-day) */}
+        <ChartCard title="Productivity Trend" subtitle="Average team productivity over the last 30 days">
+          {trendData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={trendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="prod-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#34C759" stopOpacity={0.22} />
+                    <stop offset="100%" stopColor="#34C759" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="period" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null
+                    const d = payload[0]?.payload
+                    return (
+                      <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px] min-w-[148px]">
+                        <p className="font-semibold text-[var(--apple-label)] mb-2">{d?.fullDate}</p>
+                        {payload.map((item: any, i: number) => (
+                          <div key={i} className="flex justify-between gap-4">
+                            <span className="text-[var(--apple-secondary-label)]">{item.name}</span>
+                            <span className="font-semibold font-apple-mono">{Number(item.value).toFixed(1)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }}
+                  cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="workload" 
-                  stackId="2" 
-                  stroke="#FFBB28" 
-                  fill="#FFBB28" 
-                  fillOpacity={0.6}
-                  name="Workload"
-                />
+                <Area type="monotone" dataKey="Productivity" stroke="#34C759" strokeWidth={2} fill="url(#prod-area)" dot={false} activeDot={{ r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center">
+              <p className="text-[13px] text-[var(--apple-secondary-label)]">No trend data available</p>
+            </div>
+          )}
+        </ChartCard>
 
-        {/* Hours vs Productivity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Hours vs Productivity</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Hours logged vs productivity correlation</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={productivityData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
-                <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Line 
-                  yAxisId="left"
-                  type="monotone" 
-                  dataKey="productivity" 
-                  stroke="#00C49F" 
-                  strokeWidth={2}
-                  name="Productivity %"
+        {/* Area — hours logged trend (30-day) */}
+        <ChartCard title="Hours Logged Over Time" subtitle="Total team hours logged over the last 30 days">
+          {hoursTrendData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={hoursTrendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="hours-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--apple-chart-color)" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="var(--apple-chart-color)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="period" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}h`} />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null
+                    const d = payload[0]?.payload
+                    return (
+                      <div className="rounded-[14px] border border-[var(--apple-separator)] bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] p-3 text-[13px] min-w-[148px]">
+                        <p className="font-semibold text-[var(--apple-label)] mb-2">{d?.fullDate}</p>
+                        {payload.map((item: any, i: number) => (
+                          <div key={i} className="flex justify-between gap-4">
+                            <span className="text-[var(--apple-secondary-label)]">{item.name}</span>
+                            <span className="font-semibold font-apple-mono">{Number(item.value).toFixed(1)}h</span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }}
+                  cursor={{ stroke: 'var(--apple-separator)', strokeWidth: 1 }}
                 />
-                <Line 
-                  yAxisId="right"
-                  type="monotone" 
-                  dataKey="hours" 
-                  stroke="#8884d8" 
-                  strokeWidth={2}
-                  name="Hours Logged"
-                />
-              </LineChart>
+                <Area type="monotone" dataKey="Hours" stroke="var(--apple-chart-color)" strokeWidth={2} fill="url(#hours-area)" dot={false} activeDot={{ r: 4 }} />
+              </AreaChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center">
+              <p className="text-[13px] text-[var(--apple-secondary-label)]">No data available</p>
+            </div>
+          )}
+        </ChartCard>
+
+        {/* Horizontal bar — member productivity (all, scrollable) */}
+        <ChartCard title="Member Productivity Ranking" subtitle="Productivity score per member">
+          {memberData.length > 0 ? (
+            <div className="overflow-y-auto" style={{ maxHeight: 240 }}>
+              <div style={{ height: Math.max(240, memberData.length * 28) }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={memberData} layout="vertical" barCategoryGap="28%" margin={{ top: 4, right: 16, left: 44, bottom: 0 }}>
+                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }} axisLine={false} tickLine={false} width={44} />
+                    <Tooltip content={<AppleTooltip formatValue={(v: number) => `${v.toFixed(1)}%`} />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
+                    <Bar dataKey="Productivity" fill="#34C759" radius={[0, 5, 5, 0]} maxBarSize={12} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center">
+              <p className="text-[13px] text-[var(--apple-secondary-label)]">No member data available</p>
+            </div>
+          )}
+        </ChartCard>
+
+        {/* Hours per member inline bars */}
+        <ChartCard title="Hours Logged per Member" subtitle="Individual time contribution this period">
+          <div className="space-y-3 mt-1 max-h-[240px] overflow-y-auto pr-1">
+            {[...members].sort((a, b) => b.stats.hoursLogged - a.stats.hoursLogged).map((m, i) => {
+              const pct = (m.stats.hoursLogged / maxH) * 100
+              return (
+                <div key={m._id} className="flex items-center gap-3">
+                  <Avatar className="h-6 w-6 flex-shrink-0">
+                    <AvatarImage src={m.avatar} />
+                    <AvatarFallback className="text-[9px] font-semibold bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                      {m.firstName.charAt(0)}{m.lastName.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <p className="text-[12px] font-medium w-24 truncate flex-shrink-0">{m.firstName} {m.lastName.charAt(0)}.</p>
+                  <div className="flex-1 h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${pct}%`, backgroundColor: 'var(--apple-chart-color)' }}
+                    />
+                  </div>
+                  <span className="text-[12px] font-semibold font-apple-mono text-[var(--apple-secondary-label)] w-12 text-right flex-shrink-0">
+                    {m.stats.hoursLogged.toFixed(0)}h
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </ChartCard>
       </div>
 
-      {/* Top Performers */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
-            <Zap className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-            <span className="truncate">Top Performers</span>
-          </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Most productive team members</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-5">
-            {topPerformers.map((performer, index) => (
-              <div key={performer._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
-                <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 flex-shrink-0">
-                    <Badge variant="outline" className="w-6 h-6 rounded-full flex items-center justify-center">
-                      {index + 1}
-                    </Badge>
-                    <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
-                      <AvatarImage src={performer.avatar} />
-                      <AvatarFallback className="text-xs sm:text-sm">
-                        {performer.firstName.charAt(0)}{performer.lastName.charAt(0)}
+      {/* ── Productivity Breakdown ── */}
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+        <div className="px-5 pt-5 pb-4 border-b border-[var(--apple-separator)]">
+          <div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-[#FF9500]" />
+            <p className="text-[17px] font-semibold">Productivity Breakdown</p>
+          </div>
+          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Score, hours, and session stats per member</p>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {[...members].sort((a, b) => b.stats.productivityScore - a.stats.productivityScore).map((m) => {
+              const prodColor = m.stats.productivityScore >= 75 ? '#34C759' : m.stats.productivityScore >= 50 ? '#FF9500' : '#FF453A'
+              const prodBg = m.stats.productivityScore >= 75 ? 'rgba(52,199,89,0.10)' : m.stats.productivityScore >= 50 ? 'rgba(255,149,0,0.10)' : 'rgba(255,69,58,0.10)'
+              return (
+                <div key={m._id} className="rounded-[var(--apple-radius)] border border-[var(--apple-separator)] p-4 flex flex-col gap-3 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
+                  {/* Header */}
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9 flex-shrink-0">
+                      <AvatarImage src={m.avatar} />
+                      <AvatarFallback className="text-[12px] font-semibold bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                        {m.firstName.charAt(0)}{m.lastName.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm sm:text-base truncate">
-                      {performer.firstName} {performer.lastName}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                      {performer.role} • {performer.department}
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 sm:flex sm:items-center sm:space-x-4 sm:space-x-6 gap-3 sm:gap-0 w-full sm:w-auto flex-shrink-0">
-                  <div className="text-center">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {performer.stats.productivityScore.toFixed(1)}%
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold truncate">{m.firstName} {m.lastName}</p>
+                      <p className="text-[11px] text-[var(--apple-secondary-label)] truncate">{m.role}</p>
                     </div>
-                    <div className="text-xs text-muted-foreground">Productivity</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {performer.stats.tasksCompleted}
+                    <div className="flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold font-apple-mono" style={{ backgroundColor: prodBg, color: prodColor }}>
+                      {m.stats.productivityScore.toFixed(0)}%
                     </div>
-                    <div className="text-xs text-muted-foreground">Tasks Done</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {performer.stats.hoursLogged.toFixed(1)}h
-                    </div>
-                    <div className="text-xs text-muted-foreground">Hours Logged</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs sm:text-sm font-medium">
-                      {performer.stats.averageSessionLength.toFixed(1)}h
-                    </div>
-                    <div className="text-xs text-muted-foreground">Avg Session</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Productivity Analysis */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base sm:text-lg">Productivity Analysis</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Detailed productivity metrics for all team members</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-5">
-            {members.map((member) => (
-              <div key={member._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
-                <div className="flex-1 min-w-0 w-full sm:w-auto">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
-                    <div className="flex items-center space-x-2">
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarImage src={member.avatar} />
-                        <AvatarFallback className="text-xs sm:text-sm">
-                          {member.firstName.charAt(0)}{member.lastName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm sm:text-base truncate">
-                          {member.firstName} {member.lastName}
-                        </h3>
-                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                          {member.role} • {member.department}
-                        </p>
-                      </div>
+                  {/* Progress bar */}
+                  <div className="space-y-1">
+                    <div className="h-1.5 rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${m.stats.productivityScore}%`, backgroundColor: prodColor }} />
                     </div>
-                    <Badge variant={member.stats.productivityScore > 80 ? 'default' : 
-                                   member.stats.productivityScore > 60 ? 'secondary' : 'outline'} className="flex-shrink-0">
-                      {member.stats.productivityScore.toFixed(1)}% productivity
-                    </Badge>
                   </div>
-                  
-                  <div className="mt-3 space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
-                        <span>Productivity Score</span>
-                        <span className="flex-shrink-0 ml-2">{member.stats.productivityScore.toFixed(1)}%</span>
+
+                  {/* Stats row */}
+                  <div className="grid grid-cols-3 gap-2 pt-0.5">
+                    {[
+                      { label: 'Hours', value: `${m.stats.hoursLogged.toFixed(0)}h` },
+                      { label: 'Session', value: `${m.stats.averageSessionLength.toFixed(1)}h` },
+                      { label: 'Tasks', value: String(m.stats.tasksCompleted) },
+                    ].map(s => (
+                      <div key={s.label} className="text-center">
+                        <p className="text-[12px] font-semibold font-apple-mono text-[var(--apple-label)]">{s.value}</p>
+                        <p className="text-[10px] text-[var(--apple-tertiary-label)]">{s.label}</p>
                       </div>
-                      <Progress value={member.stats.productivityScore} className="h-2" />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5 text-xs sm:text-sm">
-                      <div>
-                        <div className="text-muted-foreground">Tasks Completed</div>
-                        <div className="font-medium break-words">{member.stats.tasksCompleted}</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Hours Logged</div>
-                        <div className="font-medium break-words">{member.stats.hoursLogged.toFixed(1)}h</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Completion Rate</div>
-                        <div className="font-medium">{member.stats.completionRate.toFixed(1)}%</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Avg Session</div>
-                        <div className="font-medium">{member.stats.averageSessionLength.toFixed(1)}h</div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

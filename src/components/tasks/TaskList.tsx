@@ -422,13 +422,11 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     fetchTasks()
     setShowEditModal(false)
     setSelectedTask(null)
-    notifySuccess({ title: 'Success', message: 'Task updated successfully' })
   }
 
   const handleTaskCreated = () => {
-    fetchTasks() // Refresh the task list
+    fetchTasks()
     setShowCreateModal(false)
-    notifySuccess({ title: 'Success', message: 'Task created successfully' })
   }
 
   const handleCreateTaskClick = () => {

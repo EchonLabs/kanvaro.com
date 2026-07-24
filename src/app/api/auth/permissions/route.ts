@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
       projectPermissions,
       projectRoles,
       userRole: userPermissions.userRole,
+      customRole: userPermissions.customRole || null,
       accessibleProjects: await PermissionService.getAccessibleProjects(userId)
     });
 

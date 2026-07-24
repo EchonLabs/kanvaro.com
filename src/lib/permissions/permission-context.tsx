@@ -8,6 +8,11 @@ interface UserPermissions {
   projectPermissions: Record<string, Permission[]>;
   projectRoles: Record<string, string>;
   userRole: string;
+  customRole?: {
+    _id: string;
+    name: string;
+    permissions?: Permission[];
+  };
   accessibleProjects: string[];
 }
 
@@ -152,6 +157,7 @@ export function PermissionProvider({ children, initialPermissions }: PermissionP
         projectPermissions: {},
         projectRoles: {},
         userRole: 'team_member',
+        customRole: undefined,
         accessibleProjects: []
       };
       setPermissions(defaultPermissions);

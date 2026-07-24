@@ -100,10 +100,13 @@ export async function POST(
       invoiceNumber,
       category,
       subCategory,
+      customSubCategory,
       description,
       utilizableBudget,
       approvedDate,
       actualStartDate,
+      paidStatus,
+      receivedBy,
       attachments
     } = body || {}
 
@@ -118,9 +121,17 @@ export async function POST(
 
     const normalizedSubCategory = typeof subCategory === 'string' ? subCategory.toLowerCase() : undefined
     if (normalizedCategory === 'invoice') {
-      if (!normalizedSubCategory || !['amc', 'cr'].includes(normalizedSubCategory)) {
+      if (!normalizedSubCategory || !['amc', 'cr', 'other'].includes(normalizedSubCategory)) {
         return NextResponse.json({ error: 'Sub Category is required for Invoice category' }, { status: 400 })
       }
+    }
+
+    const normalizedCustomSubCategory = typeof customSubCategory === 'string'
+      ? customSubCategory.trim()
+      : ''
+
+    if (normalizedCategory === 'invoice' && normalizedSubCategory === 'other' && !normalizedCustomSubCategory) {
+      return NextResponse.json({ error: 'Custom sub category is required when Sub Category is Other' }, { status: 400 })
     }
 
     const numericBudget = Number(utilizableBudget)
@@ -172,16 +183,31 @@ export async function POST(
       }
     }
 
+    const normalizedPaidStatus = paidStatus === 'paid' ? 'paid' : 'unpaid'
+    const normalizedReceivedBy = normalizedPaidStatus === 'paid' && typeof receivedBy === 'string' && receivedBy.trim()
+      ? receivedBy.trim()
+      : undefined
+
+    if (normalizedPaidStatus === 'paid' && !normalizedReceivedBy) {
+      return NextResponse.json({ error: 'Received By is required when status is Paid' }, { status: 400 })
+    }
+
     const income = new ProjectIncome({
       project: params.id,
       organization: user.organization,
       invoiceNumber: String(invoiceNumber).trim(),
       category: normalizedCategory,
       subCategory: normalizedCategory === 'invoice' ? normalizedSubCategory : undefined,
+      customSubCategory:
+        normalizedCategory === 'invoice' && normalizedSubCategory === 'other'
+          ? normalizedCustomSubCategory
+          : undefined,
       description: String(description).trim(),
       utilizableBudget: numericBudget,
       approvedDate: parsedApprovedDate,
       actualStartDate: parsedActualStartDate,
+      paidStatus: normalizedPaidStatus,
+      receivedBy: normalizedReceivedBy,
       attachments: processedAttachments,
       addedBy: user.id
     })
@@ -236,10 +262,13 @@ export async function PUT(
       invoiceNumber,
       category,
       subCategory,
+      customSubCategory,
       description,
       utilizableBudget,
       approvedDate,
       actualStartDate,
+      paidStatus,
+      receivedBy,
       attachments
     } = body || {}
 
@@ -258,9 +287,17 @@ export async function PUT(
 
     const normalizedSubCategory = typeof subCategory === 'string' ? subCategory.toLowerCase() : undefined
     if (normalizedCategory === 'invoice') {
-      if (!normalizedSubCategory || !['amc', 'cr'].includes(normalizedSubCategory)) {
+      if (!normalizedSubCategory || !['amc', 'cr', 'other'].includes(normalizedSubCategory)) {
         return NextResponse.json({ error: 'Sub Category is required for Invoice category' }, { status: 400 })
       }
+    }
+
+    const normalizedCustomSubCategory = typeof customSubCategory === 'string'
+      ? customSubCategory.trim()
+      : ''
+
+    if (normalizedCategory === 'invoice' && normalizedSubCategory === 'other' && !normalizedCustomSubCategory) {
+      return NextResponse.json({ error: 'Custom sub category is required when Sub Category is Other' }, { status: 400 })
     }
 
     const numericBudget = Number(utilizableBudget)
@@ -320,13 +357,27 @@ export async function PUT(
       return NextResponse.json({ error: 'Access denied to income' }, { status: 403 })
     }
 
+    const normalizedPaidStatus = paidStatus === 'paid' ? 'paid' : 'unpaid'
+    const normalizedReceivedBy = normalizedPaidStatus === 'paid' && typeof receivedBy === 'string' && receivedBy.trim()
+      ? receivedBy.trim()
+      : undefined
+
+    if (normalizedPaidStatus === 'paid' && !normalizedReceivedBy) {
+      return NextResponse.json({ error: 'Received By is required when status is Paid' }, { status: 400 })
+    }
+
     income.invoiceNumber = String(invoiceNumber).trim()
     income.category = normalizedCategory
     income.subCategory = normalizedCategory === 'invoice' ? normalizedSubCategory : undefined
+    income.customSubCategory = normalizedCategory === 'invoice' && normalizedSubCategory === 'other'
+      ? normalizedCustomSubCategory
+      : undefined
     income.description = String(description).trim()
     income.utilizableBudget = numericBudget
     income.approvedDate = parsedApprovedDate
     income.actualStartDate = parsedActualStartDate
+    income.paidStatus = normalizedPaidStatus
+    income.receivedBy = normalizedReceivedBy
     income.attachments = processedAttachments
 
     await income.save()
@@ -334,6 +385,64 @@ export async function PUT(
     return NextResponse.json({ success: true, data: income })
   } catch (error) {
     console.error('Update project income error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectDB()
+
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    }
+
+    const { user } = authResult
+    const userId = user.id
+
+    const project = await Project.findById(params.id).select('organization')
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    if (project.organization?.toString() !== user.organization?.toString()) {
+      return NextResponse.json({ error: 'Access denied to project' }, { status: 403 })
+    }
+
+    const hasProjectAccess = await PermissionService.canAccessProject(userId, params.id)
+    if (!hasProjectAccess) {
+      return NextResponse.json({ error: 'Insufficient access to project' }, { status: 403 })
+    }
+
+    const canDeleteIncome = await PermissionService.hasPermission(userId, Permission.FINANCIAL_CREATE_INCOME, params.id)
+    if (!canDeleteIncome) {
+      return NextResponse.json({ error: 'Insufficient permissions to delete income' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const incomeId = searchParams.get('incomeId')
+    if (!incomeId) {
+      return NextResponse.json({ error: 'Income ID is required' }, { status: 400 })
+    }
+
+    const income = await ProjectIncome.findOne({ _id: incomeId, project: params.id })
+    if (!income) {
+      return NextResponse.json({ error: 'Income not found' }, { status: 404 })
+    }
+
+    if (income.organization?.toString() !== user.organization?.toString()) {
+      return NextResponse.json({ error: 'Access denied to income' }, { status: 403 })
+    }
+
+    await income.deleteOne()
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Delete project income error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -110,10 +110,14 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
     }
   }
 
-  const { hasPermission } = usePermissions()
+  const { hasPermission, permissions } = usePermissions()
   const canManageOrgRoles = hasPermission(Permission.USER_MANAGE_ROLES)
   const canManageBudget = hasPermission(Permission.BUDGET_HANDLING)
   const canManageTeam = hasPermission(Permission.PROJECT_MANAGE_TEAM, projectId)
+
+  // Only Admin, Super Admin, HR, and Project Manager org roles can add/remove project members
+  const memberManagementRoles = ['admin', 'super_admin', 'human_resource', 'project_manager']
+  const canManageMembers = memberManagementRoles.includes(permissions?.userRole || '')
 
   const scrollToAddMemberSection = () => {
     if (addMemberSectionRef.current) {
@@ -499,12 +503,12 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
             Manage project team members and their roles
           </p>
         </div>
-        <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
+        {canManageMembers && <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
           <Button onClick={handleOpenAddMember}>
             <UserPlus className="h-4 w-4 mr-2" />
             Add Member
           </Button>
-        </PermissionGate>
+        </PermissionGate>}
       </div>
 
       {/* Project Creator */}
@@ -552,7 +556,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No team members yet</p>
-              <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
+              {canManageMembers && <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
                 <Button
                   variant="outline"
                   className="mt-4"
@@ -561,7 +565,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add First Member
                 </Button>
-              </PermissionGate>
+              </PermissionGate>}
             </div>
           ) : (
             <div className="space-y-3">
@@ -672,7 +676,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                       )}
 
 
-                      <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
+                      {canManageMembers && <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -701,7 +705,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </PermissionGate>
+                      </PermissionGate>}
                     </div>
                   </div>
                 )

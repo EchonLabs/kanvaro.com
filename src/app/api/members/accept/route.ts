@@ -9,6 +9,7 @@ import { formatToTitleCase } from '@/lib/utils'
 import bcrypt from 'bcryptjs'
 import { generateAvatarImage } from '@/lib/avatar-generator'
 import crypto from 'crypto'
+import { formatDisplayName } from '@/lib/email/email-branding'
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
       token,
       isAccepted: false,
       expiresAt: { $gt: new Date() }
-    }).populate('organization')
+    }).populate('organization invitedBy', 'name firstName lastName email')
 
     if (!invitation) {
       return NextResponse.json(
@@ -39,6 +40,19 @@ export async function POST(request: NextRequest) {
     if (existingUser) {
       return NextResponse.json(
         { error: 'User already exists' },
+        { status: 400 }
+      )
+    }
+
+    if (!firstName || firstName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'First name must be at least 2 characters' },
+        { status: 400 }
+      )
+    }
+    if (!lastName || lastName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'Last name must be at least 2 characters' },
         { status: 400 }
       )
     }
@@ -94,6 +108,16 @@ export async function POST(request: NextRequest) {
     try {
       const organizationName = invitation.organization?.name || 'Kanvaro'
       const roleDisplayName = invitation.roleDisplayName || formatToTitleCase(invitation.role) || 'Team Member'
+      const inviter = invitation.invitedBy as unknown as {
+        firstName?: string
+        lastName?: string
+        email?: string
+      } | undefined
+      const inviterDisplayName = formatDisplayName({
+        firstName: inviter?.firstName,
+        lastName: inviter?.lastName,
+        email: inviter?.email,
+      })
 
       // Get base URL from request headers (same as invite route)
      let baseUrl: string
@@ -179,7 +203,8 @@ export async function POST(request: NextRequest) {
         user.email,
         roleDisplayName,
         organizationName,
-        loginUrl
+        loginUrl,
+        inviterDisplayName
       )
 
       emailService.sendEmail({

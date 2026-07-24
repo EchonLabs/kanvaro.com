@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
     // Get date ranges
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const startOfWeek = new Date(startOfDay)
+    startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay())
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
@@ -158,19 +159,42 @@ export async function GET(request: NextRequest) {
       { userId }
     )
 
-    // Calculate project progress
+    // Batch-aggregate total time tracked (minutes) per project — one query for all recent projects
+    const recentProjectIds = recentProjects.map(p => p._id)
+    const projectHoursAgg = await TimeEntry.aggregate([
+      {
+        $match: {
+          organization: organizationId,
+          project: { $in: recentProjectIds },
+          status: 'completed'
+        }
+      },
+      {
+        $group: {
+          _id: '$project',
+          totalDuration: { $sum: '$duration' }
+        }
+      }
+    ])
+    const projectHoursMap = new Map(
+      projectHoursAgg.map((r: any) => [r._id.toString(), r.totalDuration as number])
+    )
+
+    // Calculate project progress + attach hoursTracked
     const projectsWithProgress = await Promise.all(
       recentProjects.map(async (project) => {
         const projectTasks = await Task.find({ project: project._id })
         const totalTasks = projectTasks.length
         const completedTasks = projectTasks.filter(task => task.status === 'done').length
         const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+        const hoursTracked = projectHoursMap.get(project._id.toString()) ?? 0
 
         return {
           ...project.toObject(),
           progress,
           tasksCompleted: completedTasks,
-          totalTasks
+          totalTasks,
+          hoursTracked   // total minutes tracked against this project
         }
       })
     )
@@ -475,18 +499,17 @@ async function getTeamActivity(
     projectQuery['teamMembers.memberId'] = userId
   }
 
-  // Get recent activities from tasks, projects, and time entries
-  const [taskActivities, projectActivities, timeActivities] = await Promise.all([
+  // Get recent activities from tasks, projects, time entries, and the current user
+  const [taskActivities, projectActivities, timeActivities, currentUser] = await Promise.all([
     Task.find(taskQuery)
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
+      .populate('assignedTo.user', 'firstName lastName email avatar')
+      .populate('createdBy', 'firstName lastName email avatar')
       .populate('project', 'name')
       .sort({ updatedAt: -1 })
       .limit(5),
 
     Project.find(projectQuery)
-      .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email avatar')
       .sort({ updatedAt: -1 })
       .limit(3),
 
@@ -497,7 +520,9 @@ async function getTeamActivity(
       .populate('project', 'name')
       .populate('task', 'title')
       .sort({ startTime: -1 })
-      .limit(3)
+      .limit(3),
+
+    User.findById(userId).select('firstName lastName email avatar')
   ])
 
   // Format activities
@@ -505,13 +530,14 @@ async function getTeamActivity(
 
   // Add task activities
   taskActivities.forEach(task => {
+    const assignedUser = (task.assignedTo as any)?.[0]?.user || null
     activities.push({
       id: `task-${task._id}`,
       type: 'task',
       action: task.status === 'done' ? 'completed' : 'updated',
       target: task.title,
       project: task.project?.name || 'Unknown Project',
-      user: task.assignedTo || task.createdBy,
+      user: assignedUser || task.createdBy,
       timestamp: task.updatedAt,
       status: task.status
     })
@@ -539,7 +565,7 @@ async function getTeamActivity(
       action: 'logged',
       target: `${entry.duration} minutes`,
       project: entry.project?.name || 'Unknown Project',
-      user: { _id: userId },
+      user: currentUser,
       timestamp: entry.startTime,
       duration: entry.duration
     })

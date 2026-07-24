@@ -5,11 +5,14 @@ export interface IProjectIncome extends Document {
   organization: mongoose.Types.ObjectId
   invoiceNumber: string
   category: 'invoice' | 'consulting' | 'other'
-  subCategory?: 'amc' | 'cr'
+  subCategory?: 'amc' | 'cr' | 'other'
+  customSubCategory?: string
   description: string
   utilizableBudget: number
   approvedDate?: Date
   actualStartDate?: Date
+  paidStatus: 'paid' | 'unpaid'
+  receivedBy?: mongoose.Types.ObjectId | string
   attachments: {
     name: string
     url: string
@@ -47,7 +50,12 @@ const ProjectIncomeSchema = new Schema<IProjectIncome>({
   },
   subCategory: {
     type: String,
-    enum: ['amc', 'cr']
+    enum: ['amc', 'cr', 'other']
+  },
+  customSubCategory: {
+    type: String,
+    trim: true,
+    maxlength: 200
   },
   description: {
     type: String,
@@ -65,6 +73,16 @@ const ProjectIncomeSchema = new Schema<IProjectIncome>({
   },
   actualStartDate: {
     type: Date
+  },
+  paidStatus: {
+    type: String,
+    enum: ['paid', 'unpaid'],
+    required: true,
+    default: 'unpaid'
+  },
+  receivedBy: {
+    type: String,
+    trim: true
   },
   attachments: [{
     name: { type: String, required: true },
@@ -84,6 +102,7 @@ const ProjectIncomeSchema = new Schema<IProjectIncome>({
 })
 
 ProjectIncomeSchema.index({ project: 1, createdAt: -1 })
+ProjectIncomeSchema.index({ project: 1, paidStatus: 1 })
 ProjectIncomeSchema.index({ organization: 1, invoiceNumber: 1 })
 ProjectIncomeSchema.index({ organization: 1, category: 1 })
 

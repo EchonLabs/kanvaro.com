@@ -240,11 +240,32 @@ export async function stopTimerInternal(
     isApproved: !requiresProjectApproval
   })
 
-  const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
-  if (!deletedTimer) {
+  // Save the TimeEntry before deleting the ActiveTimer so a failed save
+  // (e.g. the duplicate-entry guard rejecting a concurrent stop from another
+  // tab/device) never leaves the session with no record of it at all.
+  try {
+    await timeEntry.save()
+  } catch (error) {
+    // Another concurrent stop for this same timer likely already saved an
+    // equivalent entry (duplicate-entry guard rejected this one). Clean up
+    // the ActiveTimer if it's still there and report this as already stopped
+    // rather than surfacing a raw error and losing the session.
+    await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
     return { success: true, alreadyStopped: true, duration: 0 }
   }
-  await timeEntry.save()
+
+  const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
+  if (!deletedTimer) {
+    // Someone else already deleted the ActiveTimer between our checks. The
+    // TimeEntry we just saved is still valid and kept.
+    return {
+      success: true,
+      timeEntry: timeEntry.toObject(),
+      duration: finalDuration,
+      autoStopped: isAutoStop,
+      reason: options.reason ?? 'manual'
+    }
+  }
 
   // Log activity (non-blocking)
   const projectNameForLog = (activeTimer.project as any)?.name || 'Unknown Project'

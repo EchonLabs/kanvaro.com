@@ -9,6 +9,7 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { notificationService } from '@/lib/notification-service'
 import crypto from 'crypto'
 import { generateInvitationEmailHtml } from '@/lib/email/invitation-template'
+import { formatDisplayName } from '@/lib/email/email-branding'
 import mongoose from 'mongoose'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
@@ -44,6 +45,20 @@ export async function POST(request: NextRequest) {
     if (!emailRegex.test(email)) {
       return NextResponse.json(
         { error: 'Invalid email format' },
+        { status: 400 }
+      )
+    }
+
+    // Validate first/last name length when provided
+    if (firstName && firstName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'First name must be at least 2 characters' },
+        { status: 400 }
+      )
+    }
+    if (lastName && lastName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'Last name must be at least 2 characters' },
         { status: 400 }
       )
     }
@@ -184,6 +199,11 @@ export async function POST(request: NextRequest) {
             lastName: inviterUser.lastName || '',
             email: inviterUser.email || ''
           } : { firstName: '', lastName: '', email: '' }
+          const inviterDisplayName = formatDisplayName({
+            firstName: inviterName.firstName,
+            lastName: inviterName.lastName,
+            email: inviterName.email,
+          })
 
           // Get organization details
           const organization = await Organization.findById(organizationId)
@@ -278,6 +298,7 @@ export async function POST(request: NextRequest) {
             roleDisplayName,
             inviterFirstName: inviterName.firstName,
             inviterLastName: inviterName.lastName,
+            inviterEmail: inviterName.email,
             invitationLink,
           })
 
@@ -305,7 +326,7 @@ export async function POST(request: NextRequest) {
               return notificationService.createBulkNotifications(adminIds, organizationId, {
                 type: 'invitation',
                 title: 'New Team Member Invitation',
-                message: `${inviterName.firstName} ${inviterName.lastName} invited ${firstName || email} to join as ${roleDisplayName}`,
+                message: `${inviterDisplayName} invited ${firstName || email} to join as ${roleDisplayName}`,
                 data: {
                   entityType: 'user',
                   action: 'created',

@@ -784,7 +784,7 @@ export default function EditTaskPage() {
         setOriginalAssignedTo(updatedAssignees)
         notifySuccess({ title: 'Task Updated', message: 'Task updated successfully' })
         setTimeout(() => {
-          router.push('/tasks?success=Task%20updated%20successfully')
+          router.push('/tasks')
         }, 1200)
       } else {
         notifyError({ title: 'Failed to Save Task', message: data.error || 'Failed to save task' })
@@ -875,13 +875,21 @@ export default function EditTaskPage() {
   return (
     <MainLayout>
       <div className="w-full max-w-5xl mx-auto space-y-4">
-        <Button variant="ghost" onClick={() => router.back()}>
+        <Button variant="ghost" onClick={() => router.back()} className="text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
+        <div className="flex items-center gap-3">
+          <Target className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
+          <div>
+            <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight leading-tight text-[var(--apple-label)]">Edit Task</h1>
+            <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">Update task details and configuration</p>
+          </div>
+        </div>
+
         <Card>
           <CardHeader>
-            <CardTitle>Edit Task</CardTitle>
+            <CardTitle>Task Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 min-w-0">

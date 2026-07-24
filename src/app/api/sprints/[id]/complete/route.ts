@@ -171,7 +171,7 @@ export async function POST(
       if (targetSprintId && tasksToMoveToSprint.length > 0) {
         await Task.updateMany(
           { _id: { $in: tasksToMoveToSprint } },
-          { sprint: targetSprintId, status: 'todo' }
+          { sprint: targetSprintId }
         )
 
         await Sprint.findByIdAndUpdate(

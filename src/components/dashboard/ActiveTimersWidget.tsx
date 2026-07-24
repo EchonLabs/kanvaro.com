@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Clock, Square, User, FolderOpen, Loader2, RefreshCw, Search, AlertTriangle } from 'lucide-react'
+import { Clock, Square, User, FolderOpen, Loader2, RefreshCw, Search } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { useToast } from '@/components/ui/Toast'
@@ -333,59 +333,66 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
 
   return (
     <Card className="overflow-x-hidden">
-      <CardHeader className="p-4 sm:p-6">
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base sm:text-lg truncate flex items-center gap-2">
-            <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
-            Active Timers
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+            <CardTitle>Active Timers</CardTitle>
+          </div>
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={fetchActiveTimers}
             disabled={isLoading}
-            className="h-8 w-8 p-0"
+            className="h-7 w-7 rounded-full"
           >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 text-[var(--apple-secondary-label)] ${isLoading ? 'animate-spin' : ''}`} strokeWidth={1.5} />
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
-        {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <Select 
-            value={selectedEmployeeId || 'all'} 
-            onValueChange={(value) => {
-              setSelectedEmployeeId(value === 'all' ? '' : value)
-              setEmployeeSearch('') // Clear search when selection changes
-            }}
-            onOpenChange={(open) => {
-              if (!open) setEmployeeSearch('') // Clear search when dropdown closes
-            }}
+      <CardContent className="space-y-3">
+        {/*
+         * Filters — same line, no label.
+         * Each SelectContent uses overflow-hidden so only the inner list div
+         * creates a scrollbar, eliminating the double-scrollbar issue.
+         * All onValueChange / onOpenChange filtering logic is untouched.
+         */}
+        {/*
+         * ── Filters: same line, no label ─────────────────────────────────
+         * SelectContent has overflow-hidden (from select.tsx base); the inner
+         * max-h div is the ONLY scrollable element → one scrollbar, no double.
+         */}
+        <div className="flex gap-2">
+          {/* Employee filter */}
+          <Select
+            value={selectedEmployeeId || 'all'}
+            onValueChange={(value) => { setSelectedEmployeeId(value === 'all' ? '' : value); setEmployeeSearch('') }}
+            onOpenChange={(open) => { if (!open) setEmployeeSearch('') }}
           >
-            <SelectTrigger className="w-full text-sm">
-              <SelectValue placeholder="All Employees" />
+            <SelectTrigger className="flex-1 h-8 text-sm min-w-0">
+              <User className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] mr-1.5 flex-shrink-0" strokeWidth={1.5} />
+              <SelectValue placeholder="Employee" />
             </SelectTrigger>
-            <SelectContent>
-              <div className="p-2 border-b">
+            <SelectContent className="w-[var(--radix-select-trigger-width)]">
+              {/* Pinned search — not inside any overflow container */}
+              <div className="p-2 border-b border-[var(--apple-separator)]">
                 <div className="relative">
-                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                   <Input
-                    placeholder="Search employees..."
+                    placeholder="Search…"
                     value={employeeSearch}
                     onChange={(e) => setEmployeeSearch(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
-                    className="h-8 pl-7 text-xs"
+                    className="h-7 pl-7 text-xs bg-white dark:bg-[#3A3A3C] border-[var(--apple-separator)] text-[var(--apple-label)] placeholder:text-[var(--apple-tertiary-label)]"
                   />
                 </div>
               </div>
-              <div className="max-h-[200px] overflow-y-auto">
+              {/* Single scrollable item list */}
+              <div className="max-h-48 overflow-y-auto p-1">
                 <SelectItem value="all">All Employees</SelectItem>
                 {filteredMembers.length === 0 ? (
-                  <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                    No employees found
-                  </div>
+                  <div className="px-2 py-4 text-center text-xs text-[var(--apple-secondary-label)]">No employees found</div>
                 ) : (
                   filteredMembers.map(member => (
                     <SelectItem key={member._id} value={member._id}>
@@ -397,39 +404,34 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
             </SelectContent>
           </Select>
 
-          <Select 
-            value={selectedProjectId || 'all'} 
-            onValueChange={(value) => {
-              setSelectedProjectId(value === 'all' ? '' : value)
-              setProjectSearch('') // Clear search when selection changes
-            }}
-            onOpenChange={(open) => {
-              if (!open) setProjectSearch('') // Clear search when dropdown closes
-            }}
+          {/* Project filter */}
+          <Select
+            value={selectedProjectId || 'all'}
+            onValueChange={(value) => { setSelectedProjectId(value === 'all' ? '' : value); setProjectSearch('') }}
+            onOpenChange={(open) => { if (!open) setProjectSearch('') }}
           >
-            <SelectTrigger className="w-full text-sm">
-              <SelectValue placeholder="All Projects" />
+            <SelectTrigger className="flex-1 h-8 text-sm min-w-0">
+              <FolderOpen className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] mr-1.5 flex-shrink-0" strokeWidth={1.5} />
+              <SelectValue placeholder="Project" />
             </SelectTrigger>
-            <SelectContent>
-              <div className="p-2 border-b">
+            <SelectContent className="w-[var(--radix-select-trigger-width)]">
+              <div className="p-2 border-b border-[var(--apple-separator)]">
                 <div className="relative">
-                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
                   <Input
-                    placeholder="Search projects..."
+                    placeholder="Search…"
                     value={projectSearch}
                     onChange={(e) => setProjectSearch(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
-                    className="h-8 pl-7 text-xs"
+                    className="h-7 pl-7 text-xs bg-white dark:bg-[#3A3A3C] border-[var(--apple-separator)] text-[var(--apple-label)] placeholder:text-[var(--apple-tertiary-label)]"
                   />
                 </div>
               </div>
-              <div className="max-h-[200px] overflow-y-auto">
+              <div className="max-h-48 overflow-y-auto p-1">
                 <SelectItem value="all">All Projects</SelectItem>
                 {filteredProjects.length === 0 ? (
-                  <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                    No projects found
-                  </div>
+                  <div className="px-2 py-4 text-center text-xs text-[var(--apple-secondary-label)]">No projects found</div>
                 ) : (
                   filteredProjects.map(project => (
                     <SelectItem key={project._id} value={project._id}>
@@ -445,53 +447,59 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
         {/* Timers List */}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
           </div>
         ) : filteredTimers.length === 0 ? (
-          <div className="text-center py-8 text-sm text-muted-foreground">
+          <div className="text-center py-8 text-sm text-[var(--apple-secondary-label)]">
             No active timers
           </div>
         ) : (
-          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+          <div className="space-y-2 max-h-[360px] overflow-y-auto">
             {filteredTimers.map(timer => {
               const derivedMinutes = deriveTimerMinutes(timer)
               const displayTime = displayTimes[timer._id] || formatDuration(derivedMinutes)
               return (
                 <div
                   key={timer._id}
-                  className="border rounded-lg p-3 space-y-2 hover:bg-muted/50 transition-colors"
+                  className="rounded-[var(--apple-radius-md)] p-3 border border-[var(--apple-separator)] hover:bg-[var(--apple-quaternary-fill)] apple-transition space-y-1.5"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0 overflow-x-hidden">
-                      <div className="flex items-center gap-2 mb-1">
-                        <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                        <span className="text-sm font-medium truncate">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <User className="h-3 w-3 text-[var(--apple-tertiary-label)] flex-shrink-0" strokeWidth={1.5} />
+                        <span className="text-[15px] font-medium text-[var(--apple-label)] truncate">
                           {timer.user.firstName} {timer.user.lastName}
                         </span>
                         {timer.isPaused && (
-                          <Badge variant="secondary" className="text-xs">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-[var(--apple-radius-pill)] text-xs font-medium bg-[var(--apple-system-orange)]/15 text-[var(--apple-system-orange)]">
                             Paused
-                          </Badge>
+                          </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <FolderOpen className="h-3 w-3 flex-shrink-0" />
+                      <div className="flex items-center gap-1.5 text-sm text-[var(--apple-secondary-label)]">
+                        <FolderOpen className="h-3 w-3 flex-shrink-0" strokeWidth={1.5} />
                         <span className="truncate">{timer.project.name}</span>
                       </div>
                       {timer.task && (
-                        <div className="text-xs text-muted-foreground ml-5 break-words whitespace-normal" title={timer.task.title}>
-                          Task: {timer.task.title}
+                        <div className="text-[13px] text-[var(--apple-secondary-label)] ml-4 truncate" title={timer.task.title}>
+                          {timer.task.title}
                         </div>
                       )}
                       {timer.description && (
-                        <div className="text-xs text-muted-foreground mt-1 break-words whitespace-pre-wrap" title={timer.description}>
+                        <div className="text-[13px] text-[var(--apple-tertiary-label)] ml-4 truncate" title={timer.description}>
                           {timer.description}
                         </div>
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                      <div className="text-sm font-mono font-semibold">
-                        {displayTime}
+                      <div className="inline-flex items-center text-[17px] font-timer tabular-nums text-[var(--apple-label)]">
+                        {displayTime.split('').map((char, i) =>
+                          /[0-9]/.test(char) ? (
+                            <span key={`${i}-${char}`} className="number-digit-flip">{char}</span>
+                          ) : (
+                            <span key={`s${i}`} className="mx-[0.15em] opacity-50 select-none">:</span>
+                          )
+                        )}
                       </div>
                       <Button
                         size="sm"
@@ -501,12 +509,9 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
                         className="h-7 px-2 text-xs"
                       >
                         {isStopping === timer._id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
                         ) : (
-                          <>
-                            <Square className="h-3 w-3 mr-1" />
-                            Stop
-                          </>
+                          <><Square className="h-3 w-3 mr-1" strokeWidth={1.5} />Stop</>
                         )}
                       </Button>
                     </div>
@@ -519,37 +524,26 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
       </CardContent>
 
       {/* Stop Timer Confirmation Dialog */}
-      <Dialog open={!!stopConfirmTimerId} onOpenChange={(open) => !open && setStopConfirmTimerId(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Stop Timer
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to stop this timer?
-              {timerToStop && (
-                <span className="block mt-2 text-foreground font-medium">
-                  {timerToStop.user.firstName} {timerToStop.user.lastName} — {timerToStop.project.name}
-                  {timerToStop.task && ` • ${timerToStop.task.title}`}
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setStopConfirmTimerId(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => stopConfirmTimerId && handleStopTimer(stopConfirmTimerId)}
-            >
-              <Square className="h-4 w-4 mr-2" />
-              Stop Timer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmationModal
+        isOpen={!!stopConfirmTimerId}
+        onClose={() => setStopConfirmTimerId(null)}
+        onConfirm={() => stopConfirmTimerId && handleStopTimer(stopConfirmTimerId)}
+        title="Stop Timer"
+        description={
+          <>
+            Are you sure you want to stop this timer?
+            {timerToStop && (
+              <span className="block mt-2 font-medium text-[var(--apple-label)]">
+                {timerToStop.user.firstName} {timerToStop.user.lastName} — {timerToStop.project.name}
+                {timerToStop.task && ` • ${timerToStop.task.title}`}
+              </span>
+            )}
+          </>
+        }
+        confirmText="Stop Timer"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </Card>
   )
 }

@@ -81,21 +81,18 @@ export class PermissionService {
         return userPermissions.globalPermissions.includes(permission);
 
       case PermissionScope.PROJECT:
-        if (!projectId) {
-          // For project-scoped permissions, we need a project context
-          return false;
+        // A permission granted globally (via the user's org-wide role, e.g. Admin
+        // or Project Manager) already applies across the organization. Don't
+        // additionally require the referenced project to still exist/resolve -
+        // that would incorrectly block deletion of things like sprints whose
+        // project can't be looked up, even though the role grant is unconditional.
+        if (userPermissions.globalPermissions.includes(permission)) {
+          return true;
         }
 
-        // First check if user has the permission globally (e.g., ADMIN role)
-        if (userPermissions.globalPermissions.includes(permission)) {
-          // If they have it globally, verify the project belongs to their organization
-          const user = await User.findById(userId);
-          if (user) {
-            const project = await Project.findById(projectId);
-            if (project && user.organization.toString() === project.organization.toString()) {
-              return true;
-            }
-          }
+        if (!projectId) {
+          // For project-scoped permissions without a global grant, we need a project context
+          return false;
         }
 
         // Check project-specific permissions

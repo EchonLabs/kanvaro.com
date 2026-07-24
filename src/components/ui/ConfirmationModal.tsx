@@ -2,10 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { AlertTriangle, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { AlertTriangle } from 'lucide-react'
 
 interface ConfirmationModalProps {
   isOpen: boolean
@@ -33,121 +30,132 @@ export function ConfirmationModal({
   isLoading = false
 }: ConfirmationModalProps) {
   const isDestructive = variant === 'destructive'
-  const initialButtonRef = useRef<HTMLButtonElement>(null)
   const modalId = useId()
   const titleId = `${modalId}-title`
   const descriptionId = `${modalId}-description`
   const [mounted, setMounted] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
+  const confirmButtonRef = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     if (!isOpen || !mounted) return
+    const t = setTimeout(() => {
+      setIsVisible(true)
+      confirmButtonRef.current?.focus()
+    }, 10)
+    return () => clearTimeout(t)
+  }, [isOpen, mounted])
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onClose()
-      }
+  useEffect(() => {
+    if (!isOpen) setIsVisible(false)
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen || !mounted) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose() }
     }
-
     document.addEventListener('keydown', handleKeyDown)
-    initialButtonRef.current?.focus()
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isOpen, onClose, mounted])
-
-  useEffect(() => {
-    if (!isOpen || !mounted) return
-
     document.body.classList.add('modal-open')
     return () => {
+      document.removeEventListener('keydown', handleKeyDown)
       document.body.classList.remove('modal-open')
     }
-  }, [isOpen, mounted])
+  }, [isOpen, onClose, mounted])
 
   if (!isOpen || !mounted) return null
 
   return createPortal(
     <div
-      className="modal-overlay fixed inset-0 w-screen h-screen bg-white/60 dark:bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
+      className={`
+        fixed inset-0 z-[9999] flex items-center justify-center p-6
+        bg-black/20 dark:bg-black/50
+        backdrop-blur-[3px]
+        transition-opacity duration-200
+        ${isVisible ? 'opacity-100' : 'opacity-0'}
+      `}
       role="presentation"
       onClick={onClose}
     >
-      <Card
+      <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className={cn(
-          "w-full max-w-md flex flex-col max-h-[90vh] bg-card text-card-foreground shadow-2xl transition-all duration-200 ease-out pointer-events-auto",
-          isDestructive && 'border-destructive/60'
-        )}
-        onClick={event => {
-          event.stopPropagation()
-          event.preventDefault()
-        }}
-        onMouseDown={event => event.stopPropagation()}
+        className={`
+          w-full max-w-[320px] pointer-events-auto
+          bg-[var(--apple-secondary-system-background)] rounded-[var(--apple-radius-xl)] overflow-hidden
+          border border-[var(--apple-separator)]
+          shadow-[0_20px_60px_rgba(0,0,0,0.18),0_4px_16px_rgba(0,0,0,0.10)]
+          dark:shadow-[0_20px_60px_rgba(0,0,0,0.60),0_4px_16px_rgba(0,0,0,0.30)]
+          transition-all duration-200 ease-out
+          ${isVisible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-[0.92] translate-y-2'}
+        `}
+        onClick={e => { e.stopPropagation(); e.preventDefault() }}
+        onMouseDown={e => e.stopPropagation()}
       >
-        <CardHeader className="flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              {isDestructive && (
-                <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden="true" />
-              )}
-              <CardTitle id={titleId}>
-                {title}
-              </CardTitle>
+        {/* Content */}
+        <div className="px-5 pt-6 pb-5 text-center">
+          {isDestructive && (
+            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-6 h-6 text-[var(--apple-system-red)]" aria-hidden="true" />
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close confirmation dialog">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <CardDescription id={descriptionId}>
+          )}
+          <h2
+            id={titleId}
+            className="text-[17px] font-semibold tracking-[-0.01em] text-[var(--apple-label)]"
+          >
+            {title}
+          </h2>
+          <div
+            id={descriptionId}
+            className="mt-2 text-[13px] leading-relaxed text-[var(--apple-secondary-label)]"
+          >
             {description}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex-shrink-0 pt-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end sm:space-x-2">
-            <Button
-              ref={initialButtonRef}
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                onClose()
-              }}
-              disabled={isLoading}
-              className="pointer-events-auto"
-            >
-              {cancelText}
-            </Button>
-            <Button
-              variant={isDestructive ? 'destructive' : 'default'}
-              onClick={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                onConfirm()
-              }}
-              disabled={isLoading}
-              className="pointer-events-auto"
-            >
-              {isLoading ? (
-                'Processing...'
-              ) : (
-                <span className="inline-flex items-center gap-2">
-                  {confirmIcon}
-                  {confirmText}
-                </span>
-              )}
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Divider */}
+        <div className="h-px bg-[var(--apple-separator)]" />
+
+        {/* Buttons */}
+        <div className="flex">
+          <button
+            onClick={e => { e.stopPropagation(); e.preventDefault(); onClose() }}
+            disabled={isLoading}
+            className="
+              flex-1 py-3.5 text-[17px] text-[var(--apple-system-blue)]
+              apple-transition hover:bg-[var(--apple-quaternary-fill)]
+              disabled:opacity-40
+            "
+          >
+            {cancelText}
+          </button>
+
+          <div className="w-px bg-[var(--apple-separator)]" />
+
+          <button
+            ref={confirmButtonRef}
+            onClick={e => { e.stopPropagation(); e.preventDefault(); onConfirm() }}
+            disabled={isLoading}
+            className="flex-1 py-3.5 text-[17px] font-semibold apple-transition hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
+            style={{ color: isDestructive ? 'var(--apple-system-red)' : 'var(--apple-system-blue)' }}
+          >
+            {isLoading ? (
+              <span className="inline-flex items-center justify-center gap-2">
+                <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+              </span>
+            ) : (
+              <span className="inline-flex items-center justify-center gap-1.5">
+                {confirmIcon}
+                {confirmText}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
     </div>,
     document.body
   )

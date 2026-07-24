@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Bell, User, Sun, Moon, Monitor, LogOut, UserCircle, X, Check, Menu } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Badge } from '@/components/ui/Badge'
@@ -58,7 +59,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
 
   return (
     <>
-    <header className="flex h-14 lg:h-16 items-center border-b bg-background px-3 sm:px-4">
+    <header className="flex h-14 items-center border-b border-[var(--apple-separator)] apple-glass px-3 sm:px-4 sticky top-0 z-30">
       {/* Mobile Menu Button */}
       <TooltipProvider>
         <Tooltip>
@@ -67,10 +68,10 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
               variant="ghost"
               size="icon"
               onClick={onMobileMenuToggle}
-              className="lg:hidden h-9 w-9 mr-2"
+              className="lg:hidden h-8 w-8 mr-2 rounded-full"
               aria-label="Toggle Menu"
             >
-              <Menu className="h-4 w-4" />
+              <Menu className="h-4 w-4 text-[var(--apple-secondary-label)]" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>
@@ -81,70 +82,71 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
 
       {/* Global Search - Full Width */}
       <div className="flex-1">
-        <GlobalSearch 
+        <GlobalSearch
           placeholder="Search projects, tasks, users, epics, sprints..."
           className="w-full"
         />
       </div>
 
       {/* Right Side Actions */}
-      <div className="flex items-center space-x-1 sm:space-x-2 ml-2 sm:ml-4">
-        {/* Theme Toggle Buttons - Hidden on mobile */}
+      <div className="flex items-center gap-1.5 ml-3">
+        {/* Theme Toggle — Apple pill style */}
         {mounted && (
-          <TooltipProvider>
-            <div className="hidden md:flex items-center border rounded-md">
+          <div className="hidden md:flex items-center bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-pill)] p-0.5 gap-0.5">
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant={theme === 'light' ? 'default' : 'ghost'}
-                    size="sm"
+                  <button
                     onClick={() => setTheme('light')}
-                    className="h-8 px-3 rounded-r-none border-r"
                     aria-label="Light Mode"
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded-[var(--apple-radius-pill)] apple-transition',
+                      theme === 'light'
+                        ? 'bg-card shadow-[0_1px_3px_rgba(0,0,0,0.12)] text-[var(--apple-label)]'
+                        : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]'
+                    )}
                   >
-                    <Sun className="h-4 w-4" />
-                  </Button>
+                    <Sun className="h-3.5 w-3.5" />
+                  </button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>Light Mode</p>
-                </TooltipContent>
+                <TooltipContent><p>Light Mode</p></TooltipContent>
               </Tooltip>
-              
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant={theme === 'dark' ? 'default' : 'ghost'}
-                    size="sm"
+                  <button
                     onClick={() => setTheme('dark')}
-                    className="h-8 px-3 rounded-none border-r"
                     aria-label="Dark Mode"
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded-[var(--apple-radius-pill)] apple-transition',
+                      theme === 'dark'
+                        ? 'bg-card shadow-[0_1px_3px_rgba(0,0,0,0.12)] text-[var(--apple-label)]'
+                        : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]'
+                    )}
                   >
-                    <Moon className="h-4 w-4" />
-                  </Button>
+                    <Moon className="h-3.5 w-3.5" />
+                  </button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>Dark Mode</p>
-                </TooltipContent>
+                <TooltipContent><p>Dark Mode</p></TooltipContent>
               </Tooltip>
-              
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant={theme === 'system' ? 'default' : 'ghost'}
-                    size="sm"
+                  <button
                     onClick={() => setTheme('system')}
-                    className="h-8 px-3 rounded-l-none"
                     aria-label="System Theme"
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded-[var(--apple-radius-pill)] apple-transition',
+                      theme === 'system'
+                        ? 'bg-card shadow-[0_1px_3px_rgba(0,0,0,0.12)] text-[var(--apple-label)]'
+                        : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]'
+                    )}
                   >
-                    <Monitor className="h-4 w-4" />
-                  </Button>
+                    <Monitor className="h-3.5 w-3.5" />
+                  </button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>System Theme</p>
-                </TooltipContent>
+                <TooltipContent><p>System Theme</p></TooltipContent>
               </Tooltip>
-            </div>
-          </TooltipProvider>
+            </TooltipProvider>
+          </div>
         )}
 
         {/* Notifications */}
@@ -153,12 +155,12 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative h-9 w-9" aria-label="Notifications">
-                    <Bell className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full" aria-label="Notifications">
+                    <Bell className="h-4 w-4 text-[var(--apple-secondary-label)]" />
                     {unreadCount > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
-                        {unreadCount}
-                      </Badge>
+                      <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-[var(--apple-system-red)] text-white text-[10px] flex items-center justify-center font-medium">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -167,91 +169,84 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                 <p>Notifications {unreadCount > 0 && `(${unreadCount} unread)`}</p>
               </TooltipContent>
             </Tooltip>
-          <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80" align="end">
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-                <h4 className="font-medium text-sm sm:text-base">Notifications</h4>
+            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 p-0 rounded-[var(--apple-radius-lg)] border-[var(--apple-separator)] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.12)]" align="end">
+              <div className="px-4 py-3 border-b border-[var(--apple-separator)] flex items-center justify-between">
+                <h4 className="font-semibold text-[15px] text-[var(--apple-label)]">Notifications</h4>
                 {unreadCount > 0 && (
-                  <Button variant="ghost" size="sm" onClick={markAllAsRead} className="w-full sm:w-auto text-xs sm:text-sm">
-                    <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    Mark All as Read
+                  <Button variant="ghost" size="sm" onClick={markAllAsRead} className="h-7 px-2 text-[13px] text-[var(--apple-system-blue)]">
+                    <Check className="h-3 w-3 mr-1" />
+                    Mark All Read
                   </Button>
                 )}
               </div>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="max-h-96 overflow-y-auto">
                 {loading ? (
-                  <div className="flex items-center justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <div className="flex items-center justify-center py-6">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-[var(--apple-system-blue)] border-t-transparent" />
                   </div>
                 ) : notifications.length === 0 ? (
-                  <div className="text-center py-4 text-xs sm:text-sm text-muted-foreground">
+                  <div className="text-center py-8 text-sm text-[var(--apple-secondary-label)]">
                     No notifications
                   </div>
                 ) : (
-                  notifications.map((notification) => (
-                    <div
-                      key={(notification._id as any).toString()}
-                      className={`flex items-start space-x-2 sm:space-x-3 rounded-lg p-2 sm:p-3 hover:bg-accent ${
-                        !notification.isRead ? 'bg-primary/5 border-l-2 border-primary' : ''
-                      }`}
-                    >
-                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-medium">
-                          {notification.type.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-xs sm:text-sm font-medium break-words flex-1 min-w-0">{notification.title}</p>
-                          <div className="flex items-center space-x-1 flex-shrink-0">
-                            {!notification.isRead && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                                onClick={() => markAsRead((notification._id as any).toString())}
-                                title="Mark as read"
-                              >
-                                <Check className="h-3 w-3" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                              onClick={() => deleteNotification((notification._id as any).toString())}
-                              title="Delete notification"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
+                  <div className="p-2 space-y-0.5">
+                    {notifications.map((notification) => (
+                      <div
+                        key={(notification._id as any).toString()}
+                        className={cn(
+                          'flex items-start gap-3 rounded-[var(--apple-radius-md)] px-3 py-2.5 cursor-pointer apple-transition hover:bg-[var(--apple-quaternary-fill)]',
+                          !notification.isRead && 'bg-[var(--apple-system-blue)]/8 border-l-2 border-[var(--apple-system-blue)]/50'
+                        )}
+                      >
+                        <div className="h-7 w-7 rounded-full bg-[var(--apple-tertiary-fill)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-[13px] font-semibold text-[var(--apple-secondary-label)]">
+                            {notification.type.charAt(0).toUpperCase()}
+                          </span>
                         </div>
-                        <p className="text-xs text-muted-foreground break-words">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(notification.createdAt).toLocaleString()}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn('text-sm font-medium break-words text-[var(--apple-label)]', !notification.isRead && 'font-semibold')}>{notification.title}</p>
+                          <p className="text-[13px] text-[var(--apple-secondary-label)] break-words mt-0.5 line-clamp-2">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-[var(--apple-tertiary-label)] mt-0.5">
+                            {new Date(notification.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          {!notification.isRead && (
+                            <button
+                              className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-[var(--apple-quaternary-fill)]"
+                              onClick={() => markAsRead((notification._id as any).toString())}
+                            >
+                              <Check className="h-3 w-3 text-[var(--apple-system-blue)]" />
+                            </button>
+                          )}
+                          <button
+                            className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-[var(--apple-quaternary-fill)]"
+                            onClick={() => deleteNotification((notification._id as any).toString())}
+                          >
+                            <X className="h-3 w-3 text-[var(--apple-tertiary-label)]" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
         </TooltipProvider>
 
         {/* User Profile Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
-              className="h-9 px-2 sm:px-3 group relative flex items-center gap-2" 
+            <Button
+              variant="ghost"
+              className="h-8 w-8 p-0 rounded-full overflow-hidden"
               title={getUserDisplayName()}
             >
               {user ? (
-                <GravatarAvatar 
+                <GravatarAvatar
                   user={{
                     avatar: user.avatar,
                     firstName: user.firstName,
@@ -262,17 +257,14 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                   className="flex-shrink-0"
                 />
               ) : (
-                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                  <User className="h-4 w-4" />
+                <div className="h-8 w-8 rounded-full bg-[var(--apple-tertiary-fill)] flex items-center justify-center flex-shrink-0">
+                  <User className="h-4 w-4 text-[var(--apple-secondary-label)]" />
                 </div>
               )}
-              {/* <span className="hidden sm:inline ml-0 sm:ml-2 opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
-                {user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'User'}
-              </span> */}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-56 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)]">
+            <DropdownMenuLabel className="text-[var(--apple-label)]">
               {user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'User'}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -281,9 +273,9 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
               Profile
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setShowLogoutConfirm(true)}>
+            <DropdownMenuItem onClick={() => setShowLogoutConfirm(true)} className="text-[var(--apple-system-red)]">
               <LogOut className="mr-2 h-4 w-4" />
-              Logout
+              Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -297,6 +289,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       description="You are about to log out from the system. This will end your current session and you will need to log in again to access your account. Any unsaved work will be lost."
       confirmText="Logout"
       cancelText="Cancel"
+      variant="destructive"
     />
     </>
   )

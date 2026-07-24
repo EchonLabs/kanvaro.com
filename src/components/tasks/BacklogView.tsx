@@ -97,6 +97,8 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
   const [typeFilter, setTypeFilter] = useState('all')
   const [sortBy, setSortBy] = useState('priority')
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [totalTaskCount, setTotalTaskCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -146,6 +148,9 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
 
       if (data.success) {
         setTasks(data.data)
+        if (data.pagination?.total !== undefined) {
+          setTotalTaskCount(data.pagination.total)
+        }
       } else {
         setError(data.error || 'Failed to fetch tasks')
       }
@@ -175,9 +180,10 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
     }
   }
 
-  const refreshTasks = () => {
-    fetchTasks()
-    fetchStories()
+  const refreshTasks = async () => {
+    setRefreshing(true)
+    await Promise.all([fetchTasks(), fetchStories()])
+    setRefreshing(false)
   }
 
   const getPriorityColor = (priority: string) => {
@@ -234,9 +240,8 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
   // Tasks are already paginated from the server, no need for client-side slicing
   const paginatedTasks = filteredAndSortedTasks
 
-  // Determine if we're on the last page (API returns fewer items than requested)
   const isLastPage = tasks.length < pageSize
-  const totalPages = isLastPage && currentPage === 1 ? 1 : currentPage + (isLastPage ? 0 : 1)
+  const totalPages = totalTaskCount > 0 ? Math.ceil(totalTaskCount / pageSize) : (isLastPage && currentPage === 1 ? 1 : currentPage + (isLastPage ? 0 : 1))
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -361,7 +366,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
   }
 
   const stats = useMemo(() => {
-    const totalTasks = tasks.length
+    const totalTasks = totalTaskCount
     const todoTasks = tasks.filter(task => task.status === 'todo').length
     const inProgressTasks = tasks.filter(task => task.status === 'in_progress').length
     const completedTasks = tasks.filter(task => task.status === 'done').length
@@ -382,13 +387,13 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
       completedStoryPoints,
       completionPercentage: totalStoryPoints > 0 ? Math.round((completedStoryPoints / totalStoryPoints) * 100) : 0
     }
-  }, [tasks, stories])
+  }, [tasks, stories, totalTaskCount])
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" strokeWidth={1.5} />
           <p className="text-muted-foreground">Loading backlog...</p>
         </div>
       </div>
@@ -405,12 +410,12 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-          <Button variant="outline" size="sm" onClick={refreshTasks} className="w-full sm:w-auto">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={refreshTasks} disabled={refreshing} className="w-full sm:w-auto">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} strokeWidth={1.5} />
             Refresh
           </Button>
           {/* <Button onClick={onCreateTask} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 mr-2" strokeWidth={1.5} />
             Add Task
           </Button> */}
         </div>
@@ -418,7 +423,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
 
       {error && (
         <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
+          <AlertTriangle className="h-4 w-4" strokeWidth={1.5} />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -428,9 +433,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
+              <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
                 <p className="text-2xl font-bold text-foreground">{stats.totalTasks}</p>
@@ -442,9 +445,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                <Pause className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              </div>
+              <Pause className="h-5 w-5 text-yellow-600 dark:text-yellow-400" strokeWidth={1.5} fill="none" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">To Do</p>
                 <p className="text-2xl font-bold text-foreground">{stats.todoTasks}</p>
@@ -456,9 +457,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                <Play className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
+              <Play className="h-5 w-5 text-blue-600 dark:text-blue-400" strokeWidth={1.5} fill="none" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">In Progress</p>
                 <p className="text-2xl font-bold text-foreground">{stats.inProgressTasks}</p>
@@ -470,9 +469,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
+              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" strokeWidth={1.5} />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Completed</p>
                 <p className="text-2xl font-bold text-foreground">{stats.completedTasks}</p>
@@ -515,19 +512,19 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
       </Card>
 
       {/* Filters and Search */}
-      <div className="flex flex-col gap-2 sm:gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+      <div className="rounded-[var(--apple-radius-lg)] bg-[var(--apple-quaternary-fill)] border border-[var(--apple-separator)] p-3 sm:p-4 space-y-2 sm:space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
           <Input
             placeholder="Search backlog items..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 w-full"
+            className="pl-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[15px] placeholder:text-[var(--apple-tertiary-label)] focus:border-[var(--apple-system-blue)]"
           />
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
           <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="h-10 w-full sm:w-40 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
             <SelectContent>
@@ -539,7 +536,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="h-10 w-full sm:w-40 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
@@ -551,7 +548,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
             </SelectContent>
           </Select>
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="h-10 w-full sm:w-40 rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
@@ -600,13 +597,13 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
                       </Badge>
                       {task.storyPoints && (
                         <Badge variant="outline" className="hover:bg-transparent dark:hover:bg-transparent">
-                          <BarChart3 className="h-3 w-3 mr-1" />
+                          <BarChart3 className="h-3 w-3 mr-1" strokeWidth={1.5} />
                           {task.storyPoints} pts
                         </Badge>
                       )}
                       {task.movedFromSprint && (
                         <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900">
-                          <History className="h-3 w-3 mr-1" />
+                          <History className="h-3 w-3 mr-1" strokeWidth={1.5} />
                           Moved from {task.movedFromSprint.name}
                         </Badge>
                       )}
@@ -614,7 +611,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
                     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                       {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
                         <div className="flex items-center space-x-1">
-                          <User className="h-4 w-4" />
+                          <User className="h-4 w-4" strokeWidth={1.5} />
                           <span>
                             {(() => {
                               const firstAssignee = task.assignedTo[0];
@@ -626,13 +623,13 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
                       )}
                       {task.dueDate && (
                         <div className="flex items-center space-x-1">
-                          <Calendar className="h-4 w-4" />
+                          <Calendar className="h-4 w-4" strokeWidth={1.5} />
                           <span>Due {formatDate(task.dueDate)}</span>
                         </div>
                       )}
                       {task.estimatedHours && (
                         <div className="flex items-center space-x-1">
-                          <Clock className="h-4 w-4" />
+                          <Clock className="h-4 w-4" strokeWidth={1.5} />
                           <span>{task.estimatedHours}h estimated</span>
                         </div>
                       )}
@@ -671,7 +668,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
+                          <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -705,11 +702,11 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
 
       {paginatedTasks.length === 0 && !loading && (
         <div className="text-center py-8">
-          <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" strokeWidth={1.5} />
           <p className="text-muted-foreground">No backlog items found</p>
           {hasPermission(Permission.TASK_CREATE) && (
             <Button onClick={onCreateTask} className="mt-4">
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-2" strokeWidth={1.5} />
               Create First Task
             </Button>
           )}
@@ -734,7 +731,7 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
               <option value="50">50</option>
             </select>
             <span>
-              Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, (currentPage - 1) * pageSize + paginatedTasks.length)} of ~{!isLastPage ? 'many' : (currentPage - 1) * pageSize + paginatedTasks.length}
+              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalTaskCount || (currentPage - 1) * pageSize + paginatedTasks.length)} of {totalTaskCount || paginatedTasks.length}
             </span>
           </div>
           <div className="flex items-center gap-2">

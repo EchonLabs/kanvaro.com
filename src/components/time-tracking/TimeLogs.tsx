@@ -14,8 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/Dialog'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useOrganization } from '@/hooks/useOrganization'
-import { applyRoundingRules, focusSearchInput } from '@/lib/utils'
+import { applyRoundingRules, focusSearchInput, truncateText } from '@/lib/utils'
 import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permission-context'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -26,6 +27,10 @@ import { detectClientTimezone } from '@/lib/timezone'
 import { HRManualTimeLogModal } from '@/components/time-tracking/HRManualTimeLogModal'
 import { validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
 import { useAuthContext } from '@/contexts/AuthContext'
+
+// Task filter truncation and dropdown width constants
+const TRUNCATION_LENGTH = 26
+const TASK_FILTER_DROPDOWN_WIDTH = 'w-full'
 
 interface TimeLogsProps {
   userId: string
@@ -113,6 +118,9 @@ export function TimeLogs({
     const entryUserId = entry?.user?._id || entry?.user?.id || entry?.userId
     return userId && entryUserId && userId.toString() === entryUserId.toString()
   }
+  // Whether the current user has any edit/delete capability on time logs at all,
+  // used to decide whether to render the actions (three-dot) menu.
+  const canManageAnyTimeEntry = canUpdateTime || canDeleteTime
 
 
   // Debug timezone and DateTimeProvider
@@ -158,6 +166,7 @@ export function TimeLogs({
   const statusFilterSearchInputRef = useRef<HTMLInputElement | null>(null)
   const modalProjectSearchInputRef = useRef<HTMLInputElement | null>(null)
   const modalTaskSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const modalEmployeeSearchInputRef = useRef<HTMLInputElement | null>(null)
 
 
   // Filtered lists based on search queries
@@ -170,8 +179,15 @@ export function TimeLogs({
   }, [filterProjects, projectSearch])
 
   const filteredTasks = useMemo(() => {
-    // We now fetch tasks from the server based on search, so we display the server results directly
-    return filterTasks
+    // Apply smart truncation with capital letter detection
+    return filterTasks.map(task => {
+      const { truncated, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
+      return {
+        ...task,
+        truncated,
+        isTruncated
+      }
+    })
   }, [filterTasks])
 
   const filteredEmployees = useMemo(() => {
@@ -225,6 +241,8 @@ export function TimeLogs({
   const [tasks, setTasks] = useState<any[]>([])
   const [tasksLoading, setTasksLoading] = useState(false)
   const [selectedTaskForLog, setSelectedTaskForLog] = useState('')
+  const [selectedEmployeeForLog, setSelectedEmployeeForLog] = useState('')
+  const [modalEmployeeSearch, setModalEmployeeSearch] = useState('')
 
   const filteredModalProjects = useMemo(() => {
     if (!modalProjectSearch.trim()) return projects
@@ -247,6 +265,16 @@ export function TimeLogs({
     tasks.find(t => t._id === selectedTaskForLog),
     [tasks, selectedTaskForLog]
   )
+
+  const filteredModalEmployees = useMemo(() => {
+    if (!modalEmployeeSearch.trim()) return filterEmployees
+    const searchLower = modalEmployeeSearch.toLowerCase()
+    return filterEmployees.filter(emp => {
+      const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
+      const email = emp.email?.toLowerCase() || ''
+      return fullName.includes(searchLower) || email.includes(searchLower)
+    })
+  }, [filterEmployees, modalEmployeeSearch])
   const [manualLogData, setManualLogData] = useState({
     startDate: '',
     startTime: '',
@@ -271,6 +299,7 @@ export function TimeLogs({
   const [isEditing, setIsEditing] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [entryToDelete, setEntryToDelete] = useState<TimeEntry | null>(null)
+  const [isDeletingEntry, setIsDeletingEntry] = useState(false)
   const [editInitial, setEditInitial] = useState<{
     projectId: string
     taskId: string
@@ -505,6 +534,8 @@ export function TimeLogs({
   useEffect(() => {
     const fetchProjects = async () => {
       if (!resolvedUserId || !resolvedOrgId) return
+      // Admin/HR adding new entries use employee-scoped fetching instead
+      if (canViewEmployeeFilter && !isEditing) return
       try {
         const response = await fetch('/api/projects')
         const data = await response.json()
@@ -547,15 +578,46 @@ export function TimeLogs({
     }
   }, [showAddTimeLogModal, isEditing, resolvedUserId, resolvedOrgId, selectedEntry])
 
+  // Fetch employee-scoped projects when admin/HR selects a team member in add mode
+  useEffect(() => {
+    if (!canViewEmployeeFilter || !showAddTimeLogModal || isEditing) return
+    const fetchEmployeeScopedProjects = async () => {
+      setProjects([])
+      setSelectedProjectForLog('')
+      setSelectedTaskForLog('')
+      setTasks([])
+      setModalProjectSearch('')
+      setModalTaskSearch('')
+      if (!selectedEmployeeForLog || !resolvedOrgId) return
+      try {
+        const res = await fetch(`/api/time-tracking/hr/employee-projects?employeeId=${selectedEmployeeForLog}&organizationId=${resolvedOrgId}`)
+        const data = await res.json()
+        if (data.success && Array.isArray(data.projects)) {
+          setProjects(data.projects)
+        } else {
+          setProjects([])
+        }
+      } catch {
+        setProjects([])
+        showToast({ type: 'error', title: 'Failed to load employee projects' })
+      }
+    }
+    fetchEmployeeScopedProjects()
+  }, [selectedEmployeeForLog, canViewEmployeeFilter, showAddTimeLogModal, isEditing, resolvedOrgId])
+
   // Fetch tasks when project is selected
   useEffect(() => {
     if (selectedProjectForLog) {
-      loadTasksForProject(selectedProjectForLog)
+      if (canViewEmployeeFilter && selectedEmployeeForLog && !isEditing) {
+        loadEmployeeScopedTasks(selectedEmployeeForLog, selectedProjectForLog)
+      } else {
+        loadTasksForProject(selectedProjectForLog)
+      }
     } else {
       setTasks([])
       setSelectedTaskForLog('')
     }
-  }, [selectedProjectForLog, resolvedUserId, isEditing, selectedEntry])
+  }, [selectedProjectForLog, resolvedUserId, isEditing, selectedEntry, canViewEmployeeFilter, selectedEmployeeForLog])
 
   // Clear form when opening add time log modal
   useEffect(() => {
@@ -567,10 +629,14 @@ export function TimeLogs({
         endTime: '',
         description: ''
       })
+      setSelectedEmployeeForLog('')
+      setModalEmployeeSearch('')
       setSelectedProjectForLog('')
       setSelectedTaskForLog('')
       setTasks([])
+      setProjects([])
       setModalProjectSearch('')
+      setModalTaskSearch('')
       setError('')
       clearFieldErrors()
     }
@@ -729,6 +795,11 @@ export function TimeLogs({
   }, [manualLogData.startDate, manualLogData.startTime, manualLogData.endDate, manualLogData.endTime])
 
   const handleSubmitManualLog = async () => {
+    if (canViewEmployeeFilter && !selectedEmployeeForLog) {
+      setError('Please select a team member to log time for')
+      return
+    }
+
     if (!selectedProjectForLog || !resolvedUserId) {
       setError('Project selection required')
       return
@@ -777,7 +848,7 @@ export function TimeLogs({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: resolvedUserId,
+          userId: canViewEmployeeFilter ? selectedEmployeeForLog : resolvedUserId,
           organizationId: resolvedOrgId,
           projectId: selectedProjectForLog,
           taskId: selectedTaskForLog,
@@ -799,10 +870,14 @@ export function TimeLogs({
           endTime: '',
           description: ''
         })
+        setSelectedEmployeeForLog('')
+        setModalEmployeeSearch('')
         setSelectedProjectForLog('')
         setSelectedTaskForLog('')
         setModalProjectSearch('')
+        setModalTaskSearch('')
         setTasks([])
+        setProjects([])
         loadTimeEntries()
         onTimeEntryUpdate?.()
       } else {
@@ -1110,26 +1185,6 @@ export function TimeLogs({
   }, [authResolving, loadTimeEntries, loadActiveTimer, refreshKey])
 
 
-  const handleDeleteEntry = async (entryId: string) => {
-    if (!confirm('Are you sure you want to delete this time entry?')) return
-
-    try {
-      const response = await fetch(`/api/time-tracking/entries/${entryId}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        loadTimeEntries()
-        onTimeEntryUpdate?.()
-      } else {
-        const data = await response.json()
-        setError(data.error || 'Failed to delete time entry')
-      }
-    } catch (error) {
-      setError('Failed to delete time entry')
-    }
-  }
-
   const handleApproveEntries = async (action: 'approve' | 'reject', entryId?: string) => {
     const entryIds = entryId ? [entryId] : selectedEntries
     if (entryIds.length === 0) return
@@ -1316,6 +1371,30 @@ export function TimeLogs({
     setAnchorEl(null)
   }
 
+  const loadEmployeeScopedTasks = async (employeeId: string, projectId: string) => {
+    if (!employeeId || !projectId) {
+      setTasks([])
+      return
+    }
+    setTasksLoading(true)
+    try {
+      const res = await fetch(
+        `/api/time-tracking/hr/employee-tasks?employeeId=${employeeId}&projectId=${projectId}&organizationId=${resolvedOrgId}`
+      )
+      const data = await res.json()
+      if (data.success && Array.isArray(data.tasks)) {
+        setTasks(data.tasks)
+      } else {
+        setTasks([])
+      }
+    } catch {
+      setTasks([])
+      showToast({ type: 'error', title: 'Failed to load employee tasks' })
+    } finally {
+      setTasksLoading(false)
+    }
+  }
+
   const loadTasksForProject = async (
     projectId: string,
     ensureTask?: { _id: string; title: string } | null
@@ -1422,14 +1501,10 @@ export function TimeLogs({
     setShowDeleteDialog(true)
   }
 
-  const isEntryOwnedByViewer = useCallback((entry: TimeEntry) => {
-    const entryUserId = entry?.user?._id
-    return !!resolvedUserId && !!entryUserId && entryUserId === resolvedUserId
-  }, [resolvedUserId])
-
   const handleConfirmDelete = async () => {
     if (!entryToDelete) return
 
+    setIsDeletingEntry(true)
     try {
       const response = await fetch(`/api/time-tracking/entries/${entryToDelete._id}`, {
         method: 'DELETE'
@@ -1447,6 +1522,7 @@ export function TimeLogs({
       console.error('Error deleting time entry:', error)
       showToast({ type: 'error', title: 'Failed to delete time entry' })
     } finally {
+      setIsDeletingEntry(false)
       setShowDeleteDialog(false)
       setEntryToDelete(null)
     }
@@ -2054,82 +2130,53 @@ export function TimeLogs({
 
   return (
     <>
-      <Card className="w-full overflow-x-hidden">
-        <CardHeader className="pb-3 sm:pb-4 px-3 sm:px-4 lg:px-6 pt-4 sm:pt-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg min-w-0">
-              {/* <Clock className="h-5 w-5" />
-            Time Logs */}
-            </CardTitle>
-            {/* HR Manual Time Log Button - visible only to HR role and only in Timer tab */}
-            {user?.role === 'human_resource' && !showManualLogButtons && (pathname === '/time-tracking/timer' || pathname === '/time-tracking/logs') && (
-              <Button
-                onClick={() => setShowHRManualLogModal(true)}
-                size="sm"
-                variant="outline"
-                className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950"
-              >
-                <UserPlus className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                <span className="whitespace-nowrap">Add Manual Time Log</span>
-              </Button>
-            )}
-            {showManualLogButtons && pathname === '/time-tracking/timer' && canAddManualTimeLog && (
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                {/* <Button
-                onClick={() => setShowBulkUploadModal(true)}
-                size="sm"
-                variant="outline"
-                className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto"
-              >
-                <Upload className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                <span className="whitespace-nowrap">Bulk Upload</span>
-              </Button> */}
-                <Button
-                  onClick={() => {
-                    // Clear form data when opening add modal
-                    setManualLogData({
-                      startDate: '',
-                      startTime: '',
-                      endDate: '',
-                      endTime: '',
-                      description: ''
-                    })
-                    setSelectedProjectForLog('')
-                    setSelectedTaskForLog('')
-                    setTasks([])
-                    setModalProjectSearch('')
-                    setError('')
-                    clearFieldErrors()
-                    setShowAddTimeLogModal(true)
-                  }}
-                  size="sm"
-                  className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                  <span className="whitespace-nowrap">Add Time Log</span>
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 p-3 sm:p-4 lg:p-6 pt-2 sm:pt-4 overflow-x-hidden">
-          {authResolving && (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground mt-2 text-sm">Loading your time entries...</p>
-            </div>
-          )}
+      <div className="space-y-4">
 
-          {/* Filters */}
-          <div className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <Label className="text-sm font-medium whitespace-nowrap">Filters</Label>
+      {/* ── Add Manual Time Log attractive section ─────────────────── */}
+      {showManualLogButtons && canAddManualTimeLog && canViewEmployeeFilter && user?.role === 'human_resource' && (timeTrackingSettings?.allowPastTime ?? true) && (
+        <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+          <div className="px-5 py-4 flex items-center gap-4">
+            <Plus className="h-6 w-6 flex-shrink-0 text-[var(--apple-system-green)]" strokeWidth={1.5} />
+            <div className="flex-1 min-w-0">
+              <p className="text-[15px] font-semibold text-[var(--apple-label)]">Manual Time Entry</p>
+              <p className="text-[13px] text-[var(--apple-secondary-label)]">Log time for past work or specific intervals</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 w-full">
-              <div className="space-y-1.5 sm:space-y-2 min-w-0">
-                <Label htmlFor="filter-project" className="text-xs sm:text-sm font-medium">Project</Label>
-                <Select
+            <button
+              onClick={() => setShowHRManualLogModal(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-[var(--apple-radius-md)] text-[14px] font-semibold text-white apple-transition flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)', boxShadow: '0 2px 8px rgba(52,199,89,0.25)' }}
+            >
+              <Plus className="h-4 w-4" strokeWidth={1.5} />
+              Add Log
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Filters ───────────────────────────────────────────────── */}
+      <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+        <div className="px-5 py-3 border-b border-[var(--apple-separator)] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Filter className="h-3.5 w-3.5 text-[var(--apple-secondary-label)]" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Filters</p>
+          </div>
+          <button
+            onClick={() => {
+              setFilters({ startDate: '', endDate: '', status: '', isBillable: '', isApproved: '', projectId: '', taskId: '', employeeId: '' })
+              setProjectSearch(''); setTaskSearch(''); setEmployeeSearch(''); setStatusSearch('')
+              setPagination(prev => ({ ...prev, page: 1 }))
+            }}
+            className="inline-flex items-center gap-1 h-6 px-2 rounded-[var(--apple-radius-sm)] text-[12px] text-[var(--apple-secondary-label)] apple-transition hover:bg-[var(--apple-quaternary-fill)] hover:text-[var(--apple-label)]"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Clear
+          </button>
+        </div>
+        <div className="p-4 space-y-3 w-full overflow-x-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+            <div className="space-y-1 min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Project</p>
+              <Select
                   value={filters.projectId || 'all'}
                   onValueChange={(value) => {
                     handleFilterChange('projectId', value === 'all' ? '' : value)
@@ -2141,7 +2188,7 @@ export function TimeLogs({
                     if (open) focusSearchInput(projectFilterSearchInputRef.current)
                   }}
                 >
-                  <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-project">
+                  <SelectTrigger className="w-full h-9 text-[13px] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-md)]" id="filter-project">
                     <SelectValue placeholder="All projects" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
@@ -2200,8 +2247,8 @@ export function TimeLogs({
                 </Select>
               </div>
 
-              <div className="space-y-1.5 sm:space-y-2 min-w-0">
-                <Label htmlFor="filter-task" className="text-xs sm:text-sm font-medium">Task</Label>
+              <div className="space-y-1 min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Task</p>
                 <Select
                   value={filters.taskId || 'all'}
                   onValueChange={(value) => handleFilterChange('taskId', value === 'all' ? '' : value)}
@@ -2210,15 +2257,15 @@ export function TimeLogs({
                     if (open) focusSearchInput(taskFilterSearchInputRef.current)
                   }}
                 >
-                  <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-task">
+                  <SelectTrigger className="w-full h-9 text-[13px] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-md)]" id="filter-task">
                     <SelectValue placeholder={
                       filterTasksLoading
                         ? 'Loading...'
                         : 'All tasks'
                     } />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    <div className="p-2 border-b">
+                  <SelectContent className={`max-h-[200px] w-full overflow-hidden ${TASK_FILTER_DROPDOWN_WIDTH}`}>
+                    <div className="p-2 border-b overflow-y-auto max-h-[200px]">
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -2259,27 +2306,41 @@ export function TimeLogs({
                         {!filters.projectId ? 'Select a project first' : 'No tasks found'}
                       </div>
                     ) : (
-                      filteredTasks.map((task) => (
-                        <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
-                          <div className="flex items-center gap-2">
-                            {task.displayId && (
-                              <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
-                                {task.displayId}
-                              </span>
-                            )}
-                            <Target className="h-3 w-3" />
-                            <span className="truncate">{task.title}</span>
-                          </div>
-                        </SelectItem>
-                      ))
+                      filteredTasks.map((task) => {
+                        const { truncated: truncatedTitle, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
+                        return (
+                          <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {task.displayId && (
+                                      <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                        {task.displayId}
+                                      </span>
+                                    )}
+                                    <Target className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate">{truncatedTitle}</span>
+                                  </div>
+                                </TooltipTrigger>
+                                {isTruncated && (
+                                  <TooltipContent side="left" align="center" className="max-w-sm break-words">
+                                    <p className="whitespace-normal">{task.title}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                          </SelectItem>
+                        )
+                      })
                     )}
                   </SelectContent>
                 </Select>
               </div>
 
               {canViewEmployeeFilter && (
-                <div className="space-y-1.5 sm:space-y-2 min-w-0">
-                  <Label htmlFor="filter-employee" className="text-xs sm:text-sm font-medium">Employee</Label>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Employee</p>
                   <Select
                     value={filters.employeeId || 'all'}
                     onValueChange={(value) => handleFilterChange('employeeId', value === 'all' ? '' : value)}
@@ -2288,7 +2349,7 @@ export function TimeLogs({
                       if (open) focusSearchInput(employeeFilterSearchInputRef.current)
                     }}
                   >
-                    <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-employee">
+                    <SelectTrigger className="w-full h-9 text-[13px] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-md)]" id="filter-employee">
                       <SelectValue placeholder={
                         filterEmployeesLoading ? 'Loading...' : 'All employees'
                       } />
@@ -2350,28 +2411,28 @@ export function TimeLogs({
                 </div>
               )}
 
-              <div className="space-y-1.5 sm:space-y-2 min-w-0">
-                <Label htmlFor="startDate" className="text-xs sm:text-sm font-medium">Start Date</Label>
+              <div className="space-y-1 min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Start Date</p>
                 <Input
                   id="startDate"
                   type="date"
                   value={filters.startDate}
                   onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                  className="w-full h-9 sm:h-10 text-xs sm:text-sm"
+                  className="w-full h-9 text-[13px] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-md)]"
                 />
               </div>
-              <div className="space-y-1.5 sm:space-y-2 min-w-0">
-                <Label htmlFor="endDate" className="text-xs sm:text-sm font-medium">End Date</Label>
+              <div className="space-y-1 min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">End Date</p>
                 <Input
                   id="endDate"
                   type="date"
                   value={filters.endDate}
                   onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                  className="w-full h-9 sm:h-10 text-xs sm:text-sm"
+                  className="w-full h-9 text-[13px] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-md)]"
                 />
               </div>
-              <div className="space-y-1.5 sm:space-y-2 min-w-0">
-                <Label htmlFor="status" className="text-xs sm:text-sm font-medium">Status</Label>
+              <div className="space-y-1 min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Status</p>
                 <Select
                   value={filters.status || 'all'}
                   onValueChange={handleStatusFilterChange}
@@ -2379,7 +2440,7 @@ export function TimeLogs({
                     if (open) focusSearchInput(statusFilterSearchInputRef.current)
                   }}
                 >
-                  <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
+                  <SelectTrigger className="w-full h-9 text-[13px] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-md)]">
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
@@ -2426,10 +2487,10 @@ export function TimeLogs({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5 sm:space-y-2 min-w-0">
-                <Label htmlFor="isBillable" className="text-xs sm:text-sm font-medium">Billable</Label>
+              <div className="space-y-1 min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Billable</p>
                 <Select value={filters.isBillable} onValueChange={(value) => handleFilterChange('isBillable', value)}>
-                  <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
+                  <SelectTrigger className="w-full h-9 text-[13px] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-md)]">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
@@ -2440,10 +2501,10 @@ export function TimeLogs({
                 </Select>
               </div>
               {showSelectionAndApproval && (
-                <div className="space-y-1.5 sm:space-y-2 min-w-0">
-                  <Label htmlFor="isApproved" className="text-xs sm:text-sm font-medium">Approved</Label>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Approved</p>
                   <Select value={filters.isApproved} onValueChange={(value) => handleFilterChange('isApproved', value)}>
-                    <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
+                    <SelectTrigger className="w-full h-9 text-[13px] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] rounded-[var(--apple-radius-md)]">
                       <SelectValue placeholder="All" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[200px]">
@@ -2457,548 +2518,387 @@ export function TimeLogs({
               )}
             </div>
 
-            {/* Clear Filters Button */}
-            <div className="flex justify-center sm:justify-end items-center pt-2 w-full">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setFilters({
-                    startDate: '',
-                    endDate: '',
-                    status: '',
-                    isBillable: '',
-                    isApproved: '',
-                    projectId: '',
-                    taskId: '',
-                    employeeId: ''
-                  })
-                  // Clear search queries
-                  setProjectSearch('')
-                  setTaskSearch('')
-                  setEmployeeSearch('')
-                  setStatusSearch('')
-                  setPagination(prev => ({ ...prev, page: 1 }))
-                }}
-                className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm flex-shrink-0"
-                title="Clear all filters"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
+          </div>
+        </div>
+      {/* ── Bulk Actions ─────────────────────────────────────────────── */}
+      {showSelectionAndApproval && selectedEntries.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-blue)]/20 bg-[var(--apple-system-blue)]/5 w-full">
+          <span className="text-[13px] text-[var(--apple-secondary-label)] flex-1 min-w-0">
+            {selectedEntries.length} {selectedEntries.length === 1 ? 'entry' : 'entries'} selected
+          </span>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => handleApproveEntries('approve')}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[var(--apple-radius-md)] text-[13px] font-medium bg-[var(--apple-system-blue)] text-white apple-transition flex-1 sm:flex-none justify-center"
+            >
+              <Check className="h-3.5 w-3.5" />
+              Approve
+            </button>
+            <button
+              onClick={() => handleApproveEntries('reject')}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[var(--apple-radius-md)] text-[13px] font-medium bg-red-500 text-white apple-transition flex-1 sm:flex-none justify-center"
+            >
+              <X className="h-3.5 w-3.5" />
+              Reject
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Total Time Card + Entries ─────────────────────────────── */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <div className="h-8 w-8 rounded-full border-2 border-[var(--apple-system-blue)] border-t-transparent animate-spin" />
+          <p className="text-[13px] text-[var(--apple-secondary-label)]">Loading time entries…</p>
+        </div>
+      ) : displayedEntries.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <div className="h-12 w-12 rounded-full bg-[var(--apple-quaternary-fill)] flex items-center justify-center">
+            <Clock className="h-6 w-6 text-[var(--apple-tertiary-label)]" />
+          </div>
+          <p className="text-[14px] text-[var(--apple-secondary-label)]">No time entries found</p>
+        </div>
+      ) : (
+        <>
+          {/* Total Time Apple Card */}
+          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
+            <div className="px-5 py-4 flex items-center gap-4">
+              <Clock className="h-6 w-6 flex-shrink-0 text-[var(--apple-system-blue)]" strokeWidth={1.5} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Total Time Logged</p>
+                <p className="text-[22px] font-bold font-apple-mono tabular-nums text-[var(--apple-label)] leading-tight">
+                  {(() => {
+                    const totalMinutes = (viewTotals.totalDuration || 0) + (activeTimerDisplay ? (activeTimerDisplay.duration || 0) : 0)
+                    const hours = Math.floor(totalMinutes / 60)
+                    const minutes = Math.floor(totalMinutes % 60)
+                    return `${hours}h ${minutes}m`
+                  })()}
+                </p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Entries</p>
+                <p className="text-[22px] font-bold font-apple-mono tabular-nums text-[var(--apple-label)] leading-tight">{displayedEntries.length}</p>
+              </div>
             </div>
           </div>
 
-          {/* Bulk Actions */}
-          {showSelectionAndApproval && selectedEntries.length > 0 && (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 sm:p-4 bg-muted rounded-lg w-full overflow-x-hidden">
-              <span className="text-xs sm:text-sm text-muted-foreground flex-1 min-w-0 break-words">
-                {selectedEntries.length} {selectedEntries.length === 1 ? 'entry' : 'entries'} selected
-              </span>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Button
-                  size="sm"
-                  onClick={() => handleApproveEntries('approve')}
-                  className="h-9 sm:h-10 flex-1 sm:flex-initial text-xs sm:text-sm min-w-[100px]"
-                >
-                  <Check className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => handleApproveEntries('reject')}
-                  className="h-9 sm:h-10 flex-1 sm:flex-initial text-xs sm:text-sm min-w-[100px]"
-                >
-                  <X className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  Reject
-                </Button>
-              </div>
+          {/* Desktop header select-all (only when checkbox col is shown) */}
+          {showSelectionAndApproval && canApproveTimeLogs && (
+            <div className="hidden md:flex items-center gap-3 px-4">
+              <Checkbox
+                checked={allSelected}
+                onCheckedChange={(checked) => handleSelectAll(!!checked)}
+              />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-secondary-label)]">Select all</p>
             </div>
           )}
 
-          {/* Time Entries Table */}
-          <div className="space-y-2 w-full overflow-x-hidden">
-            {isLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground mt-2 text-sm">Loading time entries...</p>
-              </div>
-            ) : displayedEntries.length === 0 ? (
-              <div className="text-center py-8">
-                <Clock className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-sm sm:text-base text-muted-foreground">No time entries found</p>
-              </div>
-            ) : (
-              <div className="space-y-2 w-full overflow-x-hidden">
-                {/* Total Time Widget */}
-                <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        <Clock className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground">Total Time Logged</h3>
-                      </div>
+          {/* Entries */}
+          <div className="space-y-2 w-full">
+            {displayedEntries.map((entry) => (
+              <div
+                key={entry._id}
+                className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none overflow-hidden apple-transition"
+              >
+                {/* ── Mobile / Tablet card (hidden on md+) ────────────── */}
+                <div className="md:hidden px-4 py-3 space-y-2.5">
+                  {/* Row 1: Task name + Project name */}
+                  <div className="grid grid-cols-[1fr_auto] gap-x-2 items-start">
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-semibold text-[var(--apple-label)] truncate">
+                        {entry.task?.title || <span className="italic text-[var(--apple-tertiary-label)]">No task</span>}
+                      </p>
+                      <p className="text-[13px] text-[var(--apple-secondary-label)] truncate mt-0.5">
+                        {entry.project?.name || <span className="italic text-[var(--apple-tertiary-label)]">No project</span>}
+                      </p>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">
-                        {(() => {
-                          // Total time for the current view (filtered or default)
-                          // activeTimerDisplay only exists if it matches the current project/task/employee filters
-                          const totalMinutes = (viewTotals.totalDuration || 0) + (activeTimerDisplay ? (activeTimerDisplay.duration || 0) : 0)
-                          const hours = Math.floor(totalMinutes / 60)
-                          const minutes = Math.floor(totalMinutes % 60)
-                          return `${hours}h ${minutes}m`
-                        })()}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {displayedEntries.length} {displayedEntries.length === 1 ? 'entry' : 'entries'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Table Header - Hidden on mobile */}
-                <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${showSelectionAndApproval && canApproveTimeLogs
-                  ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
-                  : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
-                  }`}>
-                  {showSelectionAndApproval && canApproveTimeLogs && (
-                    <div className="flex items-center justify-center">
-                      <Checkbox
-                        checked={allSelected}
-                        onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                      />
-                    </div>
-                  )}
-                  <div>Memo</div>
-                  <div>Project (Task)</div>
-                  <div>Employee</div>
-                  <div>Start Time</div>
-                  <div>End Time</div>
-                  <div>Duration</div>
-                  <div>Status</div>
-                  <div>Billable</div>
-                  <div>Approval</div>
-                  <div>Actions</div>
-                </div>
-
-                {/* Table Rows */}
-                {displayedEntries.map((entry) => (
-                  <div key={entry._id} className="border rounded-lg overflow-hidden">
-                    {/* Mobile Card View */}
-                    <div className="md:hidden p-3 space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          {showSelectionAndApproval && canApproveTimeLogs && !entry.__isActive && (
-                            <Checkbox
-                              checked={selectedEntries.includes(entry._id)}
-                              onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
-                              className="flex-shrink-0"
-                            />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm truncate" title={entry.description}>{entry.description}</div>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="text-xs text-muted-foreground truncate mt-1 cursor-default">
-                                    {entry?.project?.name ? (
-                                      <>
-                                        <span className="text-foreground">{entry.project.name}</span>
-                                        {entry?.task?.title ? (
-                                          <span className="text-muted-foreground"> ({entry.task.title})</span>
-                                        ) : entry.task ? (
-                                          <span className="text-muted-foreground italic"> (Task deleted)</span>
-                                        ) : null}
-                                      </>
-                                    ) : (
-                                      <span className="text-muted-foreground italic">Project deleted or unavailable</span>
-                                    )}
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>
-                                    {entry?.project?.name
-                                      ? `${entry.project.name}${entry?.task?.title ? `(${entry.task.title})` : entry.task ? '(Task deleted)' : ''}`
-                                      : 'Project deleted or unavailable'
-                                    }
-                                  </p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <div className="text-muted-foreground">Employee</div>
-                          <div className="mt-1 font-medium">
-                            {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-muted-foreground">Start Time</div>
-                          <div className="mt-1">
-                            <div>{formatDateTimeSafe(entry.startTime)}</div>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-muted-foreground">End Time</div>
-                          {entry.endTime ? (
-                            <div className="mt-1">
-                              <div>{formatDateTimeSafe(entry.endTime)}</div>
-                            </div>
-                          ) : <div className="mt-1">-</div>}
-                        </div>
-                        <div>
-                          <div className="text-muted-foreground">Duration</div>
-                          <div className="mt-1">{formatDuration(entry.duration)}</div>
-                        </div>
-                        <div>
-                          <div className="text-muted-foreground">Status</div>
-                          <div className="mt-1">
-                            <Badge variant={entry.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
-                              {entry.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <Badge variant={entry.isBillable ? 'default' : 'outline'} className="text-xs">
-                          {entry.isBillable ? 'Billable' : 'Non-billable'}
-                        </Badge>
-                      </div>
-                      {showSelectionAndApproval && (
-                        <div>
-                          <div className="text-muted-foreground">Approval</div>
-                          <div className="mt-1">
-                            {(() => {
-                              // For running timers, don't show approval status
-                              if (entry.__isActive) {
-                                return <span className="text-muted-foreground">-</span>
-                              }
-
-                              // Use actual approval status from database
-                              const isApproved = entry.isApproved;
-                              const isRejected = entry.isReject;
-
-                              let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
-                              let badgeText = 'Pending';
-
-                              if (isRejected) {
-                                badgeVariant = 'destructive';
-                                badgeText = 'Rejected';
-                              } else if (isApproved) {
-                                badgeVariant = 'default';
-                                badgeText = 'Approved';
-                              }
-
-                              return (
-                                <Badge
-                                  variant={badgeVariant}
-                                  className="text-xs"
-                                >
-                                  {badgeText}
-                                </Badge>
-                              );
-                            })()}
-                          </div>
-                        </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {showSelectionAndApproval && canApproveTimeLogs && !entry.__isActive && (
+                        <Checkbox
+                          checked={selectedEntries.includes(entry._id)}
+                          onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
+                        />
                       )}
-                      {showSelectionAndApproval && canApproveTime && !entry.__isActive && (
-                        <div>
-                          <div className="text-muted-foreground">Actions</div>
-                          <div className="mt-1 flex gap-1">
-                            {!entry.isApproved ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6 px-2 text-xs"
-                                onClick={() => handleApproveEntries('approve', entry._id)}
-                              >
-                                <Check className="h-3 w-3" />
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6 px-2 text-xs"
-                                onClick={() => handleApproveEntries('reject', entry._id)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {/* Mobile Edit and Delete Actions */}
-                      {(() => {
-                        const canShowEditAction = !entry.__isActive && canUpdateTime && canEditTimeEntry(entry)
-                        const canShowDeleteAction = !entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && isEntryOwnedByViewer(entry)
-                        const hasAnyActions = canShowEditAction || canShowDeleteAction
-
-                        if (!hasAnyActions) return null
-
-                        return (
-                          <div className="flex gap-2 pt-2 border-t border-border">
-                            {canShowEditAction && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1 h-8 text-xs"
-                                onClick={() => handleEdit(entry)}
-                              >
-                                <Edit className="h-3 w-3 mr-1" />
-                                Edit
-                              </Button>
-                            )}
-                            {canShowDeleteAction && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="flex-1 h-8 text-xs"
-                                onClick={() => handleDeleteClick(entry)}
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Delete
-                              </Button>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </div>
-
-                    {/* Desktop Table View */}
-                    <div className={`hidden md:grid gap-2 p-3 items-center overflow-x-auto ${showSelectionAndApproval && canApproveTimeLogs
-                      ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
-                      : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
-                      }`}>
-                      {showSelectionAndApproval && canApproveTimeLogs && (
-                        <div className="flex items-center justify-center">
-                          <Checkbox
-                            id={`select-${entry._id}`}
-                            checked={selectedEntries.includes(entry._id)}
-                            onCheckedChange={() => toggleEntrySelection(entry._id)}
-                            className="h-4 w-4"
-                          />
-                          <label htmlFor={`select-${entry._id}`} className="sr-only">
-                            Select entry
-                          </label>
-                        </div>
-                      )}
-                      <div className="truncate">
-                        <div className="font-medium text-xs sm:text-sm truncate" title={entry.description}>{entry.description}</div>
-                      </div>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="text-xs sm:text-sm truncate cursor-default">
-                              {entry?.project?.name ? (
-                                <>
-                                  <span className="text-foreground">{entry.project.name}</span>
-                                  {entry?.task?.title ? (
-                                    <span className="text-muted-foreground"> ({entry.task.title})</span>
-                                  ) : entry.task ? (
-                                    <span className="text-muted-foreground italic"> (Task deleted)</span>
-                                  ) : null}
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground italic">
-                                  Project deleted
-                                </span>
-                              )}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>
-                              {entry?.project?.name
-                                ? `${entry.project.name}${entry?.task?.title ? `(${entry.task.title})` : entry.task ? '(Task deleted)' : ''}`
-                                : 'Project deleted or unavailable'
-                              }
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      <div className="text-xs sm:text-sm">
-                        {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
-                      </div>
-                      <div className="text-xs sm:text-sm leading-tight">
-                        {(() => {
-                          const formatted = formatDateTimeSafe(entry.startTime)
-                          return formatted
-                        })()}
-                      </div>
-                      <div className="text-xs sm:text-sm leading-tight">
-                        {entry.endTime ? (() => {
-                          const formatted = formatDateTimeSafe(entry.endTime)
-                          return formatted
-                        })() : '-'}
-                      </div>
-                      <div className="text-xs sm:text-sm">
-                        {formatDuration(entry.duration)}
-                      </div>
-                      <div className="flex items-center">
-                        <Badge
-                          variant={
-                            entry.status === 'completed'
-                              ? 'default'
-                              : entry.status === 'running'
-                                ? 'default'
-                                : 'secondary'
-                          }
-                          className="text-xs capitalize whitespace-nowrap"
-                        >
-                          {entry.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center">
-                        <Badge variant={entry.isBillable ? 'default' : 'outline'} className="text-xs whitespace-nowrap">
-                          {entry.isBillable ? 'Yes' : 'No'}
-                        </Badge>
-                      </div>
-                      <div>
-                        {(() => {
-                          // For running timers, don't show approval status
-                          if (entry.__isActive) {
-                            return <span className="text-muted-foreground">-</span>
-                          }
-
-                          // Use actual approval status from database
-                          const isApproved = entry.isApproved;
-                          const isRejected = entry.isReject;
-
-                          let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
-                          let badgeText = 'Pending';
-
-                          if (isRejected) {
-                            badgeVariant = 'destructive';
-                            badgeText = 'Rejected';
-                          } else if (isApproved) {
-                            badgeVariant = 'default';
-                            badgeText = 'Approved';
-                          }
-
-                          return (
-                            <Badge
-                              variant={badgeVariant}
-                              className="text-xs whitespace-nowrap"
-                            >
-                              {badgeText}
-                            </Badge>
-                          );
-                        })()}
-                        {entry.approvedBy && (
-                          <div className="text-xs text-muted-foreground mt-1 truncate" title={`by ${entry.approvedBy.firstName} ${entry.approvedBy.lastName}`}>
-                            by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center">
+                      {canManageAnyTimeEntry && (
                         <DropdownMenu.Root>
                           <DropdownMenu.Trigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 p-0"
-                              disabled={(() => {
-                                const canShowEditAction = !entry.__isActive && canUpdateTime && canEditTimeEntry(entry)
-                                const canShowDeleteAction = !entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && isEntryOwnedByViewer(entry)
-                                return !(canShowEditAction || canShowDeleteAction)
-                              })()}
+                            <button
+                              className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] apple-transition disabled:opacity-30"
+                              disabled={!(!entry.__isActive && (canUpdateTime || canDeleteTime) && canEditTimeEntry(entry))}
                             >
                               <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Open menu</span>
-                            </Button>
+                            </button>
                           </DropdownMenu.Trigger>
                           <DropdownMenu.Portal>
-                            <DropdownMenu.Content className="min-w-[120px] bg-popover dark:bg-popover rounded-md p-1 shadow-lg border border-border dark:border-border z-50">
+                            <DropdownMenu.Content className="min-w-[120px] bg-popover rounded-[var(--apple-radius-md)] p-1 shadow-lg border border-[var(--apple-separator)] z-50">
                               {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
                                 <DropdownMenu.Item
-                                  className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-accent dark:hover:bg-accent hover:text-accent-foreground dark:hover:text-accent-foreground cursor-pointer outline-none text-foreground dark:text-foreground"
+                                  className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] hover:bg-accent cursor-pointer outline-none text-foreground"
                                   onSelect={() => handleEdit(entry)}
                                 >
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  <span>Edit</span>
+                                  <Edit className="mr-2 h-3.5 w-3.5" />Edit
                                 </DropdownMenu.Item>
                               )}
-                              {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && isEntryOwnedByViewer(entry) && (
+                              {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && (
                                 <DropdownMenu.Item
-                                  className="flex items-center px-2 py-1.5 text-sm rounded text-destructive dark:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer outline-none"
+                                  className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] text-destructive hover:bg-destructive/10 cursor-pointer outline-none"
                                   onSelect={() => handleDeleteClick(entry)}
                                 >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  <span>Delete</span>
+                                  <Trash2 className="mr-2 h-3.5 w-3.5" />Delete
                                 </DropdownMenu.Item>
                               )}
                             </DropdownMenu.Content>
                           </DropdownMenu.Portal>
                         </DropdownMenu.Root>
-                      </div>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <div className="text-[13px] text-[var(--apple-secondary-label)]">
+                    {[entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown'}
+                  </div>
 
-          {/* Pagination */}
-          {pagination.total > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Items per page:</span>
-                  <Select
-                    value={pagination.limit.toString()}
-                    onValueChange={(value) => {
-                      const newLimit = parseInt(value)
-                      setPagination(prev => ({
-                        ...prev,
-                        limit: newLimit,
-                        page: 1 // Reset to first page when changing limit
-                      }))
-                    }}
-                  >
-                    <SelectTrigger className="w-16 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px]">
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {/* Row 2: Start · End · Duration */}
+                  <div className="grid grid-cols-3 gap-2 border-t border-[var(--apple-separator)] pt-2.5">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-tertiary-label)]">Start</p>
+                      <p className="text-[13px] font-apple-mono tabular-nums text-[var(--apple-label)] mt-0.5">{formatDateTimeSafe(entry.startTime)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-tertiary-label)]">End</p>
+                      <p className="text-[13px] font-apple-mono tabular-nums text-[var(--apple-label)] mt-0.5">{entry.endTime ? formatDateTimeSafe(entry.endTime) : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-tertiary-label)]">Duration</p>
+                      <p className="text-[13px] font-bold font-apple-mono tabular-nums text-[var(--apple-label)] mt-0.5">{formatDuration(entry.duration)}</p>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Status · Billable · Approved/Pending */}
+                  <div className="flex items-center gap-2 flex-wrap border-t border-[var(--apple-separator)] pt-2.5">
+                    {/* Completed / Running */}
+                    <span className={`inline-flex items-center h-5 px-2 rounded-full text-[12px] font-semibold border ${
+                      entry.status === 'completed'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                        : entry.status === 'running'
+                          ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                          : 'bg-[var(--apple-quaternary-fill)] text-[var(--apple-secondary-label)] border-[var(--apple-separator)]'
+                    }`}>
+                      {entry.status === 'running' && <span className="mr-1 h-1.5 w-1.5 rounded-full bg-current animate-pulse inline-block" />}
+                      {entry.status ? entry.status.charAt(0).toUpperCase() + entry.status.slice(1) : '—'}
+                    </span>
+                    {/* Billable */}
+                    <span className={`inline-flex items-center h-5 px-2 rounded-full text-[12px] font-semibold border ${
+                      entry.isBillable
+                        ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                        : 'bg-[var(--apple-quaternary-fill)] text-[var(--apple-tertiary-label)] border-[var(--apple-separator)]'
+                    }`}>
+                      {entry.isBillable ? 'Billable' : 'Non-billable'}
+                    </span>
+                    {/* Approved / Pending */}
+                    {(() => {
+                      const isRejected = !entry.__isActive && entry.isReject
+                      const isApproved = !entry.__isActive && entry.isApproved
+                      return (
+                        <span className={`inline-flex items-center h-5 px-2 rounded-full text-[12px] font-semibold border ${
+                          isRejected
+                            ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
+                            : isApproved
+                              ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                              : 'bg-[var(--apple-quaternary-fill)] text-[var(--apple-secondary-label)] border-[var(--apple-separator)]'
+                        }`}>
+                          {isRejected ? 'Rejected' : isApproved ? 'Approved' : 'Pending'}
+                        </span>
+                      )
+                    })()}
+                    {/* Quick approval actions */}
+                    {showSelectionAndApproval && canApproveTime && !entry.__isActive && (
+                      <div className="ml-auto flex items-center gap-1">
+                        {!entry.isApproved ? (
+                          <button
+                            onClick={() => handleApproveEntries('approve', entry._id)}
+                            className="h-5 w-5 rounded flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 apple-transition"
+                          >
+                            <Check className="h-3 w-3" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleApproveEntries('reject', entry._id)}
+                            className="h-5 w-5 rounded flex items-center justify-center bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 apple-transition"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs sm:text-sm text-muted-foreground">
-                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+
+                {/* ── Desktop row (md+) ─────────────────────────────────── */}
+                <div className={`hidden md:grid items-center gap-x-4 px-4 py-2.5 ${
+                  showSelectionAndApproval && canApproveTimeLogs
+                    ? 'grid-cols-[28px_1.5fr_1fr_1fr_1fr_1fr_1.5fr_48px]'
+                    : 'grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1.5fr_48px]'
+                }`}>
+                  {showSelectionAndApproval && canApproveTimeLogs && (
+                    <Checkbox
+                      id={`select-${entry._id}`}
+                      checked={selectedEntries.includes(entry._id)}
+                      onCheckedChange={() => toggleEntrySelection(entry._id)}
+                      className="h-4 w-4"
+                    />
+                  )}
+                  {/* Col 1: Task name + Project name */}
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">
+                      {entry.task?.title || <span className="italic text-[var(--apple-tertiary-label)]">No task</span>}
+                    </p>
+                    <p className="text-[12px] text-[var(--apple-secondary-label)] truncate mt-0.5">
+                      {entry.project?.name || <span className="italic text-[var(--apple-tertiary-label)]">No project</span>}
+                    </p>
+                  </div>
+                  {/* Col 2: Member */}
+                  <div className="text-[13px] text-[var(--apple-secondary-label)] truncate">
+                    {[entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown'}
+                  </div>
+                  {/* Col 3: Start */}
+                  <div className="text-[13px] font-apple-mono tabular-nums text-[var(--apple-label)] leading-tight">
+                    {formatDateTimeSafe(entry.startTime)}
+                  </div>
+                  {/* Col 4: End */}
+                  <div className="text-[13px] font-apple-mono tabular-nums text-[var(--apple-label)] leading-tight">
+                    {entry.endTime ? formatDateTimeSafe(entry.endTime) : '—'}
+                  </div>
+                  {/* Col 5: Duration */}
+                  <div className="text-[13px] font-bold font-apple-mono tabular-nums text-[var(--apple-label)]">
+                    {formatDuration(entry.duration)}
+                  </div>
+                  {/* Col 6: Status badges in one row */}
+                  <div className="flex flex-row flex-wrap items-center gap-1">
+                    <span className={`inline-flex items-center h-5 px-2 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
+                      entry.status === 'completed'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                        : entry.status === 'running'
+                          ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                          : 'bg-[var(--apple-quaternary-fill)] text-[var(--apple-secondary-label)] border-[var(--apple-separator)]'
+                    }`}>
+                      {entry.status === 'running' && <span className="mr-1 h-1.5 w-1.5 rounded-full bg-current animate-pulse inline-block" />}
+                      {entry.status ? entry.status.charAt(0).toUpperCase() + entry.status.slice(1) : '—'}
+                    </span>
+                    <span className={`inline-flex items-center h-5 px-2 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
+                      entry.isBillable
+                        ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                        : 'bg-[var(--apple-quaternary-fill)] text-[var(--apple-tertiary-label)] border-[var(--apple-separator)]'
+                    }`}>
+                      {entry.isBillable ? 'Billable' : 'Non-billable'}
+                    </span>
+                    {(() => {
+                      const isRejected = !entry.__isActive && entry.isReject
+                      const isApproved = !entry.__isActive && entry.isApproved
+                      return (
+                        <span className={`inline-flex items-center h-5 px-2 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
+                          isRejected
+                            ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
+                            : isApproved
+                              ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                              : 'bg-[var(--apple-quaternary-fill)] text-[var(--apple-secondary-label)] border-[var(--apple-separator)]'
+                        }`}>
+                          {isRejected ? 'Rejected' : isApproved ? 'Approved' : 'Pending'}
+                        </span>
+                      )
+                    })()}
+                  </div>
+                  {/* Col 7: Actions menu */}
+                  <div className="flex items-center justify-end">
+                    {canManageAnyTimeEntry && (
+                      <DropdownMenu.Root>
+                        <DropdownMenu.Trigger asChild>
+                          <button
+                            className="h-7 w-7 rounded-[var(--apple-radius-sm)] flex items-center justify-center text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] apple-transition disabled:opacity-30"
+                            disabled={!(!entry.__isActive && (canUpdateTime || canDeleteTime) && canEditTimeEntry(entry))}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content className="min-w-[120px] bg-popover rounded-[var(--apple-radius-md)] p-1 shadow-lg border border-[var(--apple-separator)] z-50">
+                            {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
+                              <DropdownMenu.Item
+                                className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] hover:bg-accent cursor-pointer outline-none text-foreground"
+                                onSelect={() => handleEdit(entry)}
+                              >
+                                <Edit className="mr-2 h-3.5 w-3.5" />Edit
+                              </DropdownMenu.Item>
+                            )}
+                            {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && (
+                              <DropdownMenu.Item
+                                className="flex items-center px-2 py-1.5 text-[13px] rounded-[var(--apple-radius-sm)] text-destructive hover:bg-destructive/10 cursor-pointer outline-none"
+                                onSelect={() => handleDeleteClick(entry)}
+                              >
+                                <Trash2 className="mr-2 h-3.5 w-3.5" />Delete
+                              </DropdownMenu.Item>
+                            )}
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={pagination.page === 1}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs sm:text-sm text-muted-foreground">
-                  Page {pagination.page} of {pagination.pages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={pagination.page === pagination.pages}
-                >
-                  Next
-                </Button>
-              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── Pagination ────────────────────────────────────────────── */}
+      {pagination.total > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <p className="text-[12px] text-[var(--apple-secondary-label)]">Per page</p>
+              <Select
+                value={pagination.limit.toString()}
+                onValueChange={(value) => {
+                  const newLimit = parseInt(value)
+                  setPagination(prev => ({ ...prev, limit: newLimit, page: 1 }))
+                }}
+              >
+                <SelectTrigger className="w-16 h-8 ">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-[200px]">
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <p className="text-[12px] text-[var(--apple-secondary-label)]">
+              {((pagination.page - 1) * pagination.limit) + 1}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page === 1}
+              className="inline-flex items-center gap-1 h-7 px-3 rounded-[var(--apple-radius-md)] text-[12px] font-medium border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[var(--apple-label)] apple-transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--apple-tertiary-fill)]"
+            >
+              Previous
+            </button>
+            <p className="text-[12px] text-[var(--apple-secondary-label)] px-1">
+              {pagination.page} / {pagination.pages}
+            </p>
+            <button
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page === pagination.pages}
+              className="inline-flex items-center gap-1 h-7 px-3 rounded-[var(--apple-radius-md)] text-[12px] font-medium border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[var(--apple-label)] apple-transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--apple-tertiary-fill)]"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      </div>
 
       {/* Add Manual Time Log Modal */}
       <Dialog open={showAddTimeLogModal} onOpenChange={setShowAddTimeLogModal}>
@@ -3016,6 +2916,78 @@ export function TimeLogs({
               </Alert>
             )}
 
+            {/* Team Member selector — Admin/HR only */}
+            {canViewEmployeeFilter && (
+              <div className="space-y-2">
+                <Label>Team Member *</Label>
+                <Select
+                  value={selectedEmployeeForLog}
+                  onValueChange={(value) => {
+                    setSelectedEmployeeForLog(value)
+                    setError('')
+                  }}
+                  onOpenChange={(open) => {
+                    if (open) focusSearchInput(modalEmployeeSearchInputRef.current)
+                    if (!open) setModalEmployeeSearch('')
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={filterEmployeesLoading ? 'Loading members...' : 'Select a team member'} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[250px]">
+                    <div className="sticky top-0 z-10 p-2 border-b bg-popover">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          ref={modalEmployeeSearchInputRef}
+                          placeholder="Search members..."
+                          value={modalEmployeeSearch}
+                          onChange={(e) => setModalEmployeeSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="h-8 pl-7 pr-7 text-xs"
+                        />
+                        {modalEmployeeSearch && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setModalEmployeeSearch('') }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {filterEmployeesLoading ? (
+                        <div className="flex items-center justify-center p-4">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-sm text-muted-foreground">Loading members...</span>
+                        </div>
+                      ) : filteredModalEmployees.length === 0 ? (
+                        <div className="px-2 py-4 text-center text-xs text-muted-foreground">No members found</div>
+                      ) : (
+                        filteredModalEmployees.map((emp) => (
+                          <SelectItem key={emp._id || emp.id} value={emp._id || emp.id} onMouseDown={(e) => e.preventDefault()}>
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium truncate">
+                                  {emp.firstName} {emp.lastName}
+                                </span>
+                                <span className="text-xs text-muted-foreground ml-2">{emp.email}</span>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="modal-project">Project *</Label>
@@ -3029,9 +3001,14 @@ export function TimeLogs({
                   onOpenChange={(open) => {
                     if (open) focusSearchInput(modalProjectSearchInputRef.current)
                   }}
+                  disabled={canViewEmployeeFilter && !selectedEmployeeForLog}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a project" />
+                    <SelectValue placeholder={
+                      canViewEmployeeFilter && !selectedEmployeeForLog
+                        ? 'Select a team member first'
+                        : 'Select a project'
+                    } />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
                     <div className="p-2 border-b">
@@ -3267,7 +3244,7 @@ export function TimeLogs({
                     Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                    Total: {Math.round(calculatedDuration.totalMinutes / 60 * 10) / 10}h
                     {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
                       <span className="ml-1">
                         (Max: {timeTrackingSettings.maxSessionHours}h)
@@ -3309,10 +3286,14 @@ export function TimeLogs({
                   endTime: '',
                   description: ''
                 })
+                setSelectedEmployeeForLog('')
+                setModalEmployeeSearch('')
                 setSelectedProjectForLog('')
                 setSelectedTaskForLog('')
                 setTasks([])
+                setProjects([])
                 setModalProjectSearch('')
+                setModalTaskSearch('')
                 setError('')
                 clearFieldErrors()
               }}
@@ -3324,6 +3305,7 @@ export function TimeLogs({
               onClick={handleSubmitManualLog}
               disabled={
                 submittingManualLog ||
+                (canViewEmployeeFilter && !selectedEmployeeForLog) ||
                 !selectedProjectForLog ||
                 !selectedTaskForLog ||
                 !manualLogData.startDate ||
@@ -3638,7 +3620,7 @@ export function TimeLogs({
                     Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                    Total: {Math.round(calculatedDuration.totalMinutes / 60 * 10) / 10}h
                     {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
                       <span className="ml-1">
                         (Max: {timeTrackingSettings.maxSessionHours}h)
@@ -3718,30 +3700,16 @@ export function TimeLogs({
       </Dialog>
 
 
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Delete Time Entry</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this time entry? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmDelete}
-            >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmationModal
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Time Entry"
+        description="Are you sure you want to delete this time entry? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+        isLoading={isDeletingEntry}
+      />
 
       {/* HR Manual Time Log Modal */}
       <HRManualTimeLogModal

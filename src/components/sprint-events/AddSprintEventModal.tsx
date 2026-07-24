@@ -57,6 +57,7 @@ interface AddSprintEventModalProps {
 }
 
 const MIN_DURATION_MINUTES = 15
+const MAX_DURATION_MINUTES = 480 // 8 hours
 
 export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprintEventModalProps) {
   const router = useRouter()
@@ -308,75 +309,86 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     }
   }, [formData.projectId, projectId, fetchSprints])
 
-  // Date validation function
-  const validateDate = useCallback((date: Date) => {
-    setDateError('')
-
-    if (!selectedSprint || !selectedSprint.startDate || !selectedSprint.endDate) {
-      return true // Allow if sprint details not loaded yet
-    }
-
+  // Single source of truth for which dates are selectable, shared by the
+  // Calendar's `disabled` matcher and the validation error message. Computing
+  // this in one place keeps them from drifting out of sync (which previously
+  // caused impossible states: a range with zero selectable days, or an
+  // auto-picked date that validation immediately rejected).
+  //
+  // For an ongoing/upcoming sprint we still block past dates (safety rail
+  // against fat-fingering a past date by mistake). But if the sprint's own
+  // window has already fully elapsed - an old/overdue sprint that just
+  // hasn't been marked completed - intersecting with "today or later" would
+  // leave no selectable day at all. In that case we drop the past-date
+  // restriction and fall back to the sprint's raw window so users can still
+  // backfill an event that already happened.
+  const getAllowedDateRange = useCallback((): { min: Date | null; max: Date | null } => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    const selected = new Date(date)
-    selected.setHours(0, 0, 0, 0)
+    if (!selectedSprint || !selectedSprint.startDate || !selectedSprint.endDate) {
+      // No sprint chosen yet - just keep the default "no past dates" rail.
+      return { min: today, max: null }
+    }
 
     const sprintStart = new Date(selectedSprint.startDate)
     sprintStart.setHours(0, 0, 0, 0)
 
     const sprintEnd = new Date(selectedSprint.endDate)
-    sprintEnd.setHours(23, 59, 59, 999)
+    sprintEnd.setHours(0, 0, 0, 0)
 
-    // Check if date is in the past
-    if (selected < today) {
-      setDateError('Date cannot be in the past')
-      return false
-    }
-
-    // Special validation for Sprint Review: must be AFTER sprint end date
     if (formData.eventType === 'review') {
+      // Sprint Review must be after the sprint ends; there is no upper bound.
+      // Always allow it right after sprint end - even if that's in the past -
+      // so a review for a long-finished sprint can still be logged.
       const dayAfterSprintEnd = new Date(selectedSprint.endDate)
       dayAfterSprintEnd.setDate(dayAfterSprintEnd.getDate() + 1)
       dayAfterSprintEnd.setHours(0, 0, 0, 0)
-
-      if (selected < dayAfterSprintEnd) {
-        setDateError(`Sprint Review must be scheduled after the sprint ends (after ${format(sprintEnd, 'MMM dd, yyyy')})`)
-        return false
-      }
-      // No upper limit for Sprint Review
-      return true
+      return { min: dayAfterSprintEnd, max: null }
     }
 
-    // For other event types, validate within sprint dates
-    // Check if date is before sprint start
-    if (selected < sprintStart) {
-      setDateError(`Date must be on or after sprint start date (${format(sprintStart, 'MMM dd, yyyy')})`)
-      return false
-    }
-
-    // Check if date is after sprint end
-    if (selected > sprintEnd) {
-      setDateError(`Date must be on or before sprint end date (${format(sprintEnd, 'MMM dd, yyyy')})`)
-      return false
-    }
-
-    return true
+    // Other event types must fall within the sprint's own date range.
+    const min = sprintEnd < today ? sprintStart : (sprintStart > today ? sprintStart : today)
+    return { min, max: sprintEnd }
   }, [selectedSprint, formData.eventType])
 
-  const handleDateSelect = (date: Date | undefined) => {
-    if (!date) {
-      setSelectedDate(undefined)
+  // Pure date validation function - no side effects / state updates.
+  // Must never be called during render (that causes "too many re-renders"
+  // React error #301); only from effects or event handlers.
+  const getDateValidationError = useCallback((date: Date): string => {
+    const { min, max } = getAllowedDateRange()
+    if (!min && !max) {
+      return '' // No sprint constraints loaded yet
+    }
+
+    const selected = new Date(date)
+    selected.setHours(0, 0, 0, 0)
+
+    if (min && selected < min) {
+      return formData.eventType === 'review'
+        ? `Sprint Review must be scheduled on or after ${format(min, 'MMM dd, yyyy')}`
+        : `Date must be on or after ${format(min, 'MMM dd, yyyy')}`
+    }
+
+    if (max && selected > max) {
+      return `Date must be on or before sprint end date (${format(max, 'MMM dd, yyyy')})`
+    }
+
+    return ''
+  }, [getAllowedDateRange, formData.eventType])
+
+  // Keep dateError in sync with the selected date via an effect, instead of
+  // setting state as a side effect of a "validate" call inside render.
+  useEffect(() => {
+    if (!selectedDate) {
       setDateError('')
       return
     }
+    setDateError(getDateValidationError(selectedDate))
+  }, [selectedDate, getDateValidationError])
 
-    if (validateDate(date)) {
-      setSelectedDate(date)
-    } else {
-      // Still set the date but show error
-      setSelectedDate(date)
-    }
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date)
   }
 
   // Validate end time is after start time and prevent past times
@@ -546,10 +558,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       const start = startHours * 60 + startMinutes
       const end = endHours * 60 + endMinutes
       const duration = end - start
-      const clampedDuration = duration > 0 ? Math.max(duration, MIN_DURATION_MINUTES) : MIN_DURATION_MINUTES
-      setFormData(prev => ({ ...prev, duration: clampedDuration }))
+      setFormData(prev => ({ ...prev, duration: duration > 0 ? duration : MIN_DURATION_MINUTES }))
     } else {
-      // When times are missing or invalid, keep the duration at backend minimum to avoid validation errors
       setFormData(prev => ({ ...prev, duration: MIN_DURATION_MINUTES }))
     }
   }
@@ -582,20 +592,20 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     calculateDuration()
   }, [formData.startTime, formData.endTime, startTimeError, endTimeError])
 
-  // Auto-set date for Sprint Review events
-  useEffect(() => {
-    if (formData.eventType === 'review' && selectedSprint && selectedSprint.endDate) {
-      const dayAfterSprintEnd = new Date(selectedSprint.endDate)
-      dayAfterSprintEnd.setDate(dayAfterSprintEnd.getDate() + 1)
-      dayAfterSprintEnd.setHours(0, 0, 0, 0)
+  // Note: dates are never auto-assigned for any event type, including
+  // Sprint Review. Auto-picking used to force the date field to a fixed
+  // value the user couldn't change, and for sprints that had already ended
+  // it silently picked a past date that validation then rejected. The
+  // calendar's `disabled` matcher (driven by getAllowedDateRange) now
+  // enforces the same constraint interactively instead, and defaultMonth
+  // opens the calendar on the right month as a convenience.
 
-      // If no date is selected, or if the current date is not valid for review, auto-set it
-      if (!selectedDate || (selectedDate && selectedDate < dayAfterSprintEnd)) {
-        setSelectedDate(dayAfterSprintEnd)
-        setDateError('') // Clear any existing date errors
-      }
-    }
-  }, [formData.eventType, selectedSprint, selectedDate])
+  // Reset the selected date whenever the constraints that govern it change,
+  // since a date valid under the old sprint/event type may not be valid
+  // under the new one.
+  useEffect(() => {
+    setSelectedDate(undefined)
+  }, [formData.sprintId, formData.eventType])
 
   // Update selectedSprint when sprintId changes
   useEffect(() => {
@@ -621,12 +631,13 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     // If both times are provided, they must be valid (no timeError) and duration must be > 0
     const hasValidTime =
       (!formData.startTime && !formData.endTime) || // Both empty is OK (optional)
-      (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration >= MIN_DURATION_MINUTES) // Both filled and valid
+      (formData.startTime && formData.endTime && !startTimeError && !endTimeError &&
+        formData.duration >= MIN_DURATION_MINUTES && formData.duration <= MAX_DURATION_MINUTES)
 
     // Check date validation - date must be valid if selected
-    const hasValidDate = !dateError || (selectedDate && (!selectedSprint || validateDate(selectedDate)))
+    const hasValidDate = !!selectedDate && !dateError
 
-    return hasRequiredFields && hasValidTime && hasValidDate && formData.duration >= MIN_DURATION_MINUTES
+    return !!(hasRequiredFields && hasValidTime && hasValidDate)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -689,11 +700,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
         })
         setLoading(false)
         onSuccess()
-        // Close modal and redirect after showing success notification
-        setTimeout(() => {
-          onClose()
-          router.push('/sprint-events?success=created')
-        }, 1000)
+        onClose()
       } else {
         const errorData = await response.json()
         const errorMessage = errorData.error || 'Failed to create event'
@@ -797,10 +804,10 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] flex flex-col max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle>Create Sprint Event</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-[700px] flex flex-col max-h-[90vh] overflow-hidden rounded-[var(--apple-radius-xl)] border-[var(--apple-separator)] shadow-2xl bg-[var(--apple-secondary-system-background)]">
+        <DialogHeader className="border-b border-[var(--apple-separator)] px-6 py-4 bg-[var(--apple-bg-primary)]">
+          <DialogTitle className="text-[17px] font-semibold text-[var(--apple-label)] tracking-tight">Create Sprint Event</DialogTitle>
+          <DialogDescription className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
             Schedule a new agile event or ceremony
           </DialogDescription>
         </DialogHeader>
@@ -809,16 +816,16 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
           <form onSubmit={handleSubmit} className="space-y-6" id="create-sprint-event-form">
             {/* (1) Basic Details */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Basic Details</h3>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Basic Details</h3>
               {!projectId && (
-                <div className="space-y-2">
-                  <Label htmlFor="projectId">Project *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="projectId">Project *</Label>
                   <Select
                     value={formData.projectId}
                     onValueChange={(value) => handleInputChange('projectId', value)}
                     onOpenChange={(open) => { if (open) setProjectQuery('') }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                       <SelectValue placeholder="Select project" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -846,15 +853,15 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sprintId">Sprint *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="sprintId">Sprint *</Label>
                   <Select
                     value={formData.sprintId}
                     onValueChange={(value) => handleInputChange('sprintId', value)}
                     disabled={!formData.projectId && !projectId}
                     onOpenChange={(open) => { if (open) setSprintQuery('') }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                       <SelectValue placeholder="Select sprint" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -882,14 +889,14 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="eventType">Event Type *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="eventType">Event Type *</Label>
                   <Select
                     value={formData.eventType}
                     onValueChange={(value) => handleInputChange('eventType', value)}
                     onOpenChange={(open) => { if (open) setEventTypeQuery('') }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                       <SelectValue placeholder="Select event type" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -913,27 +920,28 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="title">Event Name *</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="title">Event Name *</Label>
                 <Input
                   id="title"
                   value={formData.title}
                   onChange={(e) => handleInputChange('title', e.target.value)}
                   placeholder="Enter event name"
+                  className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                   required
                 />
               </div>
             </div>
 
             {/* (3) Schedule */}
-            <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold mt-4">Schedule</h3>
+            <div className="space-y-4 pt-4 border-t border-[var(--apple-separator)]">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Schedule</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="scheduledDate">Date *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="scheduledDate">Date *</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <Button variant="outline" className="w-full justify-start text-left font-normal rounded-[var(--apple-radius-pill)] h-10 border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {selectedDate ? format(selectedDate, 'PPP') : 'Pick a date'}
                       </Button>
@@ -943,29 +951,14 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                         mode="single"
                         selected={selectedDate}
                         onSelect={handleDateSelect}
+                        defaultMonth={getAllowedDateRange().min ?? selectedDate ?? undefined}
                         disabled={(date) => {
-                          const today = new Date()
-                          today.setHours(0, 0, 0, 0)
                           const checkDate = new Date(date)
                           checkDate.setHours(0, 0, 0, 0)
 
-                          // Disable past dates
-                          if (checkDate < today) {
-                            return true
-                          }
-
-                          // Disable dates outside sprint range if sprint is selected
-                          if (selectedSprint && selectedSprint.startDate && selectedSprint.endDate) {
-                            const sprintStart = new Date(selectedSprint.startDate)
-                            sprintStart.setHours(0, 0, 0, 0)
-                            const sprintEnd = new Date(selectedSprint.endDate)
-                            sprintEnd.setHours(23, 59, 59, 999)
-
-                            if (checkDate < sprintStart || checkDate > sprintEnd) {
-                              return true
-                            }
-                          }
-
+                          const { min, max } = getAllowedDateRange()
+                          if (min && checkDate < min) return true
+                          if (max && checkDate > max) return true
                           return false
                         }}
                         initialFocus
@@ -979,25 +972,26 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                     </Alert>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="status">Status</Label>
                   <Input
                     id="status"
                     value="Scheduled"
                     disabled
-                    className="bg-muted"
+                    className="h-10 rounded-[var(--apple-radius-pill)] bg-[var(--apple-tertiary-fill)] text-[14px] opacity-60"
                   />
                   <input type="hidden" value={formData.status} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startTime">Start Time</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="startTime">Start Time</Label>
                   <Input
                     id="startTime"
                     type="time"
                     value={formData.startTime}
                     onChange={(e) => handleInputChange('startTime', e.target.value)}
+                    className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                   />
                   {startTimeError && (
                     <Alert variant="destructive" className="mt-2">
@@ -1006,13 +1000,14 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                     </Alert>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endTime">End Time</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="endTime">End Time</Label>
                   <Input
                     id="endTime"
                     type="time"
                     value={formData.endTime}
                     onChange={(e) => handleInputChange('endTime', e.target.value)}
+                    className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                   />
                   {endTimeError && (
                     <Alert variant="destructive" className="mt-2">
@@ -1022,27 +1017,35 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   )}
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="duration">Duration</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="duration">Duration</Label>
                 <Input
                   id="duration"
                   value={getDurationDisplay()}
                   disabled
-                  className="bg-muted"
+                  className="h-10 rounded-[var(--apple-radius-pill)] bg-[var(--apple-tertiary-fill)] text-[14px] opacity-60"
                   placeholder="Enter start and end time to calculate"
                 />
+                {formData.duration > MAX_DURATION_MINUTES && formData.startTime && formData.endTime && !startTimeError && !endTimeError && (
+                  <div className="flex items-start gap-2 mt-2 px-3 py-2.5 rounded-[var(--apple-radius-md)] bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                    <AlertCircle className="h-4 w-4 text-[var(--apple-system-red)] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                    <p className="text-[12px] text-red-700 dark:text-red-300 leading-snug">
+                      Duration exceeds the 8-hour limit. Please adjust your start or end time.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* (3.5) Recurrence Settings */}
-            <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Repeat className="h-4 w-4" />
+            <div className="space-y-4 pt-4 border-t border-[var(--apple-separator)]">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)] flex items-center gap-1.5">
+                <Repeat className="h-3.5 w-3.5" />
                 Recurrence
               </h3>
-              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                <div className="space-y-2">
-                  <Label htmlFor="recurrenceType">Repeat</Label>
+              <div className="space-y-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]">
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="recurrenceType">Repeat</Label>
                   <Select
                     value={formData.recurrence.type}
                     onValueChange={(value) => {
@@ -1054,7 +1057,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                       }
                     }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-background text-[14px]">
                       <SelectValue placeholder={formData.eventType === 'daily_standup' ? 'One-time' : 'Does not repeat'} />
                     </SelectTrigger>
                     <SelectContent>
@@ -1201,11 +1204,11 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             
 
               return (
-                <div className="space-y-4 mt-8">
+                <div className="space-y-3 pt-4 border-t border-[var(--apple-separator)]">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold mt-4">Attendees</h3>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Attendees</h3>
                     {formData.attendees.length > 0 && (
-                      <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                      <span className="text-[12px] text-[var(--apple-secondary-label)] bg-[var(--apple-quaternary-fill)] px-2.5 py-0.5 rounded-full border border-[var(--apple-separator)]">
                         {formData.attendees.length} selected
                       </span>
                     )}
@@ -1218,11 +1221,11 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                       setAttendeeQuery(e.target.value)
                     }}
                     placeholder="Search attendees..."
-                    className="w-full"
+                    className="w-full h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                   />
 
                   {/* Scrollable attendees list */}
-                  <div className="max-h-48 overflow-y-auto border rounded-md">
+                  <div className="max-h-48 overflow-y-auto border border-[var(--apple-separator)] rounded-[var(--apple-radius-lg)]">
                     <div className="p-3">
                       {filteredUsers && filteredUsers.length > 0 ? (
                         <div className="space-y-3">
@@ -1261,21 +1264,21 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             })()}
 
             {/* (5) Description / Notes */}
-            <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold mt-4">Description / Notes</h3>
+            <div className="space-y-3 pt-4 border-t border-[var(--apple-separator)]">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Description / Notes</h3>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Meeting agenda, talking points, key decisions..."
-                rows={6}
-                className="resize-none"
+                rows={5}
+                className="resize-none rounded-[var(--apple-radius-lg)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]"
               />
             </div>
 
             {/* (6) Attachments */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold mt-4">Attachments (Optional)</h3>
+            <div className="space-y-3 pt-4 border-t border-[var(--apple-separator)]">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Attachments (Optional)</h3>
               <FileUploader onUpload={handleFileUpload} />
 
               {attachments.length > 0 && (
@@ -1293,17 +1296,18 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLink())}
+                  className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                 />
-                <Button type="button" variant="outline" onClick={addLink}>
+                <Button type="button" variant="outline" onClick={addLink} className="rounded-full h-10 px-5 text-[14px] border-[var(--apple-separator)]">
                   Add Link
                 </Button>
               </div>
             </div>
 
             {/* (7) Notification Settings */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold mt-4">Notification & Reminder Settings</h3>
-              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+            <div className="space-y-3 pt-4 border-t border-[var(--apple-separator)]">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--apple-tertiary-label)]">Notification & Reminders</h3>
+              <div className="space-y-4 p-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]">
                 <label className="flex items-center space-x-2">
                   <Checkbox
                     checked={formData.notificationSettings.enabled}
@@ -1370,36 +1374,39 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             </div>
 
             {/* Location and Meeting Link */}
-            <div className="grid grid-cols-2 gap-4 mt-8">
-              <div className="space-y-2 mt-4">
-                <Label htmlFor="location">Location</Label>
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--apple-separator)]">
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="location">Location</Label>
                 <Input
                   id="location"
                   value={formData.location}
                   onChange={(e) => handleInputChange('location', e.target.value)}
                   placeholder="Meeting room, office, etc."
+                  className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                 />
               </div>
-              <div className="space-y-2 mt-4">
-                <Label htmlFor="meetingLink">Meeting Link</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-medium text-[var(--apple-secondary-label)]" htmlFor="meetingLink">Meeting Link</Label>
                 <Input
                   id="meetingLink"
                   value={formData.meetingLink}
                   onChange={(e) => handleInputChange('meetingLink', e.target.value)}
                   placeholder="Zoom, Teams, Google Meet link"
+                  className="h-10 rounded-[var(--apple-radius-pill)] text-[14px]"
                 />
               </div>
             </div>
           </form>
         </DialogBody>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
+        <DialogFooter className="border-t border-[var(--apple-separator)] bg-[var(--apple-bg-primary)] px-6 py-4 gap-2">
+          <Button type="button" variant="outline" onClick={onClose} className="rounded-full px-6 h-10 text-[14px] border-[var(--apple-separator)] font-medium">
             Cancel
           </Button>
           <Button
             type="submit"
             form="create-sprint-event-form"
             disabled={loading || !isFormValid()}
+            className="rounded-full px-6 h-10 text-[14px] bg-[var(--apple-system-blue)] text-white hover:opacity-90 font-medium"
           >
             {loading ? (
               <>
@@ -1407,7 +1414,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                 Creating...
               </>
             ) : (
-              'Save'
+              'Create Event'
             )}
           </Button>
         </DialogFooter>

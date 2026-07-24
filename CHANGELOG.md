@@ -1,3 +1,209 @@
+## [1.41.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.2...v1.41.3) (2026-07-24)
+
+
+### Bug Fixes
+
+* remove unused daily progress calculation and related UI elements from TimerPage ([d5afe0a](https://github.com/EchonLabs/kanvaro.com/commit/d5afe0a4fff5ae14d4601943d4b3bd20119d0956))
+
+## [1.41.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.1...v1.41.2) (2026-07-21)
+
+
+### Bug Fixes
+
+* add permission checks for creating projects and tasks in RecentProjects and RecentTasks components ([17615b2](https://github.com/EchonLabs/kanvaro.com/commit/17615b224ba2f148030bcfdcde6cac105846b35a))
+* add taskType property to BacklogItem interface and update TypeBadge rendering ([2405816](https://github.com/EchonLabs/kanvaro.com/commit/2405816f98874606d4227777ff1a132a680280ff))
+* add validation for first and last name length across member-related APIs and components ([0d0907b](https://github.com/EchonLabs/kanvaro.com/commit/0d0907b6699848d2d6891c0fc58fca4981411689))
+* changed ui and layout of the pages to follow the current design of the project. ([29c1f9d](https://github.com/EchonLabs/kanvaro.com/commit/29c1f9dfa01c532d7514706b97c1b267c5b71d81))
+* enhance time entry deletion permissions and management capabilities in TimeLogs component ([104edec](https://github.com/EchonLabs/kanvaro.com/commit/104edec7efd453629d72abf7d8f0557e4b6bb293))
+* enhance timer stop functionality to ensure time entries are saved correctly ([8635c36](https://github.com/EchonLabs/kanvaro.com/commit/8635c362251d4c92da3932c47b22fbf7fbb398bc))
+* implement cross-field validation for time tracking limits in settings and organization components ([84d4a9a](https://github.com/EchonLabs/kanvaro.com/commit/84d4a9a7f00aa8ee367fbcd0b5ef9be6a478d3c0))
+* improve date validation logic and synchronization in AddSprintEventModal ([a9359cf](https://github.com/EchonLabs/kanvaro.com/commit/a9359cfb87f554db76d9ef4150f44da46f84a1a1))
+* remove running timer minutes from week and month duration calculations in TimeTrackingWidget ([b3d9952](https://github.com/EchonLabs/kanvaro.com/commit/b3d9952615a68bebd4183ddef72563f7f3af88d6))
+* restore permission checks for member deletion and update confirmation message for member removal ([c82da98](https://github.com/EchonLabs/kanvaro.com/commit/c82da9841e9f74bcc7ab4d991f9920123fe630c4))
+* restore SPRINT_DELETE permission for roles and adjust project permission checks ([8155204](https://github.com/EchonLabs/kanvaro.com/commit/8155204b402c2b1929fdecdda5c88b427986d6ed))
+* simplify button rendering for creating new sprints based on permission ([da413e8](https://github.com/EchonLabs/kanvaro.com/commit/da413e82748bac529858bcda66bc45afea85041f))
+* update date calculations for start of week in multiple components and restore TASK_DELETE permission for roles ([422db6d](https://github.com/EchonLabs/kanvaro.com/commit/422db6d556b0e08bfbc7c62e3ccccf78bd39d021))
+* update time entry deletion logic to require delete permission for all users and integrate ConfirmationModal for deletion confirmation ([e2cdeea](https://github.com/EchonLabs/kanvaro.com/commit/e2cdeeacbdbc6047a6a901881a4f480afb85a98d))
+
+## [1.41.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.0...v1.41.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* remove description display from task component for cleaner UI ([e6c6e4e](https://github.com/EchonLabs/kanvaro.com/commit/e6c6e4e036669ae7ab243aac91b6bc93997fa154))
+* update button styles in Timer and TimeTrackingPage for consistency and improved UI ([647b827](https://github.com/EchonLabs/kanvaro.com/commit/647b827e66a8062a6089d8124b559d6848610de8))
+
+# [1.41.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.40.1...v1.41.0) (2026-07-07)
+
+
+### Bug Fixes
+
+* add excludeStatus filter to task retrieval and update TimerPage parameters ([c44e87a](https://github.com/EchonLabs/kanvaro.com/commit/c44e87a988b26698cec12cad925d573a5b59d2ea))
+* enhance income handling by adding custom subcategory support and validation ([51d8c04](https://github.com/EchonLabs/kanvaro.com/commit/51d8c04b35136ac325c0a957c12d182b8b9d14fd))
+* income and expenses logic in project budget tab ([2fb29aa](https://github.com/EchonLabs/kanvaro.com/commit/2fb29aa5580f5801324099d4214ab438d3ea47a8))
+* logic related to financial reports and related sub pages ([5f55bfc](https://github.com/EchonLabs/kanvaro.com/commit/5f55bfcee34837fabfff7a833be0a42854a2cd6d))
+* persistent data in filters and incorrect Backlog sprint task addition ([835da7c](https://github.com/EchonLabs/kanvaro.com/commit/835da7c993acd6893105b52ee1c9c4f800fc9cbe))
+* project backlog incorrect stat and info cards ([2446e15](https://github.com/EchonLabs/kanvaro.com/commit/2446e155ccf64693fc8f945bce79b2f29cd42bd9))
+* reworked logic on all four sub pages of Team Reports page ([621d5bc](https://github.com/EchonLabs/kanvaro.com/commit/621d5bc016aeb82e5a4c2c0594c41817c87a3117))
+* reworked the logic of the team tab to restrict Team members and QAs from removing members from the project ([d254674](https://github.com/EchonLabs/kanvaro.com/commit/d2546747aff5b749359f0a3ac8c12e14665bec8b))
+* sprint completion and task transfer logic ([d0ba516](https://github.com/EchonLabs/kanvaro.com/commit/d0ba516a09893e5ebb2c946790f5d41514b4b9a3))
+* update excludeStatus filter in TimerPage to remove backlog status ([4c5e4de](https://github.com/EchonLabs/kanvaro.com/commit/4c5e4de7407e684fab6679d4d8006987f20c464d))
+
+
+### Features
+
+* add example configuration file and remove existing config ([fbcabf2](https://github.com/EchonLabs/kanvaro.com/commit/fbcabf27ac13acd71e693df526b9a6076c8ca834))
+* enhance configuration management with environment variables support ([fe438e8](https://github.com/EchonLabs/kanvaro.com/commit/fe438e888a9641aaaef3adaed2e8499bdefc705a))
+
+## [1.40.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.40.0...v1.40.1) (2026-06-24)
+
+
+### Bug Fixes
+
+* application error due to sprint event duration exceeding ([daa2510](https://github.com/EchonLabs/kanvaro.com/commit/daa251072754dfd4033e5442b626e621bb1e835c))
+* calender page formatting and layout issues ([854360f](https://github.com/EchonLabs/kanvaro.com/commit/854360fd84b4245f9e620b235a2266672a9fa6fc))
+* fixed the scrollbar popup in sprint events page. ([5017987](https://github.com/EchonLabs/kanvaro.com/commit/5017987ff95f218f00887ee7f970703623e48e44))
+* fixed vertical scrollbar in Toast Notifications and added new info for Info cards in Project view page ([5c0c37b](https://github.com/EchonLabs/kanvaro.com/commit/5c0c37bbaee63e4646634bd150a209350ab5e5f4))
+* handled the duplicate toast notifications and fixed the UI issue in the sprint event view page ([c07d856](https://github.com/EchonLabs/kanvaro.com/commit/c07d856c9a0291ae74b5e47e05c3bd1052ab7f54))
+* layout and spacing issues in the Sprint page List View ([fbb49f0](https://github.com/EchonLabs/kanvaro.com/commit/fbb49f03480a732b020e3bf1a913d68e5def62f3))
+* reworked the logic in the reports tab in the project view page. ([fff765a](https://github.com/EchonLabs/kanvaro.com/commit/fff765ab6b23d1a7cc9cc8a107a0abe48b03fe22))
+* reworked the logic on all four sub pages of the Project Reports page ([0f4e7c1](https://github.com/EchonLabs/kanvaro.com/commit/0f4e7c1a4a4e9154769c2a2a1d8b71070cb95a60))
+* scrollbar popup issue when no results were found ([e126c3f](https://github.com/EchonLabs/kanvaro.com/commit/e126c3f18bf8e2dfdb864c697044ea103eb2f025))
+* showing unformatted task descriptions in the Tasks page List view ([8c11d6d](https://github.com/EchonLabs/kanvaro.com/commit/8c11d6d62ef55a334489876b3e63f6b842681c91))
+
+# [1.40.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.39.1...v1.40.0) (2026-06-15)
+
+
+### Bug Fixes
+
+* added the outline svg style to all Title svgs in all pages and made the sidebar active state follow the new UI theme ([3bffcb1](https://github.com/EchonLabs/kanvaro.com/commit/3bffcb13f5f88ad1809d2c969032aafe900b5590))
+* changed all svgs to outlined svgs in all pages belonging to the Time Tracking Module ([4b64083](https://github.com/EchonLabs/kanvaro.com/commit/4b640835ffc8ff413fd3940af8c09dbeb00731e3))
+* final adjustments for the sprint events and epic pages to follow the new UI theme. ([f12dfa6](https://github.com/EchonLabs/kanvaro.com/commit/f12dfa6154cbfa8440443e5618864806e8a521f4))
+* member avatars not showing in the dashboard and Standup Dashboard ([7707d8d](https://github.com/EchonLabs/kanvaro.com/commit/7707d8d6b8e7cac2560a0ae85f3de0da93c7afad))
+* redesigned the dashboard to fit the new theme and align with Apple design standards. ([d7d3af6](https://github.com/EchonLabs/kanvaro.com/commit/d7d3af6e52e6f73f3297096bf9ce993dd9474ac8))
+* removed unnecessary and redundant .md files ([588bcd7](https://github.com/EchonLabs/kanvaro.com/commit/588bcd7a4ed68428948d200e0539660be33f9da7))
+* replaced lucide icons with Outlined icons in the dashboard. ([d368cd9](https://github.com/EchonLabs/kanvaro.com/commit/d368cd96426bde0d3bf6dd28e5f5cd8c6ff409c2))
+* upadeted all pages in the Test Management Module to use outlined svgs ([55c3c98](https://github.com/EchonLabs/kanvaro.com/commit/55c3c984e3458be630d5e6a1ba4bf914c769fe52))
+* updated all pages in Settings Module to use outlined svgs ([ef5743b](https://github.com/EchonLabs/kanvaro.com/commit/ef5743b438e275982b4a70f88c8def56401fdcb8))
+* updated all pages in the Reports Module to use outlined svgs ([472a0fd](https://github.com/EchonLabs/kanvaro.com/commit/472a0fd5db0a4c302aedb44063c899aeacf939dc))
+* updated all pages related to Tasks Module and Project Module to use oulined svgs. ([94b5d74](https://github.com/EchonLabs/kanvaro.com/commit/94b5d74b70bb67597e660d3a1343367a1c6db93c))
+* updated all scheduled standup pages to follow the new UI theme ([58c5667](https://github.com/EchonLabs/kanvaro.com/commit/58c5667d4a84eea2f733ff0822228aa43d32410e))
+
+
+### Features
+
+* added the new theme as a toggle for users and removed the gradient background for both dark and light modes. ([6e4ed49](https://github.com/EchonLabs/kanvaro.com/commit/6e4ed49bbc6df901edb03209f105681caadfbf6c))
+* changed all page related to the Projects Module to follow the new UI color theme ([dd23adf](https://github.com/EchonLabs/kanvaro.com/commit/dd23adf030ae2b4623cfb72cbf213a2ce01a700a))
+* changed the Standup Dashboard and all pages related to this feature follow the new theme. ([e183b42](https://github.com/EchonLabs/kanvaro.com/commit/e183b42ca65c9a1e227eab9ee48e6c9a29bf7700))
+* final design fixes for the dashboard and updated the signout confirmation modal. ([5dc9c1c](https://github.com/EchonLabs/kanvaro.com/commit/5dc9c1c4a707e3febe651a6b481f71f7c53a495e))
+* redesigned both sprint and task popup modals and and the task view page ([1eb3159](https://github.com/EchonLabs/kanvaro.com/commit/1eb31598867f336e4bdb5709e0b8b1e31676632c))
+* **ui:** Added a new theme feature for users to select from a group of four premium colors as the global theme. ([039ab6f](https://github.com/EchonLabs/kanvaro.com/commit/039ab6fa51fea419e58dfb363b47ddd2e0a24619))
+* updated all pages and components related to the reports module to follow the new UI theme ([13535f2](https://github.com/EchonLabs/kanvaro.com/commit/13535f24c8d96224dd4153b6e7a8ca5f70a3f77b))
+* updated all pages of the Tasks Module to follow the new UI color theme ([2a1e1f0](https://github.com/EchonLabs/kanvaro.com/commit/2a1e1f0a00500127c8ee926b54d7425b3d173633))
+* updated all pages of the Timer Tracking Module to fit the new UI color theme ([35ab351](https://github.com/EchonLabs/kanvaro.com/commit/35ab3512904452de34abfcc6d5d1e14a0ebe2414))
+* updated all the pages in Test Management Module to follow the new UI theme. ([fc560a6](https://github.com/EchonLabs/kanvaro.com/commit/fc560a6d95256b240978e6497968411166c28a21))
+* updated pages in the Settings Module to follow the new UI theme ([485851b](https://github.com/EchonLabs/kanvaro.com/commit/485851b72df0157014c733bb4494f4c9502306dd))
+
+## [1.39.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.39.0...v1.39.1) (2026-06-10)
+
+
+### Bug Fixes
+
+* harden session timeout logic and stabilize token refresh Enforce a minimum session timeout of 4 hours in SessionTimeoutWrapper ([cd59682](https://github.com/EchonLabs/kanvaro.com/commit/cd59682939a51daa3008b530ddcb12ad75c7f8dc))
+* implement dynamic past time log limits Update the time tracking system to use a configurable past time limit ([f700305](https://github.com/EchonLabs/kanvaro.com/commit/f70030524ad094713d9cf80f9d5fff6a371e4bbe))
+* restrict manual time logs to today and yesterday ([0afbee3](https://github.com/EchonLabs/kanvaro.com/commit/0afbee32126e86ef8fe9e31dc65c46a5870628fb))
+
+# [1.39.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.2...v1.39.0) (2026-06-09)
+
+
+### Bug Fixes
+
+* adjust order of elements in dashboard layout for better responsiveness ([771dacb](https://github.com/EchonLabs/kanvaro.com/commit/771dacb3860d6202dc5088000b080a57cd75cfe9))
+* improve responsiveness and layout across project and calendar pages ([1b7a517](https://github.com/EchonLabs/kanvaro.com/commit/1b7a517213cee5f486ec67da3771fbda36564fd4))
+* refine glassmorphism effects and transition timing Adjusted the opacity and blur intensity of Apple-inspired glass materials to improve visual depth and transparency. Additionally, introduce a custom cubic-bezier timing function and transition duration to align with premium motion standards. ([b0c897b](https://github.com/EchonLabs/kanvaro.com/commit/b0c897bdba1fd469d96f3852272753ab60d22810))
+* **reports:** improve responsiveness and add date filtering to Gantt charts Update `QuickActions` component to use a dynamic grid system that adapts to the number of available actions. ([f97b15f](https://github.com/EchonLabs/kanvaro.com/commit/f97b15fe6966bc8fdf5e89ae7bfbd59968c5b27e))
+
+
+### Features
+
+* **dashboard:** redesigned the UI to fit Apple theme enhanced data aggregation and refine typography scales ([401154f](https://github.com/EchonLabs/kanvaro.com/commit/401154f42dd6978a9cfffcd6ad9ce7f1bb0f17d6))
+* **ui/dashboard:** implement Apple HIG design system tokens ([7839f56](https://github.com/EchonLabs/kanvaro.com/commit/7839f5626f9aab3f12d7940560b5c2215375be0c))
+* **ui:** apply Apple HIG semantic styling and component refinements to dashboard core UI Components ([f1adb0b](https://github.com/EchonLabs/kanvaro.com/commit/f1adb0b680cd1eab0758e6c4ccaf64fd74705580))
+* **ui:** Implement a more sophisticated visual presentation for time tracking components and extend the manual logging functionality for administrative users. ([ae9b1f8](https://github.com/EchonLabs/kanvaro.com/commit/ae9b1f88f7ab99248a8ab3c19198173945c4709e))
+* **ui:** implemented new revamped designs for all pages realted to the Time Tracking Module and added new animation styles ([c8c5440](https://github.com/EchonLabs/kanvaro.com/commit/c8c54403e59353cc832fccdee8550df3eb92c8d2))
+* **ui:** implemented revamped UI to all Team Module pages ([b188b04](https://github.com/EchonLabs/kanvaro.com/commit/b188b044bd185fa9c2eda1c01ab2543ade7e829f))
+* **ui:** redesign all report pages, components and the calender page with Apple-inspired design system ([76c536b](https://github.com/EchonLabs/kanvaro.com/commit/76c536bf4eda0f3d865cc0bb30a8c2705af311b4))
+* **ui:** redesign standup dashboard with Apple-inspired design system ([bd97109](https://github.com/EchonLabs/kanvaro.com/commit/bd97109628b0dae55c58acf0114c07229b5ef317))
+* **ui:** redesign UI and improve component structure in Test Management Module pages ([26ffcef](https://github.com/EchonLabs/kanvaro.com/commit/26ffcef4541dc7d9bf481e0b53325a81bdd9e633))
+* **ui:** refactor task management pages with shared components and Apple-inspired design ([9c1f424](https://github.com/EchonLabs/kanvaro.com/commit/9c1f424a286cbeb4cea22c09e5dd91236d1762d2))
+* **ui:** Update Kanban and Projects pages with new design tokens, improved typography, and refined component structures  Implement a theme switcher (Light, Dark, System) in the MobileMenu using `next-themes`. ([be4d213](https://github.com/EchonLabs/kanvaro.com/commit/be4d213f883a4e0594831da3235f0406b7f0419f))
+
+## [1.38.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.1...v1.38.2) (2026-06-02)
+
+## [1.38.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.38.0...v1.38.1) (2026-06-02)
+
+
+### Reverts
+
+* Revert "chore(release): 1.38.0 [skip ci]" ([01d28ce](https://github.com/EchonLabs/kanvaro.com/commit/01d28ce888238b9011c4ae8050bebf31fecfe903))
+* Revert "Merge pull request [#843](https://github.com/EchonLabs/kanvaro.com/issues/843) from EchonLabs/improvments/AI-Feature-report-gen" ([5613e8a](https://github.com/EchonLabs/kanvaro.com/commit/5613e8afd36519bd49114bc11f08eb015f4b084f))
+
+# [1.37.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.4...v1.37.0) (2026-05-29)
+
+
+### Features
+
+* add loading component for Standup Dashboard ([e67c2e1](https://github.com/EchonLabs/kanvaro.com/commit/e67c2e1a069cb68713bc4c285bebaeb3c6b80b3a))
+* add short format for logged hours in Standup Timelog utilities ([46c1a00](https://github.com/EchonLabs/kanvaro.com/commit/46c1a0090c8ecdfe590cd146379318525555d2ec))
+* add Standup Assignment and Schedule dialogs with form handling ([b2e2a04](https://github.com/EchonLabs/kanvaro.com/commit/b2e2a04d852c35742876000124549e772fd5d865))
+* add Standup Dashboard link to Sidebar and MobileMenu navigation ([85210ff](https://github.com/EchonLabs/kanvaro.com/commit/85210ff112affa9bbb609f1e5a1aba479584ff24))
+* add standup summary page and delay reasons handling ([0e3eae9](https://github.com/EchonLabs/kanvaro.com/commit/0e3eae92f735f0db728e31686f83538911b5266b))
+* add StandupSchedule model and API routes for managing standup schedules ([cefb8d7](https://github.com/EchonLabs/kanvaro.com/commit/cefb8d7640a1c35c268a08d28078458e8b2ad765))
+* create Standup Schedule page with form handling and project details ([b94f381](https://github.com/EchonLabs/kanvaro.com/commit/b94f3818c78f9b0af575fb847183f66413e72177))
+* enhance Standup Dashboard with detailed meeting view and local schedule management ([5596ef4](https://github.com/EchonLabs/kanvaro.com/commit/5596ef4f2174b931aea744409f55567f10351600))
+* enhance Standup Dashboard with new schedule management features and improved data handling ([34b7cd1](https://github.com/EchonLabs/kanvaro.com/commit/34b7cd15c15abcbd27fa9572535ba4d209a3e1f7))
+* Enhance Standup Dashboard with Unified Comments and Summary Generation ([51fd24f](https://github.com/EchonLabs/kanvaro.com/commit/51fd24ff348a56c0531db2a0a14b67592b6c1164))
+* enhance standup schedule creation with task assignments and notes and added summary generation ([1e7ba04](https://github.com/EchonLabs/kanvaro.com/commit/1e7ba04086ad47bc0cae60b333aca734ff7b87f1))
+* enhance standup scheduling with actual date handling and date key utilities ([7730eba](https://github.com/EchonLabs/kanvaro.com/commit/7730eba8a7b4f6a9a0fe7a08a3d50703690c110f))
+* enhanced the StandupSummaryDialog to parse and display existing summaries more intelligently, including section titles and comments. ([3a92bc1](https://github.com/EchonLabs/kanvaro.com/commit/3a92bc1de5bf5f1a6a6aa71ae1376208537c9636))
+* implement Standup Dashboard with project summaries and details ([e9dc33b](https://github.com/EchonLabs/kanvaro.com/commit/e9dc33bd676576d32ecd2856f6bf0f8db1139133))
+* improve date handling in standup schedule and dashboard components ([e4407d0](https://github.com/EchonLabs/kanvaro.com/commit/e4407d0b2ea8adf3ff92be75d5749fcfc99134fd))
+* refactor Standup Dashboard and Schedule pages for improved error handling and state management ([ebc6679](https://github.com/EchonLabs/kanvaro.com/commit/ebc66799964b0e0d29651040098d36ddd64666f1))
+* update breadcrumb management in Standup Dashboard and Schedule pages for improved navigation ([4ee138d](https://github.com/EchonLabs/kanvaro.com/commit/4ee138dc4ac58732f765e00e41e1e476a786b1db))
+
+## [1.36.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.3...v1.36.4) (2026-05-27)
+
+
+### Bug Fixes
+
+* dashboard showing incorrect logged hours until page is refreshed. ([e0298ac](https://github.com/EchonLabs/kanvaro.com/commit/e0298acefcd42301777889167e046dbf4b27369c))
+* ensure orphaned inline elements are wrapped in <p> tags for proper formatting ([f1e67af](https://github.com/EchonLabs/kanvaro.com/commit/f1e67af27c50803835bdf179177387a80146befc))
+* removed access for Team Members and QA's to view reports ([d6f9b2f](https://github.com/EchonLabs/kanvaro.com/commit/d6f9b2fd4f79c264a6bf2824c43a3c4fc12a4f08))
+* resolve missing organization logo and incorrect inviter/footer details; revamp welcome email design ([156090e](https://github.com/EchonLabs/kanvaro.com/commit/156090e53e385860cc43595bdd2ae1a5e6826e07))
+* restrict Assignee and Creator Filters for QA Engineer Role ([7ba0e9a](https://github.com/EchonLabs/kanvaro.com/commit/7ba0e9a148bfa940c311e33972ae360a31ef080c))
+* update email CTA button color for better visibility ([7c19481](https://github.com/EchonLabs/kanvaro.com/commit/7c19481a365d73be6dc0be67c600718712fe8393))
+* update task title tooltip to display only the title ([368b059](https://github.com/EchonLabs/kanvaro.com/commit/368b05904d01d0837a36fa4e1c21305d4603691f))
+
+## [1.36.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.2...v1.36.3) (2026-05-19)
+
+
+### Bug Fixes
+
+* reports - The selected task is missing after selection. Although the results are displayed, the selected task is not shown in the task dropdown. ([0875282](https://github.com/EchonLabs/kanvaro.com/commit/087528299148a3a132915432998c2833a97e77f6))
+
+## [1.36.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.1...v1.36.2) (2026-05-19)
+
+
+### Bug Fixes
+
+* add edit member details permission for HR role ([a6e276c](https://github.com/EchonLabs/kanvaro.com/commit/a6e276c05c8d1fe6da916f8a864ec5709f3c0780))
+* clear timer form when timer stops to refresh the timer form fields ([073a0c4](https://github.com/EchonLabs/kanvaro.com/commit/073a0c48927799ae8845a45841b349f09b55f974))
+* enhance sprint modal functionality to include project context and filtering ([abf463f](https://github.com/EchonLabs/kanvaro.com/commit/abf463f774e9f1ebda30577aea37ec2fd60eca8d))
+* implement text truncation for task titles in dropdowns and improve layout consistency ([4c43d21](https://github.com/EchonLabs/kanvaro.com/commit/4c43d2120c234fd016f63c54a9bfae5b6e6d3a60))
+* improved smart truncation for task titles based on capital letter detection ([b7dd50e](https://github.com/EchonLabs/kanvaro.com/commit/b7dd50e407867129580f69e5b89907ebd6f436b2))
+* update permissions to allow HR role to cancel invitations and restricted PM role to remove members ([c0d32d6](https://github.com/EchonLabs/kanvaro.com/commit/c0d32d642d75b96470a29b9da72bc127230d50aa))
+* update user profile picture to show changes immediately when updated or removed ([1a3acb7](https://github.com/EchonLabs/kanvaro.com/commit/1a3acb79adb0b7ae41d4e15fff74d81e739020e7))
+
 ## [1.36.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.0...v1.36.1) (2026-05-12)
 
 

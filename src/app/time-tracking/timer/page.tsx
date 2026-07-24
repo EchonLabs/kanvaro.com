@@ -23,12 +23,12 @@ import {
   AlertTriangle,
   Info,
   Settings,
-  Plus,
   Calendar,
   DollarSign
 } from 'lucide-react'
 import { useToast } from '@/components/ui/Toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { cn } from '@/lib/utils'
 
 interface Project {
   _id: string
@@ -83,7 +83,6 @@ interface TimeTrackingSettings {
   maxWeeklyHours: number
   maxSessionHours: number
   allowOvertime: boolean
-  //  requireDescription: boolean
   requireCategory: boolean
   allowFutureTime: boolean
   allowPastTime: boolean
@@ -138,7 +137,6 @@ export default function TimerPage() {
   })
   const [submittingManualLog, setSubmittingManualLog] = useState(false)
   const [sessionHoursError, setSessionHoursError] = useState('')
-  const [activeTab, setActiveTab] = useState<'timer' | 'manual'>('timer')
   const autoStopNotifiedRef = useRef(false)
   const [projectSearch, setProjectSearch] = useState('')
   const [taskSearch, setTaskSearch] = useState('')
@@ -158,7 +156,6 @@ export default function TimerPage() {
 
     const doFocus = () => {
       el.focus({ preventScroll: true })
-      // Convenience: if user opens dropdown again, keep typing fluid
       try {
         el.select?.()
       } catch {
@@ -173,8 +170,6 @@ export default function TimerPage() {
     }
   }
 
-
-  // Helper function to combine date and time into datetime-local format
   const combineDateTime = (date: string, time: string): string => {
     if (!date || !time) return ''
     return `${date}T${time}`
@@ -184,12 +179,8 @@ export default function TimerPage() {
     project.name.toLowerCase().includes(projectSearch.toLowerCase())
   )
 
-  // Only show the loading state in the task select for the initial load,
-  // not for every background refetch while the user is typing.
   const showInitialTasksLoading = tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)
 
-
-  // Validate maxSessionHours and future time when dates/times change
   const validateSessionHours = useCallback(() => {
     setSessionHoursError('')
 
@@ -213,7 +204,6 @@ export default function TimerPage() {
 
     const now = new Date()
 
-    // Check for future time logging
     if (!timeTrackingSettings?.allowFutureTime) {
       if (start > now) {
         const startDateStr = start.toLocaleDateString()
@@ -229,7 +219,6 @@ export default function TimerPage() {
       }
     }
 
-    // Check maxSessionHours only when overtime is disabled
     if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours) {
       const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
       const durationHours = durationMinutes / 60
@@ -241,7 +230,6 @@ export default function TimerPage() {
       }
     }
 
-    // Check daily hours limit
     if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxDailyHours) {
       const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
       const durationHours = durationMinutes / 60
@@ -268,7 +256,6 @@ export default function TimerPage() {
     dailyHoursLogged
   ])
 
-
   // Auth initialization - trigger data loading
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -281,7 +268,6 @@ export default function TimerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated])
 
-  // Validate session hours when relevant fields change
   useEffect(() => {
     validateSessionHours()
   }, [validateSessionHours])
@@ -312,7 +298,6 @@ export default function TimerPage() {
       selectedTaskObjectRef.current = null
     }
   }, [selectedTask])
-
 
   const fetchDailyHoursLogged = useCallback(async () => {
     if (!user?.id || !user?.organization) return
@@ -371,13 +356,10 @@ export default function TimerPage() {
     }
   }, [projects, searchParams, selectedProject, pendingActiveProject, pendingActiveDescription])
 
-  // Preselect task from active timer / query params.
-  // Active timer task might not be present in the currently loaded tasks page.
   useEffect(() => {
     if (selectedTask) return
     if (!selectedProject) return
 
-    // Active timer preselect
     if (pendingActiveTask) {
       setSelectedTask(pendingActiveTask)
 
@@ -391,7 +373,6 @@ export default function TimerPage() {
       return
     }
 
-    // Query-param preselect requires tasks to be loaded
     if (!tasks || tasks.length === 0) return
 
     let tid = searchParams?.get('taskId') || ''
@@ -432,23 +413,19 @@ export default function TimerPage() {
       const response = await fetch('/api/projects')
       const data = await response.json()
       if (data.success && Array.isArray(data.data)) {
-        const effectiveUser = currentUser ?? user     // Filter projects by strict requirements:
-        // 1. project.settings.allowTimeTracking === true (explicitly enabled)     // 2. project.teamMembers contains logged user as memberId
+        const effectiveUser = currentUser ?? user
         const filtered = data.data.filter((project: any) => {
           const u = effectiveUser
           if (!u) return false
 
-          // Check project-level time tracking setting - must be explicitly true
           const projectAllowsTimeTracking = project?.settings?.allowTimeTracking === true
           if (!projectAllowsTimeTracking) return false
 
-          // Check if user created the project (createdBy may be populated object or string)
           const isCreator =
             project?.createdBy === u.id ||
             project?.createdBy?._id === u.id ||
             project?.createdBy?.id === u.id
 
-          // Check if user is in teamMembers array as memberId
           const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
           const isUserTeamMember = teamMembers.some((member: any) => {
             if (typeof member === 'object' && member !== null) {
@@ -460,25 +437,12 @@ export default function TimerPage() {
             return false
           })
 
-          // Check if user is the project client
           const isClient =
             project?.client === u.id ||
             project?.client?._id === u.id ||
             project?.client?.id === u.id
 
           return isCreator || isUserTeamMember || isClient
-        })
-
-        console.log('Time tracking - Filtered projects:', {
-          userId: effectiveUser?.id,
-          totalProjects: data.data.length,
-          filteredProjects: filtered.length,
-          projects: filtered.map((p: any) => ({
-            _id: p._id,
-            name: p.name,
-            allowTimeTracking: p.settings?.allowTimeTracking,
-            teamMembers: p.teamMembers?.map((tm: any) => tm.memberId)
-          }))
         })
 
         setProjects(filtered)
@@ -513,7 +477,8 @@ export default function TimerPage() {
         assignedTo: user.id,
         limit: '10',
         page: String(page),
-        minimal: 'true'
+        minimal: 'true',
+        excludeStatus: 'done,cancelled'
       })
       if (search && search.trim()) {
         params.set('search', search.trim())
@@ -533,7 +498,6 @@ export default function TimerPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
-        console.log('DEBUG: fetched tasks for search', search, data.data);
         let validTasks = data.data.filter((task: any) => {
           const projectMatch = task?.project === projectId ||
             task?.project?._id === projectId ||
@@ -556,10 +520,6 @@ export default function TimerPage() {
           return userAssigned
         })
 
-        // If the user selected a task from a search result or a later page,
-        // clearing the search refetches page 1 and the selected task can drop
-        // out of the list, causing the Select trigger to render empty.
-        // Preserve the selected task as an option if we have it cached.
         const selectedId = selectedTaskIdRef.current
         const selectedObj = selectedTaskObjectRef.current
         if (
@@ -597,7 +557,6 @@ export default function TimerPage() {
       } else {
         console.error('Failed to fetch tasks:', err)
       }
-      // On search errors, keep existing tasks so the UI doesn't jump
       if (page === 1 && !search) setTasks([])
     } finally {
       if (page === 1) {
@@ -608,7 +567,6 @@ export default function TimerPage() {
     }
   }, [user?.id])
 
-  // IntersectionObserver callback for infinite scroll
   const handleLoadMoreIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
     const entry = entries[0]
     if (entry?.isIntersecting && hasMoreTasks && !isLoadingMoreRef.current && !tasksLoading) {
@@ -619,7 +577,6 @@ export default function TimerPage() {
     }
   }, [selectedProject, hasMoreTasks, tasksLoading, taskSearch, taskPage, fetchTasks])
 
-  // Set up IntersectionObserver on sentinel ref
   useEffect(() => {
     const sentinel = loadMoreSentinelRef.current
     if (!sentinel) return
@@ -643,7 +600,6 @@ export default function TimerPage() {
     fetchTasks(selectedProject, taskSearch || undefined, taskPage + 1)
   }, [selectedProject, loadingMoreTasks, hasMoreTasks, taskPage, taskSearch, fetchTasks])
 
-  // Debounced server-side search for tasks
   useEffect(() => {
     if (!selectedProject) return
 
@@ -653,7 +609,6 @@ export default function TimerPage() {
       clearTimeout(taskSearchTimerRef.current)
     }
 
-    // When search is cleared, reload the initial task list immediately
     if (!searchTerm) {
       fetchTasks(selectedProject, undefined, 1)
       return
@@ -683,7 +638,6 @@ export default function TimerPage() {
       selectedTaskObjectRef.current = task
       setDescription(task.title)
 
-      // Check if task is billable and allowBillableTime is false
       if (task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime) {
         showToast({
           type: 'warning',
@@ -695,7 +649,6 @@ export default function TimerPage() {
     }
   }
 
-  // Keep label/cache in sync when tasks list changes (e.g. after refetch).
   useEffect(() => {
     if (!selectedTask) return
     const found = Array.isArray(tasks) ? tasks.find(t => t._id === selectedTask) : undefined
@@ -718,13 +671,11 @@ export default function TimerPage() {
       return
     }
 
-    // Only validate description if it's explicitly required
     if (!manualLogData.description.trim()) {
       setError('⚠️ Memo required: Please enter a Memo for this time entry.')
       return
     }
 
-    // Check which fields are missing
     const missingFields: string[] = []
     if (!manualLogData.startDate) missingFields.push('Start Date')
     if (!manualLogData.startTime) missingFields.push('Start Time')
@@ -742,7 +693,6 @@ export default function TimerPage() {
     const start = new Date(startDateTime)
     const end = new Date(endDateTime)
 
-    // Check for invalid dates
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       setError('⚠️ Invalid date/time: The selected dates or times are invalid. Please check your entries and try again.')
       return
@@ -753,60 +703,24 @@ export default function TimerPage() {
       return
     }
 
-    // Validate future time logging
     const now = new Date()
     if (start > now && !timeTrackingSettings?.allowFutureTime) {
-      const startDateStr = start.toLocaleDateString()
-      const startTimeStr = start.toLocaleTimeString()
-      setError(`⚠️ Future time not allowed: Your organization does not allow logging time for future dates/times. The selected start time (${startDateStr} ${startTimeStr}) is in the future. Please select a start date/time that is today or in the past.`)
+      setError(`⚠️ Future time not allowed.`)
       return
     }
 
     if (end > now && !timeTrackingSettings?.allowFutureTime) {
-      const endDateStr = end.toLocaleDateString()
-      const endTimeStr = end.toLocaleTimeString()
-      setError(`⚠️ Future time not allowed: Your organization does not allow logging time for future dates/times. The selected end time (${endDateStr} ${endTimeStr}) is in the future. Please select an end date/time that is today or in the past.`)
+      setError(`⚠️ Future time not allowed.`)
       return
     }
 
-    // Validate past time logging
-    if (timeTrackingSettings?.allowPastTime !== undefined) {
-      const daysDiff = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-      const pastLimitDays = timeTrackingSettings.pastTimeLimitDays || 30
-
-      if (!timeTrackingSettings.allowPastTime && daysDiff > 0) {
-        setError(`⚠️ Past time not allowed: Your organization does not allow logging time for past dates. You can only log time for today or future dates.`)
-        return
-      }
-
-      if (timeTrackingSettings.allowPastTime && daysDiff > pastLimitDays) {
-        const startDateStr = start.toLocaleDateString()
-        setError(`⚠️ Past time limit exceeded: You can only log time up to ${pastLimitDays} days in the past. The selected start date (${startDateStr}) is more than ${pastLimitDays} days ago. Please select a more recent date.`)
-        return
-      }
-    }
-
-    // Validate maxSessionHours
     const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
     const durationHours = durationMinutes / 60
 
     if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
       const maxHours = timeTrackingSettings.maxSessionHours
-      setError(`⚠️ Session duration exceeded: The logged time (${durationHours.toFixed(2)} hours) exceeds the maximum allowed session duration of ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'}. Please break this into multiple sessions or contact your administrator if you need to log longer sessions.`)
+      setError(`⚠️ Session duration exceeded: Maximum ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'} per session.`)
       return
-    }
-
-    // Check daily hours limit
-    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxDailyHours) {
-      if (dailyHoursLogged >= timeTrackingSettings.maxDailyHours) {
-        setError(`⚠️ Daily time limit reached: You have already logged ${dailyHoursLogged.toFixed(1)} hours today (maximum: ${timeTrackingSettings.maxDailyHours} hours). No more time entries can be added for today.`)
-        return
-      }
-      if (dailyHoursLogged + durationHours > timeTrackingSettings.maxDailyHours) {
-        const remainingHours = (timeTrackingSettings.maxDailyHours - dailyHoursLogged).toFixed(1)
-        setError(`⚠️ Daily time limit would be exceeded: This entry (${durationHours.toFixed(2)} hours) plus already logged time (${dailyHoursLogged.toFixed(1)} hours) exceeds the daily limit of ${timeTrackingSettings.maxDailyHours} hours. You have ${remainingHours} hours remaining today.`)
-        return
-      }
     }
 
     setSubmittingManualLog(true)
@@ -838,15 +752,7 @@ export default function TimerPage() {
           message: 'Your time entry has been created successfully.',
           duration: 5000
         })
-        // Reset all input fields
-        setManualLogData({
-          startDate: '',
-          startTime: '',
-          endDate: '',
-          endTime: '',
-          description: '',
-          isBillable: false
-        })
+        setManualLogData({ startDate: '', startTime: '', endDate: '', endTime: '', description: '', isBillable: false })
         setSelectedProject('')
         setSelectedTask('')
         setTasks([])
@@ -859,39 +765,14 @@ export default function TimerPage() {
         setTimeLogsRefreshKey(prev => prev + 1)
         await fetchDailyHoursLogged()
       } else {
-        // Parse and improve error messages from API
         let errorMessage = data.error || 'An unexpected error occurred while logging time.'
-
-        // Improve common error messages
-        if (errorMessage.includes('Future time logging not allowed')) {
-          errorMessage = '⚠️ Future time logging is not allowed. Please select a date/time that is today or in the past based on your organization settings.'
-        } else if (errorMessage.includes('Past time logging not allowed')) {
-          errorMessage = '⚠️ Past time logging is not allowed. You can only log time for recent dates based on your organization settings.'
-        } else if (errorMessage.includes('Description is required')) {
-          errorMessage = '⚠️ Description is required for time entries. Please enter a description before submitting.'
-        } else if (errorMessage.includes('exceed')) {
-          errorMessage = `⚠️ ${errorMessage} Please adjust your time entry accordingly.`
-        } else if (errorMessage.includes('not allowed')) {
-          errorMessage = `⚠️ ${errorMessage} Please check your organization settings or contact your administrator.`
-        }
-
         setError(errorMessage)
-        showToast({
-          type: 'error',
-          title: 'Time Logging Failed',
-          message: errorMessage,
-          duration: 7000
-        })
+        showToast({ type: 'error', title: 'Time Logging Failed', message: errorMessage, duration: 7000 })
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Network error or server unavailable'
-      setError(`⚠️ Connection error: Unable to log time. ${errorMsg}. Please check your internet connection and try again.`)
-      showToast({
-        type: 'error',
-        title: 'Connection Error',
-        message: 'Unable to connect to the server. Please check your internet connection and try again.',
-        duration: 7000
-      })
+      setError(`⚠️ Connection error: ${errorMsg}`)
+      showToast({ type: 'error', title: 'Connection Error', message: 'Unable to connect to the server.', duration: 7000 })
     } finally {
       setSubmittingManualLog(false)
     }
@@ -910,9 +791,7 @@ export default function TimerPage() {
       const data = await response.json()
 
       if (response.ok) {
-        // Check if this is an auto-stop response (when max session limit is reached)
         if (data.activeTimer === null && data.hasTimeLogged !== undefined) {
-          // Timer was auto-stopped due to max session limit
           setActiveTimerSnapshot(null)
           setLiveActiveTimer(null)
           setPendingActiveProject(null)
@@ -920,7 +799,6 @@ export default function TimerPage() {
           setPendingActiveDescription('')
           setInitializedFromActive(true)
 
-          // Show notification for auto-stop (only once per auto-stop event)
           if (data.autoStopped && !autoStopNotifiedRef.current) {
             autoStopNotifiedRef.current = true
             showToast({
@@ -931,11 +809,9 @@ export default function TimerPage() {
             })
           }
 
-          // Refresh time logs to show the completed entry
           setTimeLogsRefreshKey(prev => prev + 1)
           fetchDailyHoursLogged()
         } else if (data?.activeTimer) {
-          // Normal active timer
           setActiveTimerSnapshot(data.activeTimer)
           setLiveActiveTimer(data.activeTimer)
 
@@ -943,18 +819,11 @@ export default function TimerPage() {
           const taskId = data.activeTimer.task?._id || null
           const timerDescription = data.activeTimer.description || ''
 
-          if (projectId) {
-            setPendingActiveProject(projectId)
-          }
-          if (taskId) {
-            setPendingActiveTask(taskId)
-          }
-          if (timerDescription) {
-            setPendingActiveDescription(timerDescription)
-          }
+          if (projectId) setPendingActiveProject(projectId)
+          if (taskId) setPendingActiveTask(taskId)
+          if (timerDescription) setPendingActiveDescription(timerDescription)
           setInitializedFromActive(false)
         } else {
-          // No active timer
           setActiveTimerSnapshot(null)
           setLiveActiveTimer(null)
           setPendingActiveProject(null)
@@ -963,7 +832,6 @@ export default function TimerPage() {
           setInitializedFromActive(true)
         }
       } else {
-        console.error('Failed to fetch active timer:', data)
         setActiveTimerSnapshot(null)
         setLiveActiveTimer(null)
         setPendingActiveProject(null)
@@ -992,15 +860,6 @@ export default function TimerPage() {
     }
   }, [fetchTasks, user])
 
-
-  // Debug Timer component rendering
-  useEffect(() => {
-
-
-    if (selectedProject && user) {
-    }
-  }, [selectedProject, user])
-
   useEffect(() => {
     if (liveActiveTimer) {
       hadActiveTimerRef.current = true
@@ -1014,31 +873,25 @@ export default function TimerPage() {
     }
   }, [liveActiveTimer, resetTimerForm, fetchDailyHoursLogged, initializedFromActive])
 
-  // Fetch daily hours when settings change
   useEffect(() => {
     if (user && timeTrackingSettings) {
       fetchDailyHoursLogged()
     }
   }, [user, timeTrackingSettings])
 
-  // Fetch time tracking settings from TimeTrackingSettings collection
   useEffect(() => {
     const fetchTimeTrackingSettings = async () => {
       if (!user?.organization) return
 
       try {
-        // First fetch organization-level settings (without projectId) to determine if time tracking is allowed
         const orgResponse = await fetch('/api/time-tracking/settings')
         if (orgResponse.ok) {
           const orgData = await orgResponse.json()
           if (orgData.settings) {
             setTimeTrackingSettings(orgData.settings)
           }
-        } else {
-          console.error('Failed to fetch organization time tracking settings:', orgResponse.statusText)
         }
 
-        // Then fetch project-specific settings if a project is selected
         if (selectedProject) {
           const projectResponse = await fetch(`/api/time-tracking/settings?projectId=${selectedProject}`)
           if (projectResponse.ok) {
@@ -1056,7 +909,6 @@ export default function TimerPage() {
     fetchTimeTrackingSettings()
   }, [user?.organization])
 
-  // Fetch project-specific settings when project changes
   useEffect(() => {
     if (selectedProject && user?.organization) {
       const fetchProjectSettings = async () => {
@@ -1076,7 +928,6 @@ export default function TimerPage() {
     }
   }, [selectedProject, user?.organization])
 
-  // Log timeTrackingSettings whenever it changes
   useEffect(() => {
     console.log('timeTrackingSettings updated:', timeTrackingSettings?.allowTimeTracking ? 'ENABLED' : 'DISABLED')
   }, [timeTrackingSettings])
@@ -1084,188 +935,138 @@ export default function TimerPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading timer...</p>
+        <div className="text-center space-y-3">
+          <div className="h-10 w-10 rounded-full border-2 border-[var(--apple-system-blue)] border-t-transparent animate-spin mx-auto" />
+          <p className="text-[15px] text-[var(--apple-secondary-label)]">Loading timer…</p>
         </div>
       </div>
     )
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-muted-foreground">No user data available</p>
-        </div>
-      </div>
-    )
-  }
+  if (!user) return null
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          {/* <Button 
-            variant="ghost" 
-            onClick={() => {
-              // Use browser history to go back to the previous page
-              // If the page was accessed from dashboard, it will go back to dashboard
-              // Otherwise, it will go back to the previous page (likely time-tracking)
-              if (typeof window !== 'undefined' && window.history.length > 1) {
-                router.back()
-              } else {
-                // Fallback to time-tracking if no history available
-                router.push('/time-tracking')
-              }
-            }} 
-            className="flex-shrink-0 w-full sm:w-auto"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button> */}
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center space-x-2">
-              <Clock className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600 flex-shrink-0" />
-              <span className="truncate">Time Tracker</span>
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">Start tracking time for your tasks</p>
+      <div className="space-y-6 view-transition-container">
+
+        {/* ── Page Header ─────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Clock className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+            <div>
+              <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
+                Timer
+              </h1>
+              <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                Track time for your tasks and projects
+              </p>
+            </div>
           </div>
+          <button
+            onClick={() => router.push('/time-tracking')}
+            className="self-start sm:self-auto inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--apple-radius-md)] text-[14px] font-medium border border-[var(--apple-separator)] bg-card text-[var(--apple-label)] apple-transition hover:bg-[var(--apple-quaternary-fill)]"
+          >
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+            Time Tracking
+          </button>
         </div>
 
+        {/* ── Error banner ─────────────────────────────────────────────── */}
         {error && (
-          <Alert variant="destructive" className="border-destructive bg-destructive/10">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            <AlertDescription className="text-sm font-medium whitespace-pre-wrap break-words">
-              {error}
-            </AlertDescription>
-          </Alert>
+          <div className="flex items-start gap-3 rounded-[var(--apple-radius-md)] bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-4">
+            <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+            <p className="text-[13px] text-red-600 dark:text-red-400 whitespace-pre-wrap break-words">{error}</p>
+          </div>
         )}
 
-        {/* Daily Hours Info */}
-
-        {/* {timeTrackingSettings && dailyHoursLogged > 0 && (
-          <Alert variant={dailyHoursLogged >= timeTrackingSettings.maxDailyHours ? 'destructive' : 'default'}>
-            <Info className="h-4 w-4" />
-            <AlertDescription> */}
-        {/* You have logged <strong>{dailyHoursLogged.toFixed(1)} hours</strong> today. */}
-        {/* {dailyHoursLogged >= timeTrackingSettings.maxDailyHours && (
-                <span className="ml-2">
-                  You have exceeded your daily limit of {timeTrackingSettings.maxDailyHours} hours.
-                </span>
-              )}
-              {!timeTrackingSettings.allowOvertime && dailyHoursLogged >= timeTrackingSettings.maxDailyHours && (
-                <span className="ml-2 block mt-1">
-                  Overtime is not allowed. Please contact your administrator.
-                </span>
-              )}
-            </AlertDescription>
-          </Alert>
-        )} */}
-
-        {/* Time Tracking Disabled Message */}
+        {/* ── Time tracking disabled banner ───────────────────────────── */}
         {timeTrackingSettings && !timeTrackingSettings.allowTimeTracking && (
-          <Alert>
-            <Settings className="h-4 w-4" />
-            <AlertDescription>
-              Time tracking is currently disabled. Please enable it in{' '}
-              <Button
-                variant="link"
-                className="p-0 h-auto underline"
-                onClick={() => router.push('/settings?tab=time-tracking')}
-              >
-                Application Settings
-              </Button>
-              {' '}to start tracking time.
-            </AlertDescription>
-          </Alert>
+          <div className="flex items-start gap-3 rounded-[var(--apple-radius-md)] bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4">
+            <Settings className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+            <div>
+              <p className="text-[14px] font-semibold text-amber-700 dark:text-amber-300">Time Tracking Disabled</p>
+              <p className="text-[13px] text-amber-600 dark:text-amber-400 mt-0.5">
+                Enable it in{' '}
+                <button
+                  onClick={() => router.push('/settings?tab=time-tracking')}
+                  className="underline font-medium"
+                >
+                  Application Settings
+                </button>
+                {' '}to start tracking time.
+              </p>
+            </div>
+          </div>
         )}
 
-        <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as 'timer' | 'manual')} className="space-y-8">
-          <TabsList className={`grid w-full ${timeTrackingSettings?.allowManualTimeSubmission ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            <TabsTrigger value="timer" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Timer
-            </TabsTrigger>
-            {timeTrackingSettings?.allowManualTimeSubmission && (
-              <TabsTrigger value="manual" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Manual Log
-              </TabsTrigger>
-            )}
-          </TabsList>
+        {/* ── Timer card ───────────────────────────────────────────────── */}
+        <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
 
-          <TabsContent value="timer" className="space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Clock className="h-5 w-5 flex-shrink-0" />
-                  <span className="text-xl sm:text-2xl">Time Tracker</span>
-                </CardTitle>
-                <CardDescription className="text-sm sm:text-base">
-                  Select a project and task, then start tracking your time
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="project">Project *</Label>
-                    <Select
-                      value={selectedProject}
-                      onValueChange={handleProjectChange}
-                      onOpenChange={(open) => {
-                        if (open) focusSearchInput(projectSearchInputRef.current)
-                      }}
-                      disabled={!timeTrackingSettings?.allowTimeTracking || liveActiveTimer !== null}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a project" />
-                      </SelectTrigger>
-                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
-                        <div className="p-2 sticky top-0 bg-background z-10">
-                          <Input
+            {/* Section header */}
+            <div className="px-5 py-4 border-b border-[var(--apple-separator)] flex items-center gap-2.5">
+              <FolderOpen className="h-4 w-4 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+              <div>
+                <p className="text-[15px] font-semibold text-[var(--apple-label)]">Select Work</p>
+                <p className="text-[12px] text-[var(--apple-secondary-label)]">Choose a project and task to track</p>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {/* Project + Task */}
+              <div className="grid gap-4 md:grid-cols-2">
+
+                {/* Project */}
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-tertiary-label)]">Project *</p>
+                  <Select
+                    value={selectedProject}
+                    onValueChange={handleProjectChange}
+                    onOpenChange={(open) => { if (open) focusSearchInput(projectSearchInputRef.current) }}
+                    disabled={!timeTrackingSettings?.allowTimeTracking || liveActiveTimer !== null}
+                  >
+                    <SelectTrigger className="w-full h-9 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] text-[14px]">
+                      <SelectValue placeholder="Select a project" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
+                      <div className="p-2 sticky top-0 bg-[var(--apple-system-background)] dark:bg-[#2C2C2E] z-10">
+                        <Input
                           ref={projectSearchInputRef}
-                          placeholder="Type project name..."
+                          placeholder="Search projects…"
                           value={projectSearch}
-                          onChange={(e) => {
-                            e.stopPropagation()
-                            setProjectSearch(e.target.value)
-                          }}
+                          onChange={(e) => { e.stopPropagation(); setProjectSearch(e.target.value) }}
                           onKeyDown={(e) => e.stopPropagation()}
                           onClick={(e) => e.stopPropagation()}
-                          className="h-8"
+                          className="h-8 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] text-[13px]"
                         />
+                      </div>
+                      {Array.isArray(filteredProjects) && filteredProjects.length > 0 ? (
+                        filteredProjects.map((project) => (
+                          <SelectItem key={project._id} value={project._id}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FolderOpen className="h-3.5 w-3.5 flex-shrink-0 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+                              <span className="truncate">{project.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-3 text-[13px] text-[var(--apple-secondary-label)] text-center">
+                          No projects found
                         </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                        {Array.isArray(filteredProjects) && filteredProjects.length > 0 ? (
-                          filteredProjects.map((project) => (
-                            <SelectItem key={project._id} value={project._id}>
-                              <div className="flex items-center space-x-2 min-w-0">
-                                <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                                <span className="truncate">{project.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <div className="p-3 text-sm text-muted-foreground text-center">
-                            No projects found
-                          </div>
-                        )}
-                      </SelectContent>
-
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="task">Task *</Label>
+                {/* Task */}
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-tertiary-label)]">Task *</p>
+                  <div className="relative">
                     <Select
                       value={selectedTask}
                       onValueChange={handleTaskChange}
                       onOpenChange={(open) => {
                         if (open) focusSearchInput(taskSearchInputRef.current)
-                        if (!open) {
-                          setTaskSearch('')
-                        }
+                        if (!open) setTaskSearch('')
                       }}
                       disabled={
                         !timeTrackingSettings?.allowTimeTracking ||
@@ -1274,559 +1075,195 @@ export default function TimerPage() {
                         liveActiveTimer !== null
                       }
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full h-9 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] text-[14px]">
                         {liveActiveTimer?.task?.title ? (
                           <div className="flex items-center gap-2 truncate">
                             {liveActiveTimer.task.displayId && (
-                              <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                              <span className="text-[11px] font-apple-mono bg-[var(--apple-quaternary-fill)] px-1.5 py-0.5 rounded flex-shrink-0">
                                 {liveActiveTimer.task.displayId}
                               </span>
                             )}
                             <span className="truncate">{liveActiveTimer.task.title}</span>
                           </div>
                         ) : selectedTask && selectedTaskLabel ? (
-                          <span>{selectedTaskLabel}</span>
+                          <span className="truncate">{selectedTaskLabel}</span>
                         ) : (
                           <SelectValue
                             placeholder={
-                              showInitialTasksLoading
-                                ? 'Loading tasks...'
-                                : selectedProject
-                                  ? (Array.isArray(tasks) && tasks.length > 0 ? 'Select a task' : 'No tasks available')
-                                  : 'Select a project first'
+                              showInitialTasksLoading ? 'Loading tasks…' :
+                              selectedProject ? (Array.isArray(tasks) && tasks.length > 0 ? 'Select a task' : 'No tasks available') :
+                              'Select a project first'
                             }
                           />
                         )}
                       </SelectTrigger>
                       {showInitialTasksLoading && (
-                        <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
+                        <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2 text-[var(--apple-secondary-label)]" />
                       )}
-                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)] max-h-[300px]">
+                      <SelectContent className="rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)] max-h-[300px]">
                         {!showInitialTasksLoading && (
-                          <div className="p-2 sticky top-0 bg-background z-10">
+                          <div className="p-2 sticky top-0 bg-[var(--apple-system-background)] dark:bg-[#2C2C2E] z-10">
                             <Input
                               ref={taskSearchInputRef}
-                              placeholder="Search tasks..."
+                              placeholder="Search tasks…"
                               value={taskSearch}
-                              onChange={(e) => {
-                                e.stopPropagation()
-                                setTaskSearch(e.target.value)
-                              }}
+                              onChange={(e) => { e.stopPropagation(); setTaskSearch(e.target.value) }}
                               onKeyDown={(e) => e.stopPropagation()}
                               onClick={(e) => e.stopPropagation()}
-                              className="h-8"
+                              className="h-8 rounded-[var(--apple-radius-sm)] border-[var(--apple-separator)] text-[13px]"
                             />
-                          </div>)}
-
-                        {showInitialTasksLoading ? (
-                          <div className="flex items-center justify-center p-4">
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            <span className="text-sm text-muted-foreground">Loading tasks...</span>
                           </div>
-                        ) : (
-                          Array.isArray(tasks) && tasks.length > 0 ? (
-                            <div className="flex flex-col">
-                              {tasks.filter((task) => {
-                                // Client-side filtering by search term
-
-                                // If search is empty or only dots, show all
-                                if (!taskSearch || taskSearch.trim() === '' || /^\.+$/.test(taskSearch.trim())) return true
-                                const searchLower = taskSearch.toLowerCase().trim()
-                                // Normalize: strip trailing dots for number-like search
-                                const searchNormalized = searchLower.replace(/\.+$/, '')
-
-                                // Compare with title
-                                if (task.title && task.title.toLowerCase().includes(searchLower)) {
-                                  return true
-                                }
-
-                                // Compare with displayId (convert to string, handling dots)
-                                if (task.displayId !== undefined && task.displayId !== null && task.displayId !== '') {
-                                  const displayIdStr = String(task.displayId).toLowerCase()
-                                  // Match both the original search and normalized version
-                                  if (displayIdStr.includes(searchLower) || (searchNormalized && displayIdStr.includes(searchNormalized))) {
-                                    return true
-                                  }
-                                }
-
-                                // Compare with taskNumber (convert to string, handling dots)
-                                if (task.taskNumber !== undefined && task.taskNumber !== null && task.taskNumber !== '') {
-                                  const taskNumStr = String(task.taskNumber).toLowerCase()
-                                  // Match both the original search and normalized version
-                                  if (taskNumStr.includes(searchLower) || (searchNormalized !== searchLower && taskNumStr.includes(searchNormalized))) {
-                                    return true
-                                  }
-                                }
-
-                                return false
-                              }).map((task) => {
-                                const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
-                                return (
-                                  <SelectItem
-                                    key={task._id}
-                                    value={task._id}
-                                    disabled={isBillableDisabled}
-                                    className="w-full"
-                                    title={`${task.displayId || task.taskNumber || 'N/A'} - ${task.title}`}
-                                  >
-                                    <div className="flex items-center space-x-2 w-full">
-                                      <Target className="h-4 w-4 flex-shrink-0" />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="font-medium flex items-center gap-2 w-full">
-                                          <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
-                                            {task.displayId || task.taskNumber || 'N/A'}
-                                          </span>
-                                          <span className="truncate">{task.title}</span>
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          {task.status} • {task.priority}
-                                          {isBillableDisabled && ' • Billable time not allowed'}
-                                        </div>
+                        )}
+                        {showInitialTasksLoading ? (
+                          <div className="flex items-center justify-center p-4 gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-[var(--apple-system-blue)]" />
+                            <span className="text-[13px] text-[var(--apple-secondary-label)]">Loading tasks…</span>
+                          </div>
+                        ) : Array.isArray(tasks) && tasks.length > 0 ? (
+                          <div className="flex flex-col">
+                            {tasks.filter((task) => {
+                              if (!taskSearch || taskSearch.trim() === '' || /^\.+$/.test(taskSearch.trim())) return true
+                              const searchLower = taskSearch.toLowerCase().trim()
+                              const searchNormalized = searchLower.replace(/\.+$/, '')
+                              if (task.title?.toLowerCase().includes(searchLower)) return true
+                              if (task.displayId !== undefined && task.displayId !== null && task.displayId !== '') {
+                                const displayIdStr = String(task.displayId).toLowerCase()
+                                if (displayIdStr.includes(searchLower) || (searchNormalized && displayIdStr.includes(searchNormalized))) return true
+                              }
+                              if (task.taskNumber !== undefined && task.taskNumber !== null && task.taskNumber !== '') {
+                                const taskNumStr = String(task.taskNumber).toLowerCase()
+                                if (taskNumStr.includes(searchLower) || (searchNormalized !== searchLower && taskNumStr.includes(searchNormalized))) return true
+                              }
+                              return false
+                            }).map((task) => {
+                              const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
+                              return (
+                                <SelectItem
+                                  key={task._id}
+                                  value={task._id}
+                                  disabled={isBillableDisabled}
+                                  className="w-full"
+                                  title={`${task.displayId || task.taskNumber || 'N/A'} – ${task.title}`}
+                                >
+                                  <div className="flex items-center gap-2 w-full">
+                                    <Target className="h-3.5 w-3.5 flex-shrink-0 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[11px] font-apple-mono bg-[var(--apple-quaternary-fill)] px-1.5 py-0.5 rounded flex-shrink-0">
+                                          {task.displayId || task.taskNumber || 'N/A'}
+                                        </span>
+                                        <span className="truncate text-[13px]">{task.title}</span>
+                                      </div>
+                                      <div className="text-[11px] text-[var(--apple-tertiary-label)] mt-0.5">
+                                        {task.status} · {task.priority}
+                                        {isBillableDisabled && ' · Billable time not allowed'}
                                       </div>
                                     </div>
-                                  </SelectItem>
-                                )
-                              })}
-                              {hasMoreTasks && (
-                                <div
-                                  ref={loadMoreSentinelRef}
-                                  className="p-3 text-center min-h-10 flex items-center justify-center"
-                                >
-                                  <span className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                                    <Loader2 className="h-4 w-4 animate-spin" /> Loading more...
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="p-3 text-sm text-muted-foreground text-center">
-                              No tasks found
-                            </div>))}
+                                  </div>
+                                </SelectItem>
+                              )
+                            })}
+                            {hasMoreTasks && (
+                              <div ref={loadMoreSentinelRef} className="p-3 text-center min-h-10 flex items-center justify-center">
+                                <span className="flex items-center gap-2 text-[13px] text-[var(--apple-secondary-label)]">
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading more…
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-3 text-[13px] text-[var(--apple-secondary-label)] text-center">
+                            No tasks found
+                          </div>
+                        )}
                       </SelectContent>
-
                     </Select>
-                    {selectedProject && !tasksLoading && Array.isArray(tasks) && tasks.length === 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        No tasks available in this project. Please create or assign a task to start tracking.
-                      </p>
-                    )}
-                    {showInitialTasksLoading && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-2">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Loading tasks...
-                      </p>
-                    )}
                   </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="description">
-                    Memo *
-                  </Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder={
-                      'What are you working on? (required)'
-                    }
-                    rows={2}
-                    required={true}
-                    disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || !selectedTask || liveActiveTimer !== null}
-                    className="w-full"
-                  />
-                  {timeTrackingSettings && (
-                    <p className="text-xs text-muted-foreground">
-                      {'Memo is required to log time'}
+                  {selectedProject && !tasksLoading && Array.isArray(tasks) && tasks.length === 0 && (
+                    <p className="text-[12px] text-[var(--apple-secondary-label)]">
+                      No tasks in this project. Create or assign a task first.
+                    </p>
+                  )}
+                  {showInitialTasksLoading && (
+                    <p className="text-[12px] text-[var(--apple-secondary-label)] flex items-center gap-1.5">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Loading tasks…
                     </p>
                   )}
                 </div>
+              </div>
 
-                {user && timeTrackingSettings?.allowTimeTracking && (
-                  <div className="my-4">
-                    {(() => {
-                      // Determine billable status from selected task
-                      const selectedTaskObj = Array.isArray(tasks) ? tasks.find(t => t._id === selectedTask) : null
-                      const isBillable = selectedTaskObj?.isBillable ?? false
-                      return (
-                        <Timer
-                          userId={user.id}
-                          organizationId={user.organization}
-                          projectId={selectedProject || undefined}
-                          taskId={selectedTask || undefined}
-                          description={description}
-                          isBillable={isBillable}
-                          //  requireDescription={timeTrackingSettings?.requireDescription === true}
-                          allowOvertime={timeTrackingSettings?.allowOvertime ?? false}
-                          maxDailyHours={timeTrackingSettings?.maxDailyHours}
-                          dailyHoursLogged={dailyHoursLogged}
-                           onTimerUpdate={(timer) => {
-                            if (!timer || (timer as any).status === 'stopped') {
-                              setLiveActiveTimer(null)
-                              // Timer stopped - notifications will be shown by backend notification system only if time was logged
-                              // Timer stopped - notifications will be shown by backend notification system only if time was logged
-                            } else {
-                              // Timer is active/running
-                              setActiveTimerSnapshot(timer)
-                              setLiveActiveTimer(timer)
-                              // Show a reliable start snackbar when the user starts a new timer from this page.
-                              // Avoid showing it when the page simply loads an already-active timer.
-                              if (!hadActiveTimerRef.current) {
-                                showToast({
-                                  type: 'success',
-                                  title: 'Timer Started',
-                                  message: 'Your timer has started successfully.',
-                                  duration: 5000
-                                })
-                              }
-                              // Reset auto-stop notification flag when timer starts
-                              autoStopNotifiedRef.current = false
+              {/* Memo */}
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-tertiary-label)]">Memo *</p>
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="What are you working on? (required)"
+                  rows={2}
+                  required
+                  disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || !selectedTask || liveActiveTimer !== null}
+                  className="w-full rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] text-[14px] resize-none"
+                />
+              </div>
+
+              {/* Timer component */}
+              {user && timeTrackingSettings?.allowTimeTracking && (
+                <div>
+                  {(() => {
+                    const selectedTaskObj = Array.isArray(tasks) ? tasks.find(t => t._id === selectedTask) : null
+                    const isBillable = selectedTaskObj?.isBillable ?? false
+                    return (
+                      <Timer
+                        userId={user.id}
+                        organizationId={user.organization}
+                        projectId={selectedProject || undefined}
+                        taskId={selectedTask || undefined}
+                        description={description}
+                        isBillable={isBillable}
+                        allowOvertime={timeTrackingSettings?.allowOvertime ?? false}
+                        maxDailyHours={timeTrackingSettings?.maxDailyHours}
+                        dailyHoursLogged={dailyHoursLogged}
+                        onTimerUpdate={(timer) => {
+                          if (!timer || (timer as any).status === 'stopped') {
+                            setLiveActiveTimer(null)
+                            resetTimerForm()
+                          } else {
+                            setActiveTimerSnapshot(timer)
+                            setLiveActiveTimer(timer)
+                            if (!hadActiveTimerRef.current) {
+                              showToast({
+                                type: 'success',
+                                title: 'Timer Started',
+                                message: 'Your timer has started successfully.',
+                                duration: 5000
+                              })
                             }
-                            setTimeLogsRefreshKey((prev) => prev + 1)
-                          }}
-                          onAutoStop={(message) => {
-                            showToast({
-                              type: 'info',
-                              title: 'Timer Auto-Stopped',
-                              message,
-                              duration: 8000
-                            })
-                          }}
-                        />
-                      )
-                    })()}
-                  </div>
-                )}
-
-                {!timeTrackingSettings?.allowTimeTracking && (
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertDescription>
-                      Time tracking is disabled. Please enable it in Application Settings to use the timer.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-
-          </TabsContent>
-
-          {/* {timeTrackingSettings?.allowManualTimeSubmission && (
-            <TabsContent value="manual" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Calendar className="h-5 w-5 flex-shrink-0" />
-                    <span className="text-xl sm:text-2xl">Manual Time Entry</span>
-                  </CardTitle>
-                  <CardDescription className="text-sm sm:text-base">
-                    Log time manually by selecting start and end times
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="manual-project">Project *</Label>
-                      <Select 
-                        value={selectedProject} 
-                        onValueChange={handleProjectChange}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select a project" />
-                        </SelectTrigger>
-                        <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
-                          {Array.isArray(projects) && projects.map((project) => (
-                            <SelectItem key={project._id} value={project._id}>
-                              <div className="flex items-center space-x-2 min-w-0">
-                                <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                                <span className="truncate">{project.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="manual-task">Task *</Label>
-                      <Select
-                        value={selectedTask}
-                        onValueChange={handleTaskChange}
-                        disabled={!selectedProject || tasksLoading || (!tasksLoading && (!Array.isArray(tasks) || tasks.length === 0))}
-                      >
-                        <SelectTrigger className="w-full">
-                          {liveActiveTimer?.task?.title ? (
-                            <span>{liveActiveTimer.task.title}</span>
-                          ) : selectedTask && selectedTaskLabel ? (
-                            <span>{selectedTaskLabel}</span>
-                            <SelectValue
-                              placeholder={
-                                tasksLoading
-                                  ? 'Loading tasks...'
-                                  : selectedProject
-                                    ? (Array.isArray(tasks) && tasks.length > 0 ? 'Select a task' : 'No tasks available')
-                                    : 'Select a project first'
-                              }
-                            />
-                          )}
-                        </SelectTrigger>
-                        {tasksLoading && (
-                          <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
-                        )}
-                        <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
-                          {!tasksLoading && (
-                            <div className="p-2 sticky top-0 bg-background z-10">
-                              <Input
-                                placeholder="Search tasks..."
-                                value={taskSearch}
-                                onChange={(e) => {
-                                  e.stopPropagation()
-                                  setTaskSearch(e.target.value)
-                                }}
-                                onKeyDown={(e) => e.stopPropagation()}
-                                onClick={(e) => e.stopPropagation()}
-                                className="h-8"
-                              />
-                            </div>)}
-                          {tasksLoading ? (
-                            <div className="flex items-center justify-center p-4">
-                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              <span className="text-sm text-muted-foreground">Loading tasks...</span>
-                            </div>
-                          ) : (
-                            Array.isArray(tasks) && tasks.length > 0 ? (
-                              <TooltipProvider delayDuration={300}>
-                                {tasks.filter(task => task._id !== selectedTask).map((task) => {
-                                  const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
-                                  return (
-                                    <Tooltip key={task._id}>
-                                      <TooltipTrigger asChild>
-                                        <div>
-                                          <SelectItem 
-                                            value={task._id}
-                                            disabled={isBillableDisabled}
-                                          >
-                                            <div className="flex items-center space-x-2 min-w-0 w-full">
-                                              <Target className="h-4 w-4 flex-shrink-0" />
-                                              <div className="flex-1 min-w-0 overflow-hidden">
-                                                <div className="font-medium truncate flex items-center gap-2 min-w-0">
-                                                  <span className="truncate max-w-[200px] inline-block">{task.title}</span>
-                                                  {task.isBillable && (
-                                                    <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
-                                                  )}
-                                                </div>
-                                                {isBillableDisabled && (
-                                                  <div className="text-xs text-muted-foreground">
-                                                    Billable time not allowed
-                                                  </div>
-                                                )}
-                                              </div>
-                                            </div>
-                                          </SelectItem>
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="left" className="max-w-[300px]">
-                                        <p className="break-words">{task.title}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )
-                                })}
-                                {hasMoreTasks && (
-                                  <div
-                                    ref={loadMoreSentinelRef}
-                                    className="p-2 text-center"
-                                  >
-                                    <span className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                                      <Loader2 className="h-3 w-3 animate-spin" /> Loading more...
-                                    </span>
-                                  </div>
-                                )}
-                              </TooltipProvider>
-                            ) : (
-                              <div className="p-3 text-sm text-muted-foreground text-center">
-                                No tasks found
-                              </div>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {selectedProject && !tasksLoading && Array.isArray(tasks) && tasks.length === 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          No tasks available in this project. Please create or assign a task to log time.
-                        </p>
-                      )}
-                      {tasksLoading && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-2">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Loading tasks...
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="start-date">Start Date *</Label>
-                      <Input
-                        id="start-date"
-                        type="date"
-                        value={manualLogData.startDate}
-                        onChange={(e) => {
-                          setManualLogData(prev => ({ ...prev, startDate: e.target.value }))
-                          setError('')
+                            autoStopNotifiedRef.current = false
+                          }
+                          setTimeLogsRefreshKey((prev) => prev + 1)
                         }}
-                        disabled={!selectedProject}
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="start-time">Start Time *</Label>
-                      <Input
-                        id="start-time"
-                        type="time"
-                        value={manualLogData.startTime}
-                        onChange={(e) => {
-                          setManualLogData(prev => ({ ...prev, startTime: e.target.value }))
-                          setError('')
+                        onAutoStop={(message) => {
+                          showToast({ type: 'info', title: 'Timer Auto-Stopped', message, duration: 8000 })
                         }}
-                        disabled={!selectedProject}
-                        className="w-full"
                       />
-                    </div>
+                    )
+                  })()}
+                </div>
+              )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="end-date">End Date *</Label>
-                      <Input
-                        id="end-date"
-                        type="date"
-                        value={manualLogData.endDate}
-                        onChange={(e) => {
-                          setManualLogData(prev => ({ ...prev, endDate: e.target.value }))
-                          setError('')
-                        }}
-                        disabled={!selectedProject}
-                        className="w-full"
-                      />
-                    </div>
+              {/* Time tracking disabled info */}
+              {!timeTrackingSettings?.allowTimeTracking && (
+                <div className="flex items-center gap-2.5 rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] p-3.5">
+                  <Info className="h-4 w-4 text-[var(--apple-secondary-label)] flex-shrink-0" strokeWidth={1.5} />
+                  <p className="text-[13px] text-[var(--apple-secondary-label)]">
+                    Time tracking is disabled. Enable it in Application Settings to use the timer.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="end-time">End Time *</Label>
-                      <Input
-                        id="end-time"
-                        type="time"
-                        value={manualLogData.endTime}
-                        onChange={(e) => {
-                          setManualLogData(prev => ({ ...prev, endTime: e.target.value }))
-                          setError('')
-                        }}
-                        disabled={!selectedProject}
-                        className={`w-full ${sessionHoursError ? 'border-destructive' : ''}`}
-                      />
-                      {sessionHoursError && (
-                        <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                          <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                          <p className="text-xs text-destructive font-medium leading-relaxed">{sessionHoursError}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="manual-description">
-                      Description {timeTrackingSettings?.requireDescription ? '*' : ''}
-                    </Label>
-                    <Textarea
-                      id="manual-description"
-                      value={manualLogData.description}
-                      onChange={(e) => setManualLogData(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder={
-                        timeTrackingSettings?.requireDescription 
-                          ? 'What did you work on? (required)' 
-                          : 'What did you work on? (optional)'
-                      }
-                      rows={3}
-                      required={timeTrackingSettings?.requireDescription === true}
-                      disabled={!selectedProject}
-                      className="w-full"
-                    />
-                    {timeTrackingSettings && (
-                      <p className="text-xs text-muted-foreground">
-                        {timeTrackingSettings.requireDescription 
-                          ? 'Description is required to log time' 
-                          : 'Description is optional - time can be logged without it'}
-                      </p>
-                    )}
-                  </div>
-
-                  {timeTrackingSettings?.allowBillableTime && (
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="manual-billable"
-                        checked={manualLogData.isBillable}
-                        onChange={(e) => setManualLogData(prev => ({ ...prev, isBillable: e.target.checked }))}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      <Label htmlFor="manual-billable" className="text-sm font-normal cursor-pointer">
-                        Mark as billable
-                      </Label>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setManualLogData({
-                          startDate: '',
-                          startTime: '',
-                          endDate: '',
-                          endTime: '',
-                          description: '',
-                          isBillable: false
-                        })
-                        setError('')
-                        setSessionHoursError('')
-                      }}
-                      disabled={submittingManualLog}
-                    >
-                      Clear
-                    </Button>
-                    <Button
-                      onClick={handleSubmitManualLog}
-                      disabled={
-                        submittingManualLog || 
-                        !selectedProject || 
-                        !selectedTask ||
-                        !manualLogData.startDate ||
-                        !manualLogData.startTime ||
-                        !manualLogData.endDate ||
-                        !manualLogData.endTime ||
-                        !!sessionHoursError ||
-                        (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim())
-                      }
-                    >
-                      {submittingManualLog ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Logging...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Log Time
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )} */}
-        </Tabs>
-
-        {/* Time Logs - Displayed for both timer and manual log tabs */}
+        {/* ── Time Logs ────────────────────────────────────────────────── */}
         {user && (
           <TimeLogs
             userId={user.id}
@@ -1836,9 +1273,10 @@ export default function TimerPage() {
             refreshKey={timeLogsRefreshKey}
             liveActiveTimer={liveActiveTimer}
             showSelectionAndApproval={false}
-            showManualLogButtons={activeTab === 'manual'}
+            showManualLogButtons={true}
           />
         )}
+
       </div>
     </MainLayout>
   )
