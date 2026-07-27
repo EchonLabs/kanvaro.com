@@ -427,12 +427,11 @@ export function Timer({
           <span className="text-[15px] font-semibold text-[var(--apple-label)]">Active Timer</span>
           <span
             className={cn(
-              'ml-auto inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border',
+              'ml-auto inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border badge-border-pulse',
               activeTimer.isPaused
                 ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800'
                 : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
             )}
-            style={{ animation: 'badge-border-pulse 3s ease-in-out infinite' }}
           >
             <span
               className={cn('h-1.5 w-1.5 rounded-full', activeTimer.isPaused ? 'bg-amber-500' : 'bg-emerald-500')}

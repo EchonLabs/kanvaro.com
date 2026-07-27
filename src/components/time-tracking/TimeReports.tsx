@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X, RotateCcw, FileText, Briefcase } from 'lucide-react'
+import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X, RotateCcw, FileText, Briefcase, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -21,6 +21,7 @@ import { validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
 
 // Task filter truncation and dropdown width constants
 const TRUNCATION_LENGTH = 35
+const MEMO_TRUNCATION_LENGTH = 40
 const TASK_FILTER_DROPDOWN_WIDTH = 'w-full'
 
 interface TimeReportsProps {
@@ -124,21 +125,6 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const { permissions } = usePermissions()
   const isAdmin = permissions?.userRole === 'admin' || permissions?.userRole === 'super_admin'
 
-  // Function to determine hourly rate source explanation
-  const getHourlyRateSource = (entry: any) => {
-    switch (entry.rateSource) {
-      case 'project-member':
-        return 'Project member rate'
-      case 'project':
-        return 'Project default rate'
-      case 'user':
-        return 'User default rate'
-      case 'organization':
-        return 'Organization default rate'
-      default:
-        return 'Rate applied'
-    }
-  }
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -151,6 +137,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
   const [taskFilterQuery, setTaskFilterQuery] = useState('')
   const [selectedTaskDetails, setSelectedTaskDetails] = useState<Task | null>(null)
+  const [copiedMemoId, setCopiedMemoId] = useState<string | null>(null)
 
   const projectFilterInputRef = useRef<HTMLInputElement | null>(null)
   const taskFilterInputRef = useRef<HTMLInputElement | null>(null)
@@ -679,6 +666,16 @@ const handleBudgetReportExport = async () => {
   }
 }
 
+const handleCopyMemo = async (memo: string, entryId: string) => {
+  try {
+    await navigator.clipboard.writeText(memo)
+    setCopiedMemoId(entryId)
+    setTimeout(() => setCopiedMemoId((current) => (current === entryId ? null : current)), 1500)
+  } catch (error) {
+    console.error('Failed to copy memo:', error)
+  }
+}
+
 const handleExport = async () => {
   try {
     if (reportData?.detailedEntries && reportData.detailedEntries.length > 0) {
@@ -1178,15 +1175,14 @@ return (
               <div className="min-w-full">
                 {/* Desktop Table View */}
                 <div className="hidden md:block">
-                  <div className="grid grid-cols-12 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
+                  <div className="grid grid-cols-12 gap-2 p-4 border-b font-semibold text-sm text-muted-foreground">
                     <div className="col-span-2">Employee</div>
                     <div className="col-span-2">Project (Task)</div>
+                    <div className="col-span-2">Memo</div>
                     <div className="col-span-1">Date</div>
                     <div className="col-span-1">Start</div>
                     <div className="col-span-1">End</div>
                     <div className="col-span-1">Duration</div>
-                    <div className="col-span-1">Rate</div>
-                    <div className="col-span-1">Cost</div>
                     <div className="col-span-1">Billable</div>
                     <div className="col-span-1">Approval Status</div>
                   </div>
@@ -1202,6 +1198,40 @@ return (
                           <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>
                         )}
                       </div>
+                      <div className="col-span-2 text-sm min-w-0">
+                        {entry.notes ? (
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="truncate text-muted-foreground">
+                                    {truncateText(entry.notes, MEMO_TRUNCATION_LENGTH).truncated}
+                                  </span>
+                                </TooltipTrigger>
+                                {truncateText(entry.notes, MEMO_TRUNCATION_LENGTH).isTruncated && (
+                                  <TooltipContent side="top" align="start" className="max-w-sm break-words">
+                                    <p className="whitespace-normal">{entry.notes}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyMemo(entry.notes, entry._id)}
+                              className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                              title="Copy memo"
+                            >
+                              {copiedMemoId === entry._id ? (
+                                <Check className="h-3.5 w-3.5 text-green-600" />
+                              ) : (
+                                <Copy className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </div>
                       <div className="col-span-1 text-sm">
                         {formatDate(entry.date)}
                       </div>
@@ -1213,17 +1243,6 @@ return (
                       </div>
                       <div className="col-span-1 text-sm font-medium">
                         {formatDurationUtil(entry.duration)}
-                      </div>
-                      <div className="col-span-1 text-sm">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{formatCurrency(entry.hourlyRate, orgCurrency)}/hr</span>
-                          <span className="text-xs text-muted-foreground">
-                            {getHourlyRateSource(entry)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="col-span-1 text-sm font-medium">
-                        {formatCurrency(entry.cost, orgCurrency)}
                       </div>
                       <div className="col-span-1">
                         {entry.isBillable ? (
@@ -1285,6 +1304,24 @@ return (
                           <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>
                         )}
                       </div>
+                      {entry.notes && (
+                        <div className="flex items-center gap-1.5 min-w-0 text-sm">
+                          <span className="text-muted-foreground flex-shrink-0">Memo: </span>
+                          <span className="truncate">{truncateText(entry.notes, MEMO_TRUNCATION_LENGTH).truncated}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyMemo(entry.notes, entry._id)}
+                            className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                            title="Copy memo"
+                          >
+                            {copiedMemoId === entry._id ? (
+                              <Check className="h-3.5 w-3.5 text-green-600" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
                           <span className="text-muted-foreground">Date: </span>
@@ -1295,19 +1332,12 @@ return (
                           <span className="font-medium">{formatDurationUtil(entry.duration)}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Rate: </span>
-                          <span className="font-medium">{formatCurrency(entry.hourlyRate, orgCurrency)}/hr</span>
-                        </div>
-                        <div>
                           <span className="text-muted-foreground">Start: </span>
                           <span>{entry.startTime ? formatTime(entry.startTime) : '-'}</span>
                         </div>
-                        <div className="col-span-2">
-                          <span className="text-muted-foreground">Cost: </span>
-                          <span className="font-medium">{formatCurrency(entry.cost, orgCurrency)}</span>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Cost = {formatDurationUtil(entry.duration)} × {formatCurrency(entry.hourlyRate, orgCurrency)}/hr
-                          </div>
+                        <div>
+                          <span className="text-muted-foreground">End: </span>
+                          <span>{entry.endTime ? formatTime(entry.endTime) : '-'}</span>
                         </div>
                       </div>
                       <div>

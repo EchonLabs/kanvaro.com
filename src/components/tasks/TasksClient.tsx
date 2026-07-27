@@ -1734,6 +1734,7 @@ export default function TasksClient({
                                     <div className="space-y-2">
                                         {tasks.map((task) => {
                                             const statusCfg = TASK_STATUS_CONFIG[task.status] ?? TASK_STATUS_CONFIG['backlog']
+                                            const isLiveStatus = task.status === 'in_progress'
                                             return (
                                                 <div
                                                     key={task._id}
@@ -1761,7 +1762,7 @@ export default function TasksClient({
                                                             statusCfg.bg
                                                         )}
                                                     >
-                                                        <span className={cn('h-2.5 w-2.5 rounded-full flex-shrink-0', statusCfg.dot, 'status-pulse')} />
+                                                        <span className={cn('h-2.5 w-2.5 rounded-full flex-shrink-0', statusCfg.dot, isLiveStatus && 'status-pulse')} />
                                                     </div>
 
                                                     {/* Middle: title + meta */}
@@ -1775,7 +1776,7 @@ export default function TasksClient({
                                                                     statusCfg.bg
                                                                 )}
                                                             >
-                                                                <span className={cn('h-2 w-2 rounded-full flex-shrink-0', statusCfg.dot, 'status-pulse')} />
+                                                                <span className={cn('h-2 w-2 rounded-full flex-shrink-0', statusCfg.dot, isLiveStatus && 'status-pulse')} />
                                                             </div>
                                                             <TooltipProvider delayDuration={150}>
                                                                 <Tooltip>

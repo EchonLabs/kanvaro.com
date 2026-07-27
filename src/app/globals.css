@@ -143,10 +143,18 @@
   50%      { opacity: 0.5; transform: scale(0.85); }
 }
 
-/* Status badge border pulse — glowing ring around the badge using currentColor */
+/* Status badge border pulse — glowing ring around the badge using currentColor.
+   Box-shadow is set once (static) instead of animated: animating box-shadow
+   forces a paint on every frame for every badge on screen, which is what made
+   list/board views with many badges janky. Only `opacity` animates here, which
+   the compositor can handle without repainting. */
+.badge-border-pulse {
+  box-shadow: 0 0 0 1px currentColor;
+  animation: badge-border-pulse 2s ease-in-out infinite;
+}
 @keyframes badge-border-pulse {
-  0%, 100% { box-shadow: 0 0 0 1px currentColor;       opacity: 0.85;    }
-  50%       { box-shadow: 0 0 0 0px currentColor;       opacity: 1; }
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1;    }
 }
 
 /* Progress bar grow — scaleX 0→1 from left, no JS state needed */

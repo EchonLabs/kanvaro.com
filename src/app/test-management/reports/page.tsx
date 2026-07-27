@@ -344,8 +344,8 @@ export default function TestReportsPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border animate-[badge-border-pulse_3s_ease-in-out_infinite]', cfg.bg, cfg.text, cfg.border)}>
-                        <span className={cn('w-1.5 h-1.5 rounded-full animate-[status-pulse_2.4s_ease-in-out_infinite]', cfg.dot)} />
+                      <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border', cfg.bg, cfg.text, cfg.border)}>
+                        <span className={cn('w-1.5 h-1.5 rounded-full', cfg.dot)} />
                         {cfg.label}
                       </span>
                       <span className="text-[11px] text-[var(--apple-tertiary-label)] whitespace-nowrap hidden sm:block">

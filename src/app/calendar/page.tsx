@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
 import {
   Plus,
@@ -273,6 +275,8 @@ function EmptyCalendar({ message }: { message: string }) {
 export default function CalendarPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
   const router = useRouter()
+  const { hasPermission } = usePermissions()
+  const canCreateTask = hasPermission(Permission.TASK_CREATE)
   const { formatDate } = useDateTime()
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -494,13 +498,15 @@ export default function CalendarPage() {
                 <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">Timeline and schedule management</p>
               </div>
             </div>
-            <Button
-              onClick={() => router.push('/tasks/create-new-task')}
-              className="w-full sm:w-auto h-10 px-4 text-[13px] font-medium rounded-full bg-[var(--apple-system-blue)] hover:bg-[var(--apple-system-blue)]/90 text-white border-0 flex-shrink-0"
-            >
-              <Plus className="w-4 h-4 mr-1.5" strokeWidth={1.5} />
-              New Task
-            </Button>
+            {canCreateTask && (
+              <Button
+                onClick={() => router.push('/tasks/create-new-task')}
+                className="w-full sm:w-auto h-10 px-4 text-[13px] font-medium rounded-full bg-[var(--apple-system-blue)] hover:bg-[var(--apple-system-blue)]/90 text-white border-0 flex-shrink-0"
+              >
+                <Plus className="w-4 h-4 mr-1.5" strokeWidth={1.5} />
+                New Task
+              </Button>
+            )}
           </div>
 
           {/* ── Stats Bar ───────────────────────────────────────────────────── */}
