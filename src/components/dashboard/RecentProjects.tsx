@@ -66,6 +66,7 @@ function formatHoursTracked(minutes?: number): string {
  */
 function StatusBadge({ status }: { status: string }) {
   const cfg = getStatusConfig(status)
+  const isLive = status === 'active'
   return (
     <span
       className={cn(
@@ -73,13 +74,12 @@ function StatusBadge({ status }: { status: string }) {
         'rounded-full text-xs font-semibold border whitespace-nowrap',
         'w-[104px]',          /* ← fixed width keeps progress bars uniform */
         cfg.bg, cfg.text, cfg.border,
+        isLive && 'badge-border-pulse',
       )}
-      style={{ animation: 'badge-border-pulse 2s ease-in-out infinite' }}
     >
-      {/* Blinking dot */}
+      {/* Blinking dot — only for actively-running projects */}
       <span
-        className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', cfg.dot)}
-        style={{ animation: 'status-pulse 2s ease-in-out infinite' }}
+        className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', cfg.dot, isLive && 'status-pulse')}
       />
       {formatToTitleCase(status)}
     </span>
@@ -142,14 +142,11 @@ function HoursCell({ minutes }: { minutes?: number }) {
       <span className="text-sm font-apple-mono font-semibold text-[var(--apple-secondary-label)] tabular-nums">
         {text}
       </span>
-      {hasData && ( 
-        
+      {hasData && (
         <TrendingUp
           className="h-3.5 w-3.5 flex-shrink-0 text-[var(--apple-system-green)]"
-          style={{ animation: 'status-pulse 2s ease-in-out infinite' }}
           strokeWidth={1.5}
         />
-        
       )}
     </div>
   )
