@@ -408,14 +408,9 @@ export default function ProfilePage() {
       <div className="space-y-8">
 
         {/* ── Page header ──────────────────────────────────────────────────── */}
-        <div className="flex items-start gap-4 pb-6 border-b border-[var(--apple-separator)]">
-          <div
-            className="w-14 h-14 rounded-[var(--apple-radius-lg)] flex items-center justify-center shrink-0 shadow-[0_4px_16px_rgba(0,122,255,0.28)]"
-            style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
-          >
-            <User className="h-7 w-7 text-white" strokeWidth={1.75} />
-          </div>
-          <div className="flex-1 min-w-0 pt-0.5">
+        <div className="flex items-center gap-3 pb-6 border-b border-[var(--apple-separator)]">
+          <User className="h-8 w-8 flex-shrink-0 text-[var(--apple-system-blue)]" strokeWidth={1.5} />
+          <div className="flex-1 min-w-0">
             <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
               Profile
             </h1>
@@ -632,10 +627,10 @@ export default function ProfilePage() {
               <div className="px-5 pb-5">
                 <div className="grid grid-cols-3 gap-3">
                   {([
-                    { value: 'light', label: 'Light', Icon: Sun, gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)', glow: 'rgba(255,149,0,0.22)' },
-                    { value: 'dark', label: 'Dark', Icon: Moon, gradient: 'linear-gradient(135deg,#007AFF 0%,#BF5AF2 100%)', glow: 'rgba(0,122,255,0.22)' },
-                    { value: 'system', label: 'System', Icon: Laptop, gradient: 'linear-gradient(135deg,#34C759 0%,#30B0C7 100%)', glow: 'rgba(52,199,89,0.22)' },
-                  ] as const).map(({ value, label, Icon, gradient, glow }) => {
+                    { value: 'light', label: 'Light', Icon: Sun },
+                    { value: 'dark', label: 'Dark', Icon: Moon },
+                    { value: 'system', label: 'System', Icon: Laptop },
+                  ] as const).map(({ value, label, Icon }) => {
                     const active = formData.theme === value
                     return (
                       <button
@@ -648,15 +643,10 @@ export default function ProfilePage() {
                             : 'border-[var(--apple-separator)] hover:bg-[var(--apple-quaternary-fill)]'
                         )}
                       >
-                        <div
-                          className="w-10 h-10 rounded-[var(--apple-radius-sm)] flex items-center justify-center shadow-sm"
-                          style={{
-                            background: gradient,
-                            boxShadow: active ? `0 4px 12px ${glow}` : undefined
-                          }}
-                        >
-                          <Icon className="h-5 w-5 text-white" strokeWidth={1.75} />
-                        </div>
+                        <Icon
+                          className={cn('h-5 w-5', active ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-secondary-label)]')}
+                          strokeWidth={1.5}
+                        />
                         <span className={cn('text-[13px] font-medium', active ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-label)]')}>
                           {label}
                         </span>
@@ -719,9 +709,7 @@ export default function ProfilePage() {
               <div className="px-5 pb-5">
                 <div className="flex items-center justify-between py-3 rounded-[var(--apple-radius-sm)] px-4 bg-[var(--apple-quaternary-fill)]">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-[8px] flex items-center justify-center bg-[var(--apple-tertiary-fill)]">
-                      <PanelLeft className="h-4 w-4 text-[var(--apple-secondary-label)]" />
-                    </div>
+                    <PanelLeft className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                     <div>
                       <p className="text-[14px] font-medium text-[var(--apple-label)]">Collapsed Sidebar</p>
                       <p className="text-[12px] text-[var(--apple-secondary-label)]">Start with sidebar collapsed by default</p>
@@ -762,32 +750,24 @@ export default function ProfilePage() {
                     key: 'email' as const,
                     label: 'Email',
                     desc: 'Receive notifications via email',
-                    icon: Mail,
-                    gradient: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)'
+                    icon: Mail
                   },
                   {
                     key: 'inApp' as const,
                     label: 'In-App',
                     desc: 'Show notifications inside the application',
-                    icon: Monitor,
-                    gradient: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)'
+                    icon: Monitor
                   },
                   {
                     key: 'push' as const,
                     label: 'Push',
                     desc: 'Browser push notifications',
-                    icon: Smartphone,
-                    gradient: 'linear-gradient(135deg,#BF5AF2 0%,#FF375F 100%)'
+                    icon: Smartphone
                   },
-                ]).map(({ key, label, desc, icon: Icon, gradient }) => (
+                ]).map(({ key, label, desc, icon: Icon }) => (
                   <div key={key} className="flex items-center justify-between p-3.5 rounded-[var(--apple-radius-sm)] hover:bg-[var(--apple-quaternary-fill)] apple-transition group">
                     <div className="flex items-center gap-3">
-                      <div
-                        className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0"
-                        style={{ background: gradient }}
-                      >
-                        <Icon className="h-4 w-4 text-white" strokeWidth={1.75} />
-                      </div>
+                      <Icon className="h-4 w-4 shrink-0 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                       <div>
                         <p className="text-[14px] font-medium text-[var(--apple-label)]">{label} Notifications</p>
                         <p className="text-[12px] text-[var(--apple-secondary-label)]">{desc}</p>
@@ -816,32 +796,24 @@ export default function ProfilePage() {
                     key: 'taskReminders' as const,
                     label: 'Task Reminders',
                     desc: 'Get reminded about upcoming deadlines',
-                    icon: Clock,
-                    gradient: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)'
+                    icon: Clock
                   },
                   {
                     key: 'projectUpdates' as const,
                     label: 'Project Updates',
                     desc: 'Notified about project status changes',
-                    icon: Globe,
-                    gradient: 'linear-gradient(135deg,#30B0C7 0%,#64D2FF 100%)'
+                    icon: Globe
                   },
                   {
                     key: 'teamActivity' as const,
                     label: 'Team Activity',
                     desc: 'Updates on team member actions',
-                    icon: User,
-                    gradient: 'linear-gradient(135deg,#AF52DE 0%,#BF5AF2 100%)'
+                    icon: User
                   },
-                ]).map(({ key, label, desc, icon: Icon, gradient }) => (
+                ]).map(({ key, label, desc, icon: Icon }) => (
                   <div key={key} className="flex items-center justify-between p-3.5 rounded-[var(--apple-radius-sm)] hover:bg-[var(--apple-quaternary-fill)] apple-transition">
                     <div className="flex items-center gap-3">
-                      <div
-                        className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0"
-                        style={{ background: gradient }}
-                      >
-                        <Icon className="h-4 w-4 text-white" strokeWidth={1.75} />
-                      </div>
+                      <Icon className="h-4 w-4 shrink-0 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                       <div>
                         <p className="text-[14px] font-medium text-[var(--apple-label)]">{label}</p>
                         <p className="text-[12px] text-[var(--apple-secondary-label)]">{desc}</p>
@@ -870,12 +842,7 @@ export default function ProfilePage() {
             {/* Change password */}
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
               <div className="px-5 pt-5 pb-2 flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0"
-                  style={{ background: 'linear-gradient(135deg,#FF9500 0%,#FFD60A 100%)' }}
-                >
-                  <Key className="h-4 w-4 text-white" strokeWidth={1.75} />
-                </div>
+                <Key className="h-4 w-4 shrink-0 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                 <div>
                   <p className="text-[15px] font-semibold text-[var(--apple-label)]">Change Password</p>
                   <p className="text-[12px] text-[var(--apple-secondary-label)]">Use a strong password with at least 8 characters</p>
@@ -964,12 +931,7 @@ export default function ProfilePage() {
             {/* Two-Factor Authentication */}
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
               <div className="px-5 pt-5 pb-2 flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0"
-                  style={{ background: 'linear-gradient(135deg,#34C759 0%,#30D158 100%)' }}
-                >
-                  <Shield className="h-4 w-4 text-white" strokeWidth={1.75} />
-                </div>
+                <Shield className="h-4 w-4 shrink-0 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                 <div>
                   <p className="text-[15px] font-semibold text-[var(--apple-label)]">Two-Factor Authentication</p>
                   <p className="text-[12px] text-[var(--apple-secondary-label)]">Add an extra layer of security to your account</p>
@@ -1036,12 +998,7 @@ export default function ProfilePage() {
             {/* Active sessions info card */}
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
               <div className="px-5 pt-5 pb-2 flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0"
-                  style={{ background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)' }}
-                >
-                  <Monitor className="h-4 w-4 text-white" strokeWidth={1.75} />
-                </div>
+                <Monitor className="h-4 w-4 shrink-0 text-[var(--apple-secondary-label)]" strokeWidth={1.5} />
                 <div>
                   <p className="text-[15px] font-semibold text-[var(--apple-label)]">Active Sessions</p>
                   <p className="text-[12px] text-[var(--apple-secondary-label)]">Devices currently signed in to your account</p>
