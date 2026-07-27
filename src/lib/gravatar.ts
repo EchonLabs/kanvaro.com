@@ -81,9 +81,16 @@ export function getAvatarData(
     firstName?: string
     lastName?: string
     email?: string
-  },
+  } | null | undefined,
   options: GravatarOptions = {}
 ) {
+  if (!user) {
+    return {
+      avatarUrl: '',
+      fallbackInitials: 'U'
+    }
+  }
+
   // If user has a custom avatar, use it
   if (user.avatar) {
     return {
