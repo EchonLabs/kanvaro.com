@@ -9,6 +9,15 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 
+function formatDuration(minutes: number): string {
+  const rounded = Math.round(minutes || 0)
+  const h = Math.floor(rounded / 60)
+  const m = rounded % 60
+  if (h > 0 && m > 0) return `${h}h ${m}m`
+  if (h > 0) return `${h}h`
+  return `${m}m`
+}
+
 export async function GET(request: NextRequest) {
   try {
     await connectDB()
@@ -563,7 +572,7 @@ async function getTeamActivity(
       id: `time-${entry._id}`,
       type: 'time',
       action: 'logged',
-      target: `${entry.duration} minutes`,
+      target: formatDuration(entry.duration),
       project: entry.project?.name || 'Unknown Project',
       user: currentUser,
       timestamp: entry.startTime,
