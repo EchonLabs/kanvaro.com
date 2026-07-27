@@ -475,7 +475,7 @@ export default function TimerPage() {
       const params = new URLSearchParams({
         project: projectId,
         assignedTo: user.id,
-        limit: '10',
+        limit: '200',
         page: String(page),
         minimal: 'true',
         excludeStatus: 'done,cancelled'
