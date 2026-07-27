@@ -1,3 +1,10 @@
+## [1.41.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.4...v1.41.5) (2026-07-27)
+
+
+### Bug Fixes
+
+* handle null or undefined user in GravatarAvatar and getAvatarData functions ([888b093](https://github.com/EchonLabs/kanvaro.com/commit/888b09334005516b616ce97817ad569540af2668))
+
 ## [1.41.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.3...v1.41.4) (2026-07-27)
 
 
