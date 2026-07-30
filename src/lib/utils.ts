@@ -107,9 +107,14 @@ export function applyRoundingRules(
 /**
  * Utility to focus and select text in a search input within a dropdown/select component.
  * Uses requestAnimationFrame to ensure the focus happens after the dropdown is rendered.
+ *
+ * Skipped on touch/coarse-pointer devices: focusing here pops the on-screen keyboard,
+ * which fires a viewport `resize` event that Radix's Select treats as an outside
+ * interaction and immediately closes the dropdown it just opened.
  */
 export const focusSearchInput = (el: HTMLInputElement | null) => {
   if (!el || el.disabled) return
+  if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return
 
   const doFocus = () => {
     el.focus({ preventScroll: true })

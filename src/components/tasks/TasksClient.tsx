@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
-import { cn, formatToTitleCase } from '@/lib/utils'
+import { cn, formatToTitleCase, focusSearchInput } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { useAuthContext } from '@/contexts/AuthContext'
 import {
@@ -39,7 +39,8 @@ import {
     RotateCcw,
     Upload,
     ListTodo,
-    CheckSquare
+    CheckSquare,
+    ChevronDown
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -167,6 +168,140 @@ const _myTasksFilters = {
     assignedToFilter: 'all',
     createdByFilter: 'all',
     dateRangeFilter: undefined as DateRange | undefined,
+}
+
+/**
+ * Searchable single-select filter built on Popover instead of Radix Select.
+ *
+ * Radix Select emulates native <select> press-drag-release: it tracks the pointer
+ * from open to release and force-closes if the release lands outside the content
+ * after >10px of movement. On touch devices a normal tap/scroll easily crosses that
+ * threshold, so long searchable lists (project/assignee/creator) would close
+ * "by themselves". Popover doesn't have that logic, so it's used here instead.
+ */
+function SearchableFilterSelect<T>({
+    value,
+    onValueChange,
+    query,
+    onQueryChange,
+    allLabel,
+    placeholder,
+    searchPlaceholder,
+    options,
+    getValue,
+    getLabel,
+    triggerClassName,
+}: {
+    value: string
+    onValueChange: (value: string) => void
+    query: string
+    onQueryChange: (query: string) => void
+    allLabel: string
+    placeholder: string
+    searchPlaceholder: string
+    options: T[]
+    getValue: (option: T) => string
+    getLabel: (option: T) => string
+    triggerClassName?: string
+}) {
+    const [open, setOpen] = useState(false)
+    const inputRef = useRef<HTMLInputElement | null>(null)
+    const selected = options.find((o) => getValue(o) === value)
+    const label = value === 'all' || !selected ? placeholder : getLabel(selected)
+
+    const select = (next: string) => {
+        onValueChange(next)
+        setOpen(false)
+    }
+
+    return (
+        <Popover
+            open={open}
+            onOpenChange={(next) => {
+                setOpen(next)
+                if (next) focusSearchInput(inputRef.current)
+            }}
+        >
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    className={cn(
+                        'flex items-center justify-between whitespace-nowrap rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)]',
+                        'bg-[var(--apple-quaternary-fill)] px-3 py-1.5 text-[13px] font-medium text-[var(--apple-secondary-label)]',
+                        'focus:outline-none focus:ring-2 focus:ring-[var(--apple-system-blue)]/40 focus:border-[var(--apple-system-blue)]',
+                        'apple-transition',
+                        triggerClassName
+                    )}
+                >
+                    <span className="truncate">{label}</span>
+                    <ChevronDown className="h-3.5 w-3.5 opacity-50 flex-shrink-0 ml-2" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent
+                className="z-[10050] w-[--radix-popover-trigger-width] min-w-[12rem] p-2"
+                align="start"
+            >
+                <div className="relative mb-2">
+                    <Input
+                        ref={inputRef}
+                        value={query}
+                        onChange={(e) => onQueryChange(e.target.value)}
+                        placeholder={searchPlaceholder}
+                        className="pr-10"
+                    />
+                    {query && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onQueryChange('')
+                                select('all')
+                            }}
+                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                            aria-label="Clear filter"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+                <div className="max-h-56 overflow-y-auto space-y-0.5">
+                    <button
+                        type="button"
+                        onClick={() => select('all')}
+                        className={cn(
+                            'flex w-full items-center rounded-[var(--apple-radius-sm)] px-3 py-2 text-left text-sm apple-transition',
+                            value === 'all'
+                                ? 'bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)]'
+                                : 'text-[var(--apple-label)] hover:bg-[var(--apple-system-blue)]/10'
+                        )}
+                    >
+                        {allLabel}
+                    </button>
+                    {options.length === 0 ? (
+                        <div className="px-3 py-1 text-xs text-muted-foreground">No matching results</div>
+                    ) : (
+                        options.map((option) => {
+                            const v = getValue(option)
+                            return (
+                                <button
+                                    key={v}
+                                    type="button"
+                                    onClick={() => select(v)}
+                                    className={cn(
+                                        'flex w-full items-center rounded-[var(--apple-radius-sm)] px-3 py-2 text-left text-sm apple-transition',
+                                        value === v
+                                            ? 'bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)]'
+                                            : 'text-[var(--apple-label)] hover:bg-[var(--apple-system-blue)]/10'
+                                    )}
+                                >
+                                    {getLabel(option)}
+                                </button>
+                            )
+                        })
+                    )}
+                </div>
+            </PopoverContent>
+        </Popover>
+    )
 }
 
 export default function TasksClient({
@@ -598,31 +733,8 @@ export default function TasksClient({
         }
     }, [availableStatusOptions, statusFilter])
 
-    // Helper function to focus filter search inputs
-    const focusSearchInput = (el: HTMLInputElement | null) => {
-        if (!el || el.disabled) return
-
-        const doFocus = () => {
-            el.focus({ preventScroll: true })
-            try {
-                el.select?.()
-            } catch {
-                // ignore
-            }
-        }
-
-        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-            window.requestAnimationFrame(doFocus)
-        } else {
-            setTimeout(doFocus, 0)
-        }
-    }
-
     // Virtualization refs
     const parentRef = useRef<HTMLDivElement>(null)
-    const projectFilterInputRef = useRef<HTMLInputElement | null>(null)
-    const assignedToFilterInputRef = useRef<HTMLInputElement | null>(null)
-    const createdByFilterInputRef = useRef<HTMLInputElement | null>(null)
     const rowVirtualizer = useVirtualizer({
         count: tasks.length,
         getScrollElement: () => parentRef.current,
@@ -1155,55 +1267,19 @@ export default function TasksClient({
             {/* Row 2: Project + Type + Assignee + Creator + Date range — Desktop: 20% each, Mobile: 2-col grid */}
             <div className="hidden sm:grid sm:grid-cols-5 gap-2">
                 {/* Project filter with search */}
-                <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
-                    if (open) focusSearchInput(projectFilterInputRef.current)
-                }}>
-                    <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
-                        <SelectValue placeholder="All Projects" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                        <div className="p-2">
-                            <div className="relative mb-2">
-                                <Input
-                                    ref={projectFilterInputRef}
-                                    value={projectFilterQuery}
-                                    onChange={(e) => setProjectFilterQuery(e.target.value)}
-                                    placeholder="Search projects"
-                                    className="pr-10"
-                                    onKeyDown={(e) => e.stopPropagation()}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                />
-                                {projectFilterQuery && (
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.preventDefault()
-                                            e.stopPropagation()
-                                            setProjectFilterQuery('')
-                                            setProjectFilter('all')
-                                        }}
-                                        className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                                        aria-label="Clear project filter"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </button>
-                                )}
-                            </div>
-                            <div className="max-h-56 overflow-y-auto">
-                                <SelectItem value="all">All Projects</SelectItem>
-                                {filteredProjectOptions.length === 0 ? (
-                                    <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                                ) : (
-                                    filteredProjectOptions.map((project) => (
-                                        <SelectItem key={project._id} value={project._id}>
-                                            {project.name}
-                                        </SelectItem>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </SelectContent>
-                </Select>
+                <SearchableFilterSelect
+                    value={projectFilter}
+                    onValueChange={setProjectFilter}
+                    query={projectFilterQuery}
+                    onQueryChange={setProjectFilterQuery}
+                    allLabel="All Projects"
+                    placeholder="All Projects"
+                    searchPlaceholder="Search projects"
+                    options={filteredProjectOptions}
+                    getValue={(project) => project._id}
+                    getLabel={(project) => project.name}
+                    triggerClassName="h-10 w-full"
+                />
 
                 {/* Type filter */}
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -1222,105 +1298,33 @@ export default function TasksClient({
                 {/* Assigned To / Created By — only for users with permission */}
                 {canFilterUsers ? (
                     <>
-                        <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
-                            if (open) focusSearchInput(assignedToFilterInputRef.current)
-                        }}>
-                            <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
-                                <SelectValue placeholder="All Assignees" />
-                            </SelectTrigger>
-                            <SelectContent className="z-[10050] p-0">
-                                <div className="p-2">
-                                    <div className="relative mb-2">
-                                        <Input
-                                            ref={assignedToFilterInputRef}
-                                            value={assignedToFilterQuery}
-                                            onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                                            placeholder="Search assignees"
-                                            className="pr-10"
-                                            onKeyDown={(e) => e.stopPropagation()}
-                                            onMouseDown={(e) => e.stopPropagation()}
-                                        />
-                                        {assignedToFilterQuery && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.preventDefault()
-                                                    e.stopPropagation()
-                                                    setAssignedToFilterQuery('')
-                                                    setAssignedToFilter('all')
-                                                }}
-                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                                                aria-label="Clear assignee filter"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="max-h-56 overflow-y-auto">
-                                        <SelectItem value="all">All Assignees</SelectItem>
-                                        {filteredAssignedToOptions.length === 0 ? (
-                                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
-                                        ) : (
-                                            filteredAssignedToOptions.map((member) => (
-                                                <SelectItem key={member._id} value={member._id}>
-                                                    {member.firstName} {member.lastName}
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-                            </SelectContent>
-                        </Select>
+                        <SearchableFilterSelect
+                            value={assignedToFilter}
+                            onValueChange={setAssignedToFilter}
+                            query={assignedToFilterQuery}
+                            onQueryChange={setAssignedToFilterQuery}
+                            allLabel="All Assignees"
+                            placeholder="All Assignees"
+                            searchPlaceholder="Search assignees"
+                            options={filteredAssignedToOptions}
+                            getValue={(member) => member._id}
+                            getLabel={(member) => `${member.firstName} ${member.lastName}`}
+                            triggerClassName="h-10 w-full"
+                        />
 
-                        <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
-                            if (open) focusSearchInput(createdByFilterInputRef.current)
-                        }}>
-                            <SelectTrigger className="h-10 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
-                                <SelectValue placeholder="All Creators" />
-                            </SelectTrigger>
-                            <SelectContent className="z-[10050] p-0">
-                                <div className="p-2">
-                                    <div className="relative mb-2">
-                                        <Input
-                                            ref={createdByFilterInputRef}
-                                            value={createdByFilterQuery}
-                                            onChange={(e) => setCreatedByFilterQuery(e.target.value)}
-                                            placeholder="Search creators"
-                                            className="pr-10"
-                                            onKeyDown={(e) => e.stopPropagation()}
-                                            onMouseDown={(e) => e.stopPropagation()}
-                                        />
-                                        {createdByFilterQuery && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.preventDefault()
-                                                    e.stopPropagation()
-                                                    setCreatedByFilterQuery('')
-                                                    setCreatedByFilter('all')
-                                                }}
-                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                                                aria-label="Clear creator filter"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="max-h-56 overflow-y-auto">
-                                        <SelectItem value="all">All Creators</SelectItem>
-                                        {filteredCreatedByOptions.length === 0 ? (
-                                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
-                                        ) : (
-                                            filteredCreatedByOptions.map((member) => (
-                                                <SelectItem key={member._id} value={member._id}>
-                                                    {member.firstName} {member.lastName}
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-                            </SelectContent>
-                        </Select>
+                        <SearchableFilterSelect
+                            value={createdByFilter}
+                            onValueChange={setCreatedByFilter}
+                            query={createdByFilterQuery}
+                            onQueryChange={setCreatedByFilterQuery}
+                            allLabel="All Creators"
+                            placeholder="All Creators"
+                            searchPlaceholder="Search creators"
+                            options={filteredCreatedByOptions}
+                            getValue={(member) => member._id}
+                            getLabel={(member) => `${member.firstName} ${member.lastName}`}
+                            triggerClassName="h-10 w-full"
+                        />
 
                         {/* Date range picker */}
                         <Popover>
@@ -1423,55 +1427,19 @@ export default function TasksClient({
 
             {/* Row 2: Mobile — scrollable horizontal row of secondary filters */}
             <div className="sm:hidden grid grid-cols-2 gap-2">
-                <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
-                    if (open) focusSearchInput(projectFilterInputRef.current)
-                }}>
-                    <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
-                        <SelectValue placeholder="All Projects" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                        <div className="p-2">
-                            <div className="relative mb-2">
-                                <Input
-                                    ref={projectFilterInputRef}
-                                    value={projectFilterQuery}
-                                    onChange={(e) => setProjectFilterQuery(e.target.value)}
-                                    placeholder="Search projects"
-                                    className="pr-10"
-                                    onKeyDown={(e) => e.stopPropagation()}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                />
-                                {projectFilterQuery && (
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.preventDefault()
-                                            e.stopPropagation()
-                                            setProjectFilterQuery('')
-                                            setProjectFilter('all')
-                                        }}
-                                        className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                                        aria-label="Clear project filter"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </button>
-                                )}
-                            </div>
-                            <div className="max-h-56 overflow-y-auto">
-                                <SelectItem value="all">All Projects</SelectItem>
-                                {filteredProjectOptions.length === 0 ? (
-                                    <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                                ) : (
-                                    filteredProjectOptions.map((project) => (
-                                        <SelectItem key={project._id} value={project._id}>
-                                            {project.name}
-                                        </SelectItem>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </SelectContent>
-                </Select>
+                <SearchableFilterSelect
+                    value={projectFilter}
+                    onValueChange={setProjectFilter}
+                    query={projectFilterQuery}
+                    onQueryChange={setProjectFilterQuery}
+                    allLabel="All Projects"
+                    placeholder="All Projects"
+                    searchPlaceholder="Search projects"
+                    options={filteredProjectOptions}
+                    getValue={(project) => project._id}
+                    getLabel={(project) => project.name}
+                    triggerClassName="h-9 w-full"
+                />
 
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
                     <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
@@ -1488,105 +1456,33 @@ export default function TasksClient({
 
                 {canFilterUsers && (
                     <>
-                        <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
-                            if (open) focusSearchInput(assignedToFilterInputRef.current)
-                        }}>
-                            <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
-                                <SelectValue placeholder="All Assignees" />
-                            </SelectTrigger>
-                            <SelectContent className="z-[10050] p-0">
-                                <div className="p-2">
-                                    <div className="relative mb-2">
-                                        <Input
-                                            ref={assignedToFilterInputRef}
-                                            value={assignedToFilterQuery}
-                                            onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                                            placeholder="Search assignees"
-                                            className="pr-10"
-                                            onKeyDown={(e) => e.stopPropagation()}
-                                            onMouseDown={(e) => e.stopPropagation()}
-                                        />
-                                        {assignedToFilterQuery && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.preventDefault()
-                                                    e.stopPropagation()
-                                                    setAssignedToFilterQuery('')
-                                                    setAssignedToFilter('all')
-                                                }}
-                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                                                aria-label="Clear assignee filter"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="max-h-56 overflow-y-auto">
-                                        <SelectItem value="all">All Assignees</SelectItem>
-                                        {filteredAssignedToOptions.length === 0 ? (
-                                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
-                                        ) : (
-                                            filteredAssignedToOptions.map((member) => (
-                                                <SelectItem key={member._id} value={member._id}>
-                                                    {member.firstName} {member.lastName}
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-                            </SelectContent>
-                        </Select>
+                        <SearchableFilterSelect
+                            value={assignedToFilter}
+                            onValueChange={setAssignedToFilter}
+                            query={assignedToFilterQuery}
+                            onQueryChange={setAssignedToFilterQuery}
+                            allLabel="All Assignees"
+                            placeholder="All Assignees"
+                            searchPlaceholder="Search assignees"
+                            options={filteredAssignedToOptions}
+                            getValue={(member) => member._id}
+                            getLabel={(member) => `${member.firstName} ${member.lastName}`}
+                            triggerClassName="h-9 w-full"
+                        />
 
-                        <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
-                            if (open) focusSearchInput(createdByFilterInputRef.current)
-                        }}>
-                            <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
-                                <SelectValue placeholder="All Creators" />
-                            </SelectTrigger>
-                            <SelectContent className="z-[10050] p-0">
-                                <div className="p-2">
-                                    <div className="relative mb-2">
-                                        <Input
-                                            ref={createdByFilterInputRef}
-                                            value={createdByFilterQuery}
-                                            onChange={(e) => setCreatedByFilterQuery(e.target.value)}
-                                            placeholder="Search creators"
-                                            className="pr-10"
-                                            onKeyDown={(e) => e.stopPropagation()}
-                                            onMouseDown={(e) => e.stopPropagation()}
-                                        />
-                                        {createdByFilterQuery && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.preventDefault()
-                                                    e.stopPropagation()
-                                                    setCreatedByFilterQuery('')
-                                                    setCreatedByFilter('all')
-                                                }}
-                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                                                aria-label="Clear creator filter"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="max-h-56 overflow-y-auto">
-                                        <SelectItem value="all">All Creators</SelectItem>
-                                        {filteredCreatedByOptions.length === 0 ? (
-                                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
-                                        ) : (
-                                            filteredCreatedByOptions.map((member) => (
-                                                <SelectItem key={member._id} value={member._id}>
-                                                    {member.firstName} {member.lastName}
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-                            </SelectContent>
-                        </Select>
+                        <SearchableFilterSelect
+                            value={createdByFilter}
+                            onValueChange={setCreatedByFilter}
+                            query={createdByFilterQuery}
+                            onQueryChange={setCreatedByFilterQuery}
+                            allLabel="All Creators"
+                            placeholder="All Creators"
+                            searchPlaceholder="Search creators"
+                            options={filteredCreatedByOptions}
+                            getValue={(member) => member._id}
+                            getLabel={(member) => `${member.firstName} ${member.lastName}`}
+                            triggerClassName="h-9 w-full"
+                        />
                     </>
                 )}
 
