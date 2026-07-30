@@ -188,6 +188,7 @@ function SearchableFilterSelect<T>({
     placeholder,
     searchPlaceholder,
     options,
+    allOptions,
     getValue,
     getLabel,
     triggerClassName,
@@ -200,13 +201,15 @@ function SearchableFilterSelect<T>({
     placeholder: string
     searchPlaceholder: string
     options: T[]
+    /** Unfiltered source list, used to resolve the trigger's label so a stale search query can't hide the current selection. */
+    allOptions: T[]
     getValue: (option: T) => string
     getLabel: (option: T) => string
     triggerClassName?: string
 }) {
     const [open, setOpen] = useState(false)
     const inputRef = useRef<HTMLInputElement | null>(null)
-    const selected = options.find((o) => getValue(o) === value)
+    const selected = allOptions.find((o) => getValue(o) === value)
     const label = value === 'all' || !selected ? placeholder : getLabel(selected)
 
     const select = (next: string) => {
@@ -226,7 +229,7 @@ function SearchableFilterSelect<T>({
                 <button
                     type="button"
                     className={cn(
-                        'flex items-center justify-between whitespace-nowrap rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)]',
+                        'flex items-center justify-between whitespace-nowrap rounded-full border border-[var(--apple-separator)]',
                         'bg-[var(--apple-quaternary-fill)] px-3 py-1.5 text-[13px] font-medium text-[var(--apple-secondary-label)]',
                         'focus:outline-none focus:ring-2 focus:ring-[var(--apple-system-blue)]/40 focus:border-[var(--apple-system-blue)]',
                         'apple-transition',
@@ -489,7 +492,9 @@ export default function TasksClient({
                     task.assignedTo.forEach((assignee) => {
                         const userId = assignee.user?._id || assignee.user || assignee._id || assignee;
                         const userData = assignee.user || assignee;
-                        if (userId && userData) {
+                        // Skip unpopulated references (userData is just the raw id string) —
+                        // otherwise this produces a name-less ghost entry that sorts first in the list.
+                        if (userId && userData && typeof userData === 'object' && (userData.firstName || userData.lastName)) {
                             assignedToMap.set(userId.toString(), {
                                 _id: userId.toString(),
                                 firstName: userData.firstName || '',
@@ -1276,6 +1281,7 @@ export default function TasksClient({
                     placeholder="All Projects"
                     searchPlaceholder="Search projects"
                     options={filteredProjectOptions}
+                    allOptions={projectOptions}
                     getValue={(project) => project._id}
                     getLabel={(project) => project.name}
                     triggerClassName="h-10 w-full"
@@ -1307,6 +1313,7 @@ export default function TasksClient({
                             placeholder="All Assignees"
                             searchPlaceholder="Search assignees"
                             options={filteredAssignedToOptions}
+                            allOptions={assignedToOptions}
                             getValue={(member) => member._id}
                             getLabel={(member) => `${member.firstName} ${member.lastName}`}
                             triggerClassName="h-10 w-full"
@@ -1321,6 +1328,7 @@ export default function TasksClient({
                             placeholder="All Creators"
                             searchPlaceholder="Search creators"
                             options={filteredCreatedByOptions}
+                            allOptions={createdByOptions}
                             getValue={(member) => member._id}
                             getLabel={(member) => `${member.firstName} ${member.lastName}`}
                             triggerClassName="h-10 w-full"
@@ -1436,6 +1444,7 @@ export default function TasksClient({
                     placeholder="All Projects"
                     searchPlaceholder="Search projects"
                     options={filteredProjectOptions}
+                    allOptions={projectOptions}
                     getValue={(project) => project._id}
                     getLabel={(project) => project.name}
                     triggerClassName="h-9 w-full"
@@ -1465,6 +1474,7 @@ export default function TasksClient({
                             placeholder="All Assignees"
                             searchPlaceholder="Search assignees"
                             options={filteredAssignedToOptions}
+                            allOptions={assignedToOptions}
                             getValue={(member) => member._id}
                             getLabel={(member) => `${member.firstName} ${member.lastName}`}
                             triggerClassName="h-9 w-full"
@@ -1479,6 +1489,7 @@ export default function TasksClient({
                             placeholder="All Creators"
                             searchPlaceholder="Search creators"
                             options={filteredCreatedByOptions}
+                            allOptions={createdByOptions}
                             getValue={(member) => member._id}
                             getLabel={(member) => `${member.firstName} ${member.lastName}`}
                             triggerClassName="h-9 w-full"
