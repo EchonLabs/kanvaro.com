@@ -257,7 +257,8 @@ export default function CreateSprintPage() {
       endDate,
       projectStart: project?.startDate,
       projectEnd: project?.endDate,
-      requireBoth
+      requireBoth,
+      allowPastDates: true
     })
     setStartDateError(result.startError)
     setEndDateError(result.endError)
@@ -480,7 +481,7 @@ export default function CreateSprintPage() {
                           {new Date(selectedProject.endDate).toLocaleDateString()}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Sprint dates must be within this range and cannot be in the past.
+                          Sprint dates must be within this range.
                         </p>
                       </div>
                     )}
@@ -490,15 +491,8 @@ export default function CreateSprintPage() {
                       onChange={(e) => handleChange('startDate', e.target.value)}
                       min={
                         selectedProject?.startDate
-                          ? new Date(
-                            Math.max(
-                              new Date(selectedProject.startDate).getTime(),
-                              new Date().setHours(0, 0, 0, 0)
-                            )
-                          )
-                            .toISOString()
-                            .split('T')[0]
-                          : new Date().toISOString().split('T')[0]
+                          ? new Date(selectedProject.startDate).toISOString().split('T')[0]
+                          : undefined
                       }
                       max={
                         selectedProject?.endDate
@@ -536,13 +530,12 @@ export default function CreateSprintPage() {
                               selectedProject?.startDate
                                 ? new Date(selectedProject.startDate).getTime()
                                 : 0,
-                              formData.startDate ? new Date(formData.startDate).getTime() : 0,
-                              new Date().setHours(0, 0, 0, 0)
+                              formData.startDate ? new Date(formData.startDate).getTime() : 0
                             )
                           )
                             .toISOString()
                             .split('T')[0]
-                          : new Date().toISOString().split('T')[0]
+                          : undefined
                       }
                       max={
                         selectedProject?.endDate
