@@ -674,15 +674,8 @@ export default function EditSprintPage() {
                     }}
                     min={
                       selectedProject?.startDate
-                        ? new Date(
-                            Math.max(
-                              new Date(selectedProject.startDate).getTime(),
-                              new Date().setHours(0, 0, 0, 0)
-                            )
-                          )
-                          .toISOString()
-                          .split('T')[0]
-                        : new Date().toISOString().split('T')[0]
+                        ? new Date(selectedProject.startDate).toISOString().split('T')[0]
+                        : undefined
                     }
                     max={
                       selectedProject?.endDate
@@ -719,13 +712,12 @@ export default function EditSprintPage() {
                         ? new Date(
                             Math.max(
                               form.startDate ? new Date(form.startDate).getTime() : 0,
-                              selectedProject?.startDate ? new Date(selectedProject.startDate).getTime() : 0,
-                              new Date().setHours(0, 0, 0, 0)
+                              selectedProject?.startDate ? new Date(selectedProject.startDate).getTime() : 0
                             )
                           )
                           .toISOString()
                           .split('T')[0]
-                        : new Date().toISOString().split('T')[0]
+                        : undefined
                     }
                     max={
                       selectedProject?.endDate

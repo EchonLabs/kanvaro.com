@@ -94,7 +94,7 @@ export async function POST(
 
     await Task.updateMany(
       { sprint: sprintId, archived: { $ne: true } },
-      { status: 'todo', startDate: now }
+      { startDate: now }
     )
 
     const updatedSprint = await Sprint.findById(sprintId)
