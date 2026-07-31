@@ -1027,7 +1027,7 @@ export default function TimerPage() {
                     <SelectTrigger className="w-full h-9 rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] text-[14px]">
                       <SelectValue placeholder="Select a project" />
                     </SelectTrigger>
-                    <SelectContent className="rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
+                    <SelectContent className="rounded-[var(--apple-radius-md)] border-[var(--apple-separator)] w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)] max-h-[300px]">
                       <div className="p-2 sticky top-0 bg-[var(--apple-system-background)] dark:bg-[#2C2C2E] z-10">
                         <Input
                           ref={projectSearchInputRef}
