@@ -1,3 +1,10 @@
+## [1.41.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.6...v1.41.7) (2026-07-31)
+
+
+### Bug Fixes
+
+* add max height to project selection dropdown in TimerPage ([ed9c3a8](https://github.com/EchonLabs/kanvaro.com/commit/ed9c3a86933c7e9fd64454cff718fe604f479d03))
+
 ## [1.41.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.5...v1.41.6) (2026-07-31)
 
 
