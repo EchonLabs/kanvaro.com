@@ -1,3 +1,13 @@
+## [1.41.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.5...v1.41.6) (2026-07-31)
+
+
+### Bug Fixes
+
+* allow past dates for sprint creation and update validation messages ([1b69941](https://github.com/EchonLabs/kanvaro.com/commit/1b69941780295455c78e37df6a60442eaf9686d4))
+* enhance searchable filters by adding unfiltered options for projects, assignees, and creators in TasksClient ([e593516](https://github.com/EchonLabs/kanvaro.com/commit/e593516a4f23a096600dea3e5cd589f45beed439))
+* remove status update from task when starting sprint ([5824e7f](https://github.com/EchonLabs/kanvaro.com/commit/5824e7fa8e00b113c0bac941ed0d056a27ab6194))
+* searchable filters mobile close fix for project, assignee, and creator in TasksClient ([83d73f8](https://github.com/EchonLabs/kanvaro.com/commit/83d73f88bc65db5abe413d9bab5772bd7f65b7ae))
+
 ## [1.41.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.4...v1.41.5) (2026-07-27)
 
 
