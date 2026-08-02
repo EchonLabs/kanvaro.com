@@ -1,3 +1,41 @@
+## [1.41.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.6...v1.41.7) (2026-07-31)
+
+
+### Bug Fixes
+
+* add max height to project selection dropdown in TimerPage ([ed9c3a8](https://github.com/EchonLabs/kanvaro.com/commit/ed9c3a86933c7e9fd64454cff718fe604f479d03))
+
+## [1.41.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.5...v1.41.6) (2026-07-31)
+
+
+### Bug Fixes
+
+* allow past dates for sprint creation and update validation messages ([1b69941](https://github.com/EchonLabs/kanvaro.com/commit/1b69941780295455c78e37df6a60442eaf9686d4))
+* enhance searchable filters by adding unfiltered options for projects, assignees, and creators in TasksClient ([e593516](https://github.com/EchonLabs/kanvaro.com/commit/e593516a4f23a096600dea3e5cd589f45beed439))
+* remove status update from task when starting sprint ([5824e7f](https://github.com/EchonLabs/kanvaro.com/commit/5824e7fa8e00b113c0bac941ed0d056a27ab6194))
+* searchable filters mobile close fix for project, assignee, and creator in TasksClient ([83d73f8](https://github.com/EchonLabs/kanvaro.com/commit/83d73f88bc65db5abe413d9bab5772bd7f65b7ae))
+
+## [1.41.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.4...v1.41.5) (2026-07-27)
+
+
+### Bug Fixes
+
+* handle null or undefined user in GravatarAvatar and getAvatarData functions ([888b093](https://github.com/EchonLabs/kanvaro.com/commit/888b09334005516b616ce97817ad569540af2668))
+
+## [1.41.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.3...v1.41.4) (2026-07-27)
+
+
+### Bug Fixes
+
+* add memo copy functionality and improve task report layout ([7c27cee](https://github.com/EchonLabs/kanvaro.com/commit/7c27ceebb000adf655cf20bcbe6413f2e8fc13e1))
+* add permission check for task creation button in calendar page ([44a592a](https://github.com/EchonLabs/kanvaro.com/commit/44a592aa822e21fc982bf68b4e4ba3d88114f870))
+* enhance duration formatting in time entries to include hours and minutes ([006df6e](https://github.com/EchonLabs/kanvaro.com/commit/006df6ece1d87056ade17f18a6722fb1079215c3))
+* increase task limit for improved data retrieval ([a03c6a6](https://github.com/EchonLabs/kanvaro.com/commit/a03c6a650564492123d593a9bd11a134e29b1270))
+* optimize status badge animations and improve performance for live project indicators ([04efbda](https://github.com/EchonLabs/kanvaro.com/commit/04efbda0025bad493ac041afa04f563fe358f740))
+* remove unnecessary animation classes from status badges for improved performance ([f5ca638](https://github.com/EchonLabs/kanvaro.com/commit/f5ca638dd4da33a8432a498e25461880ad7a399c))
+* simplify profile page icons and improve layout consistency ([4c13d69](https://github.com/EchonLabs/kanvaro.com/commit/4c13d698acb3e545537d0891478b5bb19f9055e1))
+* update badge styling for active timer to improve visual feedback ([234ed8a](https://github.com/EchonLabs/kanvaro.com/commit/234ed8a6debabd31eac7d4f5b34b109d146cee34))
+
 ## [1.41.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.2...v1.41.3) (2026-07-24)
 
 

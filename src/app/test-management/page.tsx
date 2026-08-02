@@ -395,7 +395,7 @@ export default function TestManagementPage() {
                                 const cfg = EXEC_STATUS_CONFIG[exe.status as keyof typeof EXEC_STATUS_CONFIG] ?? EXEC_STATUS_CONFIG.skipped
                                 return (
                                   <div key={exe._id} className="px-5 py-3 flex items-center gap-3 apple-transition hover:bg-[var(--apple-quaternary-fill)]">
-                                    <div className={cn('flex-shrink-0 w-2 h-2 rounded-full animate-[status-pulse_2.4s_ease-in-out_infinite]', cfg.dot)} />
+                                    <div className={cn('flex-shrink-0 w-2 h-2 rounded-full', cfg.dot)} />
                                     <div className="flex-1 min-w-0">
                                       <p className="text-[13px] font-medium text-[var(--apple-label)] truncate">{exe?.testCase?.title || exe.testCase}</p>
                                       <p className="text-[11px] text-[var(--apple-tertiary-label)] truncate mt-0.5">
@@ -403,7 +403,7 @@ export default function TestManagementPage() {
                                       </p>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border animate-[badge-border-pulse_3s_ease-in-out_infinite]', cfg.bg, cfg.text, cfg.border)}>
+                                      <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border', cfg.bg, cfg.text, cfg.border)}>
                                         {cfg.label}
                                       </span>
                                       <Button size="sm" variant="ghost"
@@ -558,8 +558,8 @@ export default function TestManagementPage() {
                                     <TableCell className="text-[13px] font-medium text-[var(--apple-label)] max-w-[180px] truncate">{execution?.testCase?.title || execution.testCase}</TableCell>
                                     <TableCell className="text-[13px] text-[var(--apple-secondary-label)] max-w-[140px] truncate">{execution?.testPlan?.name || '—'}</TableCell>
                                     <TableCell>
-                                      <span className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border animate-[badge-border-pulse_3s_ease-in-out_infinite]', cfg.bg, cfg.text, cfg.border)}>
-                                        <span className={cn('w-1.5 h-1.5 rounded-full animate-[status-pulse_2.4s_ease-in-out_infinite]', cfg.dot)} />
+                                      <span className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border', cfg.bg, cfg.text, cfg.border)}>
+                                        <span className={cn('w-1.5 h-1.5 rounded-full', cfg.dot)} />
                                         {cfg.label}
                                       </span>
                                     </TableCell>

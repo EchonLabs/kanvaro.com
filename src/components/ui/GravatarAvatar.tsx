@@ -51,7 +51,7 @@ interface GravatarAvatarProps {
     firstName?: string
     lastName?: string
     email?: string
-  }
+  } | null | undefined
   size?: number
   className?: string
   gravatarOptions?: GravatarOptions
@@ -77,7 +77,7 @@ export function GravatarAvatar({
       {avatarUrl && (
         <AvatarImage 
           src={avatarUrl} 
-          alt={`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User avatar'} 
+          alt={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User avatar'}
         />
       )}
       <AvatarFallback className="text-sm font-medium">

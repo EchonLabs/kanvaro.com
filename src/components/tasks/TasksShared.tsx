@@ -67,7 +67,9 @@ interface StatusBadgeProps {
   className?: string
 }
 
-export function StatusBadge({ status, size = 'sm', animated = true, className }: StatusBadgeProps) {
+const LIVE_STATUSES = new Set(['in_progress', 'inprogress', 'active'])
+
+export function StatusBadge({ status, size = 'sm', animated = LIVE_STATUSES.has(status), className }: StatusBadgeProps) {
   const cfg = TASK_STATUS_CONFIG[status] ?? TASK_STATUS_CONFIG['backlog']
   const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs'
   const px = size === 'sm' ? 'px-2 py-0.5' : 'px-2.5 py-1'

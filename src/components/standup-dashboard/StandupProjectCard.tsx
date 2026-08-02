@@ -31,6 +31,7 @@ export function StandupProjectCard({ project, index, onOpen }: StandupProjectCar
   const { formatDate } = useDateTime()
   const palette = PROJECT_PALETTE[index % PROJECT_PALETTE.length]
   const statusCfg = STATUS_CONFIG[project.status] ?? STATUS_CONFIG.active
+  const isLive = project.status === 'active'
 
   return (
     <div className="group relative overflow-hidden rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] apple-transition hover:shadow-[0_8px_28px_rgba(0,0,0,0.11)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.40)] hover:-translate-y-0.5">
@@ -46,14 +47,12 @@ export function StandupProjectCard({ project, index, onOpen }: StandupProjectCar
               {project.summary}
             </p>
           </div>
-          {/* Status badge with animation */}
+          {/* Status badge — pulse reserved for actively-running projects */}
           <div
-            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold shrink-0 ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
-            style={{ animation: 'badge-border-pulse 3s ease-in-out infinite' }}
+            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold shrink-0 ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border} ${isLive ? 'badge-border-pulse' : ''}`}
           >
             <span
-              className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot}`}
-              style={{ animation: 'status-pulse 2s ease-in-out infinite' }}
+              className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot} ${isLive ? 'status-pulse' : ''}`}
             />
             {statusCfg.label}
           </div>

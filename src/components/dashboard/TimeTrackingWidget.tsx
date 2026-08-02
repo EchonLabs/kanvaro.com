@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock, Play, Pause, Square, TrendingUp, AlertTriangle } from 'lucide-react'
+import { Clock, Play, Pause, Square, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useToast } from '@/components/ui/Toast'
 import { Timer } from '@/components/time-tracking/Timer'
 import { useOrganization } from '@/hooks/useOrganization'
@@ -422,32 +422,27 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
         </Card>
       )}
 
-      {/* Stop Timer Confirmation Dialog — logic unchanged */}
-      <Dialog open={showStopConfirm} onOpenChange={setShowStopConfirm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-[var(--apple-system-red)]" strokeWidth={1.5} />
-              Stop Timer
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to stop the active timer?
-              {activeTimer && (
-                <span className="block mt-2 text-[var(--apple-label)] font-medium">
-                  {activeTimer.project?.name || 'Unknown project'}
-                  {activeTimer.task && ` • ${activeTimer.task.title}`}
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStopConfirm(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => { setShowStopConfirm(false); updateTimerAction('stop') }}>
-              <Square className="h-4 w-4 mr-2" strokeWidth={1.5} />Stop Timer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Stop Timer Confirmation Dialog */}
+      <ConfirmationModal
+        isOpen={showStopConfirm}
+        onClose={() => setShowStopConfirm(false)}
+        onConfirm={() => { setShowStopConfirm(false); updateTimerAction('stop') }}
+        title="Stop Timer"
+        description={
+          <>
+            Are you sure you want to stop the active timer?
+            {activeTimer && (
+              <span className="block mt-2 text-[var(--apple-label)] font-medium">
+                {activeTimer.project?.name || 'Unknown project'}
+                {activeTimer.task && ` • ${activeTimer.task.title}`}
+              </span>
+            )}
+          </>
+        }
+        confirmText="Stop Timer"
+        confirmIcon={<Square className="h-4 w-4" strokeWidth={1.5} />}
+        variant="destructive"
+      />
 
       {/* ─── Time Tracking Overview Card ─── */}
       <Card className="overflow-x-hidden">

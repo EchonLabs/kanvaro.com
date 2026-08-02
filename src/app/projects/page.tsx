@@ -151,19 +151,19 @@ function ProjectAvatar({
 
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft
+  const isLive = status === 'active'
   return (
     <span
       className={cn(
         'inline-flex items-center justify-center gap-1.5 px-2 py-0.5',
         'rounded-full text-xs font-semibold border whitespace-nowrap',
-        'w-[104px]', 
+        'w-[104px]',
         cfg.bg, cfg.text, cfg.border,
+        isLive && 'badge-border-pulse',
       )}
-      style={{ animation: 'badge-border-pulse 2s ease-in-out infinite' }}
     >
       <span
-        className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', cfg.dot)}
-        style={{ animation: 'status-pulse 2s ease-in-out infinite' }}
+        className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', cfg.dot, isLive && 'status-pulse')}
       />
       {formatToTitleCase(status)}
     </span>
