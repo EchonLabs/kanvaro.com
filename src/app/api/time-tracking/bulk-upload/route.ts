@@ -9,11 +9,15 @@ import { Task } from '@/models/Task'
 import { applyRoundingRules } from '@/lib/utils'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { Permission } from '@/lib/permissions/permission-definitions'
+import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
+
+// Super Admin, Admin, and HR bypass the manual-log kill switch, the member sub-setting,
+// and the past-time-limit checks below — same unrestricted set as the single-entry endpoint.
+const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
 interface CSVRow {
   'Task No': string
@@ -76,6 +80,7 @@ export async function POST(request: NextRequest) {
     // Check if user has bulk upload permission
     const hasBulkUploadAll = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
     const hasViewAll = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_VIEW_ALL)
+    const isUnrestrictedRole = UNRESTRICTED_TIME_LOG_ROLES.includes(requester.role)
 
     console.log('[Bulk Upload] User permissions - bulkUploadAll:', hasBulkUploadAll, 'viewAll:', hasViewAll)
 
@@ -137,6 +142,7 @@ export async function POST(request: NextRequest) {
         project: null,
         allowTimeTracking: orgTimeTracking.allowTimeTracking ?? true,
         allowManualTimeSubmission: orgTimeTracking.allowManualTimeSubmission ?? true,
+        allowMembersToAddTimeLogs: orgTimeTracking.allowMembersToAddTimeLogs ?? false,
         requireApproval: orgTimeTracking.requireApproval ?? false,
         allowBillableTime: orgTimeTracking.allowBillableTime ?? true,
         defaultHourlyRate: orgTimeTracking.defaultHourlyRate,
@@ -189,6 +195,20 @@ export async function POST(request: NextRequest) {
           if (projectSettings) {
             settings = projectSettings
           }
+        }
+
+        // Master kill switch — blocks everyone unconditionally, no exceptions.
+        if (!settings.allowManualTimeSubmission) {
+          results.errors.push({ row: rowNum, error: 'Manual time submission is disabled for this organization/project' })
+          results.failed++
+          continue
+        }
+
+        // Restricted roles additionally need the member sub-setting explicitly enabled.
+        if (!isUnrestrictedRole && !settings.allowMembersToAddTimeLogs) {
+          results.errors.push({ row: rowNum, error: 'Manual time submission is not enabled for your role' })
+          results.failed++
+          continue
         }
 
         // Validate description if required
@@ -357,27 +377,30 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Check if time is in the past/future according to settings
+        // Check if time is in the past/future according to settings.
+        // Super Admin/Admin/HR can log any date — skip these checks entirely for them.
         const now = new Date()
-        if (!settings.allowFutureTime && startDateTime > now) {
-          results.errors.push({ row: rowNum, error: 'Future time entries are not allowed' })
-          results.failed++
-          continue
-        }
-
-        if (!settings.allowPastTime) {
-          results.errors.push({ row: rowNum, error: 'Past time entries are not allowed' })
-          results.failed++
-          continue
-        }
-
-        if (settings.pastTimeLimitDays && settings.allowPastTime) {
-          const pastLimit = new Date()
-          pastLimit.setDate(pastLimit.getDate() - settings.pastTimeLimitDays)
-          if (startDateTime < pastLimit) {
-            results.errors.push({ row: rowNum, error: `Time entries older than ${settings.pastTimeLimitDays} days are not allowed` })
-            results.failed++
-            continue
+        if (!isUnrestrictedRole) {
+          if (startDateTime > now) {
+            if (!settings.allowFutureTime) {
+              results.errors.push({ row: rowNum, error: 'Future time entries are not allowed' })
+              results.failed++
+              continue
+            }
+          } else {
+            const daysDiff = Math.ceil((now.getTime() - startDateTime.getTime()) / (1000 * 60 * 60 * 24))
+            if (daysDiff > 0) {
+              if (!settings.allowPastTime) {
+                results.errors.push({ row: rowNum, error: 'Past time entries are not allowed' })
+                results.failed++
+                continue
+              }
+              if (settings.pastTimeLimitDays && daysDiff > settings.pastTimeLimitDays) {
+                results.errors.push({ row: rowNum, error: `Time entries older than ${settings.pastTimeLimitDays} days are not allowed` })
+                results.failed++
+                continue
+              }
+            }
           }
         }
 

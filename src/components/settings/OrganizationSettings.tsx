@@ -114,6 +114,7 @@ export function OrganizationSettings() {
     timeTracking: {
       allowTimeTracking: true,
       allowManualTimeSubmission: true,
+      allowMembersToAddTimeLogs: false,
       requireApproval: false,
       allowBillableTime: true,
       defaultHourlyRate: '0',
@@ -291,6 +292,7 @@ export function OrganizationSettings() {
         timeTracking: {
           allowTimeTracking: true,
           allowManualTimeSubmission: true,
+          allowMembersToAddTimeLogs: false,
           requireApproval: false,
           allowBillableTime: true,
           defaultHourlyRate: '0',
@@ -340,6 +342,7 @@ export function OrganizationSettings() {
                 timeTracking: {
                   allowTimeTracking: data.settings.allowTimeTracking ?? prev.timeTracking.allowTimeTracking,
                   allowManualTimeSubmission: data.settings.allowManualTimeSubmission ?? prev.timeTracking.allowManualTimeSubmission,
+                  allowMembersToAddTimeLogs: data.settings.allowMembersToAddTimeLogs ?? prev.timeTracking.allowMembersToAddTimeLogs,
                   requireApproval: data.settings.requireApproval ?? prev.timeTracking.requireApproval,
                   allowBillableTime: data.settings.allowBillableTime ?? prev.timeTracking.allowBillableTime,
                   defaultHourlyRate: data.settings.defaultHourlyRate ?? prev.timeTracking.defaultHourlyRate,
@@ -780,6 +783,29 @@ export function OrganizationSettings() {
               checked={formData.timeTracking.allowManualTimeSubmission}
               onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowManualTimeSubmission: v } })}
             />
+            {formData.timeTracking.allowManualTimeSubmission && (
+              <ToggleRow
+                label="Allow Members to Add Time Logs"
+                description="Let non-admin roles submit their own manual time entries, subject to the past-time limit below. Admins, Super Admins, and HR can always add manual logs for anyone regardless of this setting."
+                checked={formData.timeTracking.allowMembersToAddTimeLogs}
+                onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowMembersToAddTimeLogs: v } })}
+              />
+            )}
+            {formData.timeTracking.allowManualTimeSubmission && formData.timeTracking.allowMembersToAddTimeLogs && (
+              <div className="pl-4 border-l-2 border-[var(--apple-separator)] space-y-3">
+                <ToggleRow label="Allow Past Time" description="Allow members to log time for past dates. Admins, Super Admins, and HR are never restricted by this."
+                  checked={formData.timeTracking.allowPastTime}
+                  onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowPastTime: v } })}
+                />
+                {formData.timeTracking.allowPastTime && (
+                  <Field label="Past Time Limit (Days)" htmlFor="pastTimeLimitDays">
+                    <Input id="pastTimeLimitDays" type="number" value={formData.timeTracking.pastTimeLimitDays}
+                      onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, pastTimeLimitDays: e.target.value } })}
+                      min="1" max="365" />
+                  </Field>
+                )}
+              </div>
+            )}
             <ToggleRow
               label="Require Approval"
               description="Require manager approval for all time entries"
@@ -835,17 +861,6 @@ export function OrganizationSettings() {
               checked={formData.timeTracking.allowFutureTime}
               onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowFutureTime: v } })}
             />
-            <ToggleRow label="Allow Past Time" description="Allow logging time for past dates"
-              checked={formData.timeTracking.allowPastTime}
-              onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowPastTime: v } })}
-            />
-            {formData.timeTracking.allowPastTime && (
-              <Field label="Past Time Limit (Days)" htmlFor="pastTimeLimitDays">
-                <Input id="pastTimeLimitDays" type="number" value={formData.timeTracking.pastTimeLimitDays}
-                  onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, pastTimeLimitDays: e.target.value } })}
-                  min="1" max="365" />
-              </Field>
-            )}
 
             {/* Time Log Editing */}
             <div className="pt-3 border-t border-[var(--apple-separator)] space-y-3">

@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
         project: null,
         allowTimeTracking: orgTimeTracking.allowTimeTracking ?? true,
         allowManualTimeSubmission: orgTimeTracking.allowManualTimeSubmission ?? true,
+        allowMembersToAddTimeLogs: orgTimeTracking.allowMembersToAddTimeLogs ?? false,
         requireApproval: orgTimeTracking.requireApproval ?? false,
         allowBillableTime: orgTimeTracking.allowBillableTime ?? true,
         defaultHourlyRate: orgTimeTracking.defaultHourlyRate ?? 0,
@@ -106,6 +107,7 @@ export async function GET(request: NextRequest) {
       settings: {
         allowTimeTracking: settings.allowTimeTracking,
         allowManualTimeSubmission: settings.allowManualTimeSubmission,
+        allowMembersToAddTimeLogs: settings.allowMembersToAddTimeLogs ?? false,
         requireApproval: settings.requireApproval,
         allowBillableTime: settings.allowBillableTime,
         defaultHourlyRate: settings.defaultHourlyRate ?? 0,
@@ -176,6 +178,7 @@ console.log('userfsdfsdf',user.organization)
     // Update all fields explicitly
     if (settings.allowTimeTracking !== undefined) updateFields.allowTimeTracking = settings.allowTimeTracking
     if (settings.allowManualTimeSubmission !== undefined) updateFields.allowManualTimeSubmission = settings.allowManualTimeSubmission
+    if (settings.allowMembersToAddTimeLogs !== undefined) updateFields.allowMembersToAddTimeLogs = settings.allowMembersToAddTimeLogs
     if (settings.requireApproval !== undefined) updateFields.requireApproval = settings.requireApproval
     if (settings.allowBillableTime !== undefined) updateFields.allowBillableTime = settings.allowBillableTime
     if (settings.defaultHourlyRate !== undefined) updateFields.defaultHourlyRate = settings.defaultHourlyRate
@@ -259,6 +262,7 @@ console.log('userfsdfsdf',user.organization)
         // Update organization settings with the new values
         if (settings.allowTimeTracking !== undefined) organization.settings.timeTracking.allowTimeTracking = settings.allowTimeTracking
         if (settings.allowManualTimeSubmission !== undefined) organization.settings.timeTracking.allowManualTimeSubmission = settings.allowManualTimeSubmission
+        if (settings.allowMembersToAddTimeLogs !== undefined) organization.settings.timeTracking.allowMembersToAddTimeLogs = settings.allowMembersToAddTimeLogs
         if (settings.requireApproval !== undefined) organization.settings.timeTracking.requireApproval = settings.requireApproval
         if (settings.allowBillableTime !== undefined) organization.settings.timeTracking.allowBillableTime = settings.allowBillableTime
         if (settings.defaultHourlyRate !== undefined) organization.settings.timeTracking.defaultHourlyRate = settings.defaultHourlyRate
@@ -314,6 +318,7 @@ console.log('userfsdfsdf',user.organization)
       settings: {
         allowTimeTracking: timeTrackingSettings.allowTimeTracking,
         allowManualTimeSubmission: timeTrackingSettings.allowManualTimeSubmission,
+        allowMembersToAddTimeLogs: timeTrackingSettings.allowMembersToAddTimeLogs,
         requireApproval: timeTrackingSettings.requireApproval,
         allowBillableTime: timeTrackingSettings.allowBillableTime,
         defaultHourlyRate: timeTrackingSettings.defaultHourlyRate ?? 0,

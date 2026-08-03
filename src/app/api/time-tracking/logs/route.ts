@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
         project: null,
         allowTimeTracking: organization.settings.timeTracking.allowTimeTracking,
         allowManualTimeSubmission: organization.settings.timeTracking.allowManualTimeSubmission,
+        allowMembersToAddTimeLogs: organization.settings.timeTracking.allowMembersToAddTimeLogs ?? false,
         requireApproval: organization.settings.timeTracking.requireApproval,
         allowBillableTime: organization.settings.timeTracking.allowBillableTime,
         defaultHourlyRate: organization.settings.timeTracking.defaultHourlyRate,

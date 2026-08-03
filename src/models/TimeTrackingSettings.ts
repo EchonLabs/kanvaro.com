@@ -5,6 +5,7 @@ export interface ITimeTrackingSettings extends Document {
   project?: mongoose.Types.ObjectId // If null, these are global settings
   allowTimeTracking: boolean
   allowManualTimeSubmission: boolean
+  allowMembersToAddTimeLogs: boolean
   requireApproval: boolean
   allowBillableTime: boolean
   defaultHourlyRate?: number
@@ -56,6 +57,10 @@ const TimeTrackingSettingsSchema = new Schema<ITimeTrackingSettings>({
   allowManualTimeSubmission: {
     type: Boolean,
     default: true
+  },
+  allowMembersToAddTimeLogs: {
+    type: Boolean,
+    default: false
   },
   requireApproval: {
     type: Boolean,

@@ -126,17 +126,6 @@ export default function TimerPage() {
   const hadActiveTimerRef = useRef(false)
   const [timeTrackingSettings, setTimeTrackingSettings] = useState<TimeTrackingSettings | null>(null)
   const [dailyHoursLogged, setDailyHoursLogged] = useState<number>(0)
-  const [showManualLogForm, setShowManualLogForm] = useState(false)
-  const [manualLogData, setManualLogData] = useState({
-    startDate: '',
-    startTime: '',
-    endDate: '',
-    endTime: '',
-    description: '',
-    isBillable: false
-  })
-  const [submittingManualLog, setSubmittingManualLog] = useState(false)
-  const [sessionHoursError, setSessionHoursError] = useState('')
   const autoStopNotifiedRef = useRef(false)
   const [projectSearch, setProjectSearch] = useState('')
   const [taskSearch, setTaskSearch] = useState('')
@@ -162,81 +151,6 @@ export default function TimerPage() {
 
   const showInitialTasksLoading = tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)
 
-  const validateSessionHours = useCallback(() => {
-    setSessionHoursError('')
-
-    if (!manualLogData.startDate || !manualLogData.startTime || !manualLogData.endDate || !manualLogData.endTime) {
-      return
-    }
-
-    const startDateTime = combineDateTime(manualLogData.startDate, manualLogData.startTime)
-    const endDateTime = combineDateTime(manualLogData.endDate, manualLogData.endTime)
-
-    if (!startDateTime || !endDateTime) {
-      return
-    }
-
-    const start = new Date(startDateTime)
-    const end = new Date(endDateTime)
-
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return
-    }
-
-    const now = new Date()
-
-    if (!timeTrackingSettings?.allowFutureTime) {
-      if (start > now) {
-        const startDateStr = start.toLocaleDateString()
-        const startTimeStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        setSessionHoursError(`⚠️ Future time not allowed: The start time (${startDateStr} at ${startTimeStr}) is in the future. Please select a time that is today or in the past.`)
-        return
-      }
-      if (end > now) {
-        const endDateStr = end.toLocaleDateString()
-        const endTimeStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        setSessionHoursError(`⚠️ Future time not allowed: The end time (${endDateStr} at ${endTimeStr}) is in the future. Please select a time that is today or in the past.`)
-        return
-      }
-    }
-
-    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours) {
-      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
-      const durationHours = durationMinutes / 60
-      const maxHours = timeTrackingSettings.maxSessionHours
-
-      if (durationHours > maxHours) {
-        setSessionHoursError(`⚠️ Maximum session duration exceeded: You've logged ${durationHours.toFixed(2)} hours, but the maximum allowed is ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'}. Please break this into multiple sessions.`)
-        return
-      }
-    }
-
-    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxDailyHours) {
-      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
-      const durationHours = durationMinutes / 60
-
-      if (dailyHoursLogged >= timeTrackingSettings.maxDailyHours) {
-        setSessionHoursError(`⚠️ Daily limit reached: You have already logged ${dailyHoursLogged.toFixed(1)} hours today (max: ${timeTrackingSettings.maxDailyHours} hours). No more time can be logged.`)
-        return
-      }
-      if (dailyHoursLogged + durationHours > timeTrackingSettings.maxDailyHours) {
-        const remaining = (timeTrackingSettings.maxDailyHours - dailyHoursLogged).toFixed(1)
-        setSessionHoursError(`⚠️ Would exceed daily limit: This entry (${durationHours.toFixed(2)}h) + already logged (${dailyHoursLogged.toFixed(1)}h) exceeds the ${timeTrackingSettings.maxDailyHours}h daily limit. Only ${remaining}h remaining.`)
-        return
-      }
-    }
-  }, [
-    manualLogData.startDate,
-    manualLogData.startTime,
-    manualLogData.endDate,
-    manualLogData.endTime,
-    timeTrackingSettings?.maxSessionHours,
-    timeTrackingSettings?.maxDailyHours,
-    timeTrackingSettings?.allowFutureTime,
-    timeTrackingSettings?.allowOvertime,
-    dailyHoursLogged
-  ])
-
   // Auth initialization - trigger data loading
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -248,10 +162,6 @@ export default function TimerPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated])
-
-  useEffect(() => {
-    validateSessionHours()
-  }, [validateSessionHours])
 
   const resetTimerForm = useCallback(() => {
     setDescription('')
@@ -640,124 +550,6 @@ export default function TimerPage() {
       selectedTaskObjectRef.current = found
     }
   }, [tasks, selectedTask, selectedTaskLabel])
-
-  const handleSubmitManualLog = async () => {
-    if (!selectedProject || !user) {
-      setError('⚠️ Project selection required: Please select a project before logging time.')
-      return
-    }
-
-    if (!selectedTask) {
-      setError('⚠️ Task selection required: Please select a task before logging time.')
-      return
-    }
-
-    if (!manualLogData.description.trim()) {
-      setError('⚠️ Memo required: Please enter a Memo for this time entry.')
-      return
-    }
-
-    const missingFields: string[] = []
-    if (!manualLogData.startDate) missingFields.push('Start Date')
-    if (!manualLogData.startTime) missingFields.push('Start Time')
-    if (!manualLogData.endDate) missingFields.push('End Date')
-    if (!manualLogData.endTime) missingFields.push('End Time')
-
-    if (missingFields.length > 0) {
-      setError(`⚠️ Missing required fields: Please fill in the following fields: ${missingFields.join(', ')}.`)
-      return
-    }
-
-    const startDateTime = combineDateTime(manualLogData.startDate, manualLogData.startTime)
-    const endDateTime = combineDateTime(manualLogData.endDate, manualLogData.endTime)
-
-    const start = new Date(startDateTime)
-    const end = new Date(endDateTime)
-
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      setError('⚠️ Invalid date/time: The selected dates or times are invalid. Please check your entries and try again.')
-      return
-    }
-
-    if (start >= end) {
-      setError('⚠️ Invalid time range: The end date/time must be after the start date/time. Please adjust your entries.')
-      return
-    }
-
-    const now = new Date()
-    if (start > now && !timeTrackingSettings?.allowFutureTime) {
-      setError(`⚠️ Future time not allowed.`)
-      return
-    }
-
-    if (end > now && !timeTrackingSettings?.allowFutureTime) {
-      setError(`⚠️ Future time not allowed.`)
-      return
-    }
-
-    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
-    const durationHours = durationMinutes / 60
-
-    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
-      const maxHours = timeTrackingSettings.maxSessionHours
-      setError(`⚠️ Session duration exceeded: Maximum ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'} per session.`)
-      return
-    }
-
-    setSubmittingManualLog(true)
-    setError('')
-    setSessionHoursError('')
-
-    try {
-      const response = await fetch('/api/time-tracking/entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          organizationId: user.organization,
-          projectId: selectedProject,
-          taskId: selectedTask || undefined,
-          description: manualLogData.description || undefined,
-          startTime: startDateTime,
-          endTime: endDateTime,
-          isBillable: manualLogData.isBillable && timeTrackingSettings?.allowBillableTime
-        })
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        showToast({
-          type: 'success',
-          title: 'Time Logged Successfully',
-          message: 'Your time entry has been created successfully.',
-          duration: 5000
-        })
-        setManualLogData({ startDate: '', startTime: '', endDate: '', endTime: '', description: '', isBillable: false })
-        setSelectedProject('')
-        setSelectedTask('')
-        setTasks([])
-        setTaskSearch('')
-        setProjectSearch('')
-        setTaskPage(1)
-        setHasMoreTasks(false)
-        setError('')
-        setSessionHoursError('')
-        setTimeLogsRefreshKey(prev => prev + 1)
-        await fetchDailyHoursLogged()
-      } else {
-        let errorMessage = data.error || 'An unexpected error occurred while logging time.'
-        setError(errorMessage)
-        showToast({ type: 'error', title: 'Time Logging Failed', message: errorMessage, duration: 7000 })
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Network error or server unavailable'
-      setError(`⚠️ Connection error: ${errorMsg}`)
-      showToast({ type: 'error', title: 'Connection Error', message: 'Unable to connect to the server.', duration: 7000 })
-    } finally {
-      setSubmittingManualLog(false)
-    }
-  }
 
   const fetchActiveTimer = async (currentUser?: User | null) => {
     const effectiveUser = currentUser ?? user

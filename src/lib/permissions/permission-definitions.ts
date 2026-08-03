@@ -470,7 +470,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER,
     Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
-    Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
 
     // Financial
     Permission.FINANCIAL_READ,
@@ -633,7 +632,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER,
-    Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
 
     // Financial
     Permission.FINANCIAL_READ,
@@ -1272,7 +1270,6 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER, // View all active timers in organization
-    Permission.TIME_TRACKING_BULK_UPLOAD_ALL, // Allow creating time entries for other users
     Permission.FINANCIAL_READ,
     Permission.BUDGET_HANDLING,
     Permission.REPORTING_VIEW,

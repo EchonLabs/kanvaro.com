@@ -22,6 +22,7 @@ export interface IOrganization extends Document {
     timeTracking: {
       allowTimeTracking: boolean
       allowManualTimeSubmission: boolean
+      allowMembersToAddTimeLogs: boolean
       requireApproval: boolean
       allowBillableTime: boolean
       defaultHourlyRate?: number
@@ -127,6 +128,7 @@ const OrganizationSchema = new Schema<IOrganization>({
     timeTracking: {
       allowTimeTracking: { type: Boolean, default: true },
       allowManualTimeSubmission: { type: Boolean, default: true },
+      allowMembersToAddTimeLogs: { type: Boolean, default: false },
       requireApproval: { type: Boolean, default: false },
       allowBillableTime: { type: Boolean, default: true },
       defaultHourlyRate: { type: Number, min: 0 },

@@ -10,7 +10,7 @@ import { Task } from '@/models/Task'
 import { applyRoundingRules } from '@/lib/utils'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { Permission } from '@/lib/permissions/permission-definitions'
+import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 
 import mongoose from 'mongoose'
@@ -18,6 +18,11 @@ import { logActivity } from '@/lib/activity-logger'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
+
+// Super Admin, Admin, and HR can log time for any org member, on any date, unrestricted
+// by allowMembersToAddTimeLogs / pastTimeLimitDays. Everyone else may only log their own
+// time, gated by allowMembersToAddTimeLogs and restricted by allowPastTime/pastTimeLimitDays.
+const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
 export async function GET(request: NextRequest) {
   try {
@@ -373,12 +378,11 @@ export async function POST(request: NextRequest) {
     requesterId = requester._id.toString()
 
     // Verify the requester can create time entries for the specified user
-    // Allow if: 1) Creating for themselves, OR 2) Has bulk_upload_all permission, OR 3) Is HR/admin role
+    // Allow if: 1) Creating for themselves, OR 2) Is Super Admin/Admin/HR (unrestricted role)
     const isCreatingSelf = userId === requesterId
-    const isHR = requester.role === 'human_resource'
-    const hasBulkUploadAll = isHR || requester.role === 'admin' || await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
+    const isUnrestrictedRole = UNRESTRICTED_TIME_LOG_ROLES.includes(requester.role)
 
-    if (!isCreatingSelf && !hasBulkUploadAll) {
+    if (!isCreatingSelf && !isUnrestrictedRole) {
       return NextResponse.json({ error: 'You do not have permission to create time entries for other users' }, { status: 403 })
     }
 
@@ -388,8 +392,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Time tracking not allowed for this project' }, { status: 403 })
     }
 
-    // If taskId is provided, verify task assignment for users without bulk_upload_all permission
-    if (taskId && !hasBulkUploadAll) {
+    // If taskId is provided, verify task assignment for users without an unrestricted role
+    if (taskId && !isUnrestrictedRole) {
       const task = await Task.findById(taskId)
 
       if (!task) {
@@ -444,6 +448,7 @@ export async function POST(request: NextRequest) {
         project: null,
         allowTimeTracking: orgTimeTracking.allowTimeTracking ?? true,
         allowManualTimeSubmission: orgTimeTracking.allowManualTimeSubmission ?? true,
+        allowMembersToAddTimeLogs: orgTimeTracking.allowMembersToAddTimeLogs ?? false,
         requireApproval: projectRequireApproval !== undefined ? projectRequireApproval : (orgTimeTracking.requireApproval ?? false),
         allowBillableTime: orgTimeTracking.allowBillableTime ?? true,
         defaultHourlyRate: orgTimeTracking.defaultHourlyRate,
@@ -474,9 +479,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // HR users can always add manual time logs, bypass the setting check
-    if (!settings.allowManualTimeSubmission && !isHR) {
-      return NextResponse.json({ error: 'Manual time submission not allowed' }, { status: 403 })
+    // Master kill switch — blocks everyone unconditionally, no exceptions (even unrestricted roles).
+    if (!settings.allowManualTimeSubmission) {
+      return NextResponse.json({ error: 'Manual time submission is disabled for this organization/project' }, { status: 403 })
+    }
+
+    // Restricted roles additionally need the member sub-setting explicitly enabled.
+    // Super Admin/Admin/HR bypass this regardless of the sub-setting.
+    if (!isUnrestrictedRole && !settings.allowMembersToAddTimeLogs) {
+      return NextResponse.json({ error: 'Manual time submission is not enabled for your role' }, { status: 403 })
     }
 
     // Validate description - always required for manual time entries
@@ -497,15 +508,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Start time cannot be after end time' }, { status: 400 })
     }
 
-    // Check if future time is allowed
-    if (start > new Date() && !settings.allowFutureTime) {
-      return NextResponse.json({ error: 'Future time logging not allowed' }, { status: 400 })
-    }
+    // Super Admin/Admin/HR can log any date, past or future — skip these checks entirely for them.
+    if (!isUnrestrictedRole) {
+      const now = new Date()
+      if (start > now) {
+        if (!settings.allowFutureTime) {
+          return NextResponse.json({ error: 'Future time logging not allowed' }, { status: 400 })
+        }
+      } else {
+        const daysDiff = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysDiff > 0) {
+          if (!settings.allowPastTime) {
+            return NextResponse.json({ error: 'Past time logging not allowed' }, { status: 400 })
+          }
+          if (daysDiff > settings.pastTimeLimitDays) {
+            return NextResponse.json({ error: `Time entries older than ${settings.pastTimeLimitDays} day(s) are not allowed` }, { status: 400 })
+          }
+        }
+      }
 
-    // Check if past time is allowed
-    const daysDiff = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-    if (daysDiff > settings.pastTimeLimitDays && !settings.allowPastTime) {
-      return NextResponse.json({ error: 'Past time logging not allowed beyond limit' }, { status: 400 })
+      // The start check above doesn't catch a start in the allowed window with an end pushed
+      // into the future - check end separately.
+      if (end > now && !settings.allowFutureTime) {
+        return NextResponse.json({ error: 'Future time logging not allowed' }, { status: 400 })
+      }
     }
 
     // Get user's hourly rate if not provided
