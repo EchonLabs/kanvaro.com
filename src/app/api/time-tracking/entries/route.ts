@@ -338,6 +338,7 @@ export async function POST(request: NextRequest) {
       description,
       startTime,
       endTime,
+      startDateOnly,
       duration,
       isBillable,
       hourlyRate,
@@ -521,8 +522,13 @@ export async function POST(request: NextRequest) {
         const orgForTimezone = await Organization.findById(organizationId).select('timezone').lean()
         const orgTimezone = (orgForTimezone as any)?.timezone || 'UTC'
 
+        // Prefer the exact calendar date the client picked (unambiguous) over re-deriving one
+        // from the converted instant, which can land on the wrong day if the browser's timezone
+        // differs from the organization's configured timezone. Fall back for older callers that
+        // don't send it.
+        const isValidDateOnly = typeof startDateOnly === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(startDateOnly)
         const todayStr = getOrgLocalDateString(now, orgTimezone)
-        const startDateStr = getOrgLocalDateString(start, orgTimezone)
+        const startDateStr = isValidDateOnly ? startDateOnly : getOrgLocalDateString(start, orgTimezone)
         const daysDiff = calendarDayDiff(startDateStr, todayStr)
 
         if (daysDiff > 0) {

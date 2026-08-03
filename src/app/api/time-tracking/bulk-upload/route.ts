@@ -394,8 +394,13 @@ export async function POST(request: NextRequest) {
               continue
             }
           } else {
+            // Use the CSV row's own date (already parsed losslessly into Y/M/D) rather than
+            // re-deriving a calendar date from the combined instant via the org's timezone -
+            // that re-derivation can land on the wrong day since `startDate` was constructed
+            // from the literal row values, not from any particular timezone's "now".
+            const pad = (n: number) => String(n).padStart(2, '0')
+            const startDateStr = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`
             const todayStr = getOrgLocalDateString(now, orgTimezone)
-            const startDateStr = getOrgLocalDateString(startDateTime, orgTimezone)
             const daysDiff = calendarDayDiff(startDateStr, todayStr)
             if (daysDiff > 0) {
               const nowTimeStr = getOrgLocalTimeString(now, orgTimezone)

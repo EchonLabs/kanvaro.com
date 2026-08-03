@@ -809,6 +809,10 @@ export function OrganizationSettings() {
                     onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, pastTimeLimitCutoffTime: e.target.value } })}
                   />
                 </Field>
+                <ToggleRow label="Allow Future Time" description="Let members log time for future dates. Admins, Super Admins, and HR can always log future dates regardless of this setting."
+                  checked={formData.timeTracking.allowFutureTime}
+                  onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowFutureTime: v } })}
+                />
               </div>
             )}
             <ToggleRow
@@ -862,11 +866,6 @@ export function OrganizationSettings() {
               checked={formData.timeTracking.requireCategory}
               onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, requireCategory: v } })}
             />
-            <ToggleRow label="Allow Future Time" description="Allow logging time for future dates"
-              checked={formData.timeTracking.allowFutureTime}
-              onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowFutureTime: v } })}
-            />
-
             {/* Time Log Editing */}
             <div className="pt-3 border-t border-[var(--apple-separator)] space-y-3">
               <p className="apple-section-label">Time Log Editing Rules</p>

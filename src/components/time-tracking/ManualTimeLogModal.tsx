@@ -513,6 +513,11 @@ export function ManualTimeLogModal({
           description: formData.memo || '',
           startTime: start.toISOString(),
           endTime: end.toISOString(),
+          // The exact calendar date the user picked, unambiguous regardless of browser/org
+          // timezone - the server uses this directly for the past-time-limit check instead of
+          // re-deriving a date from the converted instant (which can land on the wrong day if
+          // the browser's timezone differs from the organization's configured timezone).
+          startDateOnly: formData.startDate,
           isBillable: true
         })
       })
