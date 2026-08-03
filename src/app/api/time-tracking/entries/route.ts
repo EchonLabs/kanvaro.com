@@ -12,6 +12,7 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { getOrgLocalDateString, getOrgLocalTimeString, calendarDayDiff, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
 
 import mongoose from 'mongoose'
 import { logActivity } from '@/lib/activity-logger'
@@ -461,6 +462,7 @@ export async function POST(request: NextRequest) {
         allowFutureTime: orgTimeTracking.allowFutureTime ?? false,
         allowPastTime: orgTimeTracking.allowPastTime ?? true,
         pastTimeLimitDays: orgTimeTracking.pastTimeLimitDays ?? 30,
+        pastTimeLimitCutoffTime: orgTimeTracking.pastTimeLimitCutoffTime ?? '23:59',
         roundingRules: orgTimeTracking.roundingRules || { enabled: false, increment: 15, roundUp: false },
         notifications: orgTimeTracking.notifications || {
           onTimerStart: false,
@@ -516,13 +518,18 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Future time logging not allowed' }, { status: 400 })
         }
       } else {
-        const daysDiff = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+        const orgForTimezone = await Organization.findById(organizationId).select('timezone').lean()
+        const orgTimezone = (orgForTimezone as any)?.timezone || 'UTC'
+
+        const todayStr = getOrgLocalDateString(now, orgTimezone)
+        const startDateStr = getOrgLocalDateString(start, orgTimezone)
+        const daysDiff = calendarDayDiff(startDateStr, todayStr)
+
         if (daysDiff > 0) {
-          if (!settings.allowPastTime) {
-            return NextResponse.json({ error: 'Past time logging not allowed' }, { status: 400 })
-          }
-          if (daysDiff > settings.pastTimeLimitDays) {
-            return NextResponse.json({ error: `Time entries older than ${settings.pastTimeLimitDays} day(s) are not allowed` }, { status: 400 })
+          const nowTimeStr = getOrgLocalTimeString(now, orgTimezone)
+          const effectiveLimit = computeEffectivePastTimeLimitDays(settings.pastTimeLimitDays, settings.pastTimeLimitCutoffTime, nowTimeStr)
+          if (daysDiff > effectiveLimit) {
+            return NextResponse.json({ error: `Time entries older than ${effectiveLimit} day(s) are not allowed` }, { status: 400 })
           }
         }
       }

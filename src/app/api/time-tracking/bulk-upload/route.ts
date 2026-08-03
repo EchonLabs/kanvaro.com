@@ -11,6 +11,7 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { getOrgLocalDateString, getOrgLocalTimeString, calendarDayDiff, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
@@ -155,6 +156,7 @@ export async function POST(request: NextRequest) {
         allowFutureTime: orgTimeTracking.allowFutureTime ?? false,
         allowPastTime: orgTimeTracking.allowPastTime ?? true,
         pastTimeLimitDays: orgTimeTracking.pastTimeLimitDays ?? 30,
+        pastTimeLimitCutoffTime: orgTimeTracking.pastTimeLimitCutoffTime ?? '23:59',
         roundingRules: orgTimeTracking.roundingRules || { enabled: false, increment: 15, roundUp: false },
         notifications: orgTimeTracking.notifications || {
           onTimerStart: false,
@@ -166,6 +168,10 @@ export async function POST(request: NextRequest) {
       })
       await orgSettings.save()
     }
+
+    // Resolve once up-front — the cutoff-time rule is evaluated in the org's timezone, not the server's.
+    const orgForTimezone = await Organization.findById(organizationId).select('timezone').lean()
+    const orgTimezone = (orgForTimezone as any)?.timezone || 'UTC'
 
     // Process each row
     for (let i = 0; i < rows.length; i++) {
@@ -388,15 +394,14 @@ export async function POST(request: NextRequest) {
               continue
             }
           } else {
-            const daysDiff = Math.ceil((now.getTime() - startDateTime.getTime()) / (1000 * 60 * 60 * 24))
+            const todayStr = getOrgLocalDateString(now, orgTimezone)
+            const startDateStr = getOrgLocalDateString(startDateTime, orgTimezone)
+            const daysDiff = calendarDayDiff(startDateStr, todayStr)
             if (daysDiff > 0) {
-              if (!settings.allowPastTime) {
-                results.errors.push({ row: rowNum, error: 'Past time entries are not allowed' })
-                results.failed++
-                continue
-              }
-              if (settings.pastTimeLimitDays && daysDiff > settings.pastTimeLimitDays) {
-                results.errors.push({ row: rowNum, error: `Time entries older than ${settings.pastTimeLimitDays} days are not allowed` })
+              const nowTimeStr = getOrgLocalTimeString(now, orgTimezone)
+              const effectiveLimit = computeEffectivePastTimeLimitDays(settings.pastTimeLimitDays, settings.pastTimeLimitCutoffTime, nowTimeStr)
+              if (daysDiff > effectiveLimit) {
+                results.errors.push({ row: rowNum, error: `Time entries older than ${effectiveLimit} days are not allowed` })
                 results.failed++
                 continue
               }

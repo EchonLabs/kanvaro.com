@@ -18,6 +18,7 @@ export interface ITimeTrackingSettings extends Document {
   allowFutureTime: boolean
   allowPastTime: boolean
   pastTimeLimitDays: number // How many days back can users log time
+  pastTimeLimitCutoffTime: string // 'HH:mm' (org timezone) - after this time, the oldest day in the window rolls off
   disableTimeLogEditing: boolean // Whether time log editing is enabled
   timeLogEditMode?: 'days' | 'dayOfMonth' // Mode for time log editing restrictions
   timeLogEditDays?: number // Days after creation within which logs can be edited
@@ -115,8 +116,12 @@ const TimeTrackingSettingsSchema = new Schema<ITimeTrackingSettings>({
   pastTimeLimitDays: {
     type: Number,
     default: 1,
-    min: 1,
+    min: 0,
     max: 365
+  },
+  pastTimeLimitCutoffTime: {
+    type: String,
+    default: '23:59'
   },
   disableTimeLogEditing: {
     type: Boolean,

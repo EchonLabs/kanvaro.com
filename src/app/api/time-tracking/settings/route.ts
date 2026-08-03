@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
         allowFutureTime: orgTimeTracking.allowFutureTime ?? false,
         allowPastTime: orgTimeTracking.allowPastTime ?? true,
         pastTimeLimitDays: orgTimeTracking.pastTimeLimitDays ?? 1,
+        pastTimeLimitCutoffTime: orgTimeTracking.pastTimeLimitCutoffTime ?? '23:59',
         disableTimeLogEditing: orgTimeTracking.disableTimeLogEditing ?? false,
         timeLogEditMode: orgTimeTracking.timeLogEditMode,
         timeLogEditDays: orgTimeTracking.timeLogEditDays ?? 30,
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
         allowFutureTime: settings.allowFutureTime,
         allowPastTime: settings.allowPastTime,
         pastTimeLimitDays: settings.pastTimeLimitDays,
+        pastTimeLimitCutoffTime: settings.pastTimeLimitCutoffTime ?? '23:59',
         disableTimeLogEditing: settings.disableTimeLogEditing ?? false,
         timeLogEditMode: settings.timeLogEditMode,
         timeLogEditDays: settings.timeLogEditDays,
@@ -191,6 +193,7 @@ console.log('userfsdfsdf',user.organization)
     if (settings.allowFutureTime !== undefined) updateFields.allowFutureTime = settings.allowFutureTime
     if (settings.allowPastTime !== undefined) updateFields.allowPastTime = settings.allowPastTime
     if (settings.pastTimeLimitDays !== undefined) updateFields.pastTimeLimitDays = settings.pastTimeLimitDays
+    if (settings.pastTimeLimitCutoffTime !== undefined) updateFields.pastTimeLimitCutoffTime = settings.pastTimeLimitCutoffTime
     if (settings.disableTimeLogEditing !== undefined) updateFields.disableTimeLogEditing = settings.disableTimeLogEditing
     if (settings.timeLogEditMode !== undefined) updateFields.timeLogEditMode = settings.timeLogEditMode
     if (settings.timeLogEditDays !== undefined) updateFields.timeLogEditDays = settings.timeLogEditDays
@@ -275,6 +278,7 @@ console.log('userfsdfsdf',user.organization)
         if (settings.allowFutureTime !== undefined) organization.settings.timeTracking.allowFutureTime = settings.allowFutureTime
         if (settings.allowPastTime !== undefined) organization.settings.timeTracking.allowPastTime = settings.allowPastTime
         if (settings.pastTimeLimitDays !== undefined) organization.settings.timeTracking.pastTimeLimitDays = settings.pastTimeLimitDays
+        if (settings.pastTimeLimitCutoffTime !== undefined) organization.settings.timeTracking.pastTimeLimitCutoffTime = settings.pastTimeLimitCutoffTime
         if (settings.disableTimeLogEditing !== undefined) organization.settings.timeTracking.disableTimeLogEditing = settings.disableTimeLogEditing
         if (settings.timeLogEditMode !== undefined) organization.settings.timeTracking.timeLogEditMode = settings.timeLogEditMode
         if (settings.timeLogEditDays !== undefined) organization.settings.timeTracking.timeLogEditDays = settings.timeLogEditDays
@@ -331,6 +335,7 @@ console.log('userfsdfsdf',user.organization)
         allowFutureTime: timeTrackingSettings.allowFutureTime,
         allowPastTime: timeTrackingSettings.allowPastTime,
         pastTimeLimitDays: timeTrackingSettings.pastTimeLimitDays,
+        pastTimeLimitCutoffTime: timeTrackingSettings.pastTimeLimitCutoffTime,
         roundingRules: timeTrackingSettings.roundingRules,
         notifications: timeTrackingSettings.notifications
       }

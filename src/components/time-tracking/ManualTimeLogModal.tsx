@@ -23,7 +23,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/Toast'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { useOrganization } from '@/hooks/useOrganization'
 import { Role } from '@/lib/permissions/permission-definitions'
+import { getOrgLocalDateString, getOrgLocalTimeString, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
 
 const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
@@ -70,6 +72,8 @@ export function ManualTimeLogModal({
   onSuccess
 }: ManualTimeLogModalProps) {
   const { user } = useAuthContext()
+  const { organization } = useOrganization()
+  const orgTimezone = organization?.timezone || 'UTC'
   const isUnrestrictedRole = !!user?.role && UNRESTRICTED_TIME_LOG_ROLES.includes(user.role)
 
   // State for selections
@@ -107,8 +111,8 @@ export function ManualTimeLogModal({
   const [timeTrackingSettings, setTimeTrackingSettings] = useState<{
     maxSessionHours?: number
     allowOvertime?: boolean
-    allowPastTime?: boolean
     pastTimeLimitDays?: number
+    pastTimeLimitCutoffTime?: string
   } | null>(null)
 
   // Errors
@@ -118,33 +122,38 @@ export function ManualTimeLogModal({
   const [endDateError, setEndDateError] = useState('')
   const [endTimeError, setEndTimeError] = useState('')
 
-  // Allowed date range: today back to pastTimeLimitDays (default 1 = yesterday).
+  // Allowed date range: today back to the effective past-time limit, evaluated in the org's
+  // timezone. Once the daily cutoff time passes, the oldest day in the window rolls off (the
+  // effective limit shrinks by one) — see computeEffectivePastTimeLimitDays.
   // Super Admin/Admin/HR are unrestricted — no min/max date is applied for them at all.
   const { todayStr, minDateStr, maxDateStr, pastLimitMsg } = useMemo(() => {
     const now = new Date()
     const pad = (n: number) => String(n).padStart(2, '0')
-    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-    const todayFmt = fmt(now)
+    const todayFmt = getOrgLocalDateString(now, orgTimezone)
 
     if (isUnrestrictedRole) {
       return { todayStr: todayFmt, minDateStr: undefined, maxDateStr: undefined, pastLimitMsg: '' }
     }
 
-    const allowPastTime = timeTrackingSettings?.allowPastTime ?? true
     const limitDays = timeTrackingSettings?.pastTimeLimitDays ?? 1
+    const cutoffTime = timeTrackingSettings?.pastTimeLimitCutoffTime ?? '23:59'
+    const nowTimeStr = getOrgLocalTimeString(now, orgTimezone)
+    const effectiveLimitDays = computeEffectivePastTimeLimitDays(limitDays, cutoffTime, nowTimeStr)
 
-    if (!allowPastTime) {
-      // No past dates allowed at all — window collapses to today only.
+    if (effectiveLimitDays <= 0) {
+      // No past dates allowed right now — window collapses to today only.
       return { todayStr: todayFmt, minDateStr: todayFmt, maxDateStr: todayFmt, pastLimitMsg: 'Manual time logs can only be added for today' }
     }
 
-    const minDate = new Date(now)
-    minDate.setDate(minDate.getDate() - limitDays)
-    const msg = limitDays === 1
+    const [y, m, d] = todayFmt.split('-').map(Number)
+    const minDateUtc = new Date(Date.UTC(y, m - 1, d - effectiveLimitDays))
+    const minDateFmt = `${minDateUtc.getUTCFullYear()}-${pad(minDateUtc.getUTCMonth() + 1)}-${pad(minDateUtc.getUTCDate())}`
+
+    const msg = effectiveLimitDays === 1
       ? 'Manual time logs can only be added for today or yesterday'
-      : `Manual time logs can only be added within the last ${limitDays} days`
-    return { todayStr: todayFmt, minDateStr: fmt(minDate), maxDateStr: todayFmt, pastLimitMsg: msg }
-  }, [timeTrackingSettings?.pastTimeLimitDays, timeTrackingSettings?.allowPastTime, isUnrestrictedRole])
+      : `Manual time logs can only be added within the last ${effectiveLimitDays} days`
+    return { todayStr: todayFmt, minDateStr: minDateFmt, maxDateStr: todayFmt, pastLimitMsg: msg }
+  }, [timeTrackingSettings?.pastTimeLimitDays, timeTrackingSettings?.pastTimeLimitCutoffTime, isUnrestrictedRole, orgTimezone])
 
   // Filtered lists based on search
   const filteredEmployees = useMemo(() => {

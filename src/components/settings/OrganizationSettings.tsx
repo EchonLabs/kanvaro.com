@@ -126,6 +126,7 @@ export function OrganizationSettings() {
       allowFutureTime: false,
       allowPastTime: true,
       pastTimeLimitDays: '1',
+      pastTimeLimitCutoffTime: '23:59',
       disableTimeLogEditing: false,
       timeLogEditMode: undefined as 'days' | 'dayOfMonth' | undefined,
       timeLogEditDays: '30',
@@ -304,6 +305,7 @@ export function OrganizationSettings() {
           allowFutureTime: false,
           allowPastTime: true,
           pastTimeLimitDays: '1',
+          pastTimeLimitCutoffTime: '23:59',
           disableTimeLogEditing: false,
           timeLogEditMode: undefined,
           timeLogEditDays: '30',
@@ -354,6 +356,7 @@ export function OrganizationSettings() {
                   allowFutureTime: data.settings.allowFutureTime ?? prev.timeTracking.allowFutureTime,
                   allowPastTime: data.settings.allowPastTime ?? prev.timeTracking.allowPastTime,
                   pastTimeLimitDays: data.settings.pastTimeLimitDays ?? prev.timeTracking.pastTimeLimitDays,
+                  pastTimeLimitCutoffTime: data.settings.pastTimeLimitCutoffTime ?? prev.timeTracking.pastTimeLimitCutoffTime,
                   disableTimeLogEditing: data.settings.disableTimeLogEditing ?? prev.timeTracking.disableTimeLogEditing ?? false,
                   timeLogEditMode: data.settings.timeLogEditMode as 'days' | 'dayOfMonth' | undefined ?? prev.timeTracking.timeLogEditMode,
                   timeLogEditDays: data.settings.timeLogEditDays ?? prev.timeTracking.timeLogEditDays,
@@ -451,7 +454,10 @@ export function OrganizationSettings() {
             maxDailyHours: parseInt(formData.timeTracking.maxDailyHours) || 12,
             maxWeeklyHours: parseInt(formData.timeTracking.maxWeeklyHours) || 60,
             maxSessionHours: parseInt(formData.timeTracking.maxSessionHours) || 8,
-            pastTimeLimitDays: parseInt(formData.timeTracking.pastTimeLimitDays?.toString()) || 30,
+            pastTimeLimitDays: (() => {
+              const parsed = parseInt(formData.timeTracking.pastTimeLimitDays?.toString())
+              return Number.isNaN(parsed) ? 30 : parsed
+            })(),
             timeLogEditMode: formData.timeTracking.timeLogEditMode,
             timeLogEditDays: formData.timeTracking.timeLogEditDays ? parseInt(formData.timeTracking.timeLogEditDays.toString()) : 30,
             timeLogEditDayOfMonth: formData.timeTracking.timeLogEditDayOfMonth ? parseInt(formData.timeTracking.timeLogEditDayOfMonth.toString()) : 15,
@@ -793,17 +799,16 @@ export function OrganizationSettings() {
             )}
             {formData.timeTracking.allowManualTimeSubmission && formData.timeTracking.allowMembersToAddTimeLogs && (
               <div className="pl-4 border-l-2 border-[var(--apple-separator)] space-y-3">
-                <ToggleRow label="Allow Past Time" description="Allow members to log time for past dates. Admins, Super Admins, and HR are never restricted by this."
-                  checked={formData.timeTracking.allowPastTime}
-                  onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowPastTime: v } })}
-                />
-                {formData.timeTracking.allowPastTime && (
-                  <Field label="Past Time Limit (Days)" htmlFor="pastTimeLimitDays">
-                    <Input id="pastTimeLimitDays" type="number" value={formData.timeTracking.pastTimeLimitDays}
-                      onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, pastTimeLimitDays: e.target.value } })}
-                      min="1" max="365" />
-                  </Field>
-                )}
+                <Field label="Past Time Limit (Days)" htmlFor="pastTimeLimitDays" hint="How many days back members may log time. Admins, Super Admins, and HR are never restricted by this.">
+                  <Input id="pastTimeLimitDays" type="number" value={formData.timeTracking.pastTimeLimitDays}
+                    onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, pastTimeLimitDays: e.target.value } })}
+                    min="0" max="365" />
+                </Field>
+                <Field label="Cutoff Time" htmlFor="pastTimeLimitCutoffTime" hint="After this time each day, the oldest loggable day in the window above becomes unavailable — earlier days remain open all day.">
+                  <Input id="pastTimeLimitCutoffTime" type="time" value={formData.timeTracking.pastTimeLimitCutoffTime}
+                    onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, pastTimeLimitCutoffTime: e.target.value } })}
+                  />
+                </Field>
               </div>
             )}
             <ToggleRow

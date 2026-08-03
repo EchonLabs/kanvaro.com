@@ -149,6 +149,7 @@ export async function POST(request: NextRequest) {
         allowFutureTime: organization.settings.timeTracking.allowFutureTime,
         allowPastTime: organization.settings.timeTracking.allowPastTime,
         pastTimeLimitDays: organization.settings.timeTracking.pastTimeLimitDays,
+        pastTimeLimitCutoffTime: organization.settings.timeTracking.pastTimeLimitCutoffTime ?? '23:59',
         roundingRules: organization.settings.timeTracking.roundingRules,
         notifications: organization.settings.timeTracking.notifications
       })

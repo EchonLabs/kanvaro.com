@@ -35,6 +35,7 @@ export interface IOrganization extends Document {
       allowFutureTime: boolean
       allowPastTime: boolean
       pastTimeLimitDays: number
+      pastTimeLimitCutoffTime: string
       roundingRules: {
         enabled: boolean
         increment: number
@@ -140,7 +141,8 @@ const OrganizationSchema = new Schema<IOrganization>({
       requireCategory: { type: Boolean, default: false },
       allowFutureTime: { type: Boolean, default: false },
       allowPastTime: { type: Boolean, default: true },
-      pastTimeLimitDays: { type: Number, default: 30, min: 1, max: 365 },
+      pastTimeLimitDays: { type: Number, default: 30, min: 0, max: 365 },
+      pastTimeLimitCutoffTime: { type: String, default: '23:59' },
       roundingRules: {
         enabled: { type: Boolean, default: false },
         increment: { type: Number, default: 15, min: 1, max: 60 },
