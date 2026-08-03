@@ -28,7 +28,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/components/ui/Toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { cn } from '@/lib/utils'
+import { cn, focusSearchInput } from '@/lib/utils'
 
 interface Project {
   _id: string
@@ -150,25 +150,6 @@ export default function TimerPage() {
   const isLoadingMoreRef = useRef(false)
   const selectedTaskIdRef = useRef<string>('')
   const selectedTaskObjectRef = useRef<Task | null>(null)
-
-  const focusSearchInput = (el: HTMLInputElement | null) => {
-    if (!el || el.disabled) return
-
-    const doFocus = () => {
-      el.focus({ preventScroll: true })
-      try {
-        el.select?.()
-      } catch {
-        // ignore
-      }
-    }
-
-    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-      window.requestAnimationFrame(doFocus)
-    } else {
-      setTimeout(doFocus, 0)
-    }
-  }
 
   const combineDateTime = (date: string, time: string): string => {
     if (!date || !time) return ''
