@@ -122,6 +122,16 @@ export function ManualTimeLogModal({
   const [endDateError, setEndDateError] = useState('')
   const [endTimeError, setEndTimeError] = useState('')
 
+  // 24h 'HH:mm' -> friendly 12h display, e.g. '10:30' -> '10:30 AM'
+  const formatFriendlyTime = (hhmm: string): string => {
+    const [hStr, mStr] = hhmm.split(':')
+    const h = parseInt(hStr, 10)
+    if (Number.isNaN(h)) return hhmm
+    const period = h >= 12 ? 'PM' : 'AM'
+    const displayHour = h % 12 === 0 ? 12 : h % 12
+    return `${displayHour}:${mStr} ${period}`
+  }
+
   // Allowed date range: today back to the effective past-time limit, evaluated in the org's
   // timezone. Once the daily cutoff time passes, the oldest day in the window rolls off (the
   // effective limit shrinks by one) — see computeEffectivePastTimeLimitDays.
@@ -139,19 +149,22 @@ export function ManualTimeLogModal({
     const cutoffTime = timeTrackingSettings?.pastTimeLimitCutoffTime ?? '23:59'
     const nowTimeStr = getOrgLocalTimeString(now, orgTimezone)
     const effectiveLimitDays = computeEffectivePastTimeLimitDays(limitDays, cutoffTime, nowTimeStr)
+    const cutoffFriendly = formatFriendlyTime(cutoffTime)
 
     if (effectiveLimitDays <= 0) {
       // No past dates allowed right now — window collapses to today only.
-      return { todayStr: todayFmt, minDateStr: todayFmt, maxDateStr: todayFmt, pastLimitMsg: 'Manual time logs can only be added for today' }
+      const msg = limitDays > 0
+        ? `Only today can be logged right now — the ${cutoffFriendly} cutoff for logging past dates has already passed today.`
+        : 'Manual time logs can only be added for today.'
+      return { todayStr: todayFmt, minDateStr: todayFmt, maxDateStr: todayFmt, pastLimitMsg: msg }
     }
 
     const [y, m, d] = todayFmt.split('-').map(Number)
     const minDateUtc = new Date(Date.UTC(y, m - 1, d - effectiveLimitDays))
     const minDateFmt = `${minDateUtc.getUTCFullYear()}-${pad(minDateUtc.getUTCMonth() + 1)}-${pad(minDateUtc.getUTCDate())}`
 
-    const msg = effectiveLimitDays === 1
-      ? 'Manual time logs can only be added for today or yesterday'
-      : `Manual time logs can only be added within the last ${effectiveLimitDays} days`
+    const rangeDesc = effectiveLimitDays === 1 ? 'today or yesterday' : `the last ${effectiveLimitDays} days (${minDateFmt} to ${todayFmt})`
+    const msg = `You can currently log time for ${rangeDesc}. After ${cutoffFriendly} each day, the oldest allowed date rolls forward by one.`
     return { todayStr: todayFmt, minDateStr: minDateFmt, maxDateStr: todayFmt, pastLimitMsg: msg }
   }, [timeTrackingSettings?.pastTimeLimitDays, timeTrackingSettings?.pastTimeLimitCutoffTime, isUnrestrictedRole, orgTimezone])
 
@@ -541,6 +554,11 @@ export function ManualTimeLogModal({
 
   const selectedEmployee = employees.find(e => e._id === selectedEmployeeId)
 
+  // True when the current start/end date error is the past-limit message specifically, so the
+  // persistent hint box above the date fields can turn red instead of a separate error box
+  // popping up underneath.
+  const isPastLimitViolated = !!pastLimitMsg && (startDateError === pastLimitMsg || endDateError === pastLimitMsg)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
@@ -832,6 +850,16 @@ export function ManualTimeLogModal({
           </div>
 
           {/* Date and Time Fields */}
+          {!isUnrestrictedRole && pastLimitMsg && (
+            <div className={`flex items-start gap-2 p-2 rounded-md border ${isPastLimitViolated ? 'bg-destructive/10 border-destructive/20' : 'bg-muted/50 border-border'}`}>
+              {isPastLimitViolated ? (
+                <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+              ) : (
+                <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              )}
+              <p className={`text-xs leading-relaxed ${isPastLimitViolated ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>{pastLimitMsg}</p>
+            </div>
+          )}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="hr-start-date">Start Date *</Label>
@@ -854,7 +882,7 @@ export function ManualTimeLogModal({
                 disabled={!selectedTaskId}
                 className={`w-full ${startDateError ? 'border-destructive' : ''}`}
               />
-              {startDateError && (
+              {startDateError && startDateError !== pastLimitMsg && (
                 <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                   <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-destructive font-medium leading-relaxed">{startDateError}</p>
@@ -904,7 +932,7 @@ export function ManualTimeLogModal({
                 disabled={!selectedTaskId}
                 className={`w-full ${endDateError ? 'border-destructive' : ''}`}
               />
-              {endDateError && (
+              {endDateError && endDateError !== pastLimitMsg && (
                 <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                   <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-destructive font-medium leading-relaxed">{endDateError}</p>
