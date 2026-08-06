@@ -635,7 +635,7 @@ export default function TasksClient({
         if (selectedProjectDetails && selectedProjectDetails.teamMembers) {
             const projectMemberIds = new Set<string>();
             selectedProjectDetails.teamMembers.forEach((member: any) => {
-                const id = member.memberId || member.user?._id || member.user || member._id || member;
+                const id = member.memberId?._id || member.memberId || member.user?._id || member.user || member._id || member;
                 if (id) projectMemberIds.add(id.toString());
             });
             if (selectedProjectDetails.createdBy) {
@@ -674,7 +674,7 @@ export default function TasksClient({
         if (selectedProjectDetails && selectedProjectDetails.teamMembers) {
             const projectMemberIds = new Set<string>();
             selectedProjectDetails.teamMembers.forEach((member: any) => {
-                const id = member.memberId || member.user?._id || member.user || member._id || member;
+                const id = member.memberId?._id || member.memberId || member.user?._id || member.user || member._id || member;
                 if (id) projectMemberIds.add(id.toString());
             });
             if (selectedProjectDetails.createdBy) {
