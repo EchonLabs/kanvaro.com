@@ -1258,7 +1258,7 @@ export default function SprintDetailPage() {
                 )}
 
                 {/* Pagination Controls */}
-                {sprintTasks.length > sprintTasksPageSize && (
+                {sprintTasks.length > 0 && (
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-[var(--apple-separator)]">
                     <div className="flex items-center gap-2 text-[13px] text-[var(--apple-secondary-label)]">
                       <span>Items per page:</span>
