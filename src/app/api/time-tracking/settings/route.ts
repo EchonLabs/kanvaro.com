@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
         project: null,
         allowTimeTracking: orgTimeTracking.allowTimeTracking ?? true,
         allowManualTimeSubmission: orgTimeTracking.allowManualTimeSubmission ?? true,
+        allowMembersToAddTimeLogs: orgTimeTracking.allowMembersToAddTimeLogs ?? false,
         requireApproval: orgTimeTracking.requireApproval ?? false,
         allowBillableTime: orgTimeTracking.allowBillableTime ?? true,
         defaultHourlyRate: orgTimeTracking.defaultHourlyRate ?? 0,
@@ -74,6 +75,7 @@ export async function GET(request: NextRequest) {
         allowFutureTime: orgTimeTracking.allowFutureTime ?? false,
         allowPastTime: orgTimeTracking.allowPastTime ?? true,
         pastTimeLimitDays: orgTimeTracking.pastTimeLimitDays ?? 1,
+        pastTimeLimitCutoffTime: orgTimeTracking.pastTimeLimitCutoffTime ?? '23:59',
         disableTimeLogEditing: orgTimeTracking.disableTimeLogEditing ?? false,
         timeLogEditMode: orgTimeTracking.timeLogEditMode,
         timeLogEditDays: orgTimeTracking.timeLogEditDays ?? 30,
@@ -106,6 +108,7 @@ export async function GET(request: NextRequest) {
       settings: {
         allowTimeTracking: settings.allowTimeTracking,
         allowManualTimeSubmission: settings.allowManualTimeSubmission,
+        allowMembersToAddTimeLogs: settings.allowMembersToAddTimeLogs ?? false,
         requireApproval: settings.requireApproval,
         allowBillableTime: settings.allowBillableTime,
         defaultHourlyRate: settings.defaultHourlyRate ?? 0,
@@ -118,6 +121,7 @@ export async function GET(request: NextRequest) {
         allowFutureTime: settings.allowFutureTime,
         allowPastTime: settings.allowPastTime,
         pastTimeLimitDays: settings.pastTimeLimitDays,
+        pastTimeLimitCutoffTime: settings.pastTimeLimitCutoffTime ?? '23:59',
         disableTimeLogEditing: settings.disableTimeLogEditing ?? false,
         timeLogEditMode: settings.timeLogEditMode,
         timeLogEditDays: settings.timeLogEditDays,
@@ -176,6 +180,7 @@ console.log('userfsdfsdf',user.organization)
     // Update all fields explicitly
     if (settings.allowTimeTracking !== undefined) updateFields.allowTimeTracking = settings.allowTimeTracking
     if (settings.allowManualTimeSubmission !== undefined) updateFields.allowManualTimeSubmission = settings.allowManualTimeSubmission
+    if (settings.allowMembersToAddTimeLogs !== undefined) updateFields.allowMembersToAddTimeLogs = settings.allowMembersToAddTimeLogs
     if (settings.requireApproval !== undefined) updateFields.requireApproval = settings.requireApproval
     if (settings.allowBillableTime !== undefined) updateFields.allowBillableTime = settings.allowBillableTime
     if (settings.defaultHourlyRate !== undefined) updateFields.defaultHourlyRate = settings.defaultHourlyRate
@@ -188,6 +193,7 @@ console.log('userfsdfsdf',user.organization)
     if (settings.allowFutureTime !== undefined) updateFields.allowFutureTime = settings.allowFutureTime
     if (settings.allowPastTime !== undefined) updateFields.allowPastTime = settings.allowPastTime
     if (settings.pastTimeLimitDays !== undefined) updateFields.pastTimeLimitDays = settings.pastTimeLimitDays
+    if (settings.pastTimeLimitCutoffTime !== undefined) updateFields.pastTimeLimitCutoffTime = settings.pastTimeLimitCutoffTime
     if (settings.disableTimeLogEditing !== undefined) updateFields.disableTimeLogEditing = settings.disableTimeLogEditing
     if (settings.timeLogEditMode !== undefined) updateFields.timeLogEditMode = settings.timeLogEditMode
     if (settings.timeLogEditDays !== undefined) updateFields.timeLogEditDays = settings.timeLogEditDays
@@ -259,6 +265,7 @@ console.log('userfsdfsdf',user.organization)
         // Update organization settings with the new values
         if (settings.allowTimeTracking !== undefined) organization.settings.timeTracking.allowTimeTracking = settings.allowTimeTracking
         if (settings.allowManualTimeSubmission !== undefined) organization.settings.timeTracking.allowManualTimeSubmission = settings.allowManualTimeSubmission
+        if (settings.allowMembersToAddTimeLogs !== undefined) organization.settings.timeTracking.allowMembersToAddTimeLogs = settings.allowMembersToAddTimeLogs
         if (settings.requireApproval !== undefined) organization.settings.timeTracking.requireApproval = settings.requireApproval
         if (settings.allowBillableTime !== undefined) organization.settings.timeTracking.allowBillableTime = settings.allowBillableTime
         if (settings.defaultHourlyRate !== undefined) organization.settings.timeTracking.defaultHourlyRate = settings.defaultHourlyRate
@@ -271,6 +278,7 @@ console.log('userfsdfsdf',user.organization)
         if (settings.allowFutureTime !== undefined) organization.settings.timeTracking.allowFutureTime = settings.allowFutureTime
         if (settings.allowPastTime !== undefined) organization.settings.timeTracking.allowPastTime = settings.allowPastTime
         if (settings.pastTimeLimitDays !== undefined) organization.settings.timeTracking.pastTimeLimitDays = settings.pastTimeLimitDays
+        if (settings.pastTimeLimitCutoffTime !== undefined) organization.settings.timeTracking.pastTimeLimitCutoffTime = settings.pastTimeLimitCutoffTime
         if (settings.disableTimeLogEditing !== undefined) organization.settings.timeTracking.disableTimeLogEditing = settings.disableTimeLogEditing
         if (settings.timeLogEditMode !== undefined) organization.settings.timeTracking.timeLogEditMode = settings.timeLogEditMode
         if (settings.timeLogEditDays !== undefined) organization.settings.timeTracking.timeLogEditDays = settings.timeLogEditDays
@@ -314,6 +322,7 @@ console.log('userfsdfsdf',user.organization)
       settings: {
         allowTimeTracking: timeTrackingSettings.allowTimeTracking,
         allowManualTimeSubmission: timeTrackingSettings.allowManualTimeSubmission,
+        allowMembersToAddTimeLogs: timeTrackingSettings.allowMembersToAddTimeLogs,
         requireApproval: timeTrackingSettings.requireApproval,
         allowBillableTime: timeTrackingSettings.allowBillableTime,
         defaultHourlyRate: timeTrackingSettings.defaultHourlyRate ?? 0,
@@ -326,6 +335,7 @@ console.log('userfsdfsdf',user.organization)
         allowFutureTime: timeTrackingSettings.allowFutureTime,
         allowPastTime: timeTrackingSettings.allowPastTime,
         pastTimeLimitDays: timeTrackingSettings.pastTimeLimitDays,
+        pastTimeLimitCutoffTime: timeTrackingSettings.pastTimeLimitCutoffTime,
         roundingRules: timeTrackingSettings.roundingRules,
         notifications: timeTrackingSettings.notifications
       }

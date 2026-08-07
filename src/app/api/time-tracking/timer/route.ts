@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
         project: null,
         allowTimeTracking: organization.settings.timeTracking.allowTimeTracking,
         allowManualTimeSubmission: organization.settings.timeTracking.allowManualTimeSubmission,
+        allowMembersToAddTimeLogs: organization.settings.timeTracking.allowMembersToAddTimeLogs ?? false,
         requireApproval: organization.settings.timeTracking.requireApproval,
         allowBillableTime: organization.settings.timeTracking.allowBillableTime,
         defaultHourlyRate: organization.settings.timeTracking.defaultHourlyRate,
@@ -148,6 +149,7 @@ export async function POST(request: NextRequest) {
         allowFutureTime: organization.settings.timeTracking.allowFutureTime,
         allowPastTime: organization.settings.timeTracking.allowPastTime,
         pastTimeLimitDays: organization.settings.timeTracking.pastTimeLimitDays,
+        pastTimeLimitCutoffTime: organization.settings.timeTracking.pastTimeLimitCutoffTime ?? '23:59',
         roundingRules: organization.settings.timeTracking.roundingRules,
         notifications: organization.settings.timeTracking.notifications
       })

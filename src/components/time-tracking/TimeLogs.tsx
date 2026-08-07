@@ -19,14 +19,19 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules, focusSearchInput, truncateText } from '@/lib/utils'
 import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permission-context'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
-import { Permission } from '@/lib/permissions/permission-definitions'
+import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useToast } from '@/components/ui/Toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { detectClientTimezone } from '@/lib/timezone'
-import { HRManualTimeLogModal } from '@/components/time-tracking/HRManualTimeLogModal'
+import { ManualTimeLogModal } from '@/components/time-tracking/ManualTimeLogModal'
 import { validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
 import { useAuthContext } from '@/contexts/AuthContext'
+
+// Super Admin, Admin, and HR can log time for any org member, on any date; everyone else may
+// only log their own time, gated by the allowMembersToAddTimeLogs org setting. Keep in sync
+// with the same constant in src/app/api/time-tracking/entries/route.ts.
+const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
 // Task filter truncation and dropdown width constants
 const TRUNCATION_LENGTH = 26
@@ -529,6 +534,19 @@ export function TimeLogs({
 
     return orgLevelEnabled && projectLevelEnabled
   }, [organizationSettings, timeTrackingSettings, projectSettings, projectId])
+
+  // Super Admin/Admin/HR can always add manual logs (given the master toggle is on); everyone
+  // else needs the allowMembersToAddTimeLogs org setting enabled.
+  const isUnrestrictedRole = useMemo(
+    () => !!user?.role && UNRESTRICTED_TIME_LOG_ROLES.includes(user.role),
+    [user?.role]
+  )
+
+  const canCurrentUserAddManualLog = useMemo(() => {
+    if (!canAddManualTimeLog) return false
+    if (isUnrestrictedRole) return true
+    return timeTrackingSettings?.allowMembersToAddTimeLogs ?? false
+  }, [canAddManualTimeLog, isUnrestrictedRole, timeTrackingSettings?.allowMembersToAddTimeLogs])
 
   // Fetch projects for manual time log modal
   useEffect(() => {
@@ -2133,7 +2151,7 @@ export function TimeLogs({
       <div className="space-y-4">
 
       {/* ── Add Manual Time Log attractive section ─────────────────── */}
-      {showManualLogButtons && canAddManualTimeLog && canViewEmployeeFilter && user?.role === 'human_resource' && (timeTrackingSettings?.allowPastTime ?? true) && (
+      {showManualLogButtons && canCurrentUserAddManualLog && (
         <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">
           <div className="px-5 py-4 flex items-center gap-4">
             <Plus className="h-6 w-6 flex-shrink-0 text-[var(--apple-system-green)]" strokeWidth={1.5} />
@@ -3711,8 +3729,8 @@ export function TimeLogs({
         isLoading={isDeletingEntry}
       />
 
-      {/* HR Manual Time Log Modal */}
-      <HRManualTimeLogModal
+      {/* Manual Time Log Modal */}
+      <ManualTimeLogModal
         open={showHRManualLogModal}
         onOpenChange={setShowHRManualLogModal}
         organizationId={resolvedOrgId}
