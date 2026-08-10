@@ -1,3 +1,24 @@
+# [1.42.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.7...v1.42.0) (2026-08-07)
+
+
+### Bug Fixes
+
+* add ClipboardList icon to enhance no test cases found message ([562296a](https://github.com/EchonLabs/kanvaro.com/commit/562296a0b03a3a3ea0b9422609dcc2567b374ddb))
+* add past time limit cutoff time to time tracking settings and update related logic ([0c4aa05](https://github.com/EchonLabs/kanvaro.com/commit/0c4aa053a3c8c6148f8176138ea9eeb988f8149b))
+* add viewport configuration to improve layout stability on Android devices ([334df76](https://github.com/EchonLabs/kanvaro.com/commit/334df76c34c30aa1a9b5c5f1ac8ab332a5ec908f))
+* enhance past date logging messages with friendly time format and error handling ([a125569](https://github.com/EchonLabs/kanvaro.com/commit/a12556942e2f3f017624c9bb9fcfa9edb1708be7))
+* enhance project selection UI with scrollable dropdown for better usability ([d68555a](https://github.com/EchonLabs/kanvaro.com/commit/d68555ac408753839f5ae61c24a85ab84fcbb0cf))
+* improve date handling for time tracking to avoid timezone issues ([3419e56](https://github.com/EchonLabs/kanvaro.com/commit/3419e56ee44be4932a1fd9e7b066b3c166146fd9))
+* improve member ID extraction logic for better robustness in team member handling ([95b6f28](https://github.com/EchonLabs/kanvaro.com/commit/95b6f2854be3d4ac4e766a888ebbd15f82a9d568))
+* remove unused focusSearchInput function and import it from utils ([9ffac70](https://github.com/EchonLabs/kanvaro.com/commit/9ffac703e87e872a4d657ffcb95004cb4be9fd80))
+* update GanttChart styles for improved header visibility and layout consistency ([6b5b5e8](https://github.com/EchonLabs/kanvaro.com/commit/6b5b5e85aad4eeb3e3be6422b501e1970c201529))
+* update pagination control to display items when tasks are present ([d6e85ac](https://github.com/EchonLabs/kanvaro.com/commit/d6e85ac70dfb55f8591b6abe1161e18989518970))
+
+
+### Features
+
+* add Manual Time Log modal and enhance time tracking permissions ([e328198](https://github.com/EchonLabs/kanvaro.com/commit/e328198e989f211b523dc24ccd33494da874e895))
+
 ## [1.41.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.6...v1.41.7) (2026-07-31)
 
 

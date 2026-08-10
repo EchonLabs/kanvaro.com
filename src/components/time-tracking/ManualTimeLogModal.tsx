@@ -22,6 +22,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/Dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/Toast'
+import { useAuthContext } from '@/contexts/AuthContext'
+import { useOrganization } from '@/hooks/useOrganization'
+import { Role } from '@/lib/permissions/permission-definitions'
+import { getOrgLocalDateString, getOrgLocalTimeString, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
+
+const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
 interface Employee {
   _id: string
@@ -52,19 +58,24 @@ interface Task {
   displayId?: string
 }
 
-interface HRManualTimeLogModalProps {
+interface ManualTimeLogModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   organizationId: string
   onSuccess?: () => void
 }
 
-export function HRManualTimeLogModal({
+export function ManualTimeLogModal({
   open,
   onOpenChange,
   organizationId,
   onSuccess
-}: HRManualTimeLogModalProps) {
+}: ManualTimeLogModalProps) {
+  const { user } = useAuthContext()
+  const { organization } = useOrganization()
+  const orgTimezone = organization?.timezone || 'UTC'
+  const isUnrestrictedRole = !!user?.role && UNRESTRICTED_TIME_LOG_ROLES.includes(user.role)
+
   // State for selections
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
   const { showToast } = useToast()
@@ -100,8 +111,8 @@ export function HRManualTimeLogModal({
   const [timeTrackingSettings, setTimeTrackingSettings] = useState<{
     maxSessionHours?: number
     allowOvertime?: boolean
-    allowPastTime?: boolean
     pastTimeLimitDays?: number
+    pastTimeLimitCutoffTime?: string
   } | null>(null)
 
   // Errors
@@ -111,19 +122,51 @@ export function HRManualTimeLogModal({
   const [endDateError, setEndDateError] = useState('')
   const [endTimeError, setEndTimeError] = useState('')
 
-  // Allowed date range: today back to pastTimeLimitDays (default 1 = yesterday)
-  const { todayStr, minDateStr, pastLimitMsg } = useMemo(() => {
+  // 24h 'HH:mm' -> friendly 12h display, e.g. '10:30' -> '10:30 AM'
+  const formatFriendlyTime = (hhmm: string): string => {
+    const [hStr, mStr] = hhmm.split(':')
+    const h = parseInt(hStr, 10)
+    if (Number.isNaN(h)) return hhmm
+    const period = h >= 12 ? 'PM' : 'AM'
+    const displayHour = h % 12 === 0 ? 12 : h % 12
+    return `${displayHour}:${mStr} ${period}`
+  }
+
+  // Allowed date range: today back to the effective past-time limit, evaluated in the org's
+  // timezone. Once the daily cutoff time passes, the oldest day in the window rolls off (the
+  // effective limit shrinks by one) — see computeEffectivePastTimeLimitDays.
+  // Super Admin/Admin/HR are unrestricted — no min/max date is applied for them at all.
+  const { todayStr, minDateStr, maxDateStr, pastLimitMsg } = useMemo(() => {
     const now = new Date()
     const pad = (n: number) => String(n).padStart(2, '0')
-    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const todayFmt = getOrgLocalDateString(now, orgTimezone)
+
+    if (isUnrestrictedRole) {
+      return { todayStr: todayFmt, minDateStr: undefined, maxDateStr: undefined, pastLimitMsg: '' }
+    }
+
     const limitDays = timeTrackingSettings?.pastTimeLimitDays ?? 1
-    const minDate = new Date(now)
-    minDate.setDate(minDate.getDate() - limitDays)
-    const msg = limitDays === 1
-      ? 'Manual time logs can only be added for today or yesterday'
-      : `Manual time logs can only be added within the last ${limitDays} days`
-    return { todayStr: fmt(now), minDateStr: fmt(minDate), pastLimitMsg: msg }
-  }, [timeTrackingSettings?.pastTimeLimitDays])
+    const cutoffTime = timeTrackingSettings?.pastTimeLimitCutoffTime ?? '23:59'
+    const nowTimeStr = getOrgLocalTimeString(now, orgTimezone)
+    const effectiveLimitDays = computeEffectivePastTimeLimitDays(limitDays, cutoffTime, nowTimeStr)
+    const cutoffFriendly = formatFriendlyTime(cutoffTime)
+
+    if (effectiveLimitDays <= 0) {
+      // No past dates allowed right now — window collapses to today only.
+      const msg = limitDays > 0
+        ? `Only today can be logged right now — the ${cutoffFriendly} cutoff for logging past dates has already passed today.`
+        : 'Manual time logs can only be added for today.'
+      return { todayStr: todayFmt, minDateStr: todayFmt, maxDateStr: todayFmt, pastLimitMsg: msg }
+    }
+
+    const [y, m, d] = todayFmt.split('-').map(Number)
+    const minDateUtc = new Date(Date.UTC(y, m - 1, d - effectiveLimitDays))
+    const minDateFmt = `${minDateUtc.getUTCFullYear()}-${pad(minDateUtc.getUTCMonth() + 1)}-${pad(minDateUtc.getUTCDate())}`
+
+    const rangeDesc = effectiveLimitDays === 1 ? 'today or yesterday' : `the last ${effectiveLimitDays} days (${minDateFmt} to ${todayFmt})`
+    const msg = `You can currently log time for ${rangeDesc}. After ${cutoffFriendly} each day, the oldest allowed date rolls forward by one.`
+    return { todayStr: todayFmt, minDateStr: minDateFmt, maxDateStr: todayFmt, pastLimitMsg: msg }
+  }, [timeTrackingSettings?.pastTimeLimitDays, timeTrackingSettings?.pastTimeLimitCutoffTime, isUnrestrictedRole, orgTimezone])
 
   // Filtered lists based on search
   const filteredEmployees = useMemo(() => {
@@ -228,14 +271,20 @@ export function HRManualTimeLogModal({
     }
   }, [])
 
-  // Reset form when modal opens
+  // Reset form when modal opens. Unrestricted roles (Super Admin/Admin/HR) pick an employee
+  // via the picker; everyone else logs only their own time, so we skip the employee fetch
+  // entirely and pin the selection to the current user.
   useEffect(() => {
     if (open) {
       resetForm()
-      loadEmployees()
       loadTimeTrackingSettings()
+      if (isUnrestrictedRole) {
+        loadEmployees()
+      } else if (user?.id) {
+        setSelectedEmployeeId(user.id)
+      }
     }
-  }, [open])
+  }, [open, isUnrestrictedRole, user?.id])
 
   // Load projects when employee changes
   useEffect(() => {
@@ -332,23 +381,34 @@ export function HRManualTimeLogModal({
       return
     }
 
-    // Check if start is in the future
-    if (start > new Date()) {
-      setStartDateError('Start date/time cannot be in the future')
-      return
-    }
+    // Super Admin/Admin/HR can log any date, past or future — skip the date-window checks below.
+    if (!isUnrestrictedRole) {
+      const now = new Date()
 
-    // Restrict to allowed past time window
-    const startDateOnly = formData.startDate
-    if (startDateOnly < minDateStr) {
-      setStartDateError(pastLimitMsg)
-      return
-    }
+      // Check if start is in the future
+      if (start > now) {
+        setStartDateError('Start date/time cannot be in the future')
+        return
+      }
 
-    const endDateOnly = formData.endDate
-    if (endDateOnly < minDateStr) {
-      setEndDateError(pastLimitMsg)
-      return
+      // Check if end is in the future
+      if (end > now) {
+        setEndTimeError('End date/time cannot be in the future')
+        return
+      }
+
+      // Restrict to allowed past time window
+      const startDateOnly = formData.startDate
+      if (minDateStr && startDateOnly < minDateStr) {
+        setStartDateError(pastLimitMsg)
+        return
+      }
+
+      const endDateOnly = formData.endDate
+      if (minDateStr && endDateOnly < minDateStr) {
+        setEndDateError(pastLimitMsg)
+        return
+      }
     }
 
     // Validate against maxSessionHours
@@ -361,7 +421,7 @@ export function HRManualTimeLogModal({
         )
       }
     }
-  }, [formData.startDate, formData.startTime, formData.endDate, formData.endTime, timeTrackingSettings, minDateStr, pastLimitMsg])
+  }, [formData.startDate, formData.startTime, formData.endDate, formData.endTime, timeTrackingSettings, minDateStr, pastLimitMsg, isUnrestrictedRole])
 
   // Validate times when date/time fields change
   useEffect(() => {
@@ -434,6 +494,18 @@ export function HRManualTimeLogModal({
       return
     }
 
+    if (!isUnrestrictedRole) {
+      const now = new Date()
+      if (start > now) {
+        setError('Start date/time cannot be in the future')
+        return
+      }
+      if (end > now) {
+        setError('End date/time cannot be in the future')
+        return
+      }
+    }
+
     if (formData.memo && formData.memo.length > 500) {
       setError('Memo must be 500 characters or less')
       return
@@ -454,6 +526,11 @@ export function HRManualTimeLogModal({
           description: formData.memo || '',
           startTime: start.toISOString(),
           endTime: end.toISOString(),
+          // The exact calendar date the user picked, unambiguous regardless of browser/org
+          // timezone - the server uses this directly for the past-time-limit check instead of
+          // re-deriving a date from the converted instant (which can land on the wrong day if
+          // the browser's timezone differs from the organization's configured timezone).
+          startDateOnly: formData.startDate,
           isBillable: true
         })
       })
@@ -477,6 +554,11 @@ export function HRManualTimeLogModal({
 
   const selectedEmployee = employees.find(e => e._id === selectedEmployeeId)
 
+  // True when the current start/end date error is the past-limit message specifically, so the
+  // persistent hint box above the date fields can turn red instead of a separate error box
+  // popping up underneath.
+  const isPastLimitViolated = !!pastLimitMsg && (startDateError === pastLimitMsg || endDateError === pastLimitMsg)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
@@ -494,7 +576,9 @@ export function HRManualTimeLogModal({
             </Alert>
           )}
 
-          {/* Employee Selection */}
+          {/* Employee Selection — only shown to unrestricted roles (Super Admin/Admin/HR).
+              Everyone else logs their own time only, so the selection is implicit. */}
+          {isUnrestrictedRole && (
           <div className="space-y-2">
             <Label htmlFor="hr-employee">Employee *</Label>
             <Select
@@ -572,6 +656,7 @@ export function HRManualTimeLogModal({
               </p>
             )}
           </div>
+          )}
 
           {/* Project and Task Selection */}
           <div className="grid gap-4 md:grid-cols-2">
@@ -765,6 +850,16 @@ export function HRManualTimeLogModal({
           </div>
 
           {/* Date and Time Fields */}
+          {!isUnrestrictedRole && pastLimitMsg && (
+            <div className={`flex items-start gap-2 p-2 rounded-md border ${isPastLimitViolated ? 'bg-destructive/10 border-destructive/20' : 'bg-muted/50 border-border'}`}>
+              {isPastLimitViolated ? (
+                <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+              ) : (
+                <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              )}
+              <p className={`text-xs leading-relaxed ${isPastLimitViolated ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>{pastLimitMsg}</p>
+            </div>
+          )}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="hr-start-date">Start Date *</Label>
@@ -773,10 +868,10 @@ export function HRManualTimeLogModal({
                 type="date"
                 value={formData.startDate}
                 min={minDateStr}
-                max={todayStr}
+                max={maxDateStr}
                 onChange={(e) => {
                   const val = e.target.value
-                  if (val && (val < minDateStr || val > todayStr)) {
+                  if (val && ((minDateStr && val < minDateStr) || (maxDateStr && val > maxDateStr))) {
                     setStartDateError(pastLimitMsg)
                     return
                   }
@@ -787,7 +882,7 @@ export function HRManualTimeLogModal({
                 disabled={!selectedTaskId}
                 className={`w-full ${startDateError ? 'border-destructive' : ''}`}
               />
-              {startDateError && (
+              {startDateError && startDateError !== pastLimitMsg && (
                 <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                   <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-destructive font-medium leading-relaxed">{startDateError}</p>
@@ -823,10 +918,10 @@ export function HRManualTimeLogModal({
                 type="date"
                 value={formData.endDate}
                 min={minDateStr}
-                max={todayStr}
+                max={maxDateStr}
                 onChange={(e) => {
                   const val = e.target.value
-                  if (val && (val < minDateStr || val > todayStr)) {
+                  if (val && ((minDateStr && val < minDateStr) || (maxDateStr && val > maxDateStr))) {
                     setEndDateError(pastLimitMsg)
                     return
                   }
@@ -837,7 +932,7 @@ export function HRManualTimeLogModal({
                 disabled={!selectedTaskId}
                 className={`w-full ${endDateError ? 'border-destructive' : ''}`}
               />
-              {endDateError && (
+              {endDateError && endDateError !== pastLimitMsg && (
                 <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                   <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-destructive font-medium leading-relaxed">{endDateError}</p>

@@ -20,7 +20,8 @@ import {
   RotateCcw,
   MoreHorizontal,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ClipboardList
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -291,7 +292,7 @@ export default function TestCaseList({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <CardTitle className="text-xl sm:text-2xl">Test Cases</CardTitle>
           {showAddButton && (
-            <Button onClick={handleCreateTestCase} className="w-full sm:w-auto">
+            <Button onClick={handleCreateTestCase} size="sm" className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Add Test Case
             </Button>
@@ -370,6 +371,7 @@ export default function TestCaseList({
       <CardContent>
         {testCases.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
+            <ClipboardList className="h-8 w-8 mx-auto mb-2" />
             <p>No test cases found</p>
             <Button
               variant="outline"

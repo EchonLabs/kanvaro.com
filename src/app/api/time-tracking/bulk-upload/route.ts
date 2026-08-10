@@ -9,11 +9,16 @@ import { Task } from '@/models/Task'
 import { applyRoundingRules } from '@/lib/utils'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import { Permission } from '@/lib/permissions/permission-definitions'
+import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { getOrgLocalDateString, getOrgLocalTimeString, calendarDayDiff, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
+
+// Super Admin, Admin, and HR bypass the manual-log kill switch, the member sub-setting,
+// and the past-time-limit checks below — same unrestricted set as the single-entry endpoint.
+const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
 interface CSVRow {
   'Task No': string
@@ -76,6 +81,7 @@ export async function POST(request: NextRequest) {
     // Check if user has bulk upload permission
     const hasBulkUploadAll = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
     const hasViewAll = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_VIEW_ALL)
+    const isUnrestrictedRole = UNRESTRICTED_TIME_LOG_ROLES.includes(requester.role)
 
     console.log('[Bulk Upload] User permissions - bulkUploadAll:', hasBulkUploadAll, 'viewAll:', hasViewAll)
 
@@ -137,6 +143,7 @@ export async function POST(request: NextRequest) {
         project: null,
         allowTimeTracking: orgTimeTracking.allowTimeTracking ?? true,
         allowManualTimeSubmission: orgTimeTracking.allowManualTimeSubmission ?? true,
+        allowMembersToAddTimeLogs: orgTimeTracking.allowMembersToAddTimeLogs ?? false,
         requireApproval: orgTimeTracking.requireApproval ?? false,
         allowBillableTime: orgTimeTracking.allowBillableTime ?? true,
         defaultHourlyRate: orgTimeTracking.defaultHourlyRate,
@@ -149,6 +156,7 @@ export async function POST(request: NextRequest) {
         allowFutureTime: orgTimeTracking.allowFutureTime ?? false,
         allowPastTime: orgTimeTracking.allowPastTime ?? true,
         pastTimeLimitDays: orgTimeTracking.pastTimeLimitDays ?? 30,
+        pastTimeLimitCutoffTime: orgTimeTracking.pastTimeLimitCutoffTime ?? '23:59',
         roundingRules: orgTimeTracking.roundingRules || { enabled: false, increment: 15, roundUp: false },
         notifications: orgTimeTracking.notifications || {
           onTimerStart: false,
@@ -160,6 +168,10 @@ export async function POST(request: NextRequest) {
       })
       await orgSettings.save()
     }
+
+    // Resolve once up-front — the cutoff-time rule is evaluated in the org's timezone, not the server's.
+    const orgForTimezone = await Organization.findById(organizationId).select('timezone').lean()
+    const orgTimezone = (orgForTimezone as any)?.timezone || 'UTC'
 
     // Process each row
     for (let i = 0; i < rows.length; i++) {
@@ -189,6 +201,20 @@ export async function POST(request: NextRequest) {
           if (projectSettings) {
             settings = projectSettings
           }
+        }
+
+        // Master kill switch — blocks everyone unconditionally, no exceptions.
+        if (!settings.allowManualTimeSubmission) {
+          results.errors.push({ row: rowNum, error: 'Manual time submission is disabled for this organization/project' })
+          results.failed++
+          continue
+        }
+
+        // Restricted roles additionally need the member sub-setting explicitly enabled.
+        if (!isUnrestrictedRole && !settings.allowMembersToAddTimeLogs) {
+          results.errors.push({ row: rowNum, error: 'Manual time submission is not enabled for your role' })
+          results.failed++
+          continue
         }
 
         // Validate description if required
@@ -357,27 +383,34 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Check if time is in the past/future according to settings
+        // Check if time is in the past/future according to settings.
+        // Super Admin/Admin/HR can log any date — skip these checks entirely for them.
         const now = new Date()
-        if (!settings.allowFutureTime && startDateTime > now) {
-          results.errors.push({ row: rowNum, error: 'Future time entries are not allowed' })
-          results.failed++
-          continue
-        }
-
-        if (!settings.allowPastTime) {
-          results.errors.push({ row: rowNum, error: 'Past time entries are not allowed' })
-          results.failed++
-          continue
-        }
-
-        if (settings.pastTimeLimitDays && settings.allowPastTime) {
-          const pastLimit = new Date()
-          pastLimit.setDate(pastLimit.getDate() - settings.pastTimeLimitDays)
-          if (startDateTime < pastLimit) {
-            results.errors.push({ row: rowNum, error: `Time entries older than ${settings.pastTimeLimitDays} days are not allowed` })
-            results.failed++
-            continue
+        if (!isUnrestrictedRole) {
+          if (startDateTime > now) {
+            if (!settings.allowFutureTime) {
+              results.errors.push({ row: rowNum, error: 'Future time entries are not allowed' })
+              results.failed++
+              continue
+            }
+          } else {
+            // Use the CSV row's own date (already parsed losslessly into Y/M/D) rather than
+            // re-deriving a calendar date from the combined instant via the org's timezone -
+            // that re-derivation can land on the wrong day since `startDate` was constructed
+            // from the literal row values, not from any particular timezone's "now".
+            const pad = (n: number) => String(n).padStart(2, '0')
+            const startDateStr = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`
+            const todayStr = getOrgLocalDateString(now, orgTimezone)
+            const daysDiff = calendarDayDiff(startDateStr, todayStr)
+            if (daysDiff > 0) {
+              const nowTimeStr = getOrgLocalTimeString(now, orgTimezone)
+              const effectiveLimit = computeEffectivePastTimeLimitDays(settings.pastTimeLimitDays, settings.pastTimeLimitCutoffTime, nowTimeStr)
+              if (daysDiff > effectiveLimit) {
+                results.errors.push({ row: rowNum, error: `Time entries older than ${effectiveLimit} days are not allowed` })
+                results.failed++
+                continue
+              }
+            }
           }
         }
 

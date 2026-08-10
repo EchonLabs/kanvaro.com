@@ -4,9 +4,11 @@ import { User } from '@/models/User'
 import { Task } from '@/models/Task'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
+import { Role } from '@/lib/permissions/permission-definitions'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
+const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,9 +49,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only HR can access this endpoint
-    if (requester.role !== 'human_resource') {
-      return NextResponse.json({ error: 'Forbidden: Only HR users can access this endpoint' }, { status: 403 })
+    // Unrestricted roles (Super Admin/Admin/HR) can look up anyone's tasks; everyone else
+    // may only look up their own (self-service manual log flow).
+    const isSelfRequest = employeeId === requester._id.toString()
+    if (!UNRESTRICTED_TIME_LOG_ROLES.includes(requester.role) && !isSelfRequest) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const orgId = requester.organization.toString()

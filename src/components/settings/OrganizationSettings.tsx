@@ -114,6 +114,7 @@ export function OrganizationSettings() {
     timeTracking: {
       allowTimeTracking: true,
       allowManualTimeSubmission: true,
+      allowMembersToAddTimeLogs: false,
       requireApproval: false,
       allowBillableTime: true,
       defaultHourlyRate: '0',
@@ -125,6 +126,7 @@ export function OrganizationSettings() {
       allowFutureTime: false,
       allowPastTime: true,
       pastTimeLimitDays: '1',
+      pastTimeLimitCutoffTime: '23:59',
       disableTimeLogEditing: false,
       timeLogEditMode: undefined as 'days' | 'dayOfMonth' | undefined,
       timeLogEditDays: '30',
@@ -291,6 +293,7 @@ export function OrganizationSettings() {
         timeTracking: {
           allowTimeTracking: true,
           allowManualTimeSubmission: true,
+          allowMembersToAddTimeLogs: false,
           requireApproval: false,
           allowBillableTime: true,
           defaultHourlyRate: '0',
@@ -302,6 +305,7 @@ export function OrganizationSettings() {
           allowFutureTime: false,
           allowPastTime: true,
           pastTimeLimitDays: '1',
+          pastTimeLimitCutoffTime: '23:59',
           disableTimeLogEditing: false,
           timeLogEditMode: undefined,
           timeLogEditDays: '30',
@@ -340,6 +344,7 @@ export function OrganizationSettings() {
                 timeTracking: {
                   allowTimeTracking: data.settings.allowTimeTracking ?? prev.timeTracking.allowTimeTracking,
                   allowManualTimeSubmission: data.settings.allowManualTimeSubmission ?? prev.timeTracking.allowManualTimeSubmission,
+                  allowMembersToAddTimeLogs: data.settings.allowMembersToAddTimeLogs ?? prev.timeTracking.allowMembersToAddTimeLogs,
                   requireApproval: data.settings.requireApproval ?? prev.timeTracking.requireApproval,
                   allowBillableTime: data.settings.allowBillableTime ?? prev.timeTracking.allowBillableTime,
                   defaultHourlyRate: data.settings.defaultHourlyRate ?? prev.timeTracking.defaultHourlyRate,
@@ -351,6 +356,7 @@ export function OrganizationSettings() {
                   allowFutureTime: data.settings.allowFutureTime ?? prev.timeTracking.allowFutureTime,
                   allowPastTime: data.settings.allowPastTime ?? prev.timeTracking.allowPastTime,
                   pastTimeLimitDays: data.settings.pastTimeLimitDays ?? prev.timeTracking.pastTimeLimitDays,
+                  pastTimeLimitCutoffTime: data.settings.pastTimeLimitCutoffTime ?? prev.timeTracking.pastTimeLimitCutoffTime,
                   disableTimeLogEditing: data.settings.disableTimeLogEditing ?? prev.timeTracking.disableTimeLogEditing ?? false,
                   timeLogEditMode: data.settings.timeLogEditMode as 'days' | 'dayOfMonth' | undefined ?? prev.timeTracking.timeLogEditMode,
                   timeLogEditDays: data.settings.timeLogEditDays ?? prev.timeTracking.timeLogEditDays,
@@ -448,7 +454,10 @@ export function OrganizationSettings() {
             maxDailyHours: parseInt(formData.timeTracking.maxDailyHours) || 12,
             maxWeeklyHours: parseInt(formData.timeTracking.maxWeeklyHours) || 60,
             maxSessionHours: parseInt(formData.timeTracking.maxSessionHours) || 8,
-            pastTimeLimitDays: parseInt(formData.timeTracking.pastTimeLimitDays?.toString()) || 30,
+            pastTimeLimitDays: (() => {
+              const parsed = parseInt(formData.timeTracking.pastTimeLimitDays?.toString())
+              return Number.isNaN(parsed) ? 30 : parsed
+            })(),
             timeLogEditMode: formData.timeTracking.timeLogEditMode,
             timeLogEditDays: formData.timeTracking.timeLogEditDays ? parseInt(formData.timeTracking.timeLogEditDays.toString()) : 30,
             timeLogEditDayOfMonth: formData.timeTracking.timeLogEditDayOfMonth ? parseInt(formData.timeTracking.timeLogEditDayOfMonth.toString()) : 15,
@@ -780,6 +789,32 @@ export function OrganizationSettings() {
               checked={formData.timeTracking.allowManualTimeSubmission}
               onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowManualTimeSubmission: v } })}
             />
+            {formData.timeTracking.allowManualTimeSubmission && (
+              <ToggleRow
+                label="Allow Members to Add Time Logs"
+                description="Let non-admin roles submit their own manual time entries, subject to the past-time limit below. Admins, Super Admins, and HR can always add manual logs for anyone regardless of this setting."
+                checked={formData.timeTracking.allowMembersToAddTimeLogs}
+                onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowMembersToAddTimeLogs: v } })}
+              />
+            )}
+            {formData.timeTracking.allowManualTimeSubmission && formData.timeTracking.allowMembersToAddTimeLogs && (
+              <div className="pl-4 border-l-2 border-[var(--apple-separator)] space-y-3">
+                <Field label="Past Time Limit (Days)" htmlFor="pastTimeLimitDays" hint="How many days back members may log time. Admins, Super Admins, and HR are never restricted by this.">
+                  <Input id="pastTimeLimitDays" type="number" value={formData.timeTracking.pastTimeLimitDays}
+                    onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, pastTimeLimitDays: e.target.value } })}
+                    min="0" max="365" />
+                </Field>
+                <Field label="Cutoff Time" htmlFor="pastTimeLimitCutoffTime" hint="After this time each day, the oldest loggable day in the window above becomes unavailable — earlier days remain open all day.">
+                  <Input id="pastTimeLimitCutoffTime" type="time" value={formData.timeTracking.pastTimeLimitCutoffTime}
+                    onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, pastTimeLimitCutoffTime: e.target.value } })}
+                  />
+                </Field>
+                <ToggleRow label="Allow Future Time" description="Let members log time for future dates. Admins, Super Admins, and HR can always log future dates regardless of this setting."
+                  checked={formData.timeTracking.allowFutureTime}
+                  onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowFutureTime: v } })}
+                />
+              </div>
+            )}
             <ToggleRow
               label="Require Approval"
               description="Require manager approval for all time entries"
@@ -831,22 +866,6 @@ export function OrganizationSettings() {
               checked={formData.timeTracking.requireCategory}
               onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, requireCategory: v } })}
             />
-            <ToggleRow label="Allow Future Time" description="Allow logging time for future dates"
-              checked={formData.timeTracking.allowFutureTime}
-              onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowFutureTime: v } })}
-            />
-            <ToggleRow label="Allow Past Time" description="Allow logging time for past dates"
-              checked={formData.timeTracking.allowPastTime}
-              onCheckedChange={(v) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, allowPastTime: v } })}
-            />
-            {formData.timeTracking.allowPastTime && (
-              <Field label="Past Time Limit (Days)" htmlFor="pastTimeLimitDays">
-                <Input id="pastTimeLimitDays" type="number" value={formData.timeTracking.pastTimeLimitDays}
-                  onChange={(e) => setFormData({ ...formData, timeTracking: { ...formData.timeTracking, pastTimeLimitDays: e.target.value } })}
-                  min="1" max="365" />
-              </Field>
-            )}
-
             {/* Time Log Editing */}
             <div className="pt-3 border-t border-[var(--apple-separator)] space-y-3">
               <p className="apple-section-label">Time Log Editing Rules</p>
