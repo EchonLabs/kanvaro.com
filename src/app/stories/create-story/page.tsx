@@ -396,17 +396,19 @@ export default function CreateStoryPage() {
                             placeholder="Type to search projects"
                             className="mb-2"
                           />
-                          {filteredProjects.length > 0 ? (
-                            filteredProjects.map((project) => (
-                              <SelectItem key={project._id} value={project._id} title={project.name}>
-                                <div className="truncate max-w-xs" title={project.name}>
-                                  {project.name}
-                                </div>
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
-                          )}
+                          <div className="max-h-56 overflow-y-auto">
+                            {filteredProjects.length > 0 ? (
+                              filteredProjects.map((project) => (
+                                <SelectItem key={project._id} value={project._id} title={project.name}>
+                                  <div className="truncate max-w-xs" title={project.name}>
+                                    {project.name}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
+                            )}
+                          </div>
                         </div>
                       </SelectContent>
                     </Select>

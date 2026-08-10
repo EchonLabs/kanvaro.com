@@ -163,7 +163,7 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
             style={{ width: LEFT_PANEL_W }}
           >
             {/* Timeline header placeholder (aligns with the month+day rows) */}
-            <div className="border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]" style={{ height: 52 }}>
+            <div className="sticky top-0 z-20 border-b border-[var(--apple-separator)] bg-card" style={{ height: 52 }}>
               <div className="flex items-end h-full px-4 pb-1.5">
                 <span className="apple-section-label text-[var(--apple-secondary-label)]">Name</span>
               </div>
@@ -281,10 +281,10 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
           </div>
 
           {/* ── Timeline area ── */}
-          <div className="relative flex-1 overflow-hidden" style={{ width: totalDays * dayWidth }}>
+          <div className="relative flex-1" style={{ width: totalDays * dayWidth }}>
 
             {/* Month + day header (sticky) */}
-            <div className="sticky top-0 z-10 border-b border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)]" style={{ height: 52 }}>
+            <div className="sticky top-0 z-10 border-b border-[var(--apple-separator)] bg-card" style={{ height: 52 }}>
               {/* Month row */}
               <div className="flex border-b border-[var(--apple-separator)]" style={{ height: 24 }}>
                 {months.map((m, i) => (

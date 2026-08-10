@@ -59,7 +59,6 @@ import { DateRange } from 'react-day-picker'
 import { DEFAULT_TASK_STATUS_KEYS, type TaskStatusKey } from '@/constants/taskStatuses'
 import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
 
-import CreateTaskModal from './CreateTaskModal'
 // Removed bulk upload import
 // import BulkUploadModal from './BulkUploadModal'
 import {
@@ -359,7 +358,6 @@ export default function TasksClient({
     const [createdByFilterQuery, setCreatedByFilterQuery] = useState('')
     const [selectedProjectDetails, setSelectedProjectDetails] = useState<any>(null)
     const [viewMode, setViewMode] = useState<'list' | 'grid' | 'kanban'>('list')
-    const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
     const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
@@ -637,7 +635,7 @@ export default function TasksClient({
         if (selectedProjectDetails && selectedProjectDetails.teamMembers) {
             const projectMemberIds = new Set<string>();
             selectedProjectDetails.teamMembers.forEach((member: any) => {
-                const id = member.memberId || member.user?._id || member.user || member._id || member;
+                const id = member.memberId?._id || member.memberId || member.user?._id || member.user || member._id || member;
                 if (id) projectMemberIds.add(id.toString());
             });
             if (selectedProjectDetails.createdBy) {
@@ -676,7 +674,7 @@ export default function TasksClient({
         if (selectedProjectDetails && selectedProjectDetails.teamMembers) {
             const projectMemberIds = new Set<string>();
             selectedProjectDetails.teamMembers.forEach((member: any) => {
-                const id = member.memberId || member.user?._id || member.user || member._id || member;
+                const id = member.memberId?._id || member.memberId || member.user?._id || member.user || member._id || member;
                 if (id) projectMemberIds.add(id.toString());
             });
             if (selectedProjectDetails.createdBy) {
@@ -1053,12 +1051,7 @@ export default function TasksClient({
         return Array.from(DEFAULT_TASK_STATUS_KEYS)
     }, [projectFilter, projectsWithStatuses])
 
-    const handleTaskCreated = () => {
-        fetchTasks(true)
-        setShowCreateTaskModal(false)
-    }
-
-    const handlePageChange = (newPage: number) => {
+const handlePageChange = (newPage: number) => {
         setCurrentPage(newPage)
     }
 
@@ -1158,7 +1151,7 @@ export default function TasksClient({
                 actions={
                     canCreateTask ? (
                         <Button
-                            onClick={() => setShowCreateTaskModal(true)}
+                            onClick={() => router.push('/tasks/create-new-task')}
                             className="rounded-full bg-[var(--apple-system-blue)] text-white px-4 py-2 text-[15px] font-semibold hover:opacity-90 apple-transition"
                         >
                             <Plus className="h-4 w-4 mr-2" />
@@ -1940,7 +1933,7 @@ export default function TasksClient({
                                         description="Try adjusting your filters or create a new task."
                                         action={
                                             canCreateTask ? (
-                                                <Button onClick={() => setShowCreateTaskModal(true)}>New Task</Button>
+                                                <Button onClick={() => router.push('/tasks/create-new-task')}>New Task</Button>
                                             ) : undefined
                                         }
                                     />
@@ -2122,7 +2115,7 @@ export default function TasksClient({
                                         description="Try adjusting your filters or create a new task."
                                         action={
                                             canCreateTask ? (
-                                                <Button onClick={() => setShowCreateTaskModal(true)}>New Task</Button>
+                                                <Button onClick={() => router.push('/tasks/create-new-task')}>New Task</Button>
                                             ) : undefined
                                         }
                                     />
@@ -2145,7 +2138,7 @@ export default function TasksClient({
                                 projectId={projectFilter}
                                 filters={kanbanFilters}
                                 onProjectChange={setProjectFilter}
-                                onCreateTask={() => setShowCreateTaskModal(true)}
+                                onCreateTask={() => router.push('/tasks/create-new-task')}
                                 onEditTask={handleKanbanEditTask}
                                 onDeleteTask={handleKanbanDeleteTask}
                             />
@@ -2156,7 +2149,7 @@ export default function TasksClient({
                                     description="Try adjusting your filters or create a new task."
                                     action={
                                         canCreateTask ? (
-                                            <Button onClick={() => setShowCreateTaskModal(true)}>New Task</Button>
+                                            <Button onClick={() => router.push('/tasks/create-new-task')}>New Task</Button>
                                         ) : undefined
                                     }
                                 />
@@ -2167,15 +2160,6 @@ export default function TasksClient({
             )}
 
             {/* ── Modals ────────────────────────────────────────────────────────── */}
-            {showCreateTaskModal && (
-                <CreateTaskModal
-                    isOpen={showCreateTaskModal}
-                    onClose={() => setShowCreateTaskModal(false)}
-                    projectId={initialFilters.project || ''}
-                    onTaskCreated={handleTaskCreated}
-                />
-            )}
-
             <ConfirmationModal
                 isOpen={showDeleteConfirmModal}
                 onClose={() => {

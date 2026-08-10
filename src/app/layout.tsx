@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 // import { Inter } from 'next/font/google'
 import './globals.css'
 import 'swagger-ui-react/swagger-ui.css'
@@ -19,6 +19,17 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.svg',
   },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Android keyboards otherwise resize the visual viewport on open, which fires a
+  // visualViewport `resize` event mid-interaction. Radix's Select (popper positioning)
+  // mistakes that for the trigger scrolling out of view and auto-closes the dropdown —
+  // this is what broke project/task selection on Android. Overlaying keeps the viewport
+  // stable so the keyboard no longer trips that logic.
+  interactiveWidget: 'overlays-content',
 }
 
 export default async function RootLayout({
