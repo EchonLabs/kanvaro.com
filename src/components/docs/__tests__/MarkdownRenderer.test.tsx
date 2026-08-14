@@ -1,4 +1,9 @@
-import { describe, it, expect, jest } from '@jest/globals';
+/**
+ * @jest-environment jsdom
+ */
+// Uses the ambient globals from @types/jest rather than importing from
+// '@jest/globals' — importing shadows the global `jest` namespace, which blocks
+// the @testing-library/jest-dom matcher augmentation (toBeInTheDocument).
 import { render, screen, waitFor } from '@testing-library/react';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { DocNode } from '@/lib/docs/types';

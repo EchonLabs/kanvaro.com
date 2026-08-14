@@ -3,41 +3,23 @@
  * This ensures that task updates are properly synchronized across Kanban and Calendar views
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+// Uses the ambient globals from @types/jest rather than importing from
+// '@jest/globals' — importing shadows the global `jest` namespace, which both
+// blocks the @testing-library/jest-dom matcher augmentation and types bare
+// mocks as `never`.
 
 // Mock fetch for testing
-const mockFetch = vi.fn()
-global.fetch = mockFetch
-
-// Mock the useTaskSync hook
-const mockUseTaskSync = {
-  isConnected: true,
-  startPolling: vi.fn(),
-  stopPolling: vi.fn(),
-  updateTaskOptimistically: vi.fn(),
-  lastUpdate: null
-}
-
-const mockUseTaskState = {
-  tasks: [],
-  setTasks: vi.fn(),
-  isLoading: false,
-  error: null,
-  updateTask: vi.fn(),
-  deleteTask: vi.fn(),
-  handleTaskUpdate: vi.fn(),
-  handleTaskCreate: vi.fn(),
-  handleTaskDelete: vi.fn()
-}
+const mockFetch = jest.fn()
+global.fetch = mockFetch as unknown as typeof fetch
 
 describe('Task Synchronization', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
     mockFetch.mockClear()
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   describe('Real-time Updates', () => {
@@ -180,7 +162,7 @@ describe('Task Synchronization', () => {
         await fetch('/api/tasks/sync')
       } catch (error) {
         expect(error).toBeInstanceOf(Error)
-        expect(error.message).toBe('Network error')
+        expect((error as Error).message).toBe('Network error')
       }
     })
 
