@@ -109,6 +109,138 @@ export async function getDailyHoursLogged(userId: string, organizationId: string
   return totalMinutes / MINUTES_PER_HOUR
 }
 
+/**
+ * Marks a time entry that the PM typed into the stand-up "yesterday" panel
+ * rather than one captured by a timer. Spec E74 / NFR-I1: when a project does
+ * not use the timer, actuals are still stored as real time entries so every
+ * variance calculation downstream is unchanged.
+ */
+export const STANDUP_MANUAL_TIME_ENTRY_CATEGORY = 'standup_manual'
+
+/**
+ * Half-open interval of UTC instants: `from` inclusive, `to` exclusive.
+ *
+ * Callers own the timezone conversion. A stand-up "day" is a project-local
+ * calendar date (spec CAL-5), so the calendar engine resolves that date into
+ * these two instants before calling in — this layer stays timezone-agnostic so
+ * there is exactly one place that reasons about project timezones.
+ */
+export interface LoggedMinutesRange {
+  from: Date
+  to: Date
+}
+
+/** Time entries that represent abandoned work and must never count as logged. */
+const EXCLUDED_TIME_ENTRY_STATUSES = ['cancelled']
+
+const toObjectId = (value: string, label: string): mongoose.Types.ObjectId => {
+  if (!mongoose.Types.ObjectId.isValid(value)) {
+    throw new Error(`getLoggedMinutes: invalid ${label} "${value}"`)
+  }
+  return new mongoose.Types.ObjectId(value)
+}
+
+/**
+ * Minutes a specific member logged against a specific task within a date range.
+ *
+ * This is the contract the stand-up variance engine is built on (spec §18.2):
+ * it supplies `A` (actual logged hours) in every V1–V12 outcome classification.
+ * Returns an integer — all stand-up arithmetic is in whole minutes (DAT-2,
+ * NFR-P1/P2) so repeated sums cannot drift.
+ */
+export async function getLoggedMinutes(
+  taskId: string,
+  memberId: string,
+  range: LoggedMinutesRange
+): Promise<number> {
+  const result = await TimeEntry.aggregate([
+    {
+      $match: {
+        task: toObjectId(taskId, 'taskId'),
+        user: toObjectId(memberId, 'memberId'),
+        status: { $nin: EXCLUDED_TIME_ENTRY_STATUSES },
+        startTime: { $gte: range.from, $lt: range.to }
+      }
+    },
+    { $group: { _id: null, totalDuration: { $sum: '$duration' } } }
+  ])
+
+  return Math.round(result.length > 0 ? result[0].totalDuration : 0)
+}
+
+/** Key used by {@link getLoggedMinutesBulk} to identify a task/member pair. */
+export const loggedMinutesKey = (taskId: string, memberId: string) => `${taskId}:${memberId}`
+
+/**
+ * Batched form of {@link getLoggedMinutes} for a whole stand-up.
+ *
+ * The run screen resolves logged minutes for every allocation at once, so doing
+ * this per allocation would be ~50 round trips and blow the NFR-1/NFR-3
+ * budgets. Returns a map keyed by {@link loggedMinutesKey}; pairs with no time
+ * logged are present with a value of 0, so callers never have to distinguish
+ * "absent" from "zero".
+ */
+export async function getLoggedMinutesBulk(
+  pairs: Array<{ taskId: string; memberId: string }>,
+  range: LoggedMinutesRange
+): Promise<Map<string, number>> {
+  const totals = new Map<string, number>()
+  if (pairs.length === 0) return totals
+
+  for (const { taskId, memberId } of pairs) {
+    totals.set(loggedMinutesKey(taskId, memberId), 0)
+  }
+
+  const results = await TimeEntry.aggregate([
+    {
+      $match: {
+        task: { $in: pairs.map(p => toObjectId(p.taskId, 'taskId')) },
+        user: { $in: pairs.map(p => toObjectId(p.memberId, 'memberId')) },
+        status: { $nin: EXCLUDED_TIME_ENTRY_STATUSES },
+        startTime: { $gte: range.from, $lt: range.to }
+      }
+    },
+    {
+      $group: {
+        _id: { task: '$task', user: '$user' },
+        totalDuration: { $sum: '$duration' }
+      }
+    }
+  ])
+
+  for (const row of results) {
+    const key = loggedMinutesKey(row._id.task.toString(), row._id.user.toString())
+    // The $in/$in match is a cross product, so it can return pairs that were
+    // never asked for. Only keep the ones actually requested.
+    if (totals.has(key)) {
+      totals.set(key, Math.round(row.totalDuration))
+    }
+  }
+
+  return totals
+}
+
+/**
+ * Total minutes logged against a task by anyone, over its whole life.
+ *
+ * Drives the second of the two variance scopes (spec §12.1): task variance is
+ * `totalLoggedMinutesOnTask - originalEstimateMinutes`, which answers "has this
+ * task cost more than we estimated overall" as opposed to the per-day question.
+ */
+export async function getTotalLoggedMinutesForTask(taskId: string): Promise<number> {
+  const result = await TimeEntry.aggregate([
+    {
+      $match: {
+        task: toObjectId(taskId, 'taskId'),
+        status: { $nin: EXCLUDED_TIME_ENTRY_STATUSES }
+      }
+    },
+    { $group: { _id: null, totalDuration: { $sum: '$duration' } } }
+  ])
+
+  return Math.round(result.length > 0 ? result[0].totalDuration : 0)
+}
+
 export interface StopTimerOptions {
   description?: string
   category?: string
