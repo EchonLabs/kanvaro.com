@@ -18,6 +18,8 @@ import { Switch } from '@/components/ui/switch'
 import { useNotify } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 
+import { PointsMigrationDialog } from './PointsMigrationDialog'
+
 interface Settings {
   enabled: boolean
   standupLocalTime: string
@@ -46,6 +48,8 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  /** PLN-14 — a proposed factor awaiting the migration dialog's confirmation. */
+  const [pendingFactor, setPendingFactor] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -306,9 +310,30 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
           max={40}
           step={0.5}
           value={settings.pointsToHours}
-          onChange={(value) => update('pointsToHours', value)}
+          // PLN-14 — changing this after estimates exist must never recompute
+          // silently. The value is held locally and routed through the
+          // migration dialog, which previews every affected task first.
+          onChange={(value) => setPendingFactor(value)}
         />
+        {pendingFactor !== null && pendingFactor !== settings.pointsToHours && (
+          <p className="text-[12px] text-[var(--apple-secondary-label)]">
+            Reviewing what {pendingFactor}h per point would change…
+          </p>
+        )}
       </Section>
+
+      {pendingFactor !== null && (
+        <PointsMigrationDialog
+          open
+          onOpenChange={(next) => !next && setPendingFactor(null)}
+          projectId={projectId}
+          proposedFactor={pendingFactor}
+          onApplied={() => {
+            update('pointsToHours', pendingFactor)
+            setPendingFactor(null)
+          }}
+        />
+      )}
     </div>
   )
 }

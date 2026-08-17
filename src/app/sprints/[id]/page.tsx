@@ -18,6 +18,7 @@ import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { useNotify } from '@/lib/notify'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { isLiveSprint, type SprintState } from '@/lib/standup/sprint-states'
 import {
   ArrowLeft,
   Calendar,
@@ -36,14 +37,16 @@ import {
   Zap,
   ChevronDown,
   ChevronRight,
-  CheckSquare
+  CheckSquare,
+  ClipboardCheck
 } from 'lucide-react'
 
 interface Sprint {
   _id: string
   name: string
   description: string
-  status: 'planning' | 'active' | 'completed' | 'cancelled'
+  // Spec §8.1 adds `draft` and `planned` to the four states Kanvaro shipped with.
+  status: SprintState
   project: {
     _id: string
     name: string
@@ -489,7 +492,7 @@ export default function SprintDetailPage() {
       const sprintList: SprintOption[] = Array.isArray(data.data) ? data.data : []
       const filtered = sprintList.filter(
         sprintOption =>
-          sprintOption._id !== excludeSprintId && ['planning', 'active'].includes(sprintOption.status)
+          sprintOption._id !== excludeSprintId && isLiveSprint(sprintOption.status)
       )
 
       setAvailableSprints(filtered)
@@ -658,7 +661,7 @@ export default function SprintDetailPage() {
         const allSprintsList = allSprintsData.data || []
         const nextSprint = allSprintsList.find((s: Sprint) => s.name === nextSprintName)
 
-        if (nextSprint && ['planning', 'active'].includes(nextSprint.status)) {
+        if (nextSprint && isLiveSprint(nextSprint.status)) {
           // Next sprint exists - auto-select it
           setSelectedTargetSprintId(nextSprint._id)
           setCompletionMode('existing')
@@ -952,6 +955,18 @@ export default function SprintDetailPage() {
               )}
 
               <div className="flex items-center gap-2">
+                {/* The planning gate: stand-ups cannot run until this sprint
+                    has been planned, so the route to it is offered on every
+                    sprint that has not yet passed it. */}
+                {canEditSprint && ['draft', 'planning', 'planned'].includes(sprint.status) && (
+                  <button
+                    onClick={() => router.push(`/sprints/${sprintId}/planning`)}
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold px-4 h-9 border border-[var(--apple-separator)] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+                  >
+                    <ClipboardCheck className="h-3.5 w-3.5" />
+                    {sprint.status === 'planned' ? 'Planning' : 'Plan Sprint'}
+                  </button>
+                )}
                 {canEditSprint && (
                   <button
                     onClick={() => router.push(`/sprints/${sprintId}/edit`)}

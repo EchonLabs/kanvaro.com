@@ -61,6 +61,7 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import { validateAndCorrectDateRange, validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
 import { extractUserId } from '@/lib/auth/user-utils'
+import { isLiveSprint } from '@/lib/standup/sprint-states'
 
 interface UserSummary {
   _id: string
@@ -917,7 +918,7 @@ export default function BacklogPage() {
           : []
 
       const filtered = sprintList.filter(
-        (sprint) => sprint && ['planning', 'active'].includes(sprint.status)
+        (sprint) => sprint && isLiveSprint(sprint.status)
       )
 
       setSprints(filtered)
