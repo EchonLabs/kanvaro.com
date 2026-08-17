@@ -67,6 +67,7 @@ import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { Permission } from '@/lib/permissions'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { PermissionGate } from '@/lib/permissions/permission-components'
+import { StandupSettingsPanel } from '@/components/standup/StandupSettingsPanel'
 
 interface Project {
   _id: string
@@ -2525,6 +2526,10 @@ export default function ProjectDetailPage() {
                   </CardFooter>
                 </Card> */}
 
+                </div>
+
+                <div className="border-t border-[var(--apple-separator)] pt-6">
+                  <StandupSettingsPanel projectId={projectId} />
                 </div>
               </div>
             </TabsContent>
