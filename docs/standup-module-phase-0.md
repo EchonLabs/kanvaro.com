@@ -1,3 +1,14 @@
+---
+slug: "reference/standup-module-phase-0"
+title: "Stand-up Module: Phase 0 Findings"
+summary: "Pre-flight findings for the Sprint Stand-up module — what Phase 0 closed, the decisions it locked in, and the debt left for later phases."
+visibility: "public"
+audiences: ["admin", "self_host_admin"]
+category: "reference"
+order: 82
+updated: "2026-08-17"
+---
+
 # Stand-up Module — Phase 0 Findings
 
 Pre-flight for the Kanvaro Sprint Stand-up Management Module (spec v1.0, 05 Aug 2026). See the implementation plan for the full phase breakdown and requirement-ID mapping. This document records what Phase 0 closed, the decisions it locked in, and the debt it deliberately left for later phases.
