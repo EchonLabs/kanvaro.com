@@ -19,7 +19,8 @@ export const ACTIVITY_ENTITY_TYPES = [
   'standup_override',
   'working_calendar',
   'member_capacity',
-  'planning_session'
+  'planning_session',
+  'project_standup_settings'
 ] as const
 
 export const ACTIVITY_ACTIONS = [
@@ -74,8 +75,14 @@ export const ACTIVITY_ACTIONS = [
   // Overrides and gate (OVR-*, PLN-16..19)
   'override_issued',
   'planning_session_started',
+  'planning_session_updated',
   'planning_session_completed',
   'planning_waiver_issued',
+  'planning_waiver_revoked',
+  // Estimation (PLN-11..15, DAT-6/7). `estimate_revised` is declared above
+  // with the variance actions.
+  'task_estimated',
+  'points_to_hours_changed',
   // Configuration (CAL-*)
   'working_calendar_updated',
   'holiday_set_imported',

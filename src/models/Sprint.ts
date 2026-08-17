@@ -1,12 +1,18 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
+import { SPRINT_STATES, type SprintState } from '@/lib/standup/sprint-states'
+
 export interface ISprint extends Document {
   name: string
   description?: string
   organization: mongoose.Types.ObjectId
   project: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
-  status: 'planning' | 'active' | 'completed' | 'cancelled'
+  /**
+   * Spec §8.1. `draft` and `planned` are additive; every pre-existing row is in
+   * one of the original four and keeps its meaning.
+   */
+  status: SprintState
   startDate: Date
   endDate: Date
   actualStartDate?: Date
@@ -29,6 +35,26 @@ export interface ISprint extends Document {
     uploadedAt: Date
   }[]
   archived: boolean
+
+  // --- Planning gate (spec §8, PLN-1/16/17/18) ------------------------------
+  /** The session that most recently took this sprint into `planned`. */
+  activePlanningSession?: mongoose.Types.ObjectId
+  plannedAt?: Date
+  /**
+   * PLN-16/17 — an Org-Admin waiver letting stand-ups run despite a failing
+   * mandatory check. Stored inline because a sprint has at most one, and it is
+   * read on every stand-up start (PLN-18's persistent banner).
+   */
+  planningWaiver?: {
+    waivedCheckIds: string[]
+    justification: string
+    issuedBy: mongoose.Types.ObjectId
+    issuedAt: Date
+    expiresAt: Date
+    revokedAt?: Date
+    revokedBy?: mongoose.Types.ObjectId
+  }
+
   createdAt: Date
   updatedAt: Date
 }
@@ -61,7 +87,9 @@ const SprintSchema = new Schema<ISprint>({
   },
   status: {
     type: String,
-    enum: ['planning', 'active', 'completed', 'cancelled'],
+    enum: [...SPRINT_STATES],
+    // Still `planning`, not `draft`: sprints created through the existing UI
+    // must land where they always have.
     default: 'planning'
   },
   startDate: {
@@ -119,7 +147,44 @@ const SprintSchema = new Schema<ISprint>({
     uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     uploadedAt: { type: Date, default: Date.now }
   }],
-  archived: { type: Boolean, default: false }
+  archived: { type: Boolean, default: false },
+
+  // --- Planning gate (spec §8) ---------------------------------------------
+  activePlanningSession: {
+    type: Schema.Types.ObjectId,
+    ref: 'SprintPlanningSession'
+  },
+  plannedAt: Date,
+  planningWaiver: {
+    type: new Schema(
+      {
+        waivedCheckIds: {
+          type: [String],
+          required: true,
+          validate: {
+            validator: (ids: string[]) => ids.length > 0,
+            message: 'A waiver must name at least one check'
+          }
+        },
+        justification: {
+          type: String,
+          required: true,
+          trim: true,
+          // PLN-17: at least 30 characters, longer than the 20 an override
+          // needs — waiving a mandatory gate deserves more explanation.
+          minlength: 30,
+          maxlength: 2000
+        },
+        issuedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        issuedAt: { type: Date, default: Date.now },
+        expiresAt: { type: Date, required: true },
+        revokedAt: Date,
+        revokedBy: { type: Schema.Types.ObjectId, ref: 'User' }
+      },
+      { _id: false }
+    ),
+    required: false
+  }
 }, {
   timestamps: true
 })
