@@ -88,6 +88,47 @@ export const standupStrings = {
     loadFailed: () => 'Could not load the calendar'
   },
 
+  /**
+   * Planning gate messages (spec §8.3).
+   *
+   * The PC/PA wording is quoted from the spec's own failure-message column —
+   * it is deliberately blunt ("You are planning to fail unless you cut scope"),
+   * and softening it would remove the point of the check.
+   */
+  planning: {
+    pc1: () => 'Write a sprint goal before completing planning.',
+    pc2: () => 'This sprint has no tasks.',
+    pc3: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task has', 'tasks have')} no estimate. Estimate them or remove them from the sprint.`,
+    pc4: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task has', 'tasks have')} no description of what done means.`,
+    pc5: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task is', 'tasks are')} missing type or priority.`,
+    pc6: () => 'Add team members to this sprint.',
+    pc7NoWorkingDays: () => 'This sprint contains no working days.',
+    pc7BadRange: () => 'The sprint start date must be on or before its end date.',
+
+    pa1: ({ overBy }: { overBy: string }) =>
+      `Scope is ${overBy} over capacity. You are planning to fail unless you cut scope.`,
+    pa2: ({ percent }: { percent: number }) =>
+      `Scope is only ${percent} percent of capacity. The team will run out of work.`,
+    pa3: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task is', 'tasks are')} larger than a single day. Consider splitting them.`,
+    pa4: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task was', 'tasks were')} estimated without a team vote.`,
+    pa5: ({ name, assigned, capacity }: { name: string; assigned: string; capacity: string }) =>
+      `${name} is pre-assigned ${assigned} against ${capacity} of capacity.`,
+    pa6: ({ name }: { name: string }) =>
+      `${name} has nothing assigned. That is fine if you intend to assign at day one stand-up.`,
+
+    /** PLN-19's carve-out, refused under every circumstance. */
+    waiverCannotCoverEstimates: () =>
+      'A waiver cannot allow an unestimated task to be allocated. Estimate it first.',
+
+    gateNotPassed: () =>
+      'This sprint has not completed planning, so its stand-ups cannot run.'
+  },
+
   impact: {
     none: () => 'This change does not affect any stand-ups.',
 
