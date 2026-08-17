@@ -35,6 +35,9 @@ export enum PermissionCategory {
   // Test management permissions
   TEST_MANAGEMENT = 'test_management',
 
+  // Sprint stand-up permissions
+  STANDUP = 'standup',
+
   // Documentation permissions
   DOCUMENTATION = 'documentation',
 }
@@ -205,6 +208,29 @@ export enum Permission {
   TEST_REPORT_VIEW = 'test_report:view',
   TEST_REPORT_EXPORT = 'test_report:export',
   TEST_MANAGE = 'test:manage',
+
+  // Stand-up permissions.
+  // Modelled directly on the spec's §3.2 role matrix. Split finely because the
+  // matrix draws real distinctions: a Team Member may edit their own allocation
+  // rows before the stand-up starts but not assign work to others, and only an
+  // Org Admin may approve a planning waiver.
+  STANDUP_CONFIGURE = 'standup:configure',
+  STANDUP_VIEW = 'standup:view',
+  STANDUP_GENERATE = 'standup:generate',
+  STANDUP_RUN = 'standup:run',
+  STANDUP_COMPLETE = 'standup:complete',
+  STANDUP_REOPEN = 'standup:reopen',
+  STANDUP_ALLOCATE = 'standup:allocate',
+  STANDUP_ALLOCATE_OWN = 'standup:allocate_own',
+  STANDUP_OVERRIDE = 'standup:override',
+  STANDUP_REVISE_ESTIMATE = 'standup:revise_estimate',
+  STANDUP_CARRY_FORWARD_NOTE = 'standup:carry_forward_note',
+  STANDUP_BLOCKER_RAISE = 'standup:blocker_raise',
+  STANDUP_VIEW_DEBT = 'standup:view_debt',
+  STANDUP_VIEW_OWN_DEBT = 'standup:view_own_debt',
+  STANDUP_WRITE_OFF_DEBT = 'standup:write_off_debt',
+  STANDUP_VIEW_ANALYTICS = 'standup:view_analytics',
+  STANDUP_PLANNING_WAIVER = 'standup:planning_waiver',
 
   // Documentation permissions
   DOCUMENTATION_VIEW = 'documentation:view',
@@ -403,6 +429,26 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,
     Permission.DOCUMENTATION_MANAGE_PERMISSIONS,
+
+    // Stand-ups — Org Admin holds every capability in the §3.2 matrix,
+    // including the planning waiver, which is Org Admin only (PLN-16).
+    Permission.STANDUP_CONFIGURE,
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_GENERATE,
+    Permission.STANDUP_RUN,
+    Permission.STANDUP_COMPLETE,
+    Permission.STANDUP_REOPEN,
+    Permission.STANDUP_ALLOCATE,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_OVERRIDE,
+    Permission.STANDUP_REVISE_ESTIMATE,
+    Permission.STANDUP_CARRY_FORWARD_NOTE,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_DEBT,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_WRITE_OFF_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+    Permission.STANDUP_PLANNING_WAIVER,
   ],
 
   // Human Resource role - currently has the same permissions as ADMIN.
@@ -573,6 +619,27 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.PROJECT_MANAGER]: [
+    // Stand-ups — every capability except the planning waiver, which the §3.2
+    // matrix reserves for Org Admin. SEC-2: any PM on the project may run the
+    // stand-up; whoever starts it becomes facilitator but the rest keep full
+    // edit rights, so this is a plain role grant with no ownership check.
+    Permission.STANDUP_CONFIGURE,
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_GENERATE,
+    Permission.STANDUP_RUN,
+    Permission.STANDUP_COMPLETE,
+    Permission.STANDUP_REOPEN,
+    Permission.STANDUP_ALLOCATE,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_OVERRIDE,
+    Permission.STANDUP_REVISE_ESTIMATE,
+    Permission.STANDUP_CARRY_FORWARD_NOTE,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_DEBT,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_WRITE_OFF_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     // User management
     Permission.USER_CREATE,
     Permission.USER_READ,
@@ -739,6 +806,18 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.TEAM_MEMBER]: [
+    // Stand-ups — per §3.2, a Team Member attends and maintains their own row.
+    // They may adjust their own allocation before the stand-up starts (RUN-26
+    // locks this the moment it moves to In_Progress) and raise blockers, but
+    // may not assign work to others, override, or complete.
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_BLOCKER_RAISE,
+    // Own debt only. NFR-13 and decision D2: individual debt is visible to the
+    // member themselves and their PM, never across the team.
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     // User management (own profile only)
     Permission.USER_READ,
     Permission.USER_UPDATE,
@@ -855,6 +934,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.VIEWER]: [
+    // Stand-ups — the spec's read-only "Stakeholder". Deliberately has
+    // STANDUP_VIEW_ANALYTICS but NOT STANDUP_VIEW_DEBT: NFR-13 requires
+    // individual estimate debt and estimation accuracy to be invisible to
+    // stakeholders, who see team aggregates only. The analytics payload filters
+    // on this at field level, not just in the UI.
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     // User management (own profile only)
     Permission.USER_READ,
 
@@ -1056,6 +1143,25 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 
 export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
   [ProjectRole.PROJECT_MANAGER]: [
+    // Stand-ups — full facilitation rights on this project (SEC-2: any PM may
+    // run it), minus the Org-Admin-only planning waiver.
+    Permission.STANDUP_CONFIGURE,
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_GENERATE,
+    Permission.STANDUP_RUN,
+    Permission.STANDUP_COMPLETE,
+    Permission.STANDUP_REOPEN,
+    Permission.STANDUP_ALLOCATE,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_OVERRIDE,
+    Permission.STANDUP_REVISE_ESTIMATE,
+    Permission.STANDUP_CARRY_FORWARD_NOTE,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_DEBT,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_WRITE_OFF_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     Permission.PROJECT_READ,
     Permission.PROJECT_UPDATE,
     Permission.PROJECT_MANAGE_TEAM,
@@ -1111,6 +1217,14 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
   ],
 
   [ProjectRole.PROJECT_MEMBER]: [
+    // Stand-ups — attends, maintains own row before the stand-up starts,
+    // raises blockers, sees only their own debt (NFR-13 / D2).
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     Permission.PROJECT_READ,
     Permission.TASK_CREATE,
     Permission.TASK_READ,
@@ -1132,6 +1246,11 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
   ],
 
   [ProjectRole.PROJECT_VIEWER]: [
+    // Stand-ups — read only. No STANDUP_VIEW_DEBT: stakeholders see team
+    // aggregates only (NFR-13).
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     Permission.PROJECT_READ,
     Permission.TASK_READ,
     Permission.TEAM_READ,
