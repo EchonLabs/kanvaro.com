@@ -101,7 +101,16 @@ export interface ActivityChangeDetails {
 
 export interface IActivityLog extends Document {
   organization: mongoose.Types.ObjectId
-  user: mongoose.Types.ObjectId
+  /** Absent only for system-actor entries — see `actorType`. */
+  user?: mongoose.Types.ObjectId
+  /**
+   * Who caused the mutation. INV-10 requires system actions (scheduler jobs,
+   * automatic reconciliation) to be attributed to a system actor rather than to
+   * the last human who happened to touch the record.
+   */
+  actorType: 'user' | 'system'
+  /** For `actorType: 'system'`, which job or process — e.g. `standup:mark-missed`. */
+  systemActor?: string
   action: ActivityAction
   entityType: ActivityEntityType
   entityId?: mongoose.Types.ObjectId
@@ -122,7 +131,21 @@ const ActivityLogSchema = new Schema<IActivityLog>(
     user: {
       type: Schema.Types.ObjectId,
       ref: 'User',
+      // Required for human actions, which is every pre-existing entry. System
+      // actors have no User document, so they record `systemActor` instead.
+      required: function (this: { actorType?: string }) {
+        return this.actorType !== 'system'
+      }
+    },
+    actorType: {
+      type: String,
+      enum: ['user', 'system'],
+      default: 'user',
       required: true
+    },
+    systemActor: {
+      type: String,
+      maxlength: 100
     },
     action: {
       type: String,

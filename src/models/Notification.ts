@@ -7,7 +7,7 @@ export interface INotification extends Document {
   title: string
   message: string
   data?: {
-    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'sprint_event' | 'standup' | 'carry_forward_item' | 'standup_override'
+    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'sprint_event' | 'standup' | 'carry_forward_item' | 'standup_override' | 'working_calendar'
     entityId?: mongoose.Types.ObjectId
     action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'completed' | 'overdue' | 'reminder' | 'upcoming'
     priority?: 'low' | 'medium' | 'high' | 'critical'
@@ -41,7 +41,7 @@ const NotificationSchema = new Schema<INotification>({
   data: {
     entityType: { 
       type: String, 
-      enum: ['task', 'project', 'epic', 'sprint', 'story', 'user', 'budget', 'time_entry', 'sprint_event', 'standup', 'carry_forward_item', 'standup_override']
+      enum: ['task', 'project', 'epic', 'sprint', 'story', 'user', 'budget', 'time_entry', 'sprint_event', 'standup', 'carry_forward_item', 'standup_override', 'working_calendar']
     },
     entityId: { type: Schema.Types.ObjectId },
     action: { 
