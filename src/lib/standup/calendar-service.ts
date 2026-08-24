@@ -10,6 +10,7 @@
  * implement weekend or holiday logic.
  */
 import { Holiday } from '@/models/Holiday'
+import { HolidaySet } from '@/models/HolidaySet'
 import { WorkingCalendar, type IWorkingCalendar } from '@/models/WorkingCalendar'
 
 import { assertIsoDate, monthDay, type IsoDate } from './calendar-dates'
@@ -62,6 +63,10 @@ export async function loadCalendarContext(
   const holidays = subscribedSetIds.length
     ? await Holiday.find({
         holidaySet: { $in: subscribedSetIds },
+        // Revoked rows are kept for history but must not affect resolution
+        // (DO-3). Legacy rows written before the field existed have no
+        // `status`, so absence counts as active.
+        status: { $ne: 'revoked' },
         date: { $gte: from, $lte: to }
       }).lean()
     : []
@@ -159,7 +164,9 @@ export async function getHolidayCoverage(
   if (holidaySetIds.length === 0) return null
 
   const [result] = await Holiday.aggregate([
-    { $match: { holidaySet: { $in: holidaySetIds.map(toObjectId) } } },
+    // Revoked rows must not extend claimed coverage — otherwise the calendar
+    // says it covers dates with no data behind them.
+    { $match: { holidaySet: { $in: holidaySetIds.map(toObjectId) }, status: { $ne: 'revoked' } } },
     {
       $group: {
         _id: null,
@@ -184,7 +191,7 @@ export async function checkHolidayCoverage(
   projectId: string,
   from: IsoDate,
   to: IsoDate
-): Promise<{ message: string; coveredTo?: IsoDate } | null> {
+): Promise<{ message: string; setName: string; coveredTo?: IsoDate } | null> {
   const calendar = (await WorkingCalendar.findOne({
     project: projectId,
     scope: 'project'
@@ -193,21 +200,39 @@ export async function checkHolidayCoverage(
   const setIds = (calendar?.subscribedHolidaySets ?? []).map((id) => id.toString())
   if (setIds.length === 0) return null
 
-  const coverage = await getHolidayCoverage(setIds)
-  if (!coverage) {
-    return { message: 'No holidays have been loaded for the subscribed calendars yet.' }
-  }
+  // Checked per set, not across all of them. A max() over the union would let a
+  // set that has run out hide behind one that has not — and the set that ran out
+  // is exactly the one about to put a stand-up on a public holiday.
+  const sets = (await HolidaySet.find({ _id: { $in: setIds }, isActive: { $ne: false } })
+    .select('name')
+    .lean()) as unknown as Array<{ _id: unknown; name: string }>
 
-  if (to > coverage.to) {
-    return {
-      message:
-        `Holiday data only runs to ${coverage.to}. Dates after that are treated as ` +
-        'working days. Import the next gazette to cover them.',
-      coveredTo: coverage.to
+  let worst: { message: string; setName: string; coveredTo?: IsoDate } | null = null
+
+  for (const set of sets) {
+    const coverage = await getHolidayCoverage([String(set._id)])
+
+    if (!coverage) {
+      // Nothing loaded at all beats any partial gap: every date is being treated
+      // as a working day.
+      return {
+        message: `No holidays have been loaded for ${set.name} yet.`,
+        setName: set.name
+      }
+    }
+
+    if (to > coverage.to && (!worst?.coveredTo || coverage.to < worst.coveredTo)) {
+      worst = {
+        message:
+          `Holiday data for ${set.name} only runs to ${coverage.to}. Dates after that are ` +
+          'treated as working days. Import the next gazette to cover them.',
+        setName: set.name,
+        coveredTo: coverage.to
+      }
     }
   }
 
-  return null
+  return worst
 }
 
 function toObjectId(id: string) {

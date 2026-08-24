@@ -282,7 +282,13 @@ export const standupStrings = {
     schedulerStaleAction: 'How to fix this',
     cronRoutesUnauthenticated:
       'Background job URLs can be triggered by anyone who knows the address. Set CRON_SECRET to require a token.',
-    cronRoutesUnauthenticatedAction: 'How to set CRON_SECRET'
+    cronRoutesUnauthenticatedAction: 'How to set CRON_SECRET',
+    holidayCoverageGap: ({ setName, coveredTo }: { setName: string; coveredTo: string }) =>
+      `${setName} has no dates loaded after ${coveredTo}. Stand-ups generated after ` +
+      'that date may fall on public holidays.',
+    holidayCoverageNone: ({ setName }: { setName: string }) =>
+      `${setName} has no holidays loaded at all. Every date is being treated as a working day.`,
+    holidayCoverageAction: 'Import holidays'
   }
 } as const
 

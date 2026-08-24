@@ -13,6 +13,20 @@ export const HOLIDAY_TYPES = ['public', 'company', 'optional'] as const
 export type HolidayType = typeof HOLIDAY_TYPES[number]
 
 /**
+ * Holidays are revoked, never deleted (plan DO-3).
+ *
+ * `resolveWorkingDay()` is dated, and a historical stand-up resolves its
+ * calendar as of its own `standupDate` (DAT-1). If a row disappeared, a
+ * completed stand-up's skip reason and day numbering would silently become a
+ * lie. Revoking keeps the record and stops it affecting future resolution.
+ */
+export const HOLIDAY_STATUSES = ['active', 'revoked'] as const
+export type HolidayStatus = typeof HOLIDAY_STATUSES[number]
+
+/** Minimum characters for a revocation reason. Matches the override rule (OVR-4). */
+export const REVOKE_REASON_MIN_LENGTH = 20
+
+/**
  * A single dated holiday inside a set.
  *
  * Deliberately stores an explicit date rather than a recurrence rule. Most
@@ -33,6 +47,10 @@ export interface IHoliday extends Document {
   isFullDay: boolean
   /** Required when `isFullDay` is false. Stored as minutes (DAT-2). */
   minutesIfPartial?: number
+  status: HolidayStatus
+  revokedAt?: Date
+  revokedBy?: mongoose.Types.ObjectId
+  revokeReason?: string
   createdBy?: mongoose.Types.ObjectId
   createdAt: Date
   updatedAt: Date
@@ -84,6 +102,22 @@ const HolidaySchema = new Schema<IHoliday>(
         message: 'minutesIfPartial must be a whole number of minutes'
       }
     },
+    status: {
+      type: String,
+      enum: [...HOLIDAY_STATUSES],
+      required: true,
+      default: 'active'
+    },
+    revokedAt: Date,
+    revokedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    revokeReason: {
+      type: String,
+      trim: true,
+      maxlength: 500
+    },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User'
@@ -92,7 +126,9 @@ const HolidaySchema = new Schema<IHoliday>(
   { timestamps: true }
 )
 
-// Primary lookup: resolving a date range for a project's subscribed sets.
+// Primary lookup: resolving a date range for a project's subscribed sets. Every
+// read path filters on status, so it leads the index.
+HolidaySchema.index({ holidaySet: 1, status: 1, date: 1 })
 HolidaySchema.index({ holidaySet: 1, date: 1 })
 HolidaySchema.index({ organization: 1, date: 1 })
 // Two holidays may legitimately share a date — in 2026 Sri Lanka, 1 May is both

@@ -232,6 +232,18 @@ export enum Permission {
   STANDUP_VIEW_ANALYTICS = 'standup:view_analytics',
   STANDUP_PLANNING_WAIVER = 'standup:planning_waiver',
 
+  /**
+   * Organisation-wide holiday calendar administration (plan DO-2).
+   *
+   * Separate from STANDUP_CONFIGURE because the scope differs: stand-up
+   * configuration is per project, while a holiday set is shared by every
+   * project in the organisation. Gating holiday routes on STANDUP_CONFIGURE let
+   * a project manager — and a tester — edit the national holiday calendar for
+   * teams they have nothing to do with, while HR, who actually holds the
+   * published gazette, could not touch it at all.
+   */
+  HOLIDAY_MANAGE = 'holiday:manage',
+
   // Documentation permissions
   DOCUMENTATION_VIEW = 'documentation:view',
   DOCUMENTATION_SEARCH = 'documentation:search',
@@ -433,6 +445,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Stand-ups — Org Admin holds every capability in the §3.2 matrix,
     // including the planning waiver, which is Org Admin only (PLN-16).
     Permission.STANDUP_CONFIGURE,
+    Permission.HOLIDAY_MANAGE,
     Permission.STANDUP_VIEW,
     Permission.STANDUP_GENERATE,
     Permission.STANDUP_RUN,
@@ -578,6 +591,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.CALENDAR_CREATE,
     Permission.CALENDAR_UPDATE,
     Permission.CALENDAR_DELETE,
+    Permission.HOLIDAY_MANAGE,
+    Permission.STANDUP_VIEW,
 
     // Kanban
     Permission.KANBAN_READ,

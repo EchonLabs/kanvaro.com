@@ -11,6 +11,7 @@
  */
 import { JobHeartbeat } from '@/models/JobHeartbeat'
 
+import { checkHolidayCoverage } from './calendar-service'
 import { cronSecretIsConfigured } from './jobs/auth'
 import { SCHEDULER_HEARTBEAT_JOB } from './jobs/heartbeat'
 import { standupStrings } from './strings'
@@ -40,6 +41,14 @@ export interface DegradationScope {
   organizationId: string
   projectId?: string
   sprintId?: string
+  /**
+   * The window being planned or scheduled, when there is one.
+   *
+   * Coverage is only answerable against a range: "is the calendar complete?" has
+   * no meaning without saying complete *through when*. Callers that have no
+   * range — the hub, the settings screen — simply do not get the notice.
+   */
+  dateRange?: { from: string; to: string }
 }
 
 /**
@@ -53,9 +62,10 @@ export const SCHEDULER_STALE_AFTER_MS = 15 * 60 * 1000
 // A bare /docs/operations/... path 404s, and a degradation whose action link is
 // broken is a broken degradation.
 const SCHEDULER_DOCS = '/docs/internal/operations/background-jobs'
+const HOLIDAY_ADMIN = '/settings/organization/holidays'
 
 export async function getActiveDegradations(
-  _scope: DegradationScope
+  scope: DegradationScope
 ): Promise<Degradation[]> {
   const found: Degradation[] = []
   const now = new Date()
@@ -91,6 +101,33 @@ export async function getActiveDegradations(
       },
       detectedAt: now
     })
+  }
+
+  // Coverage is derived from the holidays themselves rather than a stored
+  // `coveredUntil` field, which would go stale at exactly the moment it matters
+  // (DO-4). A set running out is the failure mode that silently generates
+  // stand-ups on public holidays.
+  if (scope.projectId && scope.dateRange) {
+    const gap = await checkHolidayCoverage(
+      scope.projectId,
+      scope.dateRange.from,
+      scope.dateRange.to
+    )
+
+    if (gap) {
+      found.push({
+        code: 'HOLIDAY_COVERAGE_GAP',
+        severity: 'warning',
+        message: gap.coveredTo
+          ? standupStrings.degradation.holidayCoverageGap({
+              setName: gap.setName,
+              coveredTo: gap.coveredTo
+            })
+          : standupStrings.degradation.holidayCoverageNone({ setName: gap.setName }),
+        action: { label: standupStrings.degradation.holidayCoverageAction, href: HOLIDAY_ADMIN },
+        detectedAt: now
+      })
+    }
   }
 
   return found
