@@ -35,3 +35,25 @@ describe('stand-up health route', () => {
     }
   })
 })
+
+describe('the health route accepts a date range (OB-3)', () => {
+  const fs = require('fs')
+  const path = require('path')
+
+  const source = fs.readFileSync(
+    path.join(process.cwd(), 'src/app/api/standup/health/route.ts'),
+    'utf8'
+  )
+
+  it('reads from and to, so HOLIDAY_COVERAGE_GAP can be answered', () => {
+    expect(source).toContain("searchParams.get('from')")
+    expect(source).toContain("searchParams.get('to')")
+    expect(source).toContain('dateRange')
+  })
+
+  it('passes no range at all rather than a half one', () => {
+    // A range with only one end would silently compare against `undefined`,
+    // which reads as "covered" — the exact silent-absence the plan forbids.
+    expect(source).toContain('from && to ? { from, to } : undefined')
+  })
+})

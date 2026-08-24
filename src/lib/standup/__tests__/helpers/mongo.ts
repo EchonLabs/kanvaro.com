@@ -77,6 +77,8 @@ export const ids = {
   organization: new mongoose.Types.ObjectId(),
   project: new mongoose.Types.ObjectId(),
   otherProject: new mongoose.Types.ObjectId(),
+  sprint: new mongoose.Types.ObjectId(),
+  otherSprint: new mongoose.Types.ObjectId(),
   member: new mongoose.Types.ObjectId(),
   otherMember: new mongoose.Types.ObjectId(),
   user: new mongoose.Types.ObjectId()

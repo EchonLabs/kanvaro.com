@@ -5,9 +5,11 @@ import {
   createHoliday,
   updateHoliday,
   revokeHoliday,
+  findBlockingStandupsPending,
   HolidayRevocationBlockedError
 } from '@/lib/standup/holiday-admin'
 import { loadCalendarContext, getHolidayCoverage } from '@/lib/standup/calendar-service'
+import { Standup } from '@/models/Standup'
 
 import { anyId, ids, syncIndexes, useMongo } from './helpers/mongo'
 
@@ -270,5 +272,109 @@ describe('holiday create and update (DO-1)', () => {
 
     expect(updated.name).toBe('Vesak Poya')
     expect(guard).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * OB-2 — the real lookup, now that stand-ups exist.
+ *
+ * The suite above pins the *rule* by injecting a stub. This one pins the
+ * *query*: that the default `findBlockingStandupsPending` finds a completed
+ * stand-up on the date, scoped to the organisation, and that a merely scheduled
+ * one is not treated as history worth protecting.
+ */
+describe('findBlockingStandupsPending (OB-2)', () => {
+  useMongo()
+
+  let setId: string
+
+  const seedStandup = async (date: string, status: string, organization = ids.organization) =>
+    Standup.create({
+      project: ids.project,
+      sprint: ids.sprint,
+      organization,
+      standupDate: date,
+      scheduledStartAt: new Date(`${date}T03:30:00.000Z`),
+      durationMinutes: 15,
+      sprintDayNumber: 1,
+      totalSprintDays: 5,
+      shape: 'day_one',
+      status,
+      facilitator: ids.user
+    })
+
+  beforeEach(async () => {
+    await syncIndexes(Holiday, HolidaySet, Standup)
+
+    const set = await HolidaySet.create({
+      organization: ids.organization,
+      name: 'Sri Lanka Public Holidays',
+      countryCode: 'LK',
+      createdBy: ids.user
+    })
+    setId = set._id.toString()
+  })
+
+  const addHoliday = (date: string) =>
+    Holiday.create({
+      holidaySet: setId,
+      organization: ids.organization,
+      name: 'Vesak Poya',
+      date,
+      type: 'public',
+      isFullDay: true,
+      createdBy: ids.user
+    })
+
+  const revoke = (holidayId: string) =>
+    revokeHoliday({
+      holidayId,
+      organizationId: ids.organization.toString(),
+      actorId: ids.user.toString(),
+      reason: 'Gazette corrected: this date was withdrawn by the ministry.'
+    })
+
+  it('finds a completed stand-up on the date', async () => {
+    await seedStandup('2028-05-08', 'Completed')
+
+    expect(await findBlockingStandupsPending(['2028-05-08'])).toHaveLength(1)
+  })
+
+  it.each(['Completed', 'Reopened', 'Missed'])(
+    'blocks revocation when a %s stand-up used the date',
+    async (status) => {
+      const holiday = await addHoliday('2028-05-08')
+      await seedStandup('2028-05-08', status)
+
+      await expect(revoke(holiday._id.toString())).rejects.toThrow(
+        HolidayRevocationBlockedError
+      )
+    }
+  )
+
+  it.each(['Scheduled', 'Ready', 'Skipped_Holiday', 'Cancelled'])(
+    'allows revocation when the only stand-up on the date is %s',
+    async (status) => {
+      const holiday = await addHoliday('2028-05-08')
+      await seedStandup('2028-05-08', status)
+
+      await revoke(holiday._id.toString())
+
+      expect((await Holiday.findById(holiday._id).lean<any>()).status).toBe('revoked')
+    }
+  )
+
+  it('ignores a stand-up belonging to another organisation', async () => {
+    await seedStandup('2028-05-08', 'Completed', anyId())
+
+    expect(
+      await findBlockingStandupsPending(['2028-05-08'], ids.organization.toString())
+    ).toHaveLength(0)
+  })
+
+  it('reports nothing when no stand-up touches the date', async () => {
+    await seedStandup('2028-05-07', 'Completed')
+
+    expect(await findBlockingStandupsPending(['2028-05-08'])).toEqual([])
   })
 })
