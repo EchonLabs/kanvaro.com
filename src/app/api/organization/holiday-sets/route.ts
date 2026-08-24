@@ -30,7 +30,9 @@ export const GET = withStandupPermission(
 
     // One grouped aggregation rather than a count query per set.
     const stats = await Holiday.aggregate([
-      { $match: { organization: toObjectId(organizationId) } },
+      // Revoked rows are excluded so the count and coverage shown here match
+      // what the resolver will actually apply (DO-3).
+      { $match: { organization: toObjectId(organizationId), status: { $ne: 'revoked' } } },
       {
         $group: {
           _id: '$holidaySet',
@@ -69,7 +71,7 @@ interface CreateSetBody {
 }
 
 export const POST = withStandupPermission(
-  { permission: Permission.STANDUP_CONFIGURE },
+  { permission: Permission.HOLIDAY_MANAGE },
   async (request, { organizationId, userId }) => {
     const body = await readJson<CreateSetBody>(request)
 

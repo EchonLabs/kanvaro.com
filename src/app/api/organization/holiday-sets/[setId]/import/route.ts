@@ -18,7 +18,7 @@ import { describeImportFailure, parseHolidayCsv } from '@/lib/standup/holiday-im
 import { ok, withStandupPermission } from '@/lib/standup/route-helpers'
 
 export const POST = withStandupPermission(
-  { permission: Permission.STANDUP_CONFIGURE },
+  { permission: Permission.HOLIDAY_MANAGE },
   async (request, { organizationId, userId, params }) => {
     const setId = params.setId
 
