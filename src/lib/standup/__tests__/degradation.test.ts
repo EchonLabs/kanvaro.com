@@ -1,4 +1,7 @@
+import { Holiday } from '@/models/Holiday'
+import { HolidaySet } from '@/models/HolidaySet'
 import { JobHeartbeat } from '@/models/JobHeartbeat'
+import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { SCHEDULER_HEARTBEAT_JOB } from '@/lib/standup/jobs/heartbeat'
 import { getActiveDegradations } from '@/lib/standup/degradation'
 
@@ -83,5 +86,87 @@ describe('getActiveDegradations', () => {
 
     expect(found).toHaveLength(1)
     expect(found[0]).toMatchObject({ code: 'CRON_ROUTES_UNAUTHENTICATED', severity: 'info' })
+  })
+})
+
+describe('HOLIDAY_COVERAGE_GAP (DO-4)', () => {
+  useMongo()
+
+  beforeEach(async () => {
+    await syncIndexes(JobHeartbeat, Holiday, HolidaySet, WorkingCalendar)
+    process.env.CRON_SECRET = 'set-so-it-is-quiet'
+    await JobHeartbeat.create({
+      job: SCHEDULER_HEARTBEAT_JOB,
+      ranAt: new Date(),
+      durationMs: 1,
+      ok: true
+    })
+  })
+
+  afterEach(() => {
+    delete process.env.CRON_SECRET
+  })
+
+  const seedCalendar = async (lastLoadedDate: string) => {
+    const set = await HolidaySet.create({
+      organization: ids.organization,
+      name: 'Sri Lanka Public Holidays',
+      createdBy: ids.user
+    })
+    await Holiday.create({
+      holidaySet: set._id,
+      organization: ids.organization,
+      name: 'Christmas',
+      date: lastLoadedDate,
+      type: 'public',
+      isFullDay: true
+    })
+    await WorkingCalendar.create({
+      scope: 'project',
+      organization: ids.organization,
+      project: ids.project,
+      workingDaysOfWeek: [1, 2, 3, 4, 5],
+      standardMinutesPerDay: 480,
+      timezone: 'Asia/Colombo',
+      subscribedHolidaySets: [set._id]
+    })
+  }
+
+  const scopeWithRange = (from: string, to: string) => ({
+    organizationId: ids.organization.toString(),
+    projectId: ids.project.toString(),
+    dateRange: { from, to }
+  })
+
+  it('warns when a sprint runs past the last loaded holiday date', async () => {
+    await seedCalendar('2027-12-25')
+
+    const found = await getActiveDegradations(scopeWithRange('2028-01-03', '2028-01-14'))
+    const gap = found.find((d) => d.code === 'HOLIDAY_COVERAGE_GAP')
+
+    expect(gap).toBeDefined()
+    expect(gap?.severity).toBe('warning')
+    expect(gap?.message).toMatch(/2027-12-25/)
+    // The action must lead somewhere that fixes it, not just explain it.
+    expect(gap?.action?.href).toContain('/settings/organization/holidays')
+  })
+
+  it('stays quiet when the range is covered', async () => {
+    await seedCalendar('2028-12-31')
+
+    const found = await getActiveDegradations(scopeWithRange('2028-01-03', '2028-01-14'))
+
+    expect(found.map((d) => d.code)).not.toContain('HOLIDAY_COVERAGE_GAP')
+  })
+
+  it('says nothing without a date range to check', async () => {
+    await seedCalendar('2027-12-25')
+
+    const found = await getActiveDegradations({
+      organizationId: ids.organization.toString(),
+      projectId: ids.project.toString()
+    })
+
+    expect(found.map((d) => d.code)).not.toContain('HOLIDAY_COVERAGE_GAP')
   })
 })

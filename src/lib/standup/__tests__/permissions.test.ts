@@ -109,3 +109,38 @@ describe('grant table integrity', () => {
     }
   })
 })
+
+/**
+ * Holiday administration (plan DO-2).
+ *
+ * A deliberate deviation from spec §3.2, which restricts the organisation
+ * holiday calendar to Org Admin. In this product the person holding the
+ * published gazette is HR, so HR gets it too — and the deviation is expressed
+ * as its own permission rather than implied by a generic calendar grant, so it
+ * is legible in the table instead of buried in a route.
+ */
+describe('Holiday administration', () => {
+  it('is held by exactly super admin, admin and human resource', () => {
+    const holders = Object.values(Role).filter((role) =>
+      ROLE_PERMISSIONS[role].includes(Permission.HOLIDAY_MANAGE)
+    )
+
+    expect(holders.sort()).toEqual([Role.ADMIN, Role.HUMAN_RESOURCE, Role.SUPER_ADMIN].sort())
+  })
+
+  it('is not held by a project manager', () => {
+    // The organisation holiday calendar is shared by every project. A PM editing
+    // it changes the working days of teams they have nothing to do with.
+    expect(orgRole(Role.PROJECT_MANAGER)).not.toContain(Permission.HOLIDAY_MANAGE)
+  })
+
+  it('is not held by a tester', () => {
+    // TESTER holds STANDUP_CONFIGURE, which is what these routes used to be
+    // gated on — which meant a tester could import a national holiday gazette.
+    expect(orgRole(Role.TESTER)).not.toContain(Permission.HOLIDAY_MANAGE)
+  })
+
+  it('lets human resource read stand-up config so the admin screen can load', () => {
+    expect(orgRole(Role.HUMAN_RESOURCE)).toContain(Permission.STANDUP_VIEW)
+  })
+})
