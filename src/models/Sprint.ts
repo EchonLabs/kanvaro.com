@@ -55,6 +55,35 @@ export interface ISprint extends Document {
     revokedBy?: mongoose.Types.ObjectId
   }
 
+  /**
+   * CAL-12 / AC-4 — calendar changes that could not be applied because a
+   * stand-up on the date was already Completed.
+   *
+   * Recorded on the sprint as well as on the stand-up because the sprint report
+   * has to be able to explain why its working-day count and its stand-up count
+   * disagree, without walking every stand-up to find out.
+   */
+  calendarAnomalies?: Array<{
+    date: string
+    reason: string
+    recordedAt: Date
+  }>
+
+  /**
+   * SCH-15 — sprint health warnings raised by the scheduler, e.g. three
+   * consecutive missed stand-ups.
+   *
+   * Kept on the sprint rather than derived on read so the warning survives the
+   * condition that raised it: three misses matter to the retrospective even if
+   * the fourth stand-up went ahead.
+   */
+  healthWarnings?: Array<{
+    code: string
+    message: string
+    raisedAt: Date
+    context?: Record<string, unknown>
+  }>
+
   createdAt: Date
   updatedAt: Date
 }
@@ -184,6 +213,38 @@ const SprintSchema = new Schema<ISprint>({
       { _id: false }
     ),
     required: false
+  },
+
+  // SCH-15. Raised once per condition; the job checks before pushing.
+  healthWarnings: {
+    type: [
+      new Schema(
+        {
+          code: { type: String, required: true },
+          message: { type: String, required: true, maxlength: 500 },
+          raisedAt: { type: Date, default: Date.now },
+          context: { type: Schema.Types.Mixed }
+        },
+        { _id: false }
+      )
+    ],
+    default: []
+  },
+
+  // CAL-12 / AC-4. Append-only: a calendar change that was refused is history
+  // in its own right, so entries are added and never edited away.
+  calendarAnomalies: {
+    type: [
+      new Schema(
+        {
+          date: { type: String, required: true },
+          reason: { type: String, required: true, maxlength: 500 },
+          recordedAt: { type: Date, default: Date.now }
+        },
+        { _id: false }
+      )
+    ],
+    default: []
   }
 }, {
   timestamps: true
@@ -217,6 +278,41 @@ if (mongoose.models.Sprint) {
         type: Schema.Types.ObjectId,
         ref: 'User'
       }]
+    })
+  }
+  if (!existingSchema.path('healthWarnings')) {
+    existingSchema.add({
+      healthWarnings: {
+        type: [
+          new Schema(
+            {
+              code: { type: String, required: true },
+              message: { type: String, required: true, maxlength: 500 },
+              raisedAt: { type: Date, default: Date.now },
+              context: { type: Schema.Types.Mixed }
+            },
+            { _id: false }
+          )
+        ],
+        default: []
+      }
+    })
+  }
+  if (!existingSchema.path('calendarAnomalies')) {
+    existingSchema.add({
+      calendarAnomalies: {
+        type: [
+          new Schema(
+            {
+              date: { type: String, required: true },
+              reason: { type: String, required: true, maxlength: 500 },
+              recordedAt: { type: Date, default: Date.now }
+            },
+            { _id: false }
+          )
+        ],
+        default: []
+      }
     })
   }
   if (!existingSchema.path('tasks')) {
