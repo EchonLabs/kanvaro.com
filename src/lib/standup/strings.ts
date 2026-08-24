@@ -260,7 +260,96 @@ export const standupStrings = {
    * from its first commit rather than inlined into a component and retrofitted.
    */
   variance: {
-    // Intentionally empty until Phase 5. See the note above.
+    // Intentionally empty until Phase 8, which builds the outcome classifier.
+  },
+
+  /**
+   * The Schedule hub (spec §15.6, UI-8, UI-9).
+   *
+   * The status labels are deliberately plain-language rather than the internal
+   * state names: "Skipped — public holiday" tells a PM what happened;
+   * "Skipped_Holiday" tells them what the database calls it.
+   */
+  schedule: {
+    title: () => 'Stand-up schedule',
+    empty: () =>
+      'No stand-ups have been generated for this sprint yet. They are created when the planning session completes.',
+    today: () => 'Today',
+    dayLabel: ({ number, total }: { number: number; total: number }) =>
+      `Day ${number} of ${total}`,
+    dayOne: () => 'Day one — assignment',
+    finalDay: () => 'Final day — sprint close',
+    frozenDayNumber: ({ number }: { number: number }) => `Ran as day ${number}`,
+    backfilled: () => 'Back-filled',
+    calendarAnomaly: () =>
+      'The calendar changed after this stand-up ran. Its record was left untouched.',
+    status: {
+      Scheduled: 'Scheduled',
+      Ready: 'Ready to start',
+      In_Progress: 'In progress',
+      Completed: 'Completed',
+      Reopened: 'Reopened',
+      Missed: 'Missed',
+      Skipped_Holiday: 'Skipped — not a working day',
+      Cancelled: 'Cancelled'
+    } as Record<string, string>
+  },
+
+  /**
+   * Scheduler notifications (spec §9.5 — N1, N2, N8).
+   *
+   * Each says what the reader has to *do*. "Stand-up is ready" tells a
+   * facilitator nothing they cannot see; "your 09:00 stand-up opens in fifteen
+   * minutes" tells them whether to stop what they are doing.
+   */
+  notifications: {
+    readyTitle: () => 'Your stand-up is ready to start',
+    readyMessage: ({ localTime, minutesUntil }: { localTime: string; minutesUntil: number }) =>
+      `The ${localTime} stand-up opens in ${minutesUntil} ${plural(
+        minutesUntil,
+        'minute',
+        'minutes'
+      )}. Its numbers are prepared.`,
+
+    reminderTitle: () => 'Update your tasks before stand-up',
+    reminderMessage: ({ localTime }: { localTime: string }) =>
+      `Stand-up is at ${localTime}. Update your task statuses and log your time before it starts.`,
+
+    missedTitle: () => 'Yesterday`s stand-up was missed',
+    missedMessage: ({ date }: { date: string }) =>
+      `The stand-up for ${date} was never started. Its work has been carried into the next one, and you can still back-fill it.`,
+
+    missedTwiceTitle: () => 'Two stand-ups missed in a row',
+    missedTwiceMessage: ({ count }: { count: number }) =>
+      `${count} stand-ups have now been missed consecutively on this sprint.`,
+
+    missedThriceTitle: () => 'Three stand-ups missed in a row',
+    missedThriceMessage: ({ count }: { count: number }) =>
+      `${count} consecutive stand-ups have been missed. This sprint's plan is no longer being tracked daily.`
+  },
+
+  /**
+   * Lifecycle refusals (spec §10.1, RUN-2..RUN-5, E51, E52).
+   *
+   * These are refusals a PM reads mid-meeting, so each one says what to do
+   * next — the time the stand-up opens, or which stand-up is holding the lock —
+   * rather than only that the action was rejected.
+   */
+  lifecycle: {
+    notStartableYet: ({ localTime, localDate }: { localTime: string; localDate: string }) =>
+      `This stand-up becomes available at ${localTime} on ${localDate}.`,
+    notStartableFromStatus: ({ status }: { status: string }) =>
+      `A stand-up in ${status} cannot be started.`,
+    anotherInProgress: ({ date }: { date: string }) =>
+      `The stand-up for ${date} is still in progress. Complete or cancel it first.`,
+    invalidTransition: ({ from, to }: { from: string; to: string }) =>
+      `A stand-up cannot move from ${from} to ${to}.`,
+    reopenReasonTooShort: ({ minLength }: { minLength: number }) =>
+      `Give a reason of at least ${minLength} characters for reopening this stand-up.`,
+    reopenWindowExpired: ({ hours }: { hours: number }) =>
+      `The ${hours}-hour reopen window has passed. Only an organisation admin can reopen this stand-up now.`,
+    reopenSprintCompleted: () =>
+      'This sprint is completed, so its stand-ups can no longer be reopened.'
   },
 
   /**

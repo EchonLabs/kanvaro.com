@@ -168,6 +168,84 @@ export function withSprintPermission(
 }
 
 /**
+ * Like {@link withSprintPermission}, but keyed by **stand-up** id.
+ *
+ * `/api/standups/:id` carries neither a project nor a sprint id, so the
+ * stand-up is loaded first and its project drives the permission check. Falling
+ * back to an org-scoped check here would let anyone in the organisation read a
+ * stand-up for a project they cannot see — and a stand-up snapshot names every
+ * member's capacity, which NFR-13 treats as private.
+ */
+export function withStandupIdPermission(
+  options: { permission: Permission; standupIdParam?: string },
+  handler: (
+    request: NextRequest,
+    context: StandupRouteContext & { standupId: string; standup: any }
+  ) => Promise<NextResponse> | NextResponse
+) {
+  return async (request: NextRequest, routeContext?: { params?: Record<string, string> }) => {
+    try {
+      await connectDB()
+
+      const authResult = await authenticateUser()
+      if ('error' in authResult) {
+        return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+      }
+
+      const params = routeContext?.params ?? {}
+      const standupId = params[options.standupIdParam ?? 'id']
+
+      const { Standup } = await import('@/models/Standup')
+      const standup = await Standup.findById(standupId).lean()
+
+      const missing = NextResponse.json(
+        { error: { code: 'NOT_FOUND', message: 'That stand-up no longer exists.' } },
+        { status: 404 }
+      )
+
+      if (!standup) return missing
+
+      // Org isolation before anything else: another organisation's stand-up
+      // must look absent, not forbidden.
+      if (
+        (standup as any).organization?.toString() !== authResult.user.organization?.toString()
+      ) {
+        return missing
+      }
+
+      const projectId = (standup as any).project?.toString()
+
+      const allowed = await PermissionService.hasPermission(
+        authResult.user.id,
+        options.permission,
+        projectId
+      )
+
+      if (!allowed) {
+        return NextResponse.json(
+          { error: { code: 'FORBIDDEN', message: 'You do not have permission to do that.' } },
+          { status: 403 }
+        )
+      }
+
+      return await handler(request, {
+        userId: authResult.user.id,
+        organizationId: authResult.user.organization,
+        projectId,
+        params,
+        standupId,
+        standup
+      })
+    } catch (error) {
+      const { status, body } = toErrorResponse(error)
+      if (status === 500) console.error('Stand-up route error:', error)
+      return NextResponse.json(body, { status })
+    }
+  }
+}
+
+
+/**
  * Like {@link withSprintPermission}, but keyed by **poker session** id.
  *
  * Same reasoning: `/api/poker-sessions/:id/...` carries no project id, so the

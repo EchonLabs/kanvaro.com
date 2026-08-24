@@ -14,6 +14,7 @@ import { Task } from '@/models/Task'
 
 import { resolveWorkingDays } from './calendar-service'
 import { StandupError } from './errors'
+import { generateStandupsForSprint, type GenerateResult } from './generation'
 import {
   evaluatePlanningChecklist,
   type ChecklistInput,
@@ -143,19 +144,26 @@ export interface CompletePlanningResult {
   checklist: ChecklistResult
   sprint: any
   session: any
+  /** UI-7 shows the generated schedule on the confirmation screen. */
+  generatedStandups: GenerateResult
 }
 
 /**
- * Completes a planning session and takes the sprint to `planned` (PLN-1, PLN-8).
+ * Completes a planning session and takes the sprint to `planned` (PLN-1, PLN-8,
+ * SCH-1, SCH-5).
  *
- * Three things happen and the order matters:
+ * Four things happen and the order matters:
  *   1. The checklist is re-evaluated **server side**. A client that saw green
  *      thirty seconds ago is not evidence.
- *   2. Estimates are frozen (DAT-6) by stamping `estimateLockedAt`.
- *   3. The sprint moves to `planned`, which is what SCH-1 generation hangs off.
+ *   2. The schedule is generated. This is deliberately *before* anything is
+ *      frozen or moved: SCH-5 makes a sprint with no working days a refusal,
+ *      and a refusal has to leave the sprint exactly as it was. A Planned
+ *      sprint with no stand-ups would never remind anyone of anything.
+ *   3. Estimates are frozen (DAT-6) by stamping `estimateLockedAt`.
+ *   4. The sprint moves to `planned`.
  *
- * Stand-up generation itself is Phase 3; this leaves the sprint in the state
- * that triggers it.
+ * Generation is idempotent (SCH-2), so the only cost of doing it first is that
+ * a failure in step 3 or 4 leaves a schedule the next completion reuses.
  */
 export async function completePlanning(
   input: CompletePlanningInput
@@ -215,6 +223,10 @@ export async function completePlanning(
     countByType: {}
   } as any
 
+  // SCH-1/SCH-5. Throws before anything is written when the sprint contains no
+  // working days, which leaves the session open and the sprint in Planning.
+  const generatedStandups = await generateStandupsForSprint(sprintId, { actorId: userId })
+
   await session.save()
 
   // DAT-6 — freeze every estimate in the sprint. This single write is what
@@ -236,7 +248,7 @@ export async function completePlanning(
     { new: true }
   ).lean()
 
-  return { checklist, sprint: updatedSprint, session }
+  return { checklist, sprint: updatedSprint, session, generatedStandups }
 }
 
 /** Reads the sprint's waiver in the shape the gate expects. */
