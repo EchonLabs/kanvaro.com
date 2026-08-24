@@ -44,6 +44,18 @@ export function assertIsoDate(value: string, label = 'date'): IsoDate {
 }
 
 /**
+ * The calendar date of a stored `Date` column, read in UTC.
+ *
+ * Sprint start and end dates are written as UTC midnight for a calendar day —
+ * they are dates, not instants. Reading them back in a project timezone would
+ * shift them a day for any zone behind UTC, so the UTC reading is the correct
+ * one and the only one that round-trips.
+ */
+export function isoOfStoredDate(date: Date): IsoDate {
+  return new Date(date).toISOString().slice(0, 10)
+}
+
+/**
  * Day of week for a calendar date, 0 = Sunday … 6 = Saturday.
  *
  * Computed in UTC deliberately: the weekday of a calendar date is a property of

@@ -8,16 +8,17 @@
  * resolution.
  */
 import { Holiday, REVOKE_REASON_MIN_LENGTH, type HolidayType } from '@/models/Holiday'
+import { Standup } from '@/models/Standup'
 
 import { StandupError } from './errors'
 
 /**
  * A stand-up that already resolved a date being changed.
  *
- * Phase 5 introduces the `Standup` model; until then no stand-up exists, so the
- * default lookup correctly reports nothing. The rule is enforced and tested
- * here and now so Phase 5 only has to supply the query — see
- * {@link findBlockingStandupsPending}.
+ * DAT-1 makes calendar resolution dated: a stand-up resolved its working day as
+ * of its own `standupDate`. Once that stand-up is history, changing the holiday
+ * underneath it would rewrite what already happened, so the change is refused
+ * rather than applied.
  */
 export interface BlockingStandup {
   standupId: string
@@ -25,18 +26,48 @@ export interface BlockingStandup {
   status: string
 }
 
-export type BlockingStandupLookup = (dates: string[]) => Promise<BlockingStandup[]>
+export type BlockingStandupLookup = (
+  dates: string[],
+  organizationId?: string
+) => Promise<BlockingStandup[]>
 
 /**
- * The Phase 5 seam.
+ * Statuses whose stand-ups are history and therefore protect their date.
  *
- * Returns nothing because the `standups` collection does not exist yet, which
- * is accurate rather than permissive: there is nothing to protect until
- * stand-ups can be generated. Phase 5 must replace this with a query for
- * `Completed` and `Missed` stand-ups on the given dates, and the tests in
- * `holiday-revocation.integration.test.ts` already pin the behaviour.
+ * `Missed` is included deliberately. A missed stand-up is a record that the
+ * team did not meet on a day the calendar said they should have — turning that
+ * day into a holiday retroactively would erase the evidence, and SCH-15's
+ * escalation counts depend on it. `Skipped_Holiday` and `Cancelled` are not
+ * included: those days never ran, so nothing is rewritten by changing them.
  */
-export const findBlockingStandupsPending: BlockingStandupLookup = async () => []
+const BLOCKING_STATUSES = ['Completed', 'Reopened', 'Missed']
+
+/**
+ * Stand-ups that would be rewritten by a calendar change on these dates.
+ *
+ * Scoped to the organisation when one is given, so one tenant's history can
+ * never block another's calendar edit.
+ */
+export const findBlockingStandupsPending: BlockingStandupLookup = async (
+  dates,
+  organizationId
+) => {
+  if (dates.length === 0) return []
+
+  const standups = (await Standup.find({
+    standupDate: { $in: dates },
+    status: { $in: BLOCKING_STATUSES },
+    ...(organizationId ? { organization: organizationId } : {})
+  })
+    .select('standupDate status')
+    .lean()) as Array<{ _id: unknown; standupDate: string; status: string }>
+
+  return standups.map((standup) => ({
+    standupId: String(standup._id),
+    date: standup.standupDate,
+    status: standup.status
+  }))
+}
 
 export class HolidayRevocationBlockedError extends StandupError {
   readonly blocking: BlockingStandup[]
@@ -88,7 +119,7 @@ export async function revokeHoliday(params: RevokeHolidayParams): Promise<void> 
   if (holiday.status === 'revoked') return
 
   const lookup = params.findBlockingStandups ?? findBlockingStandupsPending
-  const blocking = await lookup([holiday.date])
+  const blocking = await lookup([holiday.date], params.organizationId)
   if (blocking.length > 0) {
     throw new HolidayRevocationBlockedError(blocking)
   }
@@ -223,7 +254,7 @@ export async function updateHoliday(params: UpdateHolidayParams): Promise<Holida
 
     const lookup = params.findBlockingStandups ?? findBlockingStandupsPending
     const affected = movingDate ? [holiday.date, changes.date as string] : [holiday.date]
-    const blocking = await lookup(affected)
+    const blocking = await lookup(affected, params.organizationId)
     if (blocking.length > 0) throw new HolidayRevocationBlockedError(blocking)
   }
 
