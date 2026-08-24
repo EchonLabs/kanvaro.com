@@ -23,11 +23,23 @@ export const GET = withStandupPermission(
     const projectId = request.nextUrl.searchParams.get('projectId') ?? undefined
     const sprintId = request.nextUrl.searchParams.get('sprintId') ?? undefined
 
+    // OB-3: coverage is only answerable against a range — "is the calendar
+    // complete?" has no meaning without saying complete through when — so the
+    // Schedule hub passes its sprint's range and HOLIDAY_COVERAGE_GAP can fire.
+    const from = request.nextUrl.searchParams.get('from') ?? undefined
+    const to = request.nextUrl.searchParams.get('to') ?? undefined
+    const dateRange = from && to ? { from, to } : undefined
+
     if (projectId) {
       await PermissionService.requireProjectAccess(userId, projectId)
     }
 
-    const degradations = await getActiveDegradations({ organizationId, projectId, sprintId })
+    const degradations = await getActiveDegradations({
+      organizationId,
+      projectId,
+      sprintId,
+      dateRange
+    })
 
     return ok({ degradations })
   }
