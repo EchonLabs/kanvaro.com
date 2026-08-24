@@ -311,9 +311,10 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
           step={0.5}
           value={settings.pointsToHours}
           // PLN-14 — changing this after estimates exist must never recompute
-          // silently. The value is held locally and routed through the
-          // migration dialog, which previews every affected task first.
-          onChange={(value) => setPendingFactor(value)}
+          // silently. The value is routed through the migration dialog, which
+          // previews every affected task first. Committed on blur, not per
+          // keystroke: the preview is a deliberate step, not a live search.
+          onCommit={(value) => setPendingFactor(value)}
         />
         {pendingFactor !== null && pendingFactor !== settings.pointsToHours && (
           <p className="text-[12px] text-[var(--apple-secondary-label)]">
@@ -451,7 +452,8 @@ function NumberField({
   max,
   step = 1,
   value,
-  onChange
+  onChange,
+  onCommit
 }: {
   label: string
   hint?: string
@@ -459,9 +461,37 @@ function NumberField({
   max: number
   step?: number
   value: number
-  onChange: (value: number) => void
+  onChange?: (value: number) => void
+  /**
+   * Fired on blur with a value already validated against `min`/`max`, instead of
+   * on every keystroke.
+   *
+   * Needed wherever changing the number has a *consequence* rather than just
+   * updating local state. Typing `8` into an empty box passes through the
+   * intermediate value `0` (`Number('') === 0`), and a per-keystroke handler
+   * would act on that: the points-to-hours field opened its migration preview
+   * against a factor of zero, which the server rejects.
+   */
+  onCommit?: (value: number) => void
 }) {
   const id = `number-${label.replace(/\s+/g, '-').toLowerCase()}`
+  const [draft, setDraft] = useState(String(value))
+
+  // Keep the box in step with the saved value when it changes elsewhere (a
+  // cancelled migration reverts the factor), but never while the user is typing.
+  useEffect(() => {
+    setDraft(String(value))
+  }, [value])
+
+  const commit = () => {
+    const parsed = Number(draft)
+    if (draft.trim() === '' || Number.isNaN(parsed) || parsed < min || parsed > max) {
+      setDraft(String(value))
+      return
+    }
+    if (parsed !== value) onCommit?.(parsed)
+  }
+
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
@@ -471,8 +501,18 @@ function NumberField({
         min={min}
         max={max}
         step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+        value={onCommit ? draft : value}
+        onChange={(event) =>
+          onCommit ? setDraft(event.target.value) : onChange?.(Number(event.target.value))
+        }
+        onBlur={onCommit ? commit : undefined}
+        onKeyDown={
+          onCommit
+            ? (event) => {
+                if (event.key === 'Enter') event.currentTarget.blur()
+              }
+            : undefined
+        }
         className="font-apple-mono tabular-nums"
       />
       {hint && <p className="text-[12px] text-[var(--apple-tertiary-label)]">{hint}</p>}

@@ -858,7 +858,12 @@ function MonthGrid({ month, workingDays }: { month: string; workingDays: Working
 
   return (
     <div>
-      <div className="grid grid-cols-7 gap-1">
+      {/* Width-capped, and sized by explicit height rather than `aspect-square`:
+          unconstrained, each cell grew to a seventh of the settings panel (~130px
+          tall); square cells at a comfortable width then made the month
+          needlessly deep. A fixed 44px row keeps the tap target while letting the
+          cells stay wider than they are tall, which is how a calendar reads. */}
+      <div className="grid max-w-[480px] grid-cols-7 gap-1">
         {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((label) => (
           <div
             key={label}
@@ -883,7 +888,7 @@ function MonthGrid({ month, workingDays }: { month: string; workingDays: Working
               key={date}
               title={describeDay(day)}
               className={cn(
-                'relative flex aspect-square items-center justify-center rounded-[var(--apple-radius-sm)] border text-[12px] tabular-nums font-apple-mono',
+                'relative flex h-11 items-center justify-center rounded-[var(--apple-radius-sm)] border text-[13px] tabular-nums font-apple-mono',
                 day?.isWorkingDay
                   ? 'border-[var(--apple-separator)] text-[var(--apple-label)]'
                   : 'border-transparent bg-[var(--apple-tertiary-fill)] text-[var(--apple-tertiary-label)]'

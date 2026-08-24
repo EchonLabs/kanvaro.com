@@ -2528,9 +2528,10 @@ export default function ProjectDetailPage() {
 
                 </div>
 
-                <div className="border-t border-[var(--apple-separator)] pt-6">
-                  <StandupSettingsPanel projectId={projectId} />
-                </div>
+                {/* The separator lives inside the panel: it renders nothing for
+                    a member without STANDUP_CONFIGURE, and a bordered empty div
+                    would leave a stray rule at the bottom of the tab. */}
+                <StandupSettingsPanel projectId={projectId} />
               </div>
             </TabsContent>
           </Tabs>

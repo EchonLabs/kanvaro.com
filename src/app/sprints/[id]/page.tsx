@@ -957,8 +957,12 @@ export default function SprintDetailPage() {
               <div className="flex items-center gap-2">
                 {/* The planning gate: stand-ups cannot run until this sprint
                     has been planned, so the route to it is offered on every
-                    sprint that has not yet passed it. */}
-                {canEditSprint && ['draft', 'planning', 'planned'].includes(sprint.status) && (
+                    sprint that has not yet passed it.
+                    Gated on *view*, not edit: planning poker is a team activity
+                    and a team member with no sprint-edit rights still has to
+                    reach the screen to cast a vote. Every action on the page is
+                    permission-checked in its own right, server side. */}
+                {canViewSprint && ['draft', 'planning', 'planned'].includes(sprint.status) && (
                   <button
                     onClick={() => router.push(`/sprints/${sprintId}/planning`)}
                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold px-4 h-9 border border-[var(--apple-separator)] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"

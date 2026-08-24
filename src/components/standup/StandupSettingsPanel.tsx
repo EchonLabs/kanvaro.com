@@ -11,7 +11,7 @@
 import { useState } from 'react'
 import { CalendarDays, Settings2, Users } from 'lucide-react'
 
-import { PermissionGate } from '@/lib/permissions/permission-components'
+import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { cn } from '@/lib/utils'
 
@@ -33,9 +33,22 @@ const VIEWS: Array<{
 
 export function StandupSettingsPanel({ projectId }: { projectId: string }) {
   const [view, setView] = useState<StandupSettingsView>('calendar')
+  const { hasPermission, loading, permissions } = usePermissions()
+
+  // STANDUP_CONFIGURE, not STANDUP_VIEW. Team Members and QA hold VIEW because
+  // they attend stand-ups (§3.2); gating on it showed them the whole settings
+  // panel, tablist included, for a project they cannot configure.
+  //
+  // Checked directly rather than through PermissionGate, which renders its
+  // children while permissions load to avoid flicker. That trade is right for
+  // ordinary content and wrong here: it would flash the entire configuration
+  // surface at every Team Member on each page load.
+  if (loading || !permissions || !hasPermission(Permission.STANDUP_CONFIGURE, projectId)) {
+    return null
+  }
 
   return (
-    <PermissionGate permission={Permission.STANDUP_VIEW} projectId={projectId}>
+    <div className="space-y-5 border-t border-[var(--apple-separator)] pt-6">
       <div className="space-y-5">
         <div>
           <h3 className="text-lg font-semibold text-foreground">Stand-ups</h3>
@@ -78,6 +91,6 @@ export function StandupSettingsPanel({ projectId }: { projectId: string }) {
         {view === 'configuration' && <StandupConfigSettings projectId={projectId} />}
         {view === 'capacity' && <CapacityMembersSettings projectId={projectId} />}
       </div>
-    </PermissionGate>
+    </div>
   )
 }

@@ -277,3 +277,29 @@ export function voteProgress(
 }
 
 const round2 = (value: number) => Math.round(value * 100) / 100
+
+/**
+ * Who may cast a vote (PLN-10 `participantIds`, PLN-11).
+ *
+ * The sprint team is the default, but two people fall outside it and still
+ * belong in the round:
+ *
+ *   - the facilitator, who is often a PM not on the sprint team and was
+ *     otherwise locked out of their own session;
+ *   - anyone the facilitator names explicitly — QA and specialists who estimate
+ *     the work without being assigned it.
+ *
+ * The facilitator is always included, even against an explicit list, because a
+ * session whose own facilitator cannot vote is never what was meant.
+ */
+export function resolveParticipants(
+  requested: string[] | undefined,
+  teamMembers: any[] | undefined,
+  facilitatorId: string
+): string[] {
+  const base = requested?.length ? requested : teamMembers ?? []
+  const ids = base.map((entry: any) => entry?.toString()).filter(Boolean)
+  ids.push(facilitatorId.toString())
+
+  return Array.from(new Set(ids))
+}

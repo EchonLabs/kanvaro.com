@@ -51,7 +51,7 @@ export async function POST(
     }
 
     const task = await Task.findById(params.id)
-    if (!task || task.organization?.toString() !== authResult.user.organization) {
+    if (!task || task.organization?.toString() !== authResult.user.organization?.toString()) {
       throw new StandupError('NOT_FOUND', 'That task no longer exists.', { taskId: params.id })
     }
 

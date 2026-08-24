@@ -78,6 +78,11 @@ export function PointsMigrationDialog({
   const [applying, setApplying] = useState(false)
 
   const load = useCallback(async () => {
+    // Defence in depth behind the caller's blur-commit: never preview a factor
+    // the server will reject anyway. A zero here is what an emptied input box
+    // produces, and previewing it produced an error toast per keystroke.
+    if (!Number.isFinite(proposedFactor) || proposedFactor <= 0) return
+
     setLoading(true)
     try {
       const response = await fetch(

@@ -129,7 +129,7 @@ export function withSprintPermission(
 
       // Org isolation before anything else: a sprint in another organisation
       // must look absent, not forbidden.
-      if ((sprint as any).organization?.toString() !== authResult.user.organization) {
+      if ((sprint as any).organization?.toString() !== authResult.user.organization?.toString()) {
         return NextResponse.json(
           { error: { code: 'NOT_FOUND', message: 'That sprint no longer exists.' } },
           { status: 404 }
@@ -202,7 +202,7 @@ export function withPokerPermission(
       )
 
       if (!pokerSession) return missing
-      if (pokerSession.organization?.toString() !== authResult.user.organization) return missing
+      if (pokerSession.organization?.toString() !== authResult.user.organization?.toString()) return missing
 
       const projectId = pokerSession.project?.toString()
 

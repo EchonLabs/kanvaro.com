@@ -25,11 +25,16 @@ import {
 
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { Checkbox } from '@/components/ui/Checkbox'
+import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Label } from '@/components/ui/label'
 // Lower-case path: the rest of the app imports it this way, and TypeScript
 // treats the two casings as different files on a case-insensitive filesystem.
 import { Textarea } from '@/components/ui/textarea'
 import { useNotify } from '@/lib/notify'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { deckCards, type DeckType } from '@/lib/standup/poker'
 import { cn } from '@/lib/utils'
 
 import {
@@ -55,6 +60,13 @@ interface ChecklistPayload {
   }
   offendingTasks: OffendingTask[]
   offendingMembers: OffendingMember[]
+}
+
+interface ProjectMember {
+  memberId: string
+  firstName?: string
+  lastName?: string
+  email?: string
 }
 
 interface BacklogTask {
@@ -86,8 +98,15 @@ export function PlanningWorkspace({
   onCompleted
 }: Props) {
   const notify = useNotify()
+  const { hasPermission } = usePermissions()
+
+  // Reveal and finalise are facilitator actions (SPRINT_UPDATE server side);
+  // casting a vote only needs SPRINT_VIEW. A team member reaches this screen to
+  // vote and must not be shown controls the API would refuse.
+  const canFacilitate = hasPermission(Permission.SPRINT_UPDATE, projectId)
 
   const [data, setData] = useState<ChecklistPayload | null>(null)
+  const [openPokerSession, setOpenPokerSession] = useState<any>(null)
   const [session, setSession] = useState<any>(null)
   const [goal, setGoal] = useState('')
   const [acknowledged, setAcknowledged] = useState<string[]>([])
@@ -97,19 +116,35 @@ export function PlanningWorkspace({
   const [poker, setPoker] = useState<any>(null)
   const [backlog, setBacklog] = useState<BacklogTask[]>([])
   const [showBacklog, setShowBacklog] = useState(false)
+  // PLN-10 `participantIds`. Only the sprint team could vote before, which shut
+  // out QA and specialists who estimate work they are not assigned.
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([])
+  const [voterIds, setVoterIds] = useState<string[] | null>(null)
+  const [choosingVoters, setChoosingVoters] = useState(false)
 
   // UI-4 — the checklist is live. Every mutation on this screen ends by
   // refetching it, so what the PM sees and what the server will enforce cannot
   // drift apart.
   const refresh = useCallback(async () => {
     try {
-      const [checklistResponse, sessionResponse] = await Promise.all([
+      const [checklistResponse, sessionResponse, pokerResponse] = await Promise.all([
         fetch(`/api/sprints/${sprintId}/planning-session/checklist`),
-        fetch(`/api/sprints/${sprintId}/planning-session`)
+        fetch(`/api/sprints/${sprintId}/planning-session`),
+        // Read-only (SPRINT_VIEW), so every participant sees an open round and
+        // can join it. Without this a member arriving mid-session sees nothing:
+        // the modal used to exist only in the state of whoever opened it.
+        fetch(`/api/sprints/${sprintId}/poker-sessions`)
       ])
 
       const checklistPayload = await checklistResponse.json()
       const sessionPayload = await sessionResponse.json()
+
+      if (pokerResponse.ok) {
+        const pokerPayload = await pokerResponse.json()
+        setOpenPokerSession(
+          (pokerPayload.data?.sessions ?? []).find((entry: any) => entry.status === 'open') ?? null
+        )
+      }
 
       if (checklistResponse.ok) setData(checklistPayload.data)
       if (sessionResponse.ok) {
@@ -137,6 +172,17 @@ export function PlanningWorkspace({
       if (response.ok) setBacklog(payload.data ?? payload.tasks ?? [])
     } catch {
       /* The backlog panel is additive; a failure here must not blank the gate. */
+    }
+  }, [projectId])
+
+  const loadMembers = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/member-capacity`)
+      const payload = await response.json()
+      if (response.ok) setProjectMembers(payload.data?.members ?? [])
+    } catch {
+      /* The picker falls back to the sprint team; a failure here must not
+         block opening a round. */
     }
   }, [projectId])
 
@@ -217,6 +263,30 @@ export function PlanningWorkspace({
     await refresh()
   }
 
+  /**
+   * Opens the modal on a round somebody else started.
+   *
+   * The queue is rebuilt from the session document rather than the checklist,
+   * because a voter may not be able to see the same task list, and the deck is
+   * derived locally — `deckCards` is pure, so there is nothing to fetch.
+   */
+  const joinPoker = () => {
+    if (!openPokerSession) return
+    setPoker({
+      session: openPokerSession,
+      cards: deckCards(openPokerSession.deckType as DeckType),
+      queue: (openPokerSession.queue ?? []).map((entry: any) => {
+        const task = data?.offendingTasks.find((candidate) => candidate.id === String(entry.task))
+        return {
+          taskId: String(entry.task),
+          key: task?.key ?? '',
+          title: task?.title ?? 'Task',
+          status: entry.status
+        }
+      })
+    })
+  }
+
   const startPoker = async () => {
     const unestimated = data?.offendingTasks.filter(
       (task) => !task.originalEstimateMinutes
@@ -231,7 +301,12 @@ export function PlanningWorkspace({
       const response = await fetch(`/api/sprints/${sprintId}/poker-sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskIds: unestimated.map((task) => task.id) })
+        body: JSON.stringify({
+          taskIds: unestimated.map((task) => task.id),
+          // Omitted entirely when untouched, so the server keeps its sprint-team
+          // default rather than receiving an empty list.
+          ...(voterIds?.length ? { participantIds: voterIds } : {})
+        })
       })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Could not open a poker session')
@@ -256,6 +331,7 @@ export function PlanningWorkspace({
       })
     } finally {
       setBusy(false)
+      setChoosingVoters(false)
     }
   }
 
@@ -319,18 +395,36 @@ export function PlanningWorkspace({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={startPoker} disabled={busy || !session}>
-            <Spade className="mr-1.5 h-4 w-4" />
-            Planning poker
-          </Button>
+          {openPokerSession ? (
+            <Button variant="outline" onClick={joinPoker} disabled={busy}>
+              <Spade className="mr-1.5 h-4 w-4" />
+              Join planning poker
+            </Button>
+          ) : (
+            canFacilitate && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  loadMembers()
+                  setChoosingVoters(true)
+                }}
+                disabled={busy || !session}
+              >
+                <Spade className="mr-1.5 h-4 w-4" />
+                Planning poker
+              </Button>
+            )
+          )}
 
           {/* UI-6 — disabled with a tooltip naming the first blocking item. */}
-          <span title={canComplete ? undefined : blockerTooltip(blockers, session)}>
-            <Button onClick={complete} disabled={!canComplete || busy}>
-              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Complete planning
-            </Button>
-          </span>
+          {canFacilitate && (
+            <span title={canComplete ? undefined : blockerTooltip(blockers, session)}>
+              <Button onClick={complete} disabled={!canComplete || busy}>
+                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Complete planning
+              </Button>
+            </span>
+          )}
         </div>
       </header>
 
@@ -362,10 +456,12 @@ export function PlanningWorkspace({
               Stand-ups cannot run until this sprint has been planned.
             </p>
           </div>
-          <Button onClick={openSession} disabled={busy}>
-            <PlayCircle className="mr-1.5 h-4 w-4" />
-            Start planning
-          </Button>
+          {canFacilitate && (
+            <Button onClick={openSession} disabled={busy}>
+              <PlayCircle className="mr-1.5 h-4 w-4" />
+              Start planning
+            </Button>
+          )}
         </div>
       )}
 
@@ -480,6 +576,66 @@ export function PlanningWorkspace({
         />
       )}
 
+      {/* PLN-10 — who votes. Defaults to the sprint team, but QA and specialists
+          estimate work they are never assigned, and the facilitator is often a
+          PM who is not on the sprint team at all. */}
+      <ResponsiveDialog
+        open={choosingVoters}
+        onOpenChange={setChoosingVoters}
+        title="Who is estimating?"
+        description="Everyone ticked can cast a vote. You can always run the round with the sprint team as it stands."
+      >
+        <div className="space-y-3">
+          <div className="max-h-[280px] space-y-1 overflow-y-auto rounded-[10px] border border-[var(--apple-separator)] p-2">
+            {projectMembers.length === 0 && (
+              <p className="p-2 text-[13px] text-[var(--apple-secondary-label)]">
+                Loading the project team…
+              </p>
+            )}
+            {projectMembers.map((member) => {
+              const name =
+                [member.firstName, member.lastName].filter(Boolean).join(' ') ||
+                member.email ||
+                member.memberId
+              const ticked = voterIds === null || voterIds.includes(member.memberId)
+
+              return (
+                <label
+                  key={member.memberId}
+                  className="flex cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-fill-quaternary)]"
+                >
+                  <Checkbox
+                    checked={ticked}
+                    onCheckedChange={(checked) => {
+                      // `null` means "untouched, use the server default", so the
+                      // first tick has to materialise the current selection.
+                      const current =
+                        voterIds ?? projectMembers.map((entry) => entry.memberId)
+                      setVoterIds(
+                        checked
+                          ? Array.from(new Set([...current, member.memberId]))
+                          : current.filter((id) => id !== member.memberId)
+                      )
+                    }}
+                  />
+                  <span className="text-[13px] text-[var(--apple-label)]">{name}</span>
+                </label>
+              )
+            })}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setChoosingVoters(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={startPoker} disabled={busy}>
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Start round
+            </Button>
+          </div>
+        </div>
+      </ResponsiveDialog>
+
       {poker && (
         <PokerModal
           open
@@ -488,7 +644,9 @@ export function PlanningWorkspace({
           cards={poker.cards}
           queue={poker.queue}
           currentTaskId={poker.session.currentTask}
-          isFacilitator
+          // Reveal and finalise are SPRINT_UPDATE server side. Hardcoding this
+          // to true showed a voter buttons the API would answer with 403.
+          isFacilitator={canFacilitate}
           pointsToHours={poker.session.pointsToHours}
           estimationUnit={poker.session.estimationUnit}
           onEstimated={refresh}

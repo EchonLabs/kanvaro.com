@@ -15,6 +15,7 @@ import {
   CONSENSUS_RULES,
   DECK_TYPES,
   deckCards,
+  resolveParticipants,
   type ConsensusRule,
   type DeckType
 } from '@/lib/standup/poker'
@@ -113,7 +114,7 @@ export const POST = withSprintPermission(
       allowRevote: body.allowRevote !== false,
       autoRevealOnAllVoted: body.autoRevealOnAllVoted !== false,
       facilitator: userId,
-      participants: body.participantIds?.length ? body.participantIds : sprint.teamMembers ?? [],
+      participants: resolveParticipants(body.participantIds, sprint.teamMembers, userId),
       queue: (tasks as any[]).map((task) => ({ task: task._id, status: 'pending', roundCount: 0 })),
       currentTask: (tasks as any[])[0]._id,
       createdBy: userId

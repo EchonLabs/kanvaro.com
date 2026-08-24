@@ -12,6 +12,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
+import { MainLayout } from '@/components/layout/MainLayout'
 import { PlanningWorkspace } from '@/components/standup/PlanningWorkspace'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -45,9 +46,11 @@ export default function SprintPlanningPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-[var(--apple-tertiary-label)]" />
-      </div>
+      <MainLayout>
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--apple-tertiary-label)]" />
+        </div>
+      </MainLayout>
     )
   }
 
@@ -70,39 +73,46 @@ export default function SprintPlanningPage() {
 
   if (error || !sprint) {
     return (
-      <div className="mx-auto max-w-2xl p-6 text-center">
-        <p className="text-[13px] text-[var(--apple-secondary-label)]">
-          {error ?? 'That sprint could not be found.'}
-        </p>
-        <Button variant="outline" className="mt-4" onClick={() => router.push('/sprints')}>
-          Back to sprints
-        </Button>
-      </div>
+      <MainLayout>
+        <div className="mx-auto max-w-2xl p-6 text-center">
+          <p className="text-[13px] text-[var(--apple-secondary-label)]">
+            {error ?? 'That sprint could not be found.'}
+          </p>
+          <Button variant="outline" className="mt-4" onClick={() => router.push('/sprints')}>
+            Back to sprints
+          </Button>
+        </div>
+      </MainLayout>
     )
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => router.push(`/sprints/${sprintId}`)}
-        className="-ml-2"
-      >
-        <ArrowLeft className="mr-1.5 h-4 w-4" />
-        {sprint.name}
-      </Button>
+    <MainLayout>
+      <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push(`/sprints/${sprintId}`)}
+          className="-ml-2"
+        >
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          {sprint.name}
+        </Button>
 
-      <PermissionGate permission={Permission.SPRINT_VIEW} projectId={sprint.project?._id ?? sprint.project}>
-        <PlanningWorkspace
-          sprintId={sprintId}
-          sprintName={sprint.name}
-          sprintStatus={sprint.status}
+        <PermissionGate
+          permission={Permission.SPRINT_VIEW}
           projectId={sprint.project?._id ?? sprint.project}
-          waiverBanner={waiverBanner}
-          onCompleted={load}
-        />
-      </PermissionGate>
-    </div>
+        >
+          <PlanningWorkspace
+            sprintId={sprintId}
+            sprintName={sprint.name}
+            sprintStatus={sprint.status}
+            projectId={sprint.project?._id ?? sprint.project}
+            waiverBanner={waiverBanner}
+            onCompleted={load}
+          />
+        </PermissionGate>
+      </div>
+    </MainLayout>
   )
 }
