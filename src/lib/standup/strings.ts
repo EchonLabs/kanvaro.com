@@ -261,6 +261,28 @@ export const standupStrings = {
    */
   variance: {
     // Intentionally empty until Phase 5. See the note above.
+  },
+
+  /**
+   * Notices for capabilities release one deliberately ships without (plan §3).
+   *
+   * Each entry leads with the **effect on the reader**, not the cause: a PM
+   * needs to know stand-ups are not being promoted, not that a heartbeat is
+   * missing. The cause belongs in the linked documentation.
+   */
+  degradation: {
+    schedulerStaleNever:
+      'Stand-ups are not being promoted automatically. No background run has been recorded yet.',
+    schedulerStale: ({ minutes }: { minutes: number }) =>
+      `Stand-ups are not being promoted automatically. The last background run was ${minutes} ${plural(
+        minutes,
+        'minute',
+        'minutes'
+      )} ago.`,
+    schedulerStaleAction: 'How to fix this',
+    cronRoutesUnauthenticated:
+      'Background job URLs can be triggered by anyone who knows the address. Set CRON_SECRET to require a token.',
+    cronRoutesUnauthenticatedAction: 'How to set CRON_SECRET'
   }
 } as const
 
