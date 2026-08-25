@@ -148,7 +148,7 @@ describe('HOLIDAY_COVERAGE_GAP (DO-4)', () => {
     expect(gap?.severity).toBe('warning')
     expect(gap?.message).toMatch(/2027-12-25/)
     // The action must lead somewhere that fixes it, not just explain it.
-    expect(gap?.action?.href).toContain('/settings/organization/holidays')
+    expect(gap?.action?.href).toBe('/settings?tab=holidays')
   })
 
   it('stays quiet when the range is covered', async () => {

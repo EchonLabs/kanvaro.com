@@ -62,7 +62,7 @@ export const SCHEDULER_STALE_AFTER_MS = 15 * 60 * 1000
 // A bare /docs/operations/... path 404s, and a degradation whose action link is
 // broken is a broken degradation.
 const SCHEDULER_DOCS = '/docs/internal/operations/background-jobs'
-const HOLIDAY_ADMIN = '/settings/organization/holidays'
+const HOLIDAY_ADMIN = '/settings?tab=holidays'
 
 export async function getActiveDegradations(
   scope: DegradationScope
