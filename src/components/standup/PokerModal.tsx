@@ -17,7 +17,11 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { useNotify } from '@/lib/notify'
+import { resolveVisibleTask } from '@/lib/standup/poker'
 import { cn } from '@/lib/utils'
+
+/** How often an open modal re-reads the session. */
+const POLL_INTERVAL_MS = 4000
 
 interface QueueEntry {
   taskId: string
@@ -78,6 +82,9 @@ export function PokerModal({
   const [reveal, setReveal] = useState<RevealState | null>(null)
   const [finalValue, setFinalValue] = useState('')
   const [busy, setBusy] = useState(false)
+  const [serverCurrentTask, setServerCurrentTask] = useState<string | null>(null)
+  const [liveQueue, setLiveQueue] = useState<{ taskId: string; status: string }[]>([])
+  const [sessionClosed, setSessionClosed] = useState(false)
 
   const task = queue.find((entry) => entry.taskId === taskId)
   const position = queue.findIndex((entry) => entry.taskId === taskId) + 1
@@ -91,9 +98,57 @@ export function PokerModal({
     setFinalValue('')
   }, [taskId])
 
+  // The facilitator advances the queue, but only their own finalize response
+  // carries `nextTaskId`. Everyone else learns about the move by re-reading the
+  // session — without this a voter sits on a task that has already been
+  // estimated and every card they click is refused. Polling rather than a live
+  // channel is deliberate: plan v3 descopes presence (RUN-24) and keeps polling.
   useEffect(() => {
-    if (currentTaskId) setTaskId(currentTaskId)
-  }, [currentTaskId])
+    if (!open) return
+
+    let cancelled = false
+
+    const sync = async () => {
+      try {
+        const response = await fetch(`/api/poker-sessions/${sessionId}`)
+        if (!response.ok) return
+
+        const payload = await response.json()
+        const session = payload?.data?.session
+        if (cancelled || !session) return
+
+        setLiveQueue(
+          (session.queue ?? []).map((entry: any) => ({
+            taskId: String(entry.task),
+            status: entry.status
+          }))
+        )
+        setServerCurrentTask(session.currentTask ?? null)
+        setSessionClosed(session.status !== 'open')
+      } catch {
+        /* A dropped poll is not worth a toast; the next one recovers. */
+      }
+    }
+
+    sync()
+    const interval = setInterval(sync, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [open, sessionId])
+
+  // One rule decides what is on screen, for the facilitator and voters alike.
+  useEffect(() => {
+    const next = resolveVisibleTask({
+      serverCurrentTask: serverCurrentTask ?? currentTaskId ?? null,
+      queue: liveQueue.length ? liveQueue : queue,
+      showing: taskId
+    })
+
+    if (next && next !== taskId) setTaskId(next)
+    if (!next && sessionClosed) onOpenChange(false)
+  }, [serverCurrentTask, liveQueue, queue, currentTaskId, taskId, sessionClosed, onOpenChange])
 
   const post = useCallback(
     async (path: string, body?: unknown) => {

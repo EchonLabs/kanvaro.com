@@ -166,7 +166,7 @@ export function PlanningWorkspace({
   const loadBacklog = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/tasks?projectId=${projectId}&noSprint=true&limit=100`
+        `/api/tasks?project=${encodeURIComponent(projectId)}&noSprint=true&limit=100`
       )
       const payload = await response.json()
       if (response.ok) setBacklog(payload.data ?? payload.tasks ?? [])

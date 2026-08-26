@@ -283,6 +283,9 @@ export const standupStrings = {
     backfilled: () => 'Back-filled',
     calendarAnomaly: () =>
       'The calendar changed after this stand-up ran. Its record was left untouched.',
+    loading: () => 'Loading the schedule…',
+    sprintsLoadFailed: () => "Could not load this project's sprints.",
+    scheduleLoadFailed: () => 'Could not load the stand-up schedule.',
     status: {
       Scheduled: 'Scheduled',
       Ready: 'Ready to start',

@@ -44,7 +44,7 @@ export default function ProjectStandupSchedulePage({
 
     const loadSprints = async () => {
       try {
-        const response = await fetch(`/api/sprints?projectId=${projectId}`)
+        const response = await fetch(`/api/sprints?project=${projectId}`)
         const payload = await response.json()
         const rows: SprintOption[] = (payload?.data ?? payload?.sprints ?? []).map(
           (sprint: any) => ({ id: sprint._id ?? sprint.id, name: sprint.name })
@@ -56,7 +56,7 @@ export default function ProjectStandupSchedulePage({
         if (rows.length === 0) setLoading(false)
       } catch {
         if (!cancelled) {
-          setError('Could not load this project`s sprints.')
+          setError(standupStrings.schedule.sprintsLoadFailed())
           setLoading(false)
         }
       }
@@ -91,7 +91,7 @@ export default function ProjectStandupSchedulePage({
         setDegradations(healthPayload.degradations ?? healthPayload.data?.degradations ?? [])
       }
     } catch {
-      setError('Could not load the stand-up schedule.')
+      setError(standupStrings.schedule.scheduleLoadFailed())
     } finally {
       setLoading(false)
     }
@@ -139,7 +139,7 @@ export default function ProjectStandupSchedulePage({
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-[var(--apple-secondary-label)]">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading the schedule…
+            {standupStrings.schedule.loading()}
           </div>
         ) : error ? (
           <p className="text-sm text-[var(--apple-system-red)]">{error}</p>

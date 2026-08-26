@@ -901,7 +901,7 @@ export default function BacklogPage() {
       // fetch sprints for that project to narrow down options. 
       // Otherwise, fetch all sprints.
       const url = projectId
-        ? `/api/sprints?limit=200&projectId=${projectId}`
+        ? `/api/sprints?limit=200&project=${encodeURIComponent(projectId)}`
         : '/api/sprints?limit=200'
 
       const response = await fetch(url)

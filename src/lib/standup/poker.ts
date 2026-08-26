@@ -303,3 +303,33 @@ export function resolveParticipants(
 
   return Array.from(new Set(ids))
 }
+
+/**
+ * Which task every client should have on screen.
+ *
+ * The facilitator advances the queue, but only their own finalize response
+ * carries `nextTaskId`. Voters learn about the move by re-reading the session,
+ * and this is the rule they apply to what comes back: the server's
+ * `currentTask` wins over whatever the client was showing. Without it a voter
+ * sits on a task the facilitator has already estimated, and every card they
+ * click is refused.
+ *
+ * Returns `null` when there is nothing left to vote on, which is the modal's
+ * signal to close.
+ */
+export function resolveVisibleTask(input: {
+  serverCurrentTask?: string | null
+  queue: { taskId: string; status: string }[]
+  showing?: string | null
+}): string | null {
+  const { serverCurrentTask, queue } = input
+
+  const named = serverCurrentTask
+    ? queue.find((entry) => entry.taskId === serverCurrentTask)
+    : undefined
+  if (named) return named.taskId
+
+  // A `currentTask` the client cannot see — or none at all — falls back to the
+  // same choice the server makes when it advances: the first task still open.
+  return queue.find((entry) => entry.status !== 'estimated')?.taskId ?? null
+}
