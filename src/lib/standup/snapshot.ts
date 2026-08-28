@@ -24,6 +24,7 @@ import {
   type CapacityAdjustment
 } from './capacity'
 import { loadCalendarContext, checkHolidayCoverage } from './calendar-service'
+import { resolveCeremonyDeductions, type CeremonyDeduction } from './ceremonies'
 import type { IsoDate } from './calendar-dates'
 import { StandupError } from './errors'
 import { minutes, type Minutes } from './minutes'
@@ -63,6 +64,13 @@ export interface StandupSnapshot {
   unassignedPool: SnapshotTask[]
   /** Total before pagination, so the UI can say "50 of 55". */
   unassignedPoolTotal: number
+  /**
+   * DN-6: false means ceremony minutes were deliberately not deducted, and the
+   * capacity board must say so. Carried on the snapshot rather than re-read by
+   * the UI, because the setting can change after the snapshot was frozen and
+   * the breakdown has to explain the numbers it is actually showing.
+   */
+  ceremoniesConsumeCapacity: boolean
   /** Register row 12: the sprint runs past the loaded holiday data. */
   coverageWarning?: string
 
@@ -102,6 +110,23 @@ export async function buildStandupSnapshot(
   const resolution = resolveWorkingDayFrom(date, context)
 
   const memberIds: string[] = (standup.expectedAttendees ?? []).map((id: unknown) => String(id))
+
+  // DN-6, opt-out. DN-3 is why the stand-up's own duration is passed here and
+  // nowhere else: `resolveCeremonyDeductions` drops `daily_standup` SprintEvents
+  // and adds this exactly once, so a project holding both loses fifteen minutes
+  // once rather than twice.
+  const ceremoniesConsumeCapacity = settings?.ceremoniesConsumeCapacity !== false
+  const ceremonyPlan = ceremoniesConsumeCapacity
+    ? await resolveCeremonyDeductions({
+        projectId,
+        sprintId: String(standup.sprint),
+        date,
+        memberIds,
+        timezone: context.timezone,
+        standupDurationMinutes: minutes(settings?.durationMinutes ?? 0)
+      })
+    : null
+
   const capacityByMember = new Map<string, any[]>()
   for (const record of capacities) {
     const key = record.member.toString()
@@ -127,6 +152,7 @@ export async function buildStandupSnapshot(
         reason: entry.reason
       })),
       nonProjectCommitments: record?.nonProjectCommitments ?? [],
+      ceremonies: (ceremonyPlan?.deductions.get(memberId) ?? []) as CeremonyDeduction[],
       observedOptionalHolidayIds: (record?.observedOptionalHolidayIds ?? []).map(String),
       overrunPolicy: settings?.overrunPolicy,
       underToleranceMinutes: settings?.underToleranceMinutes,
@@ -180,6 +206,7 @@ export async function buildStandupSnapshot(
       remainingEstimateMinutes: task.remainingEstimateMinutes
     })),
     unassignedPoolTotal,
+    ceremoniesConsumeCapacity,
     ...(coverage ? { coverageWarning: coverage.message } : {}),
 
     previousAllocations: [],

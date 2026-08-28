@@ -207,7 +207,25 @@ export const standupStrings = {
       absentPlanned: () => 'Absent (planned)',
       absentUnplanned: () => 'Absent (unplanned)',
       partialAttendance: () => 'Working a partial day'
-    }
+    },
+
+    /**
+     * DN-6 — the breakdown must say when ceremonies were *not* deducted.
+     * Otherwise a full eight-hour day on a day holding a two-hour review looks
+     * like a bug rather than a setting.
+     */
+    ceremoniesNotDeducted: () =>
+      'Ceremonies not deducted. Meetings do not reduce capacity on this project.',
+
+    /**
+     * RUN-7 — hours still sitting on somebody who is not there. States the
+     * amount rather than the task count, because the amount is what the rest of
+     * the board is measured in and what has to be placed somewhere else today.
+     */
+    strandedAllocations: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} is still allocated to this member, who has no capacity today. Reassign it or carry it forward.`,
+
+    strandedAllocationsAction: () => 'Reassign these hours'
   },
 
   allocationStatus: {
@@ -245,6 +263,23 @@ export const standupStrings = {
 
     policyChangeScope: () =>
       'Changing this only affects stand-ups that have not been completed.',
+
+    /** DN-6 — the ceremonies opt-out. */
+    ceremoniesTitle: () => 'Ceremonies reduce capacity',
+    ceremoniesHint: () =>
+      'A sprint review, retro or demo removes its own length from the day of everyone attending it. Off means meetings are treated as outside the working day.',
+
+    /**
+     * DN-4 — an event with nobody on it deducts from nobody. Named as a
+     * question about the event rather than a system error, because it is a
+     * data problem the PM fixes on the Sprint Events screen.
+     */
+    unattendedCeremonies: ({ count }: { count: number }) =>
+      count === 1
+        ? '1 upcoming event has no attendees, so it reduces nobody’s capacity.'
+        : `${count} upcoming events have no attendees, so they reduce nobody’s capacity.`,
+    unattendedCeremoniesHint: () =>
+      'Add attendees on the Sprint Events screen and the time will start coming out of their day.',
 
     saved: () => 'Stand-up settings saved',
     saveFailed: () => 'Could not save stand-up settings'

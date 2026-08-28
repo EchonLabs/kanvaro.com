@@ -48,6 +48,12 @@ export interface CapacityAdjustment {
     | 'optional_holiday'
     /** A member-scoped calendar override — layer 4 of CAL-4. */
     | 'member_exception'
+    /**
+     * A meeting this member attends — a sprint ceremony, or the stand-up
+     * itself (DN-1). Never an allocation: a meeting has no task and no
+     * estimate, so it must not reach the variance engine or the debt ledger.
+     */
+    | 'ceremony'
   label: string
   minutes: Minutes
 }
@@ -67,6 +73,19 @@ export interface NonProjectCommitmentInput {
   daysOfWeek: number[]
 }
 
+/**
+ * The shape of a ceremony this function needs, structurally.
+ *
+ * Declared here rather than imported from `ceremonies.ts` on purpose: that
+ * module reads the database, and this one must stay pure. `CeremonyDeduction`
+ * is assignable to this, so the loader's output flows straight in.
+ */
+export interface CeremonyDeductionInput {
+  /** Shown verbatim on the breakdown, so it must name the meeting (DN-7). */
+  title: string
+  minutes: Minutes
+}
+
 export interface ComputeCapacityInput {
   memberId: string
   date: IsoDate
@@ -79,6 +98,15 @@ export interface ComputeCapacityInput {
   attendancePartialMinutes?: Minutes
   leave?: MemberLeaveInput[]
   nonProjectCommitments?: NonProjectCommitmentInput[]
+  /**
+   * Meetings on this date that this member attends, already resolved by
+   * `ceremonies.ts` (DN-1 … DN-7).
+   *
+   * Passing an empty list — or omitting it — is how
+   * `ceremoniesConsumeCapacity: false` is expressed. This function has no
+   * opinion about the setting; the caller decides whether to resolve them.
+   */
+  ceremonies?: CeremonyDeductionInput[]
   /** Holiday ids from `resolution.optionalHolidays` that this member observes (CAL-9). */
   observedOptionalHolidayIds?: string[]
   /** Outstanding estimate debt for the member on this sprint (VAR-6). */
@@ -107,9 +135,45 @@ export interface CapacityBreakdown {
   status: AllocationStatus
   /** True when the day is unavailable because the member is out, not merely empty. */
   isUnavailable: boolean
+  /**
+   * Hours still allocated to a member who has no capacity left to do them —
+   * `allocatedMinutes` whenever `effectiveMinutes` is zero, otherwise zero.
+   *
+   * RUN-7 requires that marking somebody absent moves their allocations into
+   * the carry-forward register, but `status` alone cannot report a failure to
+   * do so: `unavailable` is decided before `allocatedMinutes` is even looked
+   * at, so six stranded hours and an empty day render identically. This field
+   * is what lets the board show the difference, and it stays correct whether
+   * the capacity vanished through absence, a debt wipeout, or the date ceasing
+   * to be a working day.
+   */
+  strandedMinutes: Minutes
 }
 
 const DEFAULT_TOLERANCE = minutes(15)
+
+/**
+ * The adjustment types that mean "this member is not here today", in the order
+ * that decides which one speaks for a whole-day absence.
+ *
+ * Three separate stores can each remove a member's entire day — same-day
+ * attendance (RUN-6), a dated leave range on their capacity record, and a
+ * layer-4 member calendar exception (CAL-4) — and a fourth, an observed
+ * full-day optional holiday (CAL-9), does the same. Left alone they stack, and
+ * a member who lost one day reads as `−8h Approved leave`, `−8h Absent
+ * (planned)`, `−8h Annual leave`. The arithmetic survives that, because
+ * everything floors at zero; the breakdown does not, and the breakdown is the
+ * entire reason this function returns an itemised list rather than a number.
+ *
+ * Attendance wins because it is the facilitator's judgement on the day itself,
+ * and it must beat a range somebody typed a week earlier.
+ */
+const WHOLE_DAY_ABSENCE_PRECEDENCE = [
+  'attendance',
+  'leave',
+  'member_exception',
+  'optional_holiday'
+] as const satisfies readonly CapacityAdjustment['type'][]
 
 /**
  * Computes one member's capacity for one date, in ALO-1's exact order.
@@ -124,6 +188,7 @@ export function computeCapacity(input: ComputeCapacityInput): CapacityBreakdown 
     attendancePartialMinutes,
     leave = [],
     nonProjectCommitments = [],
+    ceremonies = [],
     observedOptionalHolidayIds = [],
     outstandingDebtMinutes = ZERO_MINUTES,
     overrunPolicy = 'absorb',
@@ -149,7 +214,10 @@ export function computeCapacity(input: ComputeCapacityInput): CapacityBreakdown 
       allocatedMinutes,
       gapMinutes: ZERO_MINUTES,
       status: 'unavailable',
-      isUnavailable: true
+      isUnavailable: true,
+      // A date can stop being a working day after allocations were made on it —
+      // a holiday loaded late, a calendar override — so this is not always zero.
+      strandedMinutes: allocatedMinutes
     }
   }
 
@@ -210,6 +278,20 @@ export function computeCapacity(input: ComputeCapacityInput): CapacityBreakdown 
     })
   }
 
+  // Step 4b — ceremonies and the stand-up itself (DN-1). Fixed overhead, so it
+  // sits beside the non-project commitments rather than anywhere near the
+  // allocation arithmetic: these hours are gone before planning starts.
+  //
+  // One adjustment per meeting, never an aggregate (DN-7) — "meetings −90m"
+  // cannot answer the question the member drawer exists to answer.
+  let ceremonyMinutes: Minutes = ZERO_MINUTES
+  for (const ceremony of ceremonies) {
+    const amount = minutes(ceremony.minutes)
+    if (amount === 0) continue
+    ceremonyMinutes = addMinutes(ceremonyMinutes, amount)
+    adjustments.push({ type: 'ceremony', label: ceremony.title, minutes: amount })
+  }
+
   // Step 5 — optional holidays this member observes (CAL-9). The project keeps
   // its working day and the stand-up still runs; only observers lose capacity.
   const observed = resolution.optionalHolidays.filter((holiday) =>
@@ -253,18 +335,40 @@ export function computeCapacity(input: ComputeCapacityInput): CapacityBreakdown 
     })
   }
 
-  const adjustedMinutes = clampToZero(
-    subtractMinutes(
-      working,
-      addMinutes(
-        leaveMinutes,
-        attendanceMinutes,
-        commitmentMinutes,
-        optionalHolidayMinutes,
-        memberExceptionMinutes
+  // Step 5c — collapse a whole-day absence to the single line that explains it.
+  //
+  // Only reached when one of the absence sources removes the entire working
+  // day on its own. Everything else is dropped rather than listed beneath it:
+  // a support rota and a sprint review are real deductions on a day the member
+  // works, and noise on a day they are not there to attend either.
+  const wholeDayAbsence = findWholeDayAbsence(adjustments, working)
+
+  const finalAdjustments = wholeDayAbsence
+    ? [
+        // The partial-day factor is the context the collapsed line is measured
+        // against, not a competing reason, so it survives: on a half day the
+        // breakdown reads "Half day −4h, Absent (planned) −4h" and still
+        // accounts for the whole distance from nominal.
+        ...adjustments.filter((entry) => entry.type === 'partial_day'),
+        { ...wholeDayAbsence, minutes: working }
+      ]
+    : adjustments
+
+  const adjustedMinutes = wholeDayAbsence
+    ? ZERO_MINUTES
+    : clampToZero(
+        subtractMinutes(
+          working,
+          addMinutes(
+            leaveMinutes,
+            attendanceMinutes,
+            commitmentMinutes,
+            ceremonyMinutes,
+            optionalHolidayMinutes,
+            memberExceptionMinutes
+          )
+        )
       )
-    )
-  )
 
   // Step 6 — the overrun policy decides whether debt eats into today.
   const effectiveMinutes =
@@ -278,13 +382,14 @@ export function computeCapacity(input: ComputeCapacityInput): CapacityBreakdown 
     memberId,
     date,
     nominalMinutes,
-    adjustments,
+    adjustments: finalAdjustments,
     adjustedMinutes,
     outstandingDebtMinutes,
     overrunPolicy,
     effectiveMinutes,
     allocatedMinutes,
     gapMinutes,
+    strandedMinutes: effectiveMinutes === 0 ? allocatedMinutes : ZERO_MINUTES,
     status: allocationStatus({
       effectiveMinutes,
       allocatedMinutes,
@@ -320,6 +425,38 @@ export function allocationStatus(input: {
   }
   if (gapMinutes > underToleranceMinutes) return 'under'
   return 'over'
+}
+
+/**
+ * Returns the one adjustment that accounts for a member being out all day, or
+ * `undefined` when nobody source removed the whole day on its own.
+ *
+ * Totals per type before comparing, because leave ranges and member exceptions
+ * both arrive as lists and two half-day entries are still a whole day out. A
+ * source that removes *more* than the day still collapses to exactly the day —
+ * the caller caps it — so the itemised list keeps summing to the distance from
+ * nominal instead of overshooting it.
+ */
+function findWholeDayAbsence(
+  adjustments: readonly CapacityAdjustment[],
+  working: Minutes
+): CapacityAdjustment | undefined {
+  // A zero-length day has nothing to be absent from, and every total would
+  // trivially clear the bar.
+  if (working <= 0) return undefined
+
+  for (const type of WHOLE_DAY_ABSENCE_PRECEDENCE) {
+    const forType = adjustments.filter((entry) => entry.type === type)
+    if (forType.length === 0) continue
+
+    const total = forType.reduce<number>((sum, entry) => sum + entry.minutes, 0)
+    // The first entry's label speaks for the type. With two exceptions on one
+    // date only one reason can be shown, and the earlier one is the one the
+    // resolution ordered first.
+    if (total >= working) return forType[0]
+  }
+
+  return undefined
 }
 
 /**

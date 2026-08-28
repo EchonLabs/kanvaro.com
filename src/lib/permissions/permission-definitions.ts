@@ -592,6 +592,13 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.CALENDAR_UPDATE,
     Permission.CALENDAR_DELETE,
     Permission.HOLIDAY_MANAGE,
+    // Organisation-wide on purpose, unlike every other non-admin role: HR owns
+    // the holiday calendar for the whole organisation, and HOLIDAY_COVERAGE_GAP
+    // — the notice saying a sprint runs past the last loaded holiday — is
+    // served by the stand-up health route, which is gated on STANDUP_VIEW. HR
+    // cannot be asked to close a gap it is not allowed to see. Read only: the
+    // attendee permissions come from HR's project role when HR is actually on
+    // a project.
     Permission.STANDUP_VIEW,
 
     // Kanban
@@ -821,17 +828,16 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.TEAM_MEMBER]: [
-    // Stand-ups — per §3.2, a Team Member attends and maintains their own row.
-    // They may adjust their own allocation before the stand-up starts (RUN-26
-    // locks this the moment it moves to In_Progress) and raise blockers, but
-    // may not assign work to others, override, or complete.
-    Permission.STANDUP_VIEW,
-    Permission.STANDUP_ALLOCATE_OWN,
-    Permission.STANDUP_BLOCKER_RAISE,
-    // Own debt only. NFR-13 and decision D2: individual debt is visible to the
-    // member themselves and their PM, never across the team.
-    Permission.STANDUP_VIEW_OWN_DEBT,
-    Permission.STANDUP_VIEW_ANALYTICS,
+    // Stand-ups are granted per project, NOT here — see PROJECT_MEMBER.
+    //
+    // A grant in this table is organisation-wide: `hasPermission` returns true
+    // for a PROJECT-scoped permission as soon as the org role holds it, without
+    // ever consulting the project (permission-service.ts). Listing STANDUP_VIEW
+    // here therefore let every team member in the organisation read every
+    // stand-up in it — including capacity gaps and estimate debt for projects
+    // they are not on. A member of a project resolves to PROJECT_MEMBER, which
+    // carries the §3.2 Team Member set scoped to that project, so the
+    // capability is unchanged and the reach is not.
 
     // User management (own profile only)
     Permission.USER_READ,
@@ -1009,6 +1015,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.QA_ENGINEER]: [
+    // Stand-ups are granted per project, NOT here — see PROJECT_QA_LEAD and
+    // PROJECT_MEMBER. A grant here would be organisation-wide; see the note on
+    // TEAM_MEMBER.
+
     // User management (read only)
     Permission.USER_READ,
     Permission.USER_UPDATE,
@@ -1092,6 +1102,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.TESTER]: [
+    // Stand-ups are granted per project, NOT here — see PROJECT_TESTER and
+    // PROJECT_MEMBER. A grant here would be organisation-wide; see the note on
+    // TEAM_MEMBER.
+
     // User management (read only)
     Permission.USER_READ,
 
@@ -1296,6 +1310,15 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
   ],
 
   [ProjectRole.PROJECT_QA_LEAD]: [
+    // Stand-ups — attends as a sprint team member, maintains own row before
+    // the stand-up starts, raises blockers, sees only their own debt
+    // (NFR-13 / D2). Same set as a Team Member per §3.2.
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     Permission.PROJECT_READ,
     Permission.TASK_CREATE,
     Permission.TASK_READ,
@@ -1336,6 +1359,15 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
   ],
 
   [ProjectRole.PROJECT_TESTER]: [
+    // Stand-ups — attends as a sprint team member, maintains own row before
+    // the stand-up starts, raises blockers, sees only their own debt
+    // (NFR-13 / D2). Same set as a Team Member per §3.2.
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     Permission.PROJECT_READ,
     Permission.TASK_CREATE,
     Permission.TASK_READ,
@@ -1413,6 +1445,11 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
     Permission.SETTINGS_MANAGE_SECURITY,
+    // Organisation-wide by design: a holiday set is shared by every project,
+    // so there is no project to scope it to. Without this it fell through to
+    // PROJECT scope, which only worked because the roles that hold it hold it
+    // globally — a custom role granting it would have been scoped wrongly.
+    Permission.HOLIDAY_MANAGE,
   ];
 
   const ownPermissions = [

@@ -12,6 +12,7 @@ import { NextRequest } from 'next/server'
 import { ProjectStandupSettings, OVERRUN_POLICIES } from '@/models/ProjectStandupSettings'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { auditSnapshot, recordAudit } from '@/lib/standup/audit'
+import { listUnattendedCeremonies } from '@/lib/standup/ceremonies'
 import { StandupError } from '@/lib/standup/errors'
 import { hoursToMinutes, minutesToHours } from '@/lib/standup/minutes'
 import { ok, readJson, withStandupPermission } from '@/lib/standup/route-helpers'
@@ -25,13 +26,14 @@ const AUDITED_FIELDS = [
   'overToleranceMinutes',
   'carryForwardNoteThreshold',
   'allowSelfSelect',
-  'blockedTasksConsumeCapacity'
+  'blockedTasksConsumeCapacity',
+  'ceremoniesConsumeCapacity'
 ] as const
 
 export const GET = withStandupPermission(
   { permission: Permission.STANDUP_VIEW, projectIdParam: 'id' },
   async (_request, { projectId, organizationId }) => {
-    let settings = await ProjectStandupSettings.findOne({ project: projectId }).lean()
+    let settings = (await ProjectStandupSettings.findOne({ project: projectId }).lean()) as any
 
     if (!settings) {
       // Return schema defaults without writing — the module is opt-in, and a
@@ -42,7 +44,16 @@ export const GET = withStandupPermission(
       }).toObject()
     }
 
-    return ok({ settings: serialise(settings) })
+    // DN-4: a ceremony with an empty attendee list deducts from nobody. That is
+    // almost always a data problem rather than an intention, and this screen is
+    // where the PM can see it — so the warning travels with the settings rather
+    // than needing its own endpoint the UI would have to remember to call.
+    const unattendedCeremonies =
+      settings.ceremoniesConsumeCapacity === false || !projectId
+        ? []
+        : await listUnattendedCeremonies(projectId)
+
+    return ok({ settings: serialise(settings), unattendedCeremonies })
   }
 )
 
@@ -88,6 +99,7 @@ export const PUT = withStandupPermission(
       'crossSprintCarryForward',
       'blockedTasksConsumeCapacity',
       'requireOverAllocationAck',
+      'ceremoniesConsumeCapacity',
       'pointsToHours',
       'notificationSwitches'
     ]) {

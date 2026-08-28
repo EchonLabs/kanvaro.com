@@ -30,6 +30,17 @@ interface HandlerOptions {
   permission: Permission
   /** Route param holding the project id, when the permission is project-scoped. */
   projectIdParam?: string
+  /**
+   * Query param holding the project id, for routes with no dynamic segment.
+   *
+   * `/api/standup/health` is the case: it is one endpoint serving notices for
+   * the whole module, and the caller narrows it with `?projectId=`. Without
+   * this the check would fall back to the org-scoped one, which only a role
+   * holding the permission organisation-wide can pass — so a team member, whose
+   * stand-up permissions come from project membership, would be refused the
+   * degradation banner on a project they are actually on.
+   */
+  projectIdQuery?: string
 }
 
 type Handler = (
@@ -52,7 +63,11 @@ export function withStandupPermission(options: HandlerOptions, handler: Handler)
       }
 
       const params = routeContext?.params ?? {}
-      const projectId = options.projectIdParam ? params[options.projectIdParam] : undefined
+      const projectId = options.projectIdParam
+        ? params[options.projectIdParam]
+        : options.projectIdQuery
+          ? (request.nextUrl.searchParams.get(options.projectIdQuery) ?? undefined)
+          : undefined
 
       const allowed = await PermissionService.hasPermission(
         authResult.user.id,
