@@ -472,6 +472,90 @@ describe('DAT-1 — capacity is dated', () => {
   })
 })
 
+describe('DN-1/DN-7 — ceremonies reduce capacity and stay itemised', () => {
+  const review = { eventId: 'evt-1', title: 'Sprint Review', eventType: 'review', minutes: minutes(60) }
+  const standup = {
+    eventId: 'project-standup',
+    title: 'Daily stand-up',
+    eventType: 'daily_standup',
+    minutes: QUARTER_HOUR
+  }
+
+  it('removes ceremony minutes from the day', () => {
+    const result = computeCapacity(input({ ceremonies: [review] }))
+
+    expect(result.adjustedMinutes).toBe(420)
+    expect(result.effectiveMinutes).toBe(420)
+  })
+
+  it('lists one adjustment per ceremony, named, rather than one lumped total', () => {
+    const result = computeCapacity(input({ ceremonies: [standup, review] }))
+
+    expect(result.adjustedMinutes).toBe(405)
+    expect(result.adjustments).toEqual([
+      { type: 'ceremony', label: 'Daily stand-up', minutes: 15 },
+      { type: 'ceremony', label: 'Sprint Review', minutes: 60 }
+    ])
+  })
+
+  it('changes nothing when no ceremonies are supplied', () => {
+    expect(computeCapacity(input()).adjustments).toHaveLength(0)
+    expect(computeCapacity(input({ ceremonies: [] })).adjustments).toHaveLength(0)
+  })
+
+  it('floors at zero when a day is more meeting than work', () => {
+    const result = computeCapacity(
+      input({
+        nominalMinutes: FOUR_HOURS,
+        ceremonies: [{ ...review, minutes: minutes(300) }]
+      })
+    )
+
+    expect(result.adjustedMinutes).toBe(0)
+    expect(result.status).toBe('unavailable')
+  })
+
+  it('deducts nothing on a non-working day — there was never a day to reduce', () => {
+    const result = computeCapacity(
+      input({
+        resolution: workingDay({ isWorkingDay: false, reason: 'org_holiday' }),
+        ceremonies: [review]
+      })
+    )
+
+    expect(result.effectiveMinutes).toBe(0)
+    expect(result.adjustments).toHaveLength(0)
+  })
+
+  it('stacks with leave and commitments rather than replacing them', () => {
+    const result = computeCapacity(
+      input({
+        nonProjectCommitments: [{ label: 'Support rota', minutesPerDay: 120, daysOfWeek: [] }],
+        ceremonies: [review]
+      })
+    )
+
+    expect(result.adjustedMinutes).toBe(300)
+    expect(result.adjustments.map((entry) => entry.type)).toEqual([
+      'non_project_commitment',
+      'ceremony'
+    ])
+  })
+
+  it('is subtracted before the overrun policy consumes debt', () => {
+    const result = computeCapacity(
+      input({
+        ceremonies: [review],
+        outstandingDebtMinutes: minutes(120),
+        overrunPolicy: 'reduce'
+      })
+    )
+
+    expect(result.adjustedMinutes).toBe(420)
+    expect(result.effectiveMinutes).toBe(300)
+  })
+})
+
 describe('§12.3 — the spec\'s worked example', () => {
   // Kasun's day 4, carrying 2.0h of estimate debt from day 3's overrun.
   const KASUN_DEBT = minutes(120)
@@ -531,5 +615,157 @@ describe('§12.3 — the spec\'s worked example', () => {
 
     expect(result.gapMinutes).toBe(0)
     expect(result.status).toBe('full')
+  })
+})
+
+describe('R2 — a whole day out is one line on the breakdown', () => {
+  const conference = {
+    id: 'conf',
+    name: 'Kasun at a conference',
+    isPartialDay: false,
+    memberIds: ['kasun']
+  }
+  const wholeDayLeave = { startDate: '2026-08-27', endDate: '2026-08-27' }
+
+  it('collapses leave and a planned absence into a single adjustment', () => {
+    const result = computeCapacity(
+      input({ leave: [wholeDayLeave], attendance: 'absent_planned' })
+    )
+
+    expect(result.adjustedMinutes).toBe(0)
+    expect(result.adjustments).toHaveLength(1)
+  })
+
+  it('prefers same-day attendance over a leave range typed earlier', () => {
+    const result = computeCapacity(
+      input({ leave: [wholeDayLeave], attendance: 'absent_unplanned' })
+    )
+
+    expect(result.adjustments[0].type).toBe('attendance')
+    expect(result.adjustments[0].minutes).toBe(480)
+  })
+
+  it('prefers leave over a member calendar exception', () => {
+    const result = computeCapacity(
+      input({
+        leave: [wholeDayLeave],
+        resolution: workingDay({ memberExceptions: [conference] })
+      })
+    )
+
+    expect(result.adjustments).toHaveLength(1)
+    expect(result.adjustments[0].type).toBe('leave')
+  })
+
+  it('falls back to the exception when it is the only whole-day source', () => {
+    const result = computeCapacity(
+      input({ resolution: workingDay({ memberExceptions: [conference] }) })
+    )
+
+    expect(result.adjustments).toHaveLength(1)
+    expect(result.adjustments[0]).toEqual({
+      type: 'member_exception',
+      label: 'Kasun at a conference',
+      minutes: 480
+    })
+  })
+
+  it('caps the collapsed line at the working day so the breakdown adds up', () => {
+    const result = computeCapacity(
+      input({ leave: [{ ...wholeDayLeave, minutesPerDay: 600 }] })
+    )
+
+    expect(result.adjustments).toHaveLength(1)
+    expect(result.adjustments[0].minutes).toBe(480)
+    const removed = result.adjustments.reduce((sum, a) => sum + a.minutes, 0)
+    expect(result.nominalMinutes - removed).toBe(result.adjustedMinutes)
+  })
+
+  it('suppresses commitments and ceremonies on a day the member is not there', () => {
+    const result = computeCapacity(
+      input({
+        attendance: 'absent_planned',
+        nonProjectCommitments: [{ label: 'Support rota', minutesPerDay: 60, daysOfWeek: [] }],
+        ceremonies: [{ title: 'Sprint review', minutes: minutes(120) }]
+      })
+    )
+
+    expect(result.adjustments.map((a) => a.type)).toEqual(['attendance'])
+  })
+
+  it('keeps the partial-day scaling visible beside the collapsed line', () => {
+    const result = computeCapacity(
+      input({
+        resolution: workingDay({
+          isPartialDay: true,
+          standardMinutes: FOUR_HOURS,
+          holidayName: 'Poya half day'
+        }),
+        attendance: 'absent_planned'
+      })
+    )
+
+    expect(result.adjustments.map((a) => a.type)).toEqual(['partial_day', 'attendance'])
+    const removed = result.adjustments.reduce((sum, a) => sum + a.minutes, 0)
+    expect(result.nominalMinutes - removed).toBe(0)
+  })
+
+  it('still stacks partial reductions — the rule is only for whole days', () => {
+    const result = computeCapacity(
+      input({
+        leave: [{ ...wholeDayLeave, minutesPerDay: 120 }],
+        nonProjectCommitments: [{ label: 'Support rota', minutesPerDay: 60, daysOfWeek: [] }]
+      })
+    )
+
+    expect(result.adjustments).toHaveLength(2)
+    expect(result.adjustedMinutes).toBe(300)
+  })
+})
+
+describe('R1 — allocations stranded on an unavailable member', () => {
+  it('strands nothing on an ordinary day', () => {
+    const result = computeCapacity(input({ allocatedMinutes: minutes(360) }))
+
+    expect(result.strandedMinutes).toBe(0)
+  })
+
+  it('reports the allocated hours as stranded when the member is marked absent', () => {
+    const result = computeCapacity(
+      input({ attendance: 'absent_unplanned', allocatedMinutes: minutes(360) })
+    )
+
+    expect(result.status).toBe('unavailable')
+    expect(result.strandedMinutes).toBe(360)
+  })
+
+  it('strands nothing when an unavailable member holds no allocations', () => {
+    const result = computeCapacity(input({ attendance: 'absent_planned' }))
+
+    expect(result.strandedMinutes).toBe(0)
+  })
+
+  it('strands allocations wiped out by a reduce-policy debt too', () => {
+    const result = computeCapacity(
+      input({
+        overrunPolicy: 'reduce',
+        outstandingDebtMinutes: minutes(480),
+        allocatedMinutes: minutes(360)
+      })
+    )
+
+    expect(result.effectiveMinutes).toBe(0)
+    expect(result.strandedMinutes).toBe(360)
+  })
+
+  it('strands allocations left on a member when the day stops being a working day', () => {
+    const result = computeCapacity(
+      input({
+        resolution: workingDay({ isWorkingDay: false, reason: 'org_holiday' }),
+        allocatedMinutes: minutes(360)
+      })
+    )
+
+    expect(result.strandedMinutes).toBe(360)
   })
 })

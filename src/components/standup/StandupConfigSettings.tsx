@@ -9,13 +9,14 @@
  * is aspirational or honest, and that is not inferable from the label.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { AlertTriangle, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useNotify } from '@/lib/notify'
+import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
 import { PointsMigrationDialog } from './PointsMigrationDialog'
@@ -40,12 +41,21 @@ interface Settings {
   crossSprintCarryForward: boolean
   blockedTasksConsumeCapacity: boolean
   requireOverAllocationAck: boolean
+  ceremoniesConsumeCapacity: boolean
   pointsToHours: number
+}
+
+/** DN-4 — an upcoming event that deducts from nobody. */
+interface UnattendedCeremony {
+  eventId: string
+  title: string
+  eventType: string
 }
 
 export function StandupConfigSettings({ projectId }: { projectId: string }) {
   const notify = useNotify()
   const [settings, setSettings] = useState<Settings | null>(null)
+  const [unattended, setUnattended] = useState<UnattendedCeremony[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   /** PLN-14 — a proposed factor awaiting the migration dialog's confirmation. */
@@ -57,6 +67,7 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
       const payload = await response.json()
       if (!response.ok) throw new Error(payload?.error?.message)
       setSettings(payload.data.settings)
+      setUnattended(payload.data.unattendedCeremonies ?? [])
     } catch (error) {
       notify.error({
         title: 'Could not load stand-up settings',
@@ -261,6 +272,25 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
         </div>
       </Section>
 
+      {/* DN-1/DN-6 — what the day has already been spent on before planning
+          starts. Its own section rather than a line in Behaviour, because it
+          changes what every capacity number on the board means. */}
+      <Section title="Ceremonies">
+        <ToggleRow
+          label={standupStrings.config.ceremoniesTitle()}
+          hint={standupStrings.config.ceremoniesHint()}
+          checked={settings.ceremoniesConsumeCapacity}
+          onChange={(value) => update('ceremoniesConsumeCapacity', value)}
+        />
+        <p className="mt-2 text-[12px] text-[var(--apple-tertiary-label)]">
+          The daily stand-up&rsquo;s own {settings.durationMinutes} minutes are always deducted
+          once, whether or not a matching calendar event exists.
+        </p>
+        {settings.ceremoniesConsumeCapacity && unattended.length > 0 && (
+          <UnattendedWarning events={unattended} />
+        )}
+      </Section>
+
       <Section title="Behaviour">
         <div className="space-y-1">
           <ToggleRow
@@ -335,6 +365,38 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
           }}
         />
       )}
+    </div>
+  )
+}
+
+/**
+ * DN-4 — events that deduct from nobody.
+ *
+ * A warning rather than an error: the schedule is still correct, the hours are
+ * simply not coming out of anyone's day, and only the PM can say which of the
+ * two was intended.
+ */
+function UnattendedWarning({ events }: { events: UnattendedCeremony[] }) {
+  return (
+    <div
+      role="status"
+      className="mt-3 rounded-[var(--apple-radius-md)] border border-[var(--apple-system-orange)]/35 bg-[var(--apple-system-orange)]/10 p-3"
+    >
+      <p className="flex items-start gap-2 text-[13px] font-medium text-[var(--apple-label)]">
+        <AlertTriangle
+          className="mt-0.5 h-4 w-4 shrink-0 text-[var(--apple-system-orange)]"
+          aria-hidden
+        />
+        {standupStrings.config.unattendedCeremonies({ count: events.length })}
+      </p>
+      <ul className="mt-2 space-y-0.5 pl-6 text-[12px] text-[var(--apple-secondary-label)]">
+        {events.map((event) => (
+          <li key={event.eventId}>{event.title}</li>
+        ))}
+      </ul>
+      <p className="mt-2 pl-6 text-[12px] text-[var(--apple-tertiary-label)]">
+        {standupStrings.config.unattendedCeremoniesHint()}
+      </p>
     </div>
   )
 }

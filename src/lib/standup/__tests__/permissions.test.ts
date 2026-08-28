@@ -50,22 +50,37 @@ describe('Project Manager', () => {
   })
 })
 
+/**
+ * Asserted against the PROJECT table, not the org one.
+ *
+ * A stand-up grant on `Role.TEAM_MEMBER` reaches every project in the
+ * organisation — `hasPermission` short-circuits on the org role without ever
+ * consulting the project — so these permissions live on `PROJECT_MEMBER`,
+ * which a user only holds for projects they are a member of. See
+ * `permissions/__tests__/standup-role-matrix.test.ts` for the scoping rule.
+ */
 describe('Team Member', () => {
   it('may edit only their own allocation row, never assign to others', () => {
-    expect(orgRole(Role.TEAM_MEMBER)).toContain(Permission.STANDUP_ALLOCATE_OWN)
-    expect(orgRole(Role.TEAM_MEMBER)).not.toContain(Permission.STANDUP_ALLOCATE)
+    expect(projectRole(ProjectRole.PROJECT_MEMBER)).toContain(Permission.STANDUP_ALLOCATE_OWN)
+    expect(projectRole(ProjectRole.PROJECT_MEMBER)).not.toContain(Permission.STANDUP_ALLOCATE)
   })
 
   it('may raise a blocker but not complete or override the stand-up', () => {
-    expect(orgRole(Role.TEAM_MEMBER)).toContain(Permission.STANDUP_BLOCKER_RAISE)
-    expect(orgRole(Role.TEAM_MEMBER)).not.toContain(Permission.STANDUP_COMPLETE)
-    expect(orgRole(Role.TEAM_MEMBER)).not.toContain(Permission.STANDUP_OVERRIDE)
-    expect(orgRole(Role.TEAM_MEMBER)).not.toContain(Permission.STANDUP_REOPEN)
+    expect(projectRole(ProjectRole.PROJECT_MEMBER)).toContain(Permission.STANDUP_BLOCKER_RAISE)
+    expect(projectRole(ProjectRole.PROJECT_MEMBER)).not.toContain(Permission.STANDUP_COMPLETE)
+    expect(projectRole(ProjectRole.PROJECT_MEMBER)).not.toContain(Permission.STANDUP_OVERRIDE)
+    expect(projectRole(ProjectRole.PROJECT_MEMBER)).not.toContain(Permission.STANDUP_REOPEN)
   })
 
   it('sees their own debt but not the team\'s', () => {
-    expect(orgRole(Role.TEAM_MEMBER)).toContain(Permission.STANDUP_VIEW_OWN_DEBT)
-    expect(orgRole(Role.TEAM_MEMBER)).not.toContain(Permission.STANDUP_VIEW_DEBT)
+    expect(projectRole(ProjectRole.PROJECT_MEMBER)).toContain(Permission.STANDUP_VIEW_OWN_DEBT)
+    expect(projectRole(ProjectRole.PROJECT_MEMBER)).not.toContain(Permission.STANDUP_VIEW_DEBT)
+  })
+
+  // The scoping rule itself: a grant here would have reached every project in
+  // the organisation, so there must not be one.
+  it('holds no stand-up grant organisation-wide', () => {
+    expect(orgRole(Role.TEAM_MEMBER).filter((p) => p.startsWith('standup:'))).toEqual([])
   })
 })
 
@@ -88,7 +103,9 @@ describe('NFR-13 — stakeholders never see individual debt', () => {
 
   it('and cannot write off debt', () => {
     expect(orgRole(Role.VIEWER)).not.toContain(Permission.STANDUP_WRITE_OFF_DEBT)
-    expect(orgRole(Role.TEAM_MEMBER)).not.toContain(Permission.STANDUP_WRITE_OFF_DEBT)
+    expect(projectRole(ProjectRole.PROJECT_MEMBER)).not.toContain(
+      Permission.STANDUP_WRITE_OFF_DEBT
+    )
   })
 })
 
