@@ -170,3 +170,93 @@ describe('constructors', () => {
     expect(error.message).toContain('Revise the remaining estimate')
   })
 })
+
+/**
+ * Mongoose validation reaching the client.
+ *
+ * `VALIDATION_FAILED` was added to the catalogue for "ordinary input
+ * validation" but nothing ever mapped to it, so a model-layer rejection fell
+ * through to the unknown-error branch and answered
+ * `500 INTERNAL_ERROR / "Something went wrong."`. That is wrong twice over: it
+ * reports the caller's bad input as a server fault, and it discards the only
+ * text that says what to fix.
+ *
+ * Built here as literals rather than by importing mongoose, matching how
+ * `toErrorResponse` recognises them — by shape, not by constructor.
+ */
+const mongooseValidationError = (
+  paths: Record<string, string>
+): Error & { errors: Record<string, { message: string; path: string; kind?: string }> } => {
+  const error = new Error('Validation failed') as Error & {
+    errors: Record<string, { message: string; path: string; kind?: string }>
+  }
+  error.name = 'ValidationError'
+  error.errors = Object.fromEntries(
+    Object.entries(paths).map(([path, message]) => [
+      path,
+      { message, path, kind: 'user defined' }
+    ])
+  )
+  return error
+}
+
+describe('toErrorResponse — model validation', () => {
+  it('answers 422 VALIDATION_FAILED rather than a generic 500', () => {
+    const { status, body } = toErrorResponse(
+      mongooseValidationError({
+        carryForwardEscalationThreshold: 'Escalation threshold must exceed the note threshold'
+      })
+    )
+
+    expect(status).toBe(422)
+    expect(body.error.code).toBe('VALIDATION_FAILED')
+  })
+
+  it('surfaces the validator message, which is the only text saying what to fix', () => {
+    const { body } = toErrorResponse(
+      mongooseValidationError({
+        carryForwardEscalationThreshold: 'Escalation threshold must exceed the note threshold'
+      })
+    )
+
+    expect(body.error.message).toMatch(/Escalation threshold must exceed the note threshold/)
+  })
+
+  it('names every failing field in details, so the form can mark the right rows', () => {
+    const { body } = toErrorResponse(
+      mongooseValidationError({
+        carryForwardEscalationThreshold: 'Escalation threshold must exceed the note threshold',
+        pointsToHours: 'Points to hours must be positive'
+      })
+    )
+
+    expect((body.error as { details?: unknown }).details).toEqual({
+      fields: [
+        {
+          path: 'carryForwardEscalationThreshold',
+          message: 'Escalation threshold must exceed the note threshold'
+        },
+        { path: 'pointsToHours', message: 'Points to hours must be positive' }
+      ]
+    })
+  })
+
+  it('leaves a StandupError untouched — the catalogue still wins', () => {
+    const { status, body } = toErrorResponse(
+      new StandupError('NOTE_UNCHANGED', 'That note is unchanged.')
+    )
+
+    expect(status).toBe(422)
+    expect(body.error.code).toBe('NOTE_UNCHANGED')
+  })
+
+  it('still collapses an error merely *named* ValidationError with no field bag', () => {
+    const impostor = new Error('something internal')
+    impostor.name = 'ValidationError'
+
+    const { status, body } = toErrorResponse(impostor)
+
+    expect(status).toBe(500)
+    expect(body.error.message).toBe('Something went wrong.')
+  })
+})

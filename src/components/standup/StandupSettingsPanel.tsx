@@ -8,7 +8,7 @@
  * nested route — so these live as sub-views here rather than at
  * `/projects/[id]/settings/calendar` as the spec's own §15.1 tree suggests.
  */
-import { useState } from 'react'
+import { useRef, useState, type KeyboardEvent } from 'react'
 import { CalendarDays, Settings2, Users } from 'lucide-react'
 
 import { usePermissions } from '@/lib/permissions/permission-context'
@@ -31,9 +31,44 @@ const VIEWS: Array<{
   { id: 'capacity', label: 'Capacity & Members', icon: Users }
 ]
 
+/** Stable ids so each tab and its panel can name each other. */
+const tabId = (view: StandupSettingsView) => `standup-settings-tab-${view}`
+const panelId = (view: StandupSettingsView) => `standup-settings-panel-${view}`
+
 export function StandupSettingsPanel({ projectId }: { projectId: string }) {
   const [view, setView] = useState<StandupSettingsView>('calendar')
   const { hasPermission, loading, permissions } = usePermissions()
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+
+  /**
+   * The arrow-key navigation `role="tablist"` promises.
+   *
+   * Declaring the role without this is worse than using plain buttons: assistive
+   * technology announces a tab list, the user presses the arrow keys it implies,
+   * and nothing happens. Selection follows focus, which is the correct automatic
+   * behaviour here because switching panels is cheap and has no side effects.
+   */
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const lastIndex = VIEWS.length - 1
+
+    const nextIndex =
+      event.key === 'ArrowRight'
+        ? (index === lastIndex ? 0 : index + 1)
+        : event.key === 'ArrowLeft'
+          ? (index === 0 ? lastIndex : index - 1)
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? lastIndex
+              : null
+
+    if (nextIndex === null) return
+
+    // These keys would otherwise scroll the settings tab underneath the control.
+    event.preventDefault()
+    setView(VIEWS[nextIndex].id)
+    tabRefs.current[nextIndex]?.focus()
+  }
 
   // STANDUP_CONFIGURE, not STANDUP_VIEW. Team Members and QA hold VIEW because
   // they attend stand-ups (§3.2); gating on it showed them the whole settings
@@ -63,14 +98,24 @@ export function StandupSettingsPanel({ projectId }: { projectId: string }) {
           aria-label="Stand-up settings"
           className="inline-flex flex-wrap gap-1 rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] p-1"
         >
-          {VIEWS.map(({ id, label, icon: Icon }) => {
+          {VIEWS.map(({ id, label, icon: Icon }, index) => {
             const active = view === id
             return (
               <button
                 key={id}
+                id={tabId(id)}
+                ref={(element) => {
+                  tabRefs.current[index] = element
+                }}
                 role="tab"
                 type="button"
                 aria-selected={active}
+                aria-controls={panelId(id)}
+                // Roving tabindex: one Tab stop for the whole control, then the
+                // arrow keys move within it. Without this a keyboard user pays
+                // three Tab presses to get past a single segmented control.
+                tabIndex={active ? 0 : -1}
+                onKeyDown={(event) => onTabKeyDown(event, index)}
                 onClick={() => setView(id)}
                 className={cn(
                   'apple-transition flex items-center gap-2 rounded-[var(--apple-radius-sm)] px-3 py-1.5 text-[13px] font-medium',
@@ -87,9 +132,23 @@ export function StandupSettingsPanel({ projectId }: { projectId: string }) {
           })}
         </div>
 
-        {view === 'calendar' && <WorkingCalendarSettings projectId={projectId} />}
-        {view === 'configuration' && <StandupConfigSettings projectId={projectId} />}
-        {view === 'capacity' && <CapacityMembersSettings projectId={projectId} />}
+        {/* The panel names the tab that controls it, so assistive technology can
+            say which section it landed in. Only the selected panel is rendered —
+            the others mount data-fetching screens, and `hidden` would still run
+            all three on every page load. */}
+        <div
+          role="tabpanel"
+          id={panelId(view)}
+          aria-labelledby={tabId(view)}
+          // A panel whose content is not itself focusable needs to be reachable,
+          // or a keyboard user arrives at the tab and cannot get into what it
+          // selected.
+          tabIndex={0}
+        >
+          {view === 'calendar' && <WorkingCalendarSettings projectId={projectId} />}
+          {view === 'configuration' && <StandupConfigSettings projectId={projectId} />}
+          {view === 'capacity' && <CapacityMembersSettings projectId={projectId} />}
+        </div>
       </div>
     </div>
   )

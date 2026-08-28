@@ -87,8 +87,47 @@ export interface StandupErrorBody {
   }
 }
 
+/** One field's rejection, as the client receives it. */
+interface FieldFailure {
+  path: string
+  message: string
+}
+
+/**
+ * Recognises a Mongoose `ValidationError` **by shape rather than by
+ * constructor**, and flattens it to the failing fields.
+ *
+ * Deliberately not `instanceof mongoose.Error.ValidationError`: this module has
+ * no dependencies and must keep it that way. It is imported by route handlers
+ * that Next compiles for the Edge runtime as well as Node, and pulling mongoose
+ * into that graph is the same trap `next.config.js` already had to cut the
+ * scheduler out of. Shape is sufficient here — a `name` of `ValidationError`
+ * plus a populated `errors` bag of `{ message }` entries is not something an
+ * unrelated error produces by accident.
+ */
+function readValidationFailures(error: unknown): FieldFailure[] | undefined {
+  if (typeof error !== 'object' || error === null) return undefined
+  if ((error as { name?: unknown }).name !== 'ValidationError') return undefined
+
+  const bag = (error as { errors?: unknown }).errors
+  if (typeof bag !== 'object' || bag === null) return undefined
+
+  const failures = Object.entries(bag as Record<string, unknown>).flatMap(([path, entry]) => {
+    const message = (entry as { message?: unknown })?.message
+    return typeof message === 'string' && message.length > 0 ? [{ path, message }] : []
+  })
+
+  // An error merely *named* ValidationError with nothing usable inside is not
+  // one — it falls through to the generic 500 rather than answering 422 with an
+  // empty explanation.
+  return failures.length > 0 ? failures : undefined
+}
+
 /**
  * Converts a thrown error into the §17.1 envelope plus its HTTP status.
+ *
+ * Three branches, in order of specificity: a catalogued `StandupError`, a
+ * model-layer validation rejection, then everything else.
  *
  * Unknown errors deliberately collapse to a generic 500 body rather than
  * leaking an internal message to the client; the caller is expected to log the
@@ -96,7 +135,10 @@ export interface StandupErrorBody {
  */
 export function toErrorResponse(
   error: unknown
-): { status: number; body: StandupErrorBody | { error: { code: string; message: string } } } {
+): {
+  status: number
+  body: StandupErrorBody | { error: { code: string; message: string; details?: unknown } }
+} {
   if (isStandupError(error)) {
     return {
       status: error.status,
@@ -105,6 +147,29 @@ export function toErrorResponse(
           code: error.code,
           message: error.message,
           ...(error.details === undefined ? {} : { details: error.details })
+        }
+      }
+    }
+  }
+
+  // A model-layer rejection is the caller's bad input, not a server fault, and
+  // the validator message is the only text that says what to fix. Answering
+  // `500 / "Something went wrong."` reports it as the wrong kind of failure and
+  // throws that text away, leaving the user to guess which field is at fault.
+  //
+  // Safe to surface: these messages are authored in the schemas for exactly
+  // this purpose. Only `message` and `path` cross the boundary — never the
+  // rejected value, which for a cast failure would echo back input this module
+  // has not inspected.
+  const failures = readValidationFailures(error)
+  if (failures) {
+    return {
+      status: STANDUP_ERROR_CODES.VALIDATION_FAILED,
+      body: {
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: failures.map((failure) => failure.message).join(' '),
+          details: { fields: failures }
         }
       }
     }
