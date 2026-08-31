@@ -242,6 +242,234 @@ export const standupStrings = {
     unavailable: () => 'Unavailable'
   },
 
+  /**
+   * The shared allocation primitives (Phase 7, Task 9).
+   *
+   * Every one of these has an accessible-name job as well as a visible one.
+   * NFR-A1 to NFR-A4 require the board to be operable and legible without
+   * colour and without a mouse, and an unlabelled stepper or an unnamed drop
+   * zone fails that whether or not it looks right.
+   */
+  allocation: {
+    /** The meter's accessible name. The visible label is `allocationStatus`. */
+    meterLabel: ({
+      name,
+      allocated,
+      capacity,
+      locale
+    }: {
+      name: string
+      allocated: Minutes
+      capacity: Minutes
+      locale?: string
+    }) =>
+      `${name}: ${formatMinutesAsHours(allocated, { locale })} of ${formatMinutesAsHours(capacity, { locale })} planned.`,
+
+    /** The two meter segments, so the split is audible as well as visible. */
+    meterCarriedSegment: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} carried from previous days`,
+    meterNewSegment: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} planned today`,
+    meterOverSegment: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} beyond capacity`,
+
+    stepperLabel: ({ task }: { task: string }) => `Planned hours for ${task}`,
+    stepperIncrease: () => 'Add fifteen minutes',
+    stepperDecrease: () => 'Remove fifteen minutes',
+    /** ALO-7's split helper, shown under a partial allocation. */
+    stepperSplit: ({
+      planned,
+      remaining,
+      carries,
+      locale
+    }: {
+      planned: Minutes
+      remaining: Minutes
+      carries: Minutes
+      locale?: string
+    }) =>
+      `${formatMinutesAsHours(planned, { locale })} of ${formatMinutesAsHours(remaining, { locale })} remaining, ${formatMinutesAsHours(carries, { locale })} will carry to tomorrow.`,
+
+    /** ALO-8. Advisory only — nothing may block on it. */
+    largerThanOneDay: () =>
+      'This task is larger than one day. Consider splitting it into subtasks so progress is visible daily.',
+
+    /**
+     * The keyboard equivalent of the drop zone (§15.8.7 "Quick add").
+     *
+     * Not a convenience. Drag-and-drop has no keyboard path of its own, so this
+     * combobox *is* how a keyboard user allocates work, and it ships alongside
+     * the drop zone rather than after it.
+     */
+    quickAddLabel: ({ name }: { name: string }) => `Add a task to ${name}'s day`,
+    quickAddPlaceholder: () => 'Search sprint tasks…',
+    quickAddEmpty: () => 'No matching task in this sprint.',
+    quickAddHint: () => 'Type to search, then press Enter to allocate.',
+
+    /** ALO-17's fit indicator, against the selected member's remaining gap. */
+    fitsExact: () => 'Fits exactly',
+    fitsUnder: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `Leaves ${formatMinutesAsHours(minutes, { locale })}`,
+    fitsOver: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} over`,
+
+    removeRow: ({ task }: { task: string }) => `Remove ${task} from this day`,
+    dropZone: ({ name }: { name: string }) => `Drop a task here to add it to ${name}'s day`,
+
+    /** The member drawer's accessible name and its close control. */
+    drawerLabel: ({ name }: { name: string }) => `${name}'s day`,
+    drawerClose: () => 'Close',
+
+    /** Opens the capacity breakdown. Named per member so the board's buttons differ. */
+    breakdownTrigger: ({ name }: { name: string }) => `Show capacity breakdown for ${name}`,
+    breakdownNominal: () => 'Full day',
+    breakdownEffective: () => 'Available today',
+    breakdownNoAdjustments: () => 'Nothing is reducing this day.',
+
+    /** §15.8.7 — shown only when there is debt, so its presence is the signal. */
+    debtBadge: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} estimate debt`,
+
+    /**
+     * The per-row source chip (§15.8.7). Carried work is the one that changes
+     * how a PM reads the row — it is a commitment already made, not a choice
+     * being made now — so the words stay distinct rather than collapsing into
+     * a generic "added".
+     */
+    source: {
+      pre_assigned: () => 'Pre-assigned',
+      assigned_in_standup: () => 'New',
+      carried_forward: () => 'Carried',
+      auto_prefilled: () => 'Auto',
+      self_selected: () => 'Self-selected'
+    },
+
+    memberCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 member' : `${count} members`
+  },
+
+  /** The unassigned pool (§15.8.7, ALO-13 … ALO-17). */
+  pool: {
+    title: () => "Today's pool",
+
+    /** ALO-14's two tabs. Counts are in the label, per the spec's table. */
+    tabUnassigned: ({ count }: { count: number }) => `Unassigned (${count})`,
+    tabAssignedNotPlanned: ({ count }: { count: number }) =>
+      `Assigned but not planned today (${count})`,
+
+    searchLabel: () => 'Search the pool',
+    searchPlaceholder: () => 'Search by key, title or label…',
+    filterType: () => 'Type',
+    filterPriority: () => 'Priority',
+    sortLabel: () => 'Sort',
+    sortPriority: () => 'Priority',
+    sortEstimateAsc: () => 'Smallest first',
+    sortEstimateDesc: () => 'Largest first',
+    sortBacklogRank: () => 'Backlog rank',
+
+    /** Distinguished from a filtered-empty list: the two mean opposite things. */
+    emptyUnassigned: () => 'Every sprint task has an owner.',
+    emptyAssignedNotPlanned: () => "Everybody's assigned work is planned for today.",
+    emptyFiltered: () => 'No task matches these filters.',
+    clearFilters: () => 'Clear filters',
+
+    /** D-K — the pool paginates rather than loading an unbounded sprint. */
+    showingCount: ({ shown, total }: { shown: number; total: number }) =>
+      `Showing ${shown} of ${total}`,
+    showMore: () => 'Show more',
+
+    /** The selected member the "fits" indicator measures against (ALO-17). */
+    fitsAgainst: ({ name }: { name: string }) => `Fits shown against ${name}'s remaining gap`,
+    selectMemberFirst: () => 'Select a member to see which tasks close their day.',
+    addToMember: ({ task, name }: { task: string; name: string }) =>
+      `Add ${task} to ${name}'s day`
+  },
+
+  /** The stand-up run screen (§15.8). */
+  run: {
+    dayOf: ({ day, total }: { day: number; total: number }) => `Day ${day} of ${total}`,
+    facilitator: ({ name }: { name: string }) => `Facilitator: ${name}`,
+    presentOf: ({ present, total }: { present: number; total: number }) =>
+      `Present ${present} of ${total}`,
+    joinCall: () => 'Join call',
+    refresh: () => 'Refresh',
+    complete: () => 'Complete stand-up',
+
+    /** The §15.8.1 jump bar. One entry per panel, all seven, always. */
+    panel1: () => 'Attendance',
+    panel2: () => 'Yesterday',
+    panel3: () => 'Variance',
+    panel4: () => 'Carry forward',
+    panel5: () => "Today's allocation",
+    panel6: () => 'Blockers',
+    panel7: () => 'Complete',
+
+    /**
+     * A panel this release cannot fill yet.
+     *
+     * Rendered rather than hidden, naming the phase that will build it, for the
+     * same reason `not_evaluated` completion checks are rendered: a screen that
+     * silently omits three of its seven steps looks finished, and the PM has no
+     * way to tell a missing panel from an empty one.
+     */
+    panelPending: ({ phase }: { phase: string }) =>
+      `Not built yet — arrives in ${phase}.`,
+
+    /** RUN-25's rollback toast. */
+    editRejected: () => 'That change was not saved. The board has been put back.',
+    /** RUN-23 lost the race. */
+    staleReload: () =>
+      'Somebody else changed this stand-up. Reloading so you are working from their version.',
+    /** RUN-26. */
+    lockedForMembers: () =>
+      'The stand-up has started, so your own row is now read-only.',
+
+    /** Panel 1. */
+    attendanceTitle: () => 'Attendance',
+    attendanceFor: ({ name }: { name: string }) => `Attendance for ${name}`,
+    partialHoursFor: ({ name }: { name: string }) => `Hours available for ${name}`,
+    absenceReasonFor: ({ name }: { name: string }) => `Absence reason for ${name}`,
+    statePresent: () => 'Present',
+    stateAbsentPlanned: () => 'Absent (planned)',
+    stateAbsentUnplanned: () => 'Absent (unplanned)',
+    statePartial: () => 'Partial day',
+
+    /** RUN-7's prompt, and its bulk action. */
+    reassignPrompt: ({ name, count }: { name: string; count: number }) =>
+      count === 1
+        ? `Reassign ${name}'s 1 open task?`
+        : `Reassign ${name}'s ${count} open tasks?`,
+    reassignTo: () => 'Reassign to',
+    reassignConfirm: () => 'Reassign',
+    reassignDismiss: () => 'Leave for now',
+
+    /** Panel 7. */
+    completionTitle: () => 'Completion checks',
+    checkNotEvaluated: ({ phase }: { phase: string }) => `Not checked yet (${phase})`,
+    completeBlockedBy: ({ message }: { message: string }) =>
+      `Cannot complete: ${message}`,
+    completeReady: () => 'All checks passed.',
+    jumpToFailure: () => 'Fix',
+
+    /** Day one (§15.8.10, ALO-20/21). */
+    dayOneProgress: ({
+      assigned,
+      totalTasks,
+      placed,
+      capacity
+    }: {
+      assigned: number
+      totalTasks: number
+      placed: string
+      capacity: string
+    }) =>
+      `${assigned} of ${totalTasks} tasks assigned, ${placed} of ${capacity} placed.`,
+    dayOneUnassignedWarning: ({ count }: { count: number }) =>
+      count === 1
+        ? '1 task is still unassigned. It will appear in tomorrow’s pool.'
+        : `${count} tasks are still unassigned. They will appear in tomorrow’s pool.`
+  },
+
   config: {
     title: () => 'Stand-up Configuration',
     subtitle: () => 'When the stand-up runs, and the rules it holds the team to.',
