@@ -9,9 +9,8 @@
  * is aspirational or honest, and that is not inferable from the label.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Loader2 } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 
-import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -20,6 +19,7 @@ import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
 import { PointsMigrationDialog } from './PointsMigrationDialog'
+import { SettingsActionBar } from './SettingsActionBar'
 
 interface Settings {
   enabled: boolean
@@ -52,9 +52,23 @@ interface UnattendedCeremony {
   eventType: string
 }
 
-export function StandupConfigSettings({ projectId }: { projectId: string }) {
+export function StandupConfigSettings({
+  projectId,
+  onDirtyChange
+}: {
+  projectId: string
+  /** Lets the panel refuse a tab switch that would discard unsaved edits. */
+  onDirtyChange?: (dirty: boolean) => void
+}) {
   const notify = useNotify()
   const [settings, setSettings] = useState<Settings | null>(null)
+  /**
+   * The last state the server confirmed. Diffed against `settings` to decide
+   * whether anything is unsaved — cheaper to keep honest than a boolean flag
+   * every mutation has to remember to set, and it doubles as the value Discard
+   * restores.
+   */
+  const [saved, setSaved] = useState<Settings | null>(null)
   const [unattended, setUnattended] = useState<UnattendedCeremony[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -67,6 +81,7 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
       const payload = await response.json()
       if (!response.ok) throw new Error(payload?.error?.message)
       setSettings(payload.data.settings)
+      setSaved(payload.data.settings)
       setUnattended(payload.data.unattendedCeremonies ?? [])
     } catch (error) {
       notify.error({
@@ -95,6 +110,7 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
       if (!response.ok) throw new Error(payload?.error?.message)
 
       setSettings(payload.data.settings)
+      setSaved(payload.data.settings)
       notify.success({ title: 'Stand-up settings saved' })
     } catch (error) {
       notify.error({
@@ -105,6 +121,19 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
       setSaving(false)
     }
   }
+
+  // Structural comparison rather than a per-field diff: the form is a flat bag
+  // of primitives, so serialising both sides is exact here and cannot drift as
+  // fields are added.
+  const dirty = settings !== null && JSON.stringify(settings) !== JSON.stringify(saved)
+
+  // Reported upward so the panel can refuse a tab switch that would discard
+  // these edits, and cleared on unmount so a dismissed form leaves no stale
+  // guard behind.
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+    return () => onDirtyChange?.(false)
+  }, [dirty, onDirtyChange])
 
   if (loading) return <ConfigSkeleton />
   if (!settings) return null
@@ -123,10 +152,6 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
             When the stand-up runs, and the rules it holds the team to.
           </p>
         </div>
-        <Button onClick={save} disabled={saving} size="sm">
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Save settings
-        </Button>
       </header>
 
       <Section title="Stand-ups">
@@ -365,6 +390,14 @@ export function StandupConfigSettings({ projectId }: { projectId: string }) {
           }}
         />
       )}
+
+      <SettingsActionBar
+        dirty={dirty}
+        saving={saving}
+        onSave={save}
+        onDiscard={() => setSettings(saved)}
+        saveLabel="Save settings"
+      />
     </div>
   )
 }
