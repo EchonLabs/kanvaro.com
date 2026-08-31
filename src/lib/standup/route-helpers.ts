@@ -17,7 +17,7 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import type { Permission } from '@/lib/permissions/permission-definitions'
 
-import { toErrorResponse } from './errors'
+import { StandupError, toErrorResponse } from './errors'
 
 export interface StandupRouteContext {
   userId: string
@@ -325,6 +325,46 @@ export function withPokerPermission(
       return NextResponse.json(body, { status })
     }
   }
+}
+
+/**
+ * The header every mutating stand-up request carries (RUN-23).
+ *
+ * Named here rather than typed into each route so the client and the server
+ * cannot drift on its spelling — a mismatch would silently disable the guard
+ * rather than fail loudly, which is the worst possible failure mode for a
+ * concurrency control.
+ */
+export const STANDUP_VERSION_HEADER = 'x-standup-version'
+
+/**
+ * Reads and validates the caller's stand-up version.
+ *
+ * A missing or unparseable header is rejected rather than defaulted. Defaulting
+ * to zero would let any client that has never read the stand-up win a race
+ * against one that has, which inverts the guarantee RUN-23 exists to give.
+ */
+export function requireStandupVersion(request: NextRequest): number {
+  const raw = request.headers.get(STANDUP_VERSION_HEADER)
+
+  if (raw === null || raw.trim() === '') {
+    throw new StandupError(
+      'VALIDATION_FAILED',
+      'This request is missing the stand-up version it was based on.',
+      { header: STANDUP_VERSION_HEADER }
+    )
+  }
+
+  const parsed = Number(raw)
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new StandupError(
+      'VALIDATION_FAILED',
+      'The stand-up version must be a whole number.',
+      { header: STANDUP_VERSION_HEADER, received: raw }
+    )
+  }
+
+  return parsed
 }
 
 /** Success envelope, matching the shape the rest of the app returns. */
