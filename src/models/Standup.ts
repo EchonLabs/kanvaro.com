@@ -41,6 +41,20 @@ export type AttendanceState = typeof ATTENDANCE_STATES[number]
 export interface IStandupAttendance {
   user: mongoose.Types.ObjectId
   state: AttendanceState
+  /**
+   * Minutes the member is actually available, required when `state` is
+   * `partial` (RUN-6). Minutes rather than hours, per DAT-2.
+   */
+  partialMinutes?: number
+  /**
+   * RUN-8's optional absence reason.
+   *
+   * Deliberately its own field rather than folded into `note`: the stand-up
+   * summary and sprint analytics both read the reason on its own, and a free
+   * note that sometimes contains a reason and sometimes does not cannot be
+   * reported on.
+   */
+  reason?: string
   note?: string
 }
 
@@ -121,6 +135,15 @@ const AttendanceSchema = new Schema<IStandupAttendance>(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     state: { type: String, enum: ATTENDANCE_STATES, default: 'present' },
+    partialMinutes: {
+      type: Number,
+      min: 1,
+      validate: {
+        validator: (value: number) => value === undefined || Number.isInteger(value),
+        message: 'partialMinutes must be a whole number of minutes'
+      }
+    },
+    reason: { type: String, trim: true, maxlength: 500 },
     note: { type: String, trim: true, maxlength: 1000 }
   },
   { _id: false }
