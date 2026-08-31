@@ -12,23 +12,16 @@
  * shape does not change when they are filled and no consumer has to special-case
  * "the key is missing" today and "the key is empty" later.
  */
-import { MemberCapacity } from '@/models/MemberCapacity'
-import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
 import { Task } from '@/models/Task'
 
-import {
-  computeCapacity,
-  selectCapacityAsOf,
-  type CapacityAdjustment
-} from './capacity'
-import { loadCalendarContext, checkHolidayCoverage } from './calendar-service'
-import { resolveCeremonyDeductions, type CeremonyDeduction } from './ceremonies'
+import type { CapacityAdjustment } from './capacity'
+import { loadCapacityContext } from './capacity-context'
+import { checkHolidayCoverage } from './calendar-service'
 import type { IsoDate } from './calendar-dates'
 import { StandupError } from './errors'
-import { minutes, type Minutes } from './minutes'
-import { resolveWorkingDayFrom } from './working-day'
+import type { Minutes } from './minutes'
 
 /** SCH-10: a snapshot older than this is rebuilt before the stand-up starts. */
 export const SNAPSHOT_MAX_AGE_MINUTES = 30
@@ -100,64 +93,17 @@ export async function buildStandupSnapshot(
   const projectId = standup.project.toString()
   const date: IsoDate = standup.standupDate
 
-  const [sprint, settings, capacities, context] = await Promise.all([
+  // The whole capacity assembly — dated member rows, the calendar resolution,
+  // ceremony deductions, the project's tolerances — lives in one place so the
+  // snapshot and every allocation write compute the same numbers from the same
+  // inputs. See `capacity-context.ts`.
+  const [sprint, capacity] = await Promise.all([
     Sprint.findById(standup.sprint).lean() as Promise<any>,
-    ProjectStandupSettings.findOne({ project: projectId }).lean() as Promise<any>,
-    MemberCapacity.find({ project: projectId }).lean() as Promise<any[]>,
-    loadCalendarContext(projectId, date, date)
+    loadCapacityContext(standupId, standup)
   ])
 
-  const resolution = resolveWorkingDayFrom(date, context)
-
-  const memberIds: string[] = (standup.expectedAttendees ?? []).map((id: unknown) => String(id))
-
-  // DN-6, opt-out. DN-3 is why the stand-up's own duration is passed here and
-  // nowhere else: `resolveCeremonyDeductions` drops `daily_standup` SprintEvents
-  // and adds this exactly once, so a project holding both loses fifteen minutes
-  // once rather than twice.
-  const ceremoniesConsumeCapacity = settings?.ceremoniesConsumeCapacity !== false
-  const ceremonyPlan = ceremoniesConsumeCapacity
-    ? await resolveCeremonyDeductions({
-        projectId,
-        sprintId: String(standup.sprint),
-        date,
-        memberIds,
-        timezone: context.timezone,
-        standupDurationMinutes: minutes(settings?.durationMinutes ?? 0)
-      })
-    : null
-
-  const capacityByMember = new Map<string, any[]>()
-  for (const record of capacities) {
-    const key = record.member.toString()
-    const existing = capacityByMember.get(key)
-    if (existing) existing.push(record)
-    else capacityByMember.set(key, [record])
-  }
-
-  const members: SnapshotMember[] = memberIds.map((memberId) => {
-    // DAT-1: capacity is dated, so the row that applied *on this date* is the
-    // one that counts — not whatever is current when the job happens to run.
-    const record = selectCapacityAsOf(capacityByMember.get(memberId) ?? [], date)
-
-    const breakdown = computeCapacity({
-      memberId,
-      date,
-      resolution,
-      nominalMinutes: minutes(record?.dailyCapacityMinutes ?? resolution.fullStandardMinutes),
-      leave: (record?.leave ?? []).map((entry: any) => ({
-        startDate: entry.startDate,
-        endDate: entry.endDate,
-        minutesPerDay: entry.minutesPerDay,
-        reason: entry.reason
-      })),
-      nonProjectCommitments: record?.nonProjectCommitments ?? [],
-      ceremonies: (ceremonyPlan?.deductions.get(memberId) ?? []) as CeremonyDeduction[],
-      observedOptionalHolidayIds: (record?.observedOptionalHolidayIds ?? []).map(String),
-      overrunPolicy: settings?.overrunPolicy,
-      underToleranceMinutes: settings?.underToleranceMinutes,
-      overToleranceMinutes: settings?.overToleranceMinutes
-    })
+  const members: SnapshotMember[] = capacity.memberIds.map((memberId) => {
+    const breakdown = capacity.computeFor(memberId)
 
     return {
       memberId,
@@ -168,6 +114,8 @@ export async function buildStandupSnapshot(
       outstandingDebtMinutes: breakdown.outstandingDebtMinutes
     }
   })
+
+  const ceremoniesConsumeCapacity = capacity.ceremoniesConsumeCapacity
 
   const poolFilter = {
     sprint: standup.sprint,

@@ -114,6 +114,20 @@ export interface ComputeCapacityInput {
   overrunPolicy?: OverrunPolicy
   /** Sum of planned minutes already allocated, excluding rows excluded from capacity. */
   allocatedMinutes?: Minutes
+  /**
+   * Minutes that were planned for this member, have since been detached, and
+   * nobody has picked up (RUN-7, §6.4 OB-13).
+   *
+   * Kept separate from `allocatedMinutes` because these hours are deliberately
+   * *not* counted against the day — that is what detaching means — but they
+   * have not gone anywhere either. Without them the RUN-7 flow reports zero
+   * stranded minutes the instant it detaches, and the alert that carries the
+   * reassign action could never fire on the one path that needs it most.
+   *
+   * The caller supplies only rows whose task has no live allocation, so hours
+   * somebody has already taken over stop being stranded.
+   */
+  detachedMinutes?: Minutes
   underToleranceMinutes?: Minutes
   overToleranceMinutes?: Minutes
 }
@@ -193,6 +207,7 @@ export function computeCapacity(input: ComputeCapacityInput): CapacityBreakdown 
     outstandingDebtMinutes = ZERO_MINUTES,
     overrunPolicy = 'absorb',
     allocatedMinutes = ZERO_MINUTES,
+    detachedMinutes = ZERO_MINUTES,
     underToleranceMinutes = DEFAULT_TOLERANCE,
     overToleranceMinutes = DEFAULT_TOLERANCE
   } = input
@@ -217,7 +232,7 @@ export function computeCapacity(input: ComputeCapacityInput): CapacityBreakdown 
       isUnavailable: true,
       // A date can stop being a working day after allocations were made on it —
       // a holiday loaded late, a calendar override — so this is not always zero.
-      strandedMinutes: allocatedMinutes
+      strandedMinutes: addMinutes(allocatedMinutes, detachedMinutes)
     }
   }
 
@@ -389,7 +404,16 @@ export function computeCapacity(input: ComputeCapacityInput): CapacityBreakdown 
     effectiveMinutes,
     allocatedMinutes,
     gapMinutes,
-    strandedMinutes: effectiveMinutes === 0 ? allocatedMinutes : ZERO_MINUTES,
+    // Two independent ways for hours to be stranded, and both must show.
+    // Detached hours (RUN-7) are stranded whatever the member's capacity: the
+    // work is unplanned and unowned until somebody takes it. Allocated hours
+    // are stranded only when there is no capacity left to do them — the
+    // backstop for every route to a zero day that does *not* run detachment,
+    // such as a leave range or a holiday loaded after the fact.
+    strandedMinutes: addMinutes(
+      detachedMinutes,
+      effectiveMinutes === 0 ? allocatedMinutes : ZERO_MINUTES
+    ),
     status: allocationStatus({
       effectiveMinutes,
       allocatedMinutes,
