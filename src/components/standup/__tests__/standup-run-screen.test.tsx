@@ -190,21 +190,18 @@ describe('the jump bar and the shapes (§15.8.10)', () => {
   })
 })
 
-describe('the panels nobody has built yet', () => {
-  it('renders them as stubs naming their phase, rather than omitting them', () => {
+describe('the panel nobody has built yet', () => {
+  it('renders it as a stub naming its phase, rather than omitting it', () => {
     renderScreen()
 
-    // A screen missing steps looks finished unless the gaps announce
-    // themselves. Two remain after Phase 8: the carry-forward register
-    // (Phase 9) and blockers (Phase 10).
+    // A screen missing a step looks finished unless the gap announces
+    // itself. Only blockers (Phase 10) remain after Phase 9.
     const stubs = screen.getAllByTestId('panel-stub')
-    expect(stubs).toHaveLength(2)
-    for (const stub of stubs) {
-      expect(stub).toHaveTextContent(/arrives in Phase/)
-    }
+    expect(stubs).toHaveLength(1)
+    expect(stubs[0]).toHaveTextContent(/arrives in Phase/)
   })
 
-  it('no longer stubs the two panels Phase 8 built', () => {
+  it('no longer stubs the three panels Phase 8 and 9 built', () => {
     renderScreen()
     const stubbed = screen
       .getAllByTestId('panel-stub')
@@ -212,6 +209,41 @@ describe('the panels nobody has built yet', () => {
       .join(' ')
     expect(stubbed).not.toContain(standupStrings.run.panel2())
     expect(stubbed).not.toContain(standupStrings.run.panel3())
+    expect(stubbed).not.toContain(standupStrings.run.panel4())
+  })
+})
+
+describe('Panel 4 — carry forward (CFW-10/11)', () => {
+  it('renders the register when it is loaded', () => {
+    renderScreen({
+      carryForward: {
+        items: [
+          {
+            itemId: 'cf1',
+            type: 'unfinished_task',
+            status: 'open',
+            taskKey: 'KAN-214',
+            originDate: '2026-08-14',
+            ageInStandups: 3,
+            ageBand: 'note_required',
+            requiresNoteToday: true,
+            notedToday: false,
+            tags: [],
+            notes: [],
+            validResolutions: ['done', 'reassigned', 'descoped', 'other']
+          }
+        ],
+        summary: { totalOpen: 1, needingNoteToday: 1, escalated: 0, resolvedYesterday: 0 }
+      }
+    })
+
+    expect(screen.getByTestId('carry-forward-summary')).toBeInTheDocument()
+    expect(screen.getByTestId('carry-forward-item-cf1')).toHaveTextContent('KAN-214')
+  })
+
+  it('does not render the panel while the register has not loaded', () => {
+    renderScreen()
+    expect(screen.queryByTestId('carry-forward-summary')).not.toBeInTheDocument()
   })
 })
 
