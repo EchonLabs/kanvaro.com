@@ -328,6 +328,78 @@ export function withPokerPermission(
 }
 
 /**
+ * Like {@link withStandupIdPermission}, but keyed by **carry-forward item**
+ * id (CFW-4, CFW-7). `/api/carry-forward/:itemId/...` carries neither a
+ * project nor a standup id, so the item is loaded first — it denormalises its
+ * own `project` and `organization` (§13.4), the same reasoning
+ * `AllocationVariance` and `EstimateDebtLedger` rows use — and that drives
+ * both the org-isolation check and the permission check.
+ */
+export function withCarryForwardItemPermission(
+  options: { permission: Permission; itemIdParam?: string },
+  handler: (
+    request: NextRequest,
+    context: StandupRouteContext & { itemId: string; item: any }
+  ) => Promise<NextResponse> | NextResponse
+) {
+  return async (request: NextRequest, routeContext?: { params?: Record<string, string> }) => {
+    try {
+      await connectDB()
+
+      const authResult = await authenticateUser()
+      if ('error' in authResult) {
+        return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+      }
+
+      const params = routeContext?.params ?? {}
+      const itemId = params[options.itemIdParam ?? 'itemId']
+
+      const { CarryForwardItem } = await import('@/models/CarryForwardItem')
+      const item = await CarryForwardItem.findById(itemId).lean()
+
+      const missing = NextResponse.json(
+        { error: { code: 'NOT_FOUND', message: 'That carry-forward item no longer exists.' } },
+        { status: 404 }
+      )
+
+      if (!item) return missing
+
+      if ((item as any).organization?.toString() !== authResult.user.organization?.toString()) {
+        return missing
+      }
+
+      const projectId = (item as any).project?.toString()
+
+      const allowed = await PermissionService.hasPermission(
+        authResult.user.id,
+        options.permission,
+        projectId
+      )
+
+      if (!allowed) {
+        return NextResponse.json(
+          { error: { code: 'FORBIDDEN', message: 'You do not have permission to do that.' } },
+          { status: 403 }
+        )
+      }
+
+      return await handler(request, {
+        userId: authResult.user.id,
+        organizationId: authResult.user.organization,
+        projectId,
+        params,
+        itemId,
+        item
+      })
+    } catch (error) {
+      const { status, body } = toErrorResponse(error)
+      if (status === 500) console.error('Carry-forward route error:', error)
+      return NextResponse.json(body, { status })
+    }
+  }
+}
+
+/**
  * The header every mutating stand-up request carries (RUN-23).
  *
  * Named here rather than typed into each route so the client and the server

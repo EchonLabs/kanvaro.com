@@ -22,6 +22,7 @@ import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
 
 import { recordAudit, systemActor, type AuditActor } from './audit'
+import { countOpenCarryForwardItems, moveCarryForwardOnSkip } from './carry-forward-service'
 import { loadCalendarContext } from './calendar-service'
 import { isoOfStoredDate, toInstant, type IsoDate } from './calendar-dates'
 import { immutableCompletedStandup, StandupError } from './errors'
@@ -52,11 +53,10 @@ export interface ReconcileResult {
  * Where prepared carry-forward items go when their day stops running (CAL-12,
  * AC-3, SCH-13).
  *
- * **Phase 9 seam.** The carry-forward register is Phase 9's; until it exists
- * there is nothing to move, so the default is a no-op that is accurate rather
- * than permissive — exactly the shape Phase 3 used for the completed-stand-up
- * lookup. Phase 9 replaces these two defaults and inherits the behaviour AC-3
- * already pins through injection here.
+ * Defaults to the real Phase 9 register (`carry-forward-service.ts`), which is
+ * the shape AC-3 was pinned against by injection while Phase 9 did not exist
+ * yet. Still overridable, for tests that want to observe the calls rather than
+ * the database rows they produce.
  */
 export interface CarryForwardMove {
   fromStandupId: string
@@ -69,9 +69,6 @@ export interface CarryForwardMove {
 
 export type CarryForwardMover = (move: CarryForwardMove) => Promise<void>
 export type CarryForwardCounter = (standupId: string) => Promise<number>
-
-const moveCarryForwardPending: CarryForwardMover = async () => {}
-const countCarryForwardPending: CarryForwardCounter = async () => 0
 
 export interface ReconcileOptions {
   actorId?: string
@@ -101,7 +98,7 @@ export async function reconcileSprintSchedule(
     .lean()) as any[]
 
   const countCarryForward =
-    options.carryForwardCountByStandupId ?? countCarryForwardPending
+    options.carryForwardCountByStandupId ?? countOpenCarryForwardItems
 
   const existing: ExistingStandupRow[] = await Promise.all(
     existingDocs.map(async (doc) => ({
@@ -154,7 +151,7 @@ export async function reconcileSprintSchedule(
     notificationsSent: 0
   }
 
-  const moveCarryForward = options.moveCarryForward ?? moveCarryForwardPending
+  const moveCarryForward = options.moveCarryForward ?? moveCarryForwardOnSkip
   const nextWorkingDate = (after: IsoDate) =>
     workingDates.filter((date) => date > after).sort()[0] ?? null
 

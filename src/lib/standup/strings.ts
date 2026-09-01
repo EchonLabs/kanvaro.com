@@ -876,7 +876,15 @@ export const standupStrings = {
 
     missedThriceTitle: () => 'Three stand-ups missed in a row',
     missedThriceMessage: ({ count }: { count: number }) =>
-      `${count} consecutive stand-ups have been missed. This sprint's plan is no longer being tracked daily.`
+      `${count} consecutive stand-ups have been missed. This sprint's plan is no longer being tracked daily.`,
+
+    /** CFW-3, N9. */
+    carryForwardEscalatedTitle: () => 'A carry-forward item is escalated',
+    carryForwardEscalatedMessage: ({ label, age }: { label: string; age: number }) =>
+      `${label} has been open for ${age} stand-ups without closing.`,
+    carryForwardChronicTitle: () => 'A carry-forward item is now chronic',
+    carryForwardChronicMessage: ({ label, age }: { label: string; age: number }) =>
+      `${label} has been open for ${age} stand-ups. It needs a documented decision: continue, descope, or split.`
   },
 
   /**
@@ -929,6 +937,82 @@ export const standupStrings = {
     holidayCoverageNone: ({ setName }: { setName: string }) =>
       `${setName} has no holidays loaded at all. Every date is being treated as a working day.`,
     holidayCoverageAction: 'Import holidays'
+  },
+
+  /**
+   * Panel 4 — the carry-forward register (spec §13, CFW-1..11).
+   *
+   * "The register is the module's memory" (§13.1), so its copy leans on that:
+   * every label says what is still owed and for how long, never just a status
+   * word.
+   */
+  carryForward: {
+    title: () => 'Carry forward',
+    subtitle: () =>
+      'Anything open that did not close. It keeps appearing until it is resolved.',
+    empty: () => 'Nothing carried forward. A clean board.',
+
+    itemTypeLabel: (type: string) => {
+      switch (type) {
+        case 'unfinished_task':
+          return 'Unfinished task'
+        case 'unrevised_estimate':
+          return 'Estimate needs revising'
+        case 'open_blocker':
+          return 'Open blocker'
+        case 'owner_absent':
+          return 'Owner absent'
+        case 'unassigned_task':
+          return 'Unassigned task'
+        case 'missed_standup_rollup':
+          return 'Rolled from a missed stand-up'
+        case 'override_followup':
+          return 'Override follow-up'
+        case 'not_started_commitment':
+          return 'Not started'
+        case 'cross_sprint':
+          return 'Carried from last sprint'
+        default:
+          return 'Carried forward'
+      }
+    },
+
+    ageBadge: ({ age }: { age: number }) =>
+      age === 1 ? '1 stand-up' : `${age} stand-ups`,
+    escalatedBadge: () => 'Escalated',
+    chronicBadge: () => 'Chronic',
+
+    /** CFW-11's summary strip. */
+    summaryOpen: ({ count }: { count: number }) => `${count} open`,
+    summaryNeedingNote: ({ count }: { count: number }) => `${count} need a note today`,
+    summaryEscalated: ({ count }: { count: number }) => `${count} escalated`,
+    summaryResolved: ({ count }: { count: number }) => `${count} resolved`,
+
+    /** CFW-4's mandatory note, and its two rejections. */
+    noteRequired: () =>
+      'This item has been open long enough that a note is mandatory before completion (CC-4).',
+    notePlaceholder: () => "What's the update today?",
+    noteTooShort: ({ minLength }: { minLength: number }) =>
+      `Add at least ${minLength} characters.`,
+    noteUnchanged: () => 'Add today’s update, not yesterday’s.',
+    addNote: () => 'Add note',
+    noteHistory: () => 'Note history',
+
+    /** CFW-7's inline resolve. */
+    resolve: () => 'Resolve',
+    resolveDone: () => 'Done',
+    resolveReassigned: () => 'Reassigned',
+    resolveDescoped: () => 'Descoped',
+    resolveAcknowledged: () => 'Acknowledged',
+    resolveOther: () => 'Other',
+    resolveCommentPlaceholder: () => 'Optional comment',
+
+    /** CFW-10's filters. */
+    filterType: () => 'Type',
+    filterOwner: () => 'Owner',
+    filterAgeBand: () => 'Age',
+    filterStatus: () => 'Status',
+    sortedByAge: () => 'Sorted oldest first'
   }
 } as const
 

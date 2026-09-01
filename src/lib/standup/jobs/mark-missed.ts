@@ -19,6 +19,7 @@ import { WorkingCalendar } from '@/models/WorkingCalendar'
 
 import { recordAudit, systemActor } from '../audit'
 import type { IsoDate } from '../calendar-dates'
+import { rollForwardMissedStandup } from '../carry-forward-service'
 import { standupStrings } from '../strings'
 import { sendStandupNotificationOnce } from './notify'
 import { emptyResult, type JobResult } from './result'
@@ -33,10 +34,9 @@ const NOTIFY_ADMIN_AFTER = 3
 /**
  * What happens to a missed day's work (SCH-13).
  *
- * **Phase 9 seam.** The carry-forward register is Phase 9's; until it exists
- * there is nothing to roll, so the default is a no-op that is accurate rather
- * than permissive. The call shape is fixed here so Phase 9 fills the body
- * rather than changing the caller.
+ * Defaults to the real Phase 9 register (`carry-forward-service.ts`). Still
+ * overridable, for tests that want to observe the call rather than the
+ * database rows it produces.
  */
 export interface MissedRollForward {
   missedStandupId: string
@@ -47,8 +47,6 @@ export interface MissedRollForward {
 }
 
 export type MissedRollForwardHandler = (input: MissedRollForward) => Promise<void>
-
-const rollForwardPending: MissedRollForwardHandler = async () => {}
 
 export interface MarkMissedOptions {
   rollForward?: MissedRollForwardHandler
@@ -85,7 +83,7 @@ export async function markMissed(
     calendars.map((row) => [row.project.toString(), row.timezone as string])
   )
 
-  const rollForward = options.rollForward ?? rollForwardPending
+  const rollForward = options.rollForward ?? rollForwardMissedStandup
 
   for (const standup of candidates) {
     const projectId = standup.project.toString()

@@ -5,10 +5,10 @@
  * in the spec's table order, and `blockingFailures()` says whether the Complete
  * button may enable.
  *
- * **Seven of the eleven are answered** — CC-1, CC-2, CC-5, CC-6, CC-7, CC-10
- * from Phase 7, and CC-3 from Phase 8's variance engine. The other four need
- * the carry-forward register (Phase 9), blockers and sprint health (Phase 10)
- * and the final-day disposition (Phase 11).
+ * **Eight of the eleven are answered** — CC-1, CC-2, CC-5, CC-6, CC-7, CC-10
+ * from Phase 7, CC-3 from Phase 8's variance engine, and CC-4 from Phase 9's
+ * carry-forward register. The other three need blockers and sprint health
+ * (Phase 10) and the final-day disposition (Phase 11).
  *
  * They are returned anyway, as `not_evaluated` naming the owning phase. Two
  * reasons. A PM reading Panel 7 must not see a complete-looking list that never
@@ -85,6 +85,22 @@ export interface CheckVarianceRow {
   notStartedReason?: string
 }
 
+/**
+ * One carry-forward item, as CC-4 needs to see it (spec CFW-3, CFW-4).
+ *
+ * `notedToday` rather than the item's full note thread: the check only cares
+ * whether *this round* got its update, and computing that from a thread would
+ * duplicate the "is the newest note dated today" logic the service already
+ * owns.
+ */
+export interface CheckCarryForwardItem {
+  itemId: string
+  taskKey?: string
+  memberId?: string
+  requiresNoteToday: boolean
+  notedToday: boolean
+}
+
 export interface CheckMember {
   memberId: string
   name?: string
@@ -106,17 +122,19 @@ export interface EvaluateCompletionChecksInput {
    * whole check exists to prevent.
    */
   variance?: CheckVarianceRow[]
+  /**
+   * The carry-forward items currently on this board (Phase 9).
+   *
+   * Same absent-vs-empty rule as `variance`: `undefined` means CC-4 was never
+   * asked and reports `not_evaluated`; `[]` means it was asked and the board
+   * genuinely holds no aged items.
+   */
+  carryForward?: CheckCarryForwardItem[]
 }
 
-/** The four checks still unanswerable, and who will answer them. */
+/** The three checks still unanswerable, and who will answer them. */
 const DEFERRED: Record<string, { phase: string; hard: boolean; overridable: boolean; what: string }> =
   {
-    'CC-4': {
-      phase: 'Phase 9',
-      hard: true,
-      overridable: false,
-      what: 'Carry-forward notes need the register.'
-    },
     'CC-8': {
       phase: 'Phase 11',
       hard: true,
@@ -159,7 +177,7 @@ export function evaluateCompletionChecks(
     cc1(members),
     cc2(liveRows),
     cc3(input.variance, input.shape),
-    deferred('CC-4'),
+    cc4(input.carryForward),
     cc5(liveRows),
     cc6(members),
     cc7(members),
@@ -248,6 +266,43 @@ const identity = (row: CheckVarianceRow) => ({
   taskKey: row.taskKey,
   memberId: row.memberId
 })
+
+/**
+ * CC-4. Every carry-forward item at or beyond the note threshold has a note
+ * added on this stand-up (spec CFW-3, E61). Hard and never overridable — O7
+ * is a listed hard block, not something a PM can wave through, because a
+ * note is the one thing that keeps an aged item from going quiet.
+ */
+function cc4(items: readonly CheckCarryForwardItem[] | undefined): CompletionCheckResult {
+  const base = { checkId: 'CC-4' as const, hard: true, overridable: false }
+
+  if (items === undefined) {
+    return {
+      ...base,
+      status: 'not_evaluated',
+      message: 'The carry-forward register was not loaded, so this could not be checked.',
+      entities: [],
+      ownedBy: 'Phase 9'
+    }
+  }
+
+  const offenders = items.filter((item) => item.requiresNoteToday && !item.notedToday)
+
+  return {
+    ...base,
+    status: offenders.length ? 'fail' : 'pass',
+    message: offenders.length
+      ? `${count(offenders.length, 'carry forward item')} ${
+          offenders.length === 1 ? 'needs' : 'need'
+        } a note today.`
+      : 'Every aged carry-forward item has today’s note.',
+    entities: offenders.map((item) => ({
+      carryForwardItemId: item.itemId,
+      taskKey: item.taskKey,
+      memberId: item.memberId
+    }))
+  }
+}
 
 /* --- the six Phase 7 checks ---------------------------------------------- */
 
