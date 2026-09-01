@@ -39,6 +39,27 @@ export function StandupSettingsPanel({ projectId }: { projectId: string }) {
   const [view, setView] = useState<StandupSettingsView>('calendar')
   const { hasPermission, loading, permissions } = usePermissions()
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+  /**
+   * Whether the visible sub-view holds unsaved edits.
+   *
+   * Only the selected panel is mounted, so switching view unmounts the form and
+   * takes its local state with it. Without this flag that was silent data loss:
+   * edit six fields, click another tab, and the edits were simply gone.
+   */
+  const [dirty, setDirty] = useState(false)
+
+  /**
+   * The single gate every view change goes through — click, arrow key, Home,
+   * End. Confirms before discarding, and answers whether the change may
+   * proceed so the caller can decide what else to do.
+   */
+  const requestView = (next: StandupSettingsView) => {
+    if (next === view) return true
+    if (dirty && !window.confirm('Discard your unsaved changes?')) return false
+    setDirty(false)
+    setView(next)
+    return true
+  }
 
   /**
    * The arrow-key navigation `role="tablist"` promises.
@@ -66,6 +87,17 @@ export function StandupSettingsPanel({ projectId }: { projectId: string }) {
 
     // These keys would otherwise scroll the settings tab underneath the control.
     event.preventDefault()
+
+    // Selection normally follows focus here, which is right while switching is
+    // free. It stops being right the moment there are unsaved edits: arrowing
+    // past a tab would discard them without the user ever choosing to leave.
+    // So while dirty, focus moves and selection waits for a deliberate Enter or
+    // Space — the manual-activation half of the ARIA tabs pattern.
+    if (dirty) {
+      tabRefs.current[nextIndex]?.focus()
+      return
+    }
+
     setView(VIEWS[nextIndex].id)
     tabRefs.current[nextIndex]?.focus()
   }
@@ -116,7 +148,7 @@ export function StandupSettingsPanel({ projectId }: { projectId: string }) {
                 // three Tab presses to get past a single segmented control.
                 tabIndex={active ? 0 : -1}
                 onKeyDown={(event) => onTabKeyDown(event, index)}
-                onClick={() => setView(id)}
+                onClick={() => requestView(id)}
                 className={cn(
                   'apple-transition flex items-center gap-2 rounded-[var(--apple-radius-sm)] px-3 py-1.5 text-[13px] font-medium',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]',
@@ -145,8 +177,12 @@ export function StandupSettingsPanel({ projectId }: { projectId: string }) {
           // selected.
           tabIndex={0}
         >
-          {view === 'calendar' && <WorkingCalendarSettings projectId={projectId} />}
-          {view === 'configuration' && <StandupConfigSettings projectId={projectId} />}
+          {view === 'calendar' && (
+            <WorkingCalendarSettings projectId={projectId} onDirtyChange={setDirty} />
+          )}
+          {view === 'configuration' && (
+            <StandupConfigSettings projectId={projectId} onDirtyChange={setDirty} />
+          )}
           {view === 'capacity' && <CapacityMembersSettings projectId={projectId} />}
         </div>
       </div>

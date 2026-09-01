@@ -29,6 +29,7 @@ import {
 
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { SettingsActionBar } from './SettingsActionBar'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -97,10 +98,19 @@ interface WorkingDay {
   optionalHolidays: Array<{ id: string; name: string }>
 }
 
-export function WorkingCalendarSettings({ projectId }: { projectId: string }) {
+export function WorkingCalendarSettings({
+  projectId,
+  onDirtyChange
+}: {
+  projectId: string
+  /** Lets the panel refuse a tab switch that would discard unsaved edits. */
+  onDirtyChange?: (dirty: boolean) => void
+}) {
   const notify = useNotify()
 
   const [calendar, setCalendar] = useState<CalendarState | null>(null)
+  /** The last state the server confirmed — the diff target for `dirty`, and what Discard restores. */
+  const [saved, setSaved] = useState<CalendarState | null>(null)
   const [inherited, setInherited] = useState(false)
   const [holidaySets, setHolidaySets] = useState<HolidaySetOption[]>([])
   const [coverageWarning, setCoverageWarning] = useState<{ message: string } | null>(null)
@@ -125,13 +135,15 @@ export function WorkingCalendarSettings({ projectId }: { projectId: string }) {
       const payload = await response.json()
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Could not load the calendar')
 
-      setCalendar({
+      const loaded = {
         workingDaysOfWeek: payload.data.calendar.workingDaysOfWeek,
         standardHoursPerDay: payload.data.calendar.standardHoursPerDay,
         timezone: payload.data.calendar.timezone,
         subscribedHolidaySetIds: payload.data.calendar.subscribedHolidaySetIds,
         overrides: payload.data.calendar.overrides
-      })
+      }
+      setCalendar(loaded)
+      setSaved(loaded)
       setInherited(payload.data.inherited)
       setHolidaySets(payload.data.availableHolidaySets)
       setCoverageWarning(payload.data.coverageWarning)
@@ -253,6 +265,16 @@ export function WorkingCalendarSettings({ projectId }: { projectId: string }) {
     }
   }
 
+  // Overrides are included: they are added and removed through their own
+  // dialogs, which reload the calendar, so both sides of the diff move together
+  // and an override change never shows as a phantom unsaved edit.
+  const dirty = calendar !== null && JSON.stringify(calendar) !== JSON.stringify(saved)
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+    return () => onDirtyChange?.(false)
+  }, [dirty, onDirtyChange])
+
   if (loading) return <CalendarSkeleton />
   if (!calendar) return null
 
@@ -265,10 +287,6 @@ export function WorkingCalendarSettings({ projectId }: { projectId: string }) {
             Decides which dates get a stand-up. Everything else depends on this.
           </p>
         </div>
-        <Button onClick={attemptSave} disabled={saving} size="sm">
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Save calendar
-        </Button>
       </header>
 
       {inherited && (
@@ -494,6 +512,16 @@ export function WorkingCalendarSettings({ projectId }: { projectId: string }) {
           setOverrideDialogOpen(false)
           await Promise.all([loadCalendar(), loadPreview()])
         }}
+      />
+
+      {/* `attemptSave`, not `save` — UI-2's impact confirmation still stands
+          between the button and the write. */}
+      <SettingsActionBar
+        dirty={dirty}
+        saving={saving}
+        onSave={attemptSave}
+        onDiscard={() => setCalendar(saved)}
+        saveLabel="Save calendar"
       />
     </div>
   )
