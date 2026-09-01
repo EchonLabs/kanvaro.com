@@ -12,7 +12,8 @@
  * The degradation banner is first, per §3 rule 1: the module says what it
  * cannot currently do before it shows anything it can.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
 import { MainLayout } from '@/components/layout/MainLayout'
@@ -22,9 +23,20 @@ import {
   type RunScreenApi,
   type RunScreenData
 } from '@/components/standup/run/StandupRunScreen'
+import {
+  DebtLedgerDrawer,
+  type LedgerEntryView
+} from '@/components/standup/run/DebtLedgerDrawer'
+import {
+  ReviseEstimateModal,
+  type ReviseEstimateTarget
+} from '@/components/standup/run/ReviseEstimateModal'
+import type { VariancePanelMember, VariancePanelRow } from '@/components/standup/run/VariancePanel'
 import type { Degradation } from '@/lib/standup/degradation'
+import type { DebtPosition } from '@/lib/standup/debt'
 import { minutes, type Minutes } from '@/lib/standup/minutes'
 import { STANDUP_VERSION_HEADER } from '@/lib/standup/route-helpers'
+import { standupStrings } from '@/lib/standup/strings'
 
 export default function StandupRunPage({
   params
@@ -38,11 +50,24 @@ export default function StandupRunPage({
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async (): Promise<RunScreenData> => {
-    const response = await fetch(`/api/standups/${standupId}/allocations`)
-    if (!response.ok) throw await asError(response)
+    const [boardResponse, varianceResponse, yesterdayResponse] = await Promise.all([
+      fetch(`/api/standups/${standupId}/allocations`),
+      fetch(`/api/standups/${standupId}/variance`),
+      fetch(`/api/standups/${standupId}/yesterday`)
+    ])
+    if (!boardResponse.ok) throw await asError(boardResponse)
 
-    const payload = await response.json()
-    return toRunScreenData(payload.data ?? payload)
+    const boardPayload = await boardResponse.json()
+    // Panels 2 and 3 read live rather than block the board: a PM should not
+    // lose the whole run screen because yesterday's classification errored.
+    const variancePayload = varianceResponse.ok ? await varianceResponse.json() : null
+    const yesterdayPayload = yesterdayResponse.ok ? await yesterdayResponse.json() : null
+
+    return toRunScreenData(
+      boardPayload.data ?? boardPayload,
+      variancePayload?.data ?? variancePayload,
+      yesterdayPayload?.data ?? yesterdayPayload
+    )
   }, [standupId])
 
   useEffect(() => {
@@ -69,6 +94,26 @@ export default function StandupRunPage({
       cancelled = true
     }
   }, [load, projectId])
+
+  const router = useRouter()
+  const [revising, setRevising] = useState<ReviseEstimateTarget | null>(null)
+  const [givingReason, setGivingReason] = useState<{
+    allocationId: string
+    taskKey?: string
+    title: string
+  } | null>(null)
+  const [reasonText, setReasonText] = useState('')
+  const [ledger, setLedger] = useState<{
+    memberId: string
+    memberName: string
+    position: DebtPosition
+    entries: LedgerEntryView[]
+    canWriteOff: boolean
+  } | null>(null)
+  const [panelNotice, setPanelNotice] = useState<string | null>(null)
+
+  const varianceRows = useMemo(() => data?.variance?.rows ?? [], [data])
+  const varianceMembers = useMemo(() => data?.variance?.members ?? [], [data])
 
   const api: RunScreenApi = {
     async setAttendance(input) {
@@ -104,13 +149,132 @@ export default function StandupRunPage({
         await mutate(`/api/standups/${standupId}/attendance`, 'POST', input)
       )
     },
-    refresh: load
+    refresh: load,
+
+    // --- Phase 8 -------------------------------------------------------
+    async setYesterdayStatus(input) {
+      return unwrap(await mutate(`/api/standups/${standupId}/yesterday`, 'PATCH', input))
+    },
+    async confirmCompleted({ taskIds, expectedVersion }) {
+      await mutate(`/api/standups/${standupId}/yesterday`, 'PATCH', {
+        taskIds,
+        expectedVersion
+      })
+    },
+    openTask(taskId) {
+      router.push(`/tasks/${taskId}`)
+    },
+    reviseEstimate({ allocationId }) {
+      const row = varianceRows.find((candidate) => candidate.allocationId === allocationId)
+      if (!row) return
+      setRevising({
+        allocationId: row.allocationId,
+        taskKey: row.taskKey,
+        title: row.title,
+        memberName: row.memberName,
+        originalEstimateMinutes: row.originalEstimateMinutes,
+        totalLoggedMinutesOnTask: row.totalLoggedMinutesOnTask,
+        taskVarianceMinutes: row.taskVarianceMinutes
+      })
+    },
+    giveNotStartedReason({ allocationId }) {
+      const row = varianceRows.find((candidate) => candidate.allocationId === allocationId)
+      if (!row) return
+      setReasonText('')
+      setGivingReason({ allocationId: row.allocationId, taskKey: row.taskKey, title: row.title })
+    },
+    async viewDebtLedger(memberId) {
+      const member = varianceMembers.find((candidate) => candidate.memberId === memberId)
+      try {
+        const response = await fetch(`/api/standups/${standupId}/debt?memberId=${memberId}`)
+        const payload = await unwrap(response)
+        setLedger({
+          memberId,
+          memberName: member?.memberName ?? memberId,
+          position: payload.position,
+          entries: payload.entries ?? [],
+          canWriteOff: true
+        })
+      } catch {
+        setPanelNotice("That member's estimate debt could not be loaded.")
+      }
+    }
   }
+
+  const saveRevision = useCallback(
+    async (input: {
+      allocationId: string
+      newRemainingMinutes: Minutes
+      reason: string
+      detail?: string
+    }) => {
+      if (!data) return
+      try {
+        await mutate(
+          `/api/standups/${standupId}/variance/${input.allocationId}`,
+          'POST',
+          {
+            newRemainingMinutes: input.newRemainingMinutes,
+            reason: input.reason,
+            ...(input.detail ? { detail: input.detail } : {}),
+            expectedVersion: data.standupVersion
+          }
+        )
+        setRevising(null)
+        const fresh = await load()
+        setData(fresh)
+      } catch {
+        setPanelNotice('That revision could not be saved.')
+      }
+    },
+    [data, load, standupId]
+  )
+
+  const saveReason = useCallback(async () => {
+    if (!data || !givingReason) return
+    try {
+      await mutate(`/api/standups/${standupId}/variance/${givingReason.allocationId}`, 'POST', {
+        notStartedReason: reasonText.trim(),
+        expectedVersion: data.standupVersion
+      })
+      setGivingReason(null)
+      const fresh = await load()
+      setData(fresh)
+    } catch {
+      setPanelNotice('That reason could not be saved.')
+    }
+  }, [data, givingReason, load, reasonText, standupId])
+
+  const saveWriteOff = useCallback(
+    async (input: { minutes: Minutes; reason: string }) => {
+      if (!data || !ledger) return
+      try {
+        await mutate(`/api/standups/${standupId}/debt`, 'POST', {
+          memberId: ledger.memberId,
+          minutes: input.minutes,
+          reason: input.reason,
+          expectedVersion: data.standupVersion
+        })
+        setLedger(null)
+        const fresh = await load()
+        setData(fresh)
+      } catch {
+        setPanelNotice('That write-off could not be saved.')
+      }
+    },
+    [data, ledger, load, standupId]
+  )
 
   return (
     <MainLayout>
       <div className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">
         <DegradationBanner degradations={degradations} />
+
+        {panelNotice && (
+          <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">
+            {panelNotice}
+          </p>
+        )}
 
         {error ? (
           <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">
@@ -123,6 +287,64 @@ export default function StandupRunPage({
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading the stand-up…
           </div>
+        )}
+
+        {revising && (
+          <ReviseEstimateModal
+            target={revising}
+            onSave={saveRevision}
+            onCancel={() => setRevising(null)}
+          />
+        )}
+
+        {givingReason && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reason-title"
+            className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4"
+          >
+            <h3 id="reason-title" className="text-sm font-semibold">
+              {standupStrings.run.panel3()} — {givingReason.taskKey ?? givingReason.title}
+            </h3>
+            <label className="flex flex-col gap-1 text-sm" htmlFor="not-started-reason">
+              Why didn’t this happen?
+              <textarea
+                id="not-started-reason"
+                value={reasonText}
+                onChange={(event) => setReasonText(event.target.value)}
+                className="min-h-16 rounded-md border border-border bg-background px-2 py-1 text-sm"
+              />
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setGivingReason(null)}
+                className="rounded-md border border-border px-3 py-1 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!reasonText.trim()}
+                onClick={saveReason}
+                className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground disabled:opacity-50"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+
+        {ledger && (
+          <DebtLedgerDrawer
+            memberName={ledger.memberName}
+            position={ledger.position}
+            entries={ledger.entries}
+            canWriteOff={ledger.canWriteOff}
+            onWriteOff={saveWriteOff}
+            onClose={() => setLedger(null)}
+          />
         )}
       </div>
     </MainLayout>
@@ -169,7 +391,7 @@ async function unwrap(response: Response): Promise<any> {
 }
 
 /** Adapts the board payload into the screen's view model. */
-function toRunScreenData(board: any): RunScreenData {
+function toRunScreenData(board: any, variance?: any, yesterday?: any): RunScreenData {
   return {
     standupId: board.standupId,
     standupVersion: board.standupVersion,
@@ -207,7 +429,82 @@ function toRunScreenData(board: any): RunScreenData {
     },
     poolTotal:
       (board.pool?.unassigned?.length ?? 0) +
-      (board.pool?.assignedNotPlanned?.length ?? 0)
+      (board.pool?.assignedNotPlanned?.length ?? 0),
+    ...(variance ? { variance: toVarianceView(variance) } : {}),
+    ...(yesterday ? { yesterday: toYesterdayView(yesterday) } : {})
+  }
+}
+
+/** Panel 3's payload, minutes rebranded the way every other adapter here does. */
+function toVarianceView(
+  variance: any
+): { rows: VariancePanelRow[]; members: VariancePanelMember[] } {
+  return {
+    rows: (variance.rows ?? []).map(
+      (row: any): VariancePanelRow => ({
+        allocationId: row.allocationId,
+        taskId: row.taskId,
+        taskKey: row.taskKey,
+        title: row.title ?? '',
+        memberId: row.memberId,
+        memberName: row.memberName,
+        outcome: row.outcome,
+        plannedMinutes: minutes(row.plannedMinutes),
+        loggedMinutesOnDay: minutes(row.loggedMinutesOnDay),
+        dayVarianceMinutes: minutes(row.dayVarianceMinutes),
+        originalEstimateMinutes: minutes(row.originalEstimateMinutes),
+        totalLoggedMinutesOnTask: minutes(row.totalLoggedMinutesOnTask),
+        taskVarianceMinutes: minutes(row.taskVarianceMinutes),
+        requiresRevision: row.requiresRevision ?? false,
+        requiresReason: row.requiresReason ?? false,
+        ...(row.revisedRemainingMinutes === undefined
+          ? {}
+          : { revisedRemainingMinutes: minutes(row.revisedRemainingMinutes) }),
+        notStartedReason: row.notStartedReason,
+        spillChainLength: row.spillChainLength ?? 0,
+        chronicSpill: row.chronicSpill ?? false,
+        explanation: row.explanation ?? ''
+      })
+    ),
+    members: (variance.members ?? []).map(
+      (member: any): VariancePanelMember => ({
+        memberId: member.memberId,
+        memberName: member.memberName,
+        plannedMinutes: minutes(member.plannedMinutes),
+        loggedMinutesOnDay: minutes(member.loggedMinutesOnDay),
+        dayVarianceMinutes: minutes(member.dayVarianceMinutes),
+        outstandingDebtMinutes: minutes(member.outstandingDebtMinutes),
+        surplusMinutes: minutes(member.surplusMinutes),
+        needingRevision: member.needingRevision ?? 0
+      })
+    )
+  }
+}
+
+/** Panel 2's payload, same rebranding treatment. */
+function toYesterdayView(yesterday: any): RunScreenData['yesterday'] {
+  return {
+    buckets: (yesterday.buckets ?? []).map((bucket: any) => ({
+      bucket: bucket.bucket,
+      rows: (bucket.rows ?? []).map((row: any) => ({
+        allocationId: row.allocationId,
+        taskId: row.taskId,
+        taskKey: row.taskKey,
+        title: row.title ?? '',
+        memberId: row.memberId,
+        memberName: row.memberName,
+        previousStatus: row.previousStatus,
+        currentStatus: row.currentStatus,
+        plannedMinutes: minutes(row.plannedMinutes),
+        loggedMinutes: minutes(row.loggedMinutes),
+        dayVarianceMinutes: minutes(row.dayVarianceMinutes),
+        remainingEstimateMinutes: minutes(row.remainingEstimateMinutes),
+        ageInStandups: row.ageInStandups ?? 1,
+        unplanned: row.unplanned ?? false
+      }))
+    })),
+    previousStandupId: yesterday.previousStandupId,
+    previousStandupDate: yesterday.previousStandupDate
   }
 }
 
