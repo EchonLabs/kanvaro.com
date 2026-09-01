@@ -523,7 +523,292 @@ export const standupStrings = {
    * from its first commit rather than inlined into a component and retrofitted.
    */
   variance: {
-    // Intentionally empty until Phase 8, which builds the outcome classifier.
+    /**
+     * One entry per outcome, each a complete sentence.
+     *
+     * Never assembled from fragments: §12.2's twelve outcomes read differently
+     * in different languages, and a sentence concatenated from "Planned", a
+     * number and "not started" cannot be translated at all. The two the
+     * worked example fixes (§12.3) are reproduced here word for word — the
+     * tests assert them character by character, because a paraphrase there is
+     * a spec deviation, not a style choice.
+     */
+    deliveredUnder: ({
+      planned,
+      logged,
+      under,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      under: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, done with ${formatMinutesAsHours(under, { locale })} to spare. ` +
+      'That time is credited back against estimate debt.',
+
+    deliveredOnEstimate: ({
+      planned,
+      logged,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, done on estimate.`,
+
+    deliveredOver: ({
+      planned,
+      logged,
+      over,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      over: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, over by ${formatMinutesAsHours(over, { locale })}. Done, but the estimate was short.`,
+
+    openUnderConsumed: ({
+      planned,
+      logged,
+      under,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      under: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, so ${formatMinutesAsHours(under, { locale })} of planned time went elsewhere. ` +
+      'Still in progress and carrying forward.',
+
+    openFullyConsumed: ({
+      planned,
+      logged,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, all of it spent. Still in progress and carrying forward.`,
+
+    /** §12.3's KAN-214 sentence, verbatim. */
+    openOverConsumed: ({
+      planned,
+      logged,
+      over,
+      totalOnTask,
+      estimate,
+      taskOver,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      over: Minutes
+      totalOnTask: Minutes
+      estimate: Minutes
+      taskOver: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, over by ${formatMinutesAsHours(over, { locale })}. Still in progress. ` +
+      `Total on task ${formatMinutesAsHours(totalOnTask, {
+        locale
+      })} against a ${formatMinutesAsHours(estimate, { locale })} estimate, task is ` +
+      `${formatMinutesAsHours(taskOver, { locale })} over estimate. ` +
+      'Revised remaining estimate required.',
+
+    /** §12.3's KAN-231 sentence, verbatim. */
+    notStarted: ({ planned, locale }: { planned: Minutes; locale?: string }) =>
+      `Planned ${formatMinutesAsHours(planned, {
+        locale
+      })}, logged 0.0h, not started. ${formatMinutesAsHours(planned, {
+        locale
+      })} of planned work did not happen. Reason required.`,
+
+    blocked: ({ planned, locale }: { planned: Minutes; locale?: string }) =>
+      `Blocked. The ${formatMinutesAsHours(planned, {
+        locale
+      })} planned here is not counted as an overrun — the blocker owns this row.`,
+
+    descoped: () =>
+      'Removed from the sprint. Logged time is kept for reporting, and the carry-forward item closes.',
+
+    reassigned: ({ logged, locale }: { logged: Minutes; locale?: string }) =>
+      `Reassigned after the day was planned. The ${formatMinutesAsHours(logged, {
+        locale
+      })} logged stays with the person who worked it, and the remaining estimate moves with the task.`,
+
+    ownerAbsent: () =>
+      'The owner was away, so nothing here counts as an overrun and no estimate debt accrues.',
+
+    noTimeLoggedButProgressed: () =>
+      'Status moved but no time was logged. Enter the actual hours — nothing accrues until they exist.',
+
+    /**
+     * §12.3's absorb-policy banner. Says what the debt *means* for today's
+     * plan, because a number alone tells a PM nothing they can act on.
+     */
+    debtBanner: ({ minutes: value, locale }: { minutes: Minutes; locale?: string }) =>
+      `Carrying ${formatMinutesAsHours(value, {
+        locale
+      })} of estimate debt. Today’s plan assumes estimates hold. If they do not, this debt grows.`,
+
+    /** AC-16's sentence for the reduce policy, verbatim. */
+    capacityReduced: ({
+      nominal,
+      effective,
+      debt,
+      locale
+    }: {
+      nominal: Minutes
+      effective: Minutes
+      debt: Minutes
+      locale?: string
+    }) =>
+      `Capacity ${formatMinutesAsHours(nominal, { locale })} reduced to ${formatMinutesAsHours(
+        effective,
+        { locale }
+      )} by ${formatMinutesAsHours(debt, { locale })} of estimate debt.`,
+
+    /**
+     * VAR-6 / E42. A negative balance is surplus and gets its own word.
+     * "-2.0h of debt" would tell somebody they owe negative work.
+     */
+    surplus: ({ minutes: value, locale }: { minutes: Minutes; locale?: string }) =>
+      `Ahead of estimate by ${formatMinutesAsHours(value, { locale })}.`,
+
+    /**
+     * VAR-10 / NFR-14. Factual, never punitive: it states a number about the
+     * work, not a judgement about the person.
+     */
+    memberFacingDebt: ({ minutes: value, locale }: { minutes: Minutes; locale?: string }) =>
+      `You are ${formatMinutesAsHours(value, { locale, withUnit: false })} hours over estimate ` +
+      'on this sprint’s completed and in-flight work.',
+
+    chronicSpill: ({ chainLength }: { chainLength: number }) =>
+      `Spilled across ${chainLength} ${plural(chainLength, 'stand-up', 'stand-ups')}.`,
+
+    /** E43 — debt now larger than a whole day. */
+    notRecoverable: () =>
+      'Estimate debt now exceeds a full day. This plan is not recoverable without descoping or writing debt off.',
+
+    /** VAR-13's roll-up strip labels. */
+    rollUpPlanned: () => 'Planned yesterday',
+    rollUpLogged: () => 'Logged yesterday',
+    rollUpDayVariance: () => 'Net day variance',
+    rollUpDebt: () => 'Estimate debt',
+    rollUpNeedingRevision: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task needs', 'tasks need')} a revised estimate`,
+
+    /** VAR-12's words. Colour is never the only signal (NFR-A2). */
+    labelOver: () => 'over',
+    labelUnder: () => 'under',
+    labelOnEstimate: () => 'on estimate',
+    labelNotStarted: () => 'not started',
+
+    /** §15.11, the revision modal. */
+    reviseTitle: () => 'Revise remaining estimate',
+    reviseHoursLabel: () => 'How many hours are left?',
+    reviseOriginalUnchanged: () => 'This will not change the original estimate.',
+    reviseProjectedTotal: ({
+      name,
+      total,
+      locale
+    }: {
+      name: string
+      total: Minutes
+      locale?: string
+    }) =>
+      `${name}’s new total on this task would be ${formatMinutesAsHours(total, { locale })}.`,
+    reviseDetailRequired: ({ minLength }: { minLength: number }) =>
+      `Say a little more — at least ${minLength} characters.`,
+    reasonRequired: ({ minLength }: { minLength: number }) =>
+      `Give a reason of at least ${minLength} characters for the planned time that did not happen.`
+  },
+
+  /**
+   * Panel 2, the yesterday review (§15.8.4, RUN-9..RUN-13).
+   *
+   * The bucket headings are the panel's structure, so all four are returned
+   * even when three are empty: a PM who sees three headings cannot tell
+   * "nothing is blocked" from "the blocked bucket did not render".
+   */
+  yesterday: {
+    title: () => 'Yesterday',
+    bucketCompleted: () => 'Completed since last stand-up',
+    bucketInProgress: () => 'In progress',
+    bucketNotStarted: () => 'Not started',
+    bucketBlocked: () => 'Blocked',
+    bucketCount: ({ label, count }: { label: string; count: number }) => `${label} (${count})`,
+    noPreviousStandup: () =>
+      'This is the first stand-up of the sprint, so there is no previous day to review.',
+    emptyBucket: () => 'Nothing here.',
+    /** E39 — time logged against a task nobody planned for this member. */
+    unplannedBadge: () => 'Unplanned',
+    unplannedHint: () =>
+      'Time was logged against this task yesterday, but it was not on the plan.',
+    markAllConfirmed: () => 'Mark all confirmed',
+    ageBadge: ({ standups }: { standups: number }) =>
+      `Open across ${standups} ${plural(standups, 'stand-up', 'stand-ups')}`,
+    previousStatus: () => 'Was',
+    currentStatus: () => 'Now',
+    /** RUN-11 — a status the PM changed for somebody else. */
+    changedOnBehalfOf: ({ name }: { name: string }) => `Changed by the facilitator for ${name}`
+  },
+
+  /**
+   * The estimate-debt ledger drawer and the write-off dialog (VAR-5, VAR-8).
+   *
+   * The entry types are labelled in plain language rather than by their stored
+   * names: "accrual" is a bookkeeping word, and the drawer is read by the
+   * person the number is about.
+   */
+  debt: {
+    title: () => 'Estimate debt',
+    ledgerTitle: () => 'Estimate debt ledger',
+    empty: () => 'Nothing has been recorded on this sprint yet.',
+    outstanding: ({ minutes: value, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(value, { locale })} outstanding`,
+    entryType: {
+      accrual: () => 'Went over estimate',
+      credit: () => 'Came in under estimate',
+      settlement: () => 'Worked off against capacity',
+      writeoff: () => 'Written off',
+      carry_in: () => 'Carried in from the previous sprint'
+    },
+    writeOff: () => 'Write off debt',
+    writeOffConfirm: () => 'Confirm write-off',
+    writeOffReasonLabel: () => 'Why is this debt being written off?',
+    writeOffReasonTooShort: ({ minLength }: { minLength: number }) =>
+      `A write-off needs a justification of at least ${minLength} characters.`,
+    writeOffTooLarge: ({ outstanding, locale }: { outstanding: Minutes; locale?: string }) =>
+      `Only ${formatMinutesAsHours(outstanding, { locale })} is outstanding, so no more than that can be written off.`,
+    writeOffNotPermitted: () => 'Only a project manager can write estimate debt off.',
+    /** VAR-9's confirmation, shown at the new sprint's planning completion. */
+    carryInConfirm: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'person carries', 'people carry')} estimate debt into this sprint.`
   },
 
   /**
