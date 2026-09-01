@@ -32,6 +32,7 @@ import {
   type ReviseEstimateTarget
 } from '@/components/standup/run/ReviseEstimateModal'
 import type { VariancePanelMember, VariancePanelRow } from '@/components/standup/run/VariancePanel'
+import type { CarryForwardItemRow } from '@/components/standup/run/CarryForwardPanel'
 import type { Degradation } from '@/lib/standup/degradation'
 import type { DebtPosition } from '@/lib/standup/debt'
 import { minutes, type Minutes } from '@/lib/standup/minutes'
@@ -50,23 +51,27 @@ export default function StandupRunPage({
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async (): Promise<RunScreenData> => {
-    const [boardResponse, varianceResponse, yesterdayResponse] = await Promise.all([
-      fetch(`/api/standups/${standupId}/allocations`),
-      fetch(`/api/standups/${standupId}/variance`),
-      fetch(`/api/standups/${standupId}/yesterday`)
-    ])
+    const [boardResponse, varianceResponse, yesterdayResponse, carryForwardResponse] =
+      await Promise.all([
+        fetch(`/api/standups/${standupId}/allocations`),
+        fetch(`/api/standups/${standupId}/variance`),
+        fetch(`/api/standups/${standupId}/yesterday`),
+        fetch(`/api/standups/${standupId}/carry-forward`)
+      ])
     if (!boardResponse.ok) throw await asError(boardResponse)
 
     const boardPayload = await boardResponse.json()
-    // Panels 2 and 3 read live rather than block the board: a PM should not
+    // Panels 2, 3 and 4 read live rather than block the board: a PM should not
     // lose the whole run screen because yesterday's classification errored.
     const variancePayload = varianceResponse.ok ? await varianceResponse.json() : null
     const yesterdayPayload = yesterdayResponse.ok ? await yesterdayResponse.json() : null
+    const carryForwardPayload = carryForwardResponse.ok ? await carryForwardResponse.json() : null
 
     return toRunScreenData(
       boardPayload.data ?? boardPayload,
       variancePayload?.data ?? variancePayload,
-      yesterdayPayload?.data ?? yesterdayPayload
+      yesterdayPayload?.data ?? yesterdayPayload,
+      carryForwardPayload?.data ?? carryForwardPayload
     )
   }, [standupId])
 
@@ -198,6 +203,24 @@ export default function StandupRunPage({
       } catch {
         setPanelNotice("That member's estimate debt could not be loaded.")
       }
+    },
+
+    // --- Phase 9 ---------------------------------------------------------
+    async addCarryForwardNote({ itemId, text }) {
+      const response = await fetch(`/api/carry-forward/${itemId}/note`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, standupId })
+      })
+      await unwrap(response)
+    },
+    async resolveCarryForwardItem({ itemId, resolutionType, comment }) {
+      const response = await fetch(`/api/carry-forward/${itemId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolutionType, comment, standupId })
+      })
+      await unwrap(response)
     }
   }
 
@@ -391,7 +414,12 @@ async function unwrap(response: Response): Promise<any> {
 }
 
 /** Adapts the board payload into the screen's view model. */
-function toRunScreenData(board: any, variance?: any, yesterday?: any): RunScreenData {
+function toRunScreenData(
+  board: any,
+  variance?: any,
+  yesterday?: any,
+  carryForward?: any
+): RunScreenData {
   return {
     standupId: board.standupId,
     standupVersion: board.standupVersion,
@@ -431,7 +459,44 @@ function toRunScreenData(board: any, variance?: any, yesterday?: any): RunScreen
       (board.pool?.unassigned?.length ?? 0) +
       (board.pool?.assignedNotPlanned?.length ?? 0),
     ...(variance ? { variance: toVarianceView(variance) } : {}),
-    ...(yesterday ? { yesterday: toYesterdayView(yesterday) } : {})
+    ...(yesterday ? { yesterday: toYesterdayView(yesterday) } : {}),
+    ...(carryForward ? { carryForward: toCarryForwardView(carryForward) } : {})
+  }
+}
+
+/** Panel 4's payload — no minutes fields to rebrand, so this is a straight pass-through. */
+function toCarryForwardView(carryForward: any): {
+  items: CarryForwardItemRow[]
+  summary: { totalOpen: number; needingNoteToday: number; escalated: number; resolvedYesterday: number }
+} {
+  return {
+    items: (carryForward.items ?? []).map(
+      (item: any): CarryForwardItemRow => ({
+        itemId: item.itemId,
+        type: item.type,
+        status: item.status,
+        taskId: item.taskId,
+        taskKey: item.taskKey,
+        taskTitle: item.taskTitle,
+        memberId: item.memberId,
+        memberName: item.memberName,
+        originDate: item.originDate,
+        ageInStandups: item.ageInStandups,
+        ageBand: item.ageBand,
+        requiresNoteToday: item.requiresNoteToday ?? false,
+        notedToday: item.notedToday ?? false,
+        tags: item.tags ?? [],
+        notes: item.notes ?? [],
+        resolution: item.resolution,
+        validResolutions: item.validResolutions ?? []
+      })
+    ),
+    summary: {
+      totalOpen: carryForward.summary?.totalOpen ?? 0,
+      needingNoteToday: carryForward.summary?.needingNoteToday ?? 0,
+      escalated: carryForward.summary?.escalated ?? 0,
+      resolvedYesterday: carryForward.summary?.resolvedYesterday ?? 0
+    }
   }
 }
 

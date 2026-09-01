@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { QuickAddTask } from '@/components/standup/primitives/QuickAddCombobox'
 import { AttendancePanel, type ReassignPromptView } from './AttendancePanel'
+import { CarryForwardPanel, type CarryForwardItemRow, type CarryForwardPanelData } from './CarryForwardPanel'
 import { VariancePanel, type VariancePanelMember, type VariancePanelRow } from './VariancePanel'
 import { YesterdayPanel, type YesterdayPanelApi } from './YesterdayPanel'
 import { CapacityBoard, type BoardAllocationView } from './CapacityBoard'
@@ -15,6 +16,7 @@ import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity
 import {
   blockingFailures,
   evaluateCompletionChecks,
+  type CheckCarryForwardItem,
   type CheckMember,
   type CheckVarianceRow
 } from '@/lib/standup/completion-checks'
@@ -24,11 +26,13 @@ import { standupStrings } from '@/lib/standup/strings'
 /**
  * The stand-up run screen (§15.8) — "the screen the module lives or dies on".
  *
- * Five of its seven panels are built: 1 (attendance), 2 (yesterday) and
- * 3 (variance) from Phase 8, 5 (allocation) and 7 (completion). The other two
- * render as **stubs naming the phase that owns them**. That is deliberate and is the same decision as `not_evaluated`
- * completion checks: a screen missing three of its seven steps looks finished,
- * and a PM cannot tell a panel nobody built from a panel with nothing in it.
+ * Six of its seven panels are built: 1 (attendance) and 5/7 (allocation,
+ * completion) from Phase 7, 2 (yesterday) and 3 (variance) from Phase 8, and
+ * 4 (carry forward) from Phase 9. Panel 6 (blockers) renders as a **stub
+ * naming the phase that owns it**. That is deliberate and is the same
+ * decision as `not_evaluated` completion checks: a screen missing a step
+ * looks finished, and a PM cannot tell a panel nobody built from a panel with
+ * nothing in it.
  *
  * Two behaviours carry most of the risk here.
  *
@@ -73,6 +77,8 @@ export interface RunScreenData {
   yesterday?: { buckets: BucketedRows[]; previousStandupId?: string; previousStandupDate?: string }
   /** Panel 3. Absent for the same reason. */
   variance?: { rows: VariancePanelRow[]; members: VariancePanelMember[] }
+  /** Panel 4 (Phase 9). Absent for the same reason as Panels 2 and 3. */
+  carryForward?: CarryForwardPanelData
   /** ALO-20/21. Present only on a day-one stand-up. */
   dayOne?: {
     assignedTasks: number
@@ -128,6 +134,14 @@ export interface RunScreenApi {
   reviseEstimate?(row: { allocationId: string; taskId: string }): void
   giveNotStartedReason?(row: { allocationId: string; taskId: string }): void
   viewDebtLedger?(memberId: string): void
+
+  // --- Phase 9 ---------------------------------------------------------------
+  addCarryForwardNote?(input: { itemId: string; text: string }): Promise<void>
+  resolveCarryForwardItem?(input: {
+    itemId: string
+    resolutionType: string
+    comment?: string
+  }): Promise<void>
 }
 
 export interface RunScreenViewer {
@@ -142,12 +156,6 @@ export interface StandupRunScreenProps {
   viewer?: RunScreenViewer
   locale?: string
 }
-
-/** The two panels still unbuilt, and who builds them. */
-const PENDING_PANELS: { id: number; label: () => string; phase: string }[] = [
-  { id: 4, label: standupStrings.run.panel4, phase: 'Phase 9' },
-  { id: 6, label: standupStrings.run.panel6, phase: 'Phase 10' }
-]
 
 export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreenProps) {
   const [board, setBoard] = useState(data)
@@ -409,6 +417,21 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
             )
           : board.shape === 'day_one'
             ? []
+            : undefined,
+        // CC-4. Day one has no register yet either — `[]` says it was asked
+        // and trivially passes, the same convention `variance` uses above.
+        carryForward: board.carryForward
+          ? board.carryForward.items.map(
+              (item): CheckCarryForwardItem => ({
+                itemId: item.itemId,
+                taskKey: item.taskKey,
+                memberId: item.memberId,
+                requiresNoteToday: item.requiresNoteToday,
+                notedToday: item.notedToday
+              })
+            )
+          : board.shape === 'day_one'
+            ? []
             : undefined
       }),
     [board]
@@ -530,10 +553,24 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
         />
       )}
 
-      {!isDayOne &&
-        PENDING_PANELS.filter((panel) => panel.id !== 6).map((panel) => (
-          <PanelStub key={panel.id} id={panel.id} label={panel.label()} phase={panel.phase} />
-        ))}
+      {!isDayOne && board.carryForward && (
+        <CarryForwardPanel
+          data={board.carryForward}
+          api={{
+            async addNote(input) {
+              if (!api.addCarryForwardNote) return
+              await api.addCarryForwardNote(input)
+              await reload()
+            },
+            async resolve(input) {
+              if (!api.resolveCarryForwardItem) return
+              await api.resolveCarryForwardItem(input)
+              await reload()
+            }
+          }}
+          disabled={readOnly}
+        />
+      )}
 
       {/* §15.8.10: on day one the pool takes the primary position and the board
           is secondary but always visible. */}
