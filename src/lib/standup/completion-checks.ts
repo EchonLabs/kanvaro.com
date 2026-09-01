@@ -5,10 +5,10 @@
  * in the spec's table order, and `blockingFailures()` says whether the Complete
  * button may enable.
  *
- * **Phase 7 answers six of the eleven** — CC-1, CC-2, CC-5, CC-6, CC-7, CC-10.
- * The other five need the variance engine (Phase 8), the carry-forward register
- * (Phase 9), blockers and sprint health (Phase 10) and the final-day
- * disposition (Phase 11).
+ * **Seven of the eleven are answered** — CC-1, CC-2, CC-5, CC-6, CC-7, CC-10
+ * from Phase 7, and CC-3 from Phase 8's variance engine. The other four need
+ * the carry-forward register (Phase 9), blockers and sprint health (Phase 10)
+ * and the final-day disposition (Phase 11).
  *
  * They are returned anyway, as `not_evaluated` naming the owning phase. Two
  * reasons. A PM reading Panel 7 must not see a complete-looking list that never
@@ -64,6 +64,27 @@ export interface CheckAllocation {
   pairedDeliberately: boolean
 }
 
+/**
+ * One variance row, as CC-3 needs to see it.
+ *
+ * Declared here rather than imported from `variance-service.ts` on purpose:
+ * that module reads the database, and this one is pure and runs in the browser
+ * alongside the run screen. `VarianceRow` is structurally assignable to this,
+ * so the caller passes its rows straight in — the same arrangement
+ * `CheckAllocation` already has with the board's rows.
+ */
+export interface CheckVarianceRow {
+  allocationId: string
+  taskKey?: string
+  memberId: string
+  /** V5 with nothing left, and every V6 (§12.2). */
+  requiresRevision: boolean
+  /** V7, and V4 where nothing at all was logged. */
+  requiresReason: boolean
+  revisedRemainingMinutes?: Minutes
+  notStartedReason?: string
+}
+
 export interface CheckMember {
   memberId: string
   name?: string
@@ -76,17 +97,20 @@ export interface CheckMember {
 export interface EvaluateCompletionChecksInput {
   shape: 'day_one' | 'mid_sprint' | 'final_day'
   members: CheckMember[]
+  /**
+   * Yesterday's classified rows (Phase 8).
+   *
+   * **Absent is not the same as empty.** A caller that forgot to load the
+   * variance leaves CC-3 `not_evaluated` rather than passing it: telling a PM
+   * the day is clean because nobody asked the question is the failure this
+   * whole check exists to prevent.
+   */
+  variance?: CheckVarianceRow[]
 }
 
-/** The five checks Phase 7 cannot answer, and who will. */
+/** The four checks still unanswerable, and who will answer them. */
 const DEFERRED: Record<string, { phase: string; hard: boolean; overridable: boolean; what: string }> =
   {
-    'CC-3': {
-      phase: 'Phase 8',
-      hard: true,
-      overridable: true,
-      what: 'Revised remaining estimates need the variance engine.'
-    },
     'CC-4': {
       phase: 'Phase 9',
       hard: true,
@@ -134,7 +158,7 @@ export function evaluateCompletionChecks(
   return [
     cc1(members),
     cc2(liveRows),
-    deferred('CC-3'),
+    cc3(input.variance, input.shape),
     deferred('CC-4'),
     cc5(liveRows),
     cc6(members),
@@ -158,6 +182,72 @@ export function blockingFailures(
 ): CompletionCheckResult[] {
   return results.filter((result) => result.hard && result.status === 'fail')
 }
+
+/* --- the seven answerable checks ----------------------------------------- */
+
+/**
+ * CC-3. Every row the variance engine flagged has been answered.
+ *
+ * Two questions, one check: a revised remaining estimate where §12.2 demands
+ * one (V5 with nothing left, and every V6), and a reason where planned time did
+ * not happen (V7). Hard and overridable — a PM may complete without an answer,
+ * but only deliberately, through Phase 10's override, never by accident.
+ *
+ * A day-one stand-up passes trivially: there is no yesterday to explain.
+ */
+function cc3(
+  variance: readonly CheckVarianceRow[] | undefined,
+  shape: EvaluateCompletionChecksInput['shape']
+): CompletionCheckResult {
+  const base = { checkId: 'CC-3' as const, hard: true, overridable: true }
+
+  if (variance === undefined) {
+    return {
+      ...base,
+      status: 'not_evaluated',
+      message: 'Yesterday\u2019s variance was not loaded, so this could not be checked.',
+      entities: [],
+      ownedBy: 'Phase 8'
+    }
+  }
+
+  if (shape === 'day_one') {
+    return {
+      ...base,
+      status: 'pass',
+      message: 'Day one has no previous stand-up to explain.',
+      entities: []
+    }
+  }
+
+  const needingRevision = variance.filter(
+    (row) => row.requiresRevision && row.revisedRemainingMinutes === undefined
+  )
+  const needingReason = variance.filter(
+    (row) => row.requiresReason && !(row.notStartedReason ?? '').trim()
+  )
+  const offenders = [
+    ...needingRevision.map((row) => ({ ...identity(row), needs: 'revision' as const })),
+    ...needingReason.map((row) => ({ ...identity(row), needs: 'reason' as const }))
+  ]
+
+  return {
+    ...base,
+    status: offenders.length ? 'fail' : 'pass',
+    message: offenders.length
+      ? `${count(offenders.length, 'row')} from yesterday still ${
+          offenders.length === 1 ? 'needs an answer' : 'need answers'
+        }.`
+      : 'Yesterday\u2019s overruns and unstarted work are all explained.',
+    entities: offenders
+  }
+}
+
+const identity = (row: CheckVarianceRow) => ({
+  allocationId: row.allocationId,
+  taskKey: row.taskKey,
+  memberId: row.memberId
+})
 
 /* --- the six Phase 7 checks ---------------------------------------------- */
 

@@ -26,6 +26,7 @@ import { Standup } from '@/models/Standup'
 
 import type { IsoDate } from './calendar-dates'
 import { loadCalendarContext } from './calendar-service'
+import { loadDebtPositions } from './debt-position'
 import {
   computeCapacity,
   selectCapacityAsOf,
@@ -55,7 +56,13 @@ export interface ComputeForOptions {
    */
   attendance?: AttendanceStatus
   attendancePartialMinutes?: Minutes
-  /** Phase 8 supplies this from the ledger. Zero until then. */
+  /**
+   * Overrides the debt the context loaded for this member.
+   *
+   * The context supplies the real position by default (VAR-6); this is for a
+   * caller previewing what a different balance would do — the settlement
+   * sizing at completion, for instance.
+   */
   outstandingDebtMinutes?: Minutes
 }
 
@@ -92,10 +99,15 @@ export async function loadCapacityContext(
   const projectId = standup.project.toString()
   const date: IsoDate = standup.standupDate
 
-  const [settings, capacities, calendar] = await Promise.all([
+  const [settings, capacities, calendar, debtPositions] = await Promise.all([
     ProjectStandupSettings.findOne({ project: projectId }).lean() as Promise<any>,
     MemberCapacity.find({ project: projectId }).lean() as Promise<any[]>,
-    loadCalendarContext(projectId, date, date)
+    loadCalendarContext(projectId, date, date),
+    // AC-15 / AC-16: the debt a member carries *today*, which includes
+    // yesterday's overrun before yesterday has been formally classified.
+    // `debt-position.ts` imports no capacity module, so this direction of the
+    // dependency is the only one that does not form a cycle.
+    loadDebtPositions(standupId)
   ])
 
   const resolution = resolveWorkingDayFrom(date, calendar)
@@ -175,7 +187,10 @@ export async function loadCapacityContext(
         nonProjectCommitments: record?.nonProjectCommitments ?? [],
         ceremonies: (ceremonyPlan?.deductions.get(memberId) ?? []) as CeremonyDeduction[],
         observedOptionalHolidayIds: (record?.observedOptionalHolidayIds ?? []).map(String),
-        outstandingDebtMinutes: options.outstandingDebtMinutes ?? ZERO_MINUTES,
+        outstandingDebtMinutes:
+          options.outstandingDebtMinutes ??
+          debtPositions.get(memberId)?.outstandingMinutes ??
+          ZERO_MINUTES,
         allocatedMinutes: options.allocatedMinutes ?? ZERO_MINUTES,
         detachedMinutes: options.detachedMinutes ?? ZERO_MINUTES,
         overrunPolicy: settings?.overrunPolicy,

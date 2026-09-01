@@ -189,6 +189,16 @@ describe('createAllocation', () => {
     expect(result.capacity.status).toBe('under')
   })
 
+  it('stamps the task status the allocation was made against (Phase 8, V7 vs V12)', async () => {
+    // The classifier has to tell "planned, untouched, status unchanged" (V7,
+    // reason required) from "no time logged but the task moved anyway" (V12,
+    // a warning). Nothing else records what the status was when the PM planned
+    // the day, and reading it back later would answer with today's value.
+    const result = await create({ plannedMinutes: minutes(180) })
+    const stored = await Allocation.findById(result.allocation._id).lean()
+    expect(stored!.taskStatusAtAllocation).toBe('in_progress')
+  })
+
   it('moves a member from zero to full as the day fills', async () => {
     const first = await create({ plannedMinutes: minutes(420) })
     expect(first.capacity.status).toBe('under')

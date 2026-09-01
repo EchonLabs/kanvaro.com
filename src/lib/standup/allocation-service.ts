@@ -177,6 +177,8 @@ export async function createAllocation(
       source: input.selfSelect ? 'self_selected' : input.source ?? 'assigned_in_standup',
       note: input.note,
       pairedDeliberately: input.pairedDeliberately ?? false,
+      // Phase 8 reads this to separate V7 from V12; only this moment knows it.
+      taskStatusAtAllocation: task.status,
       carriedFromAllocation: input.carriedFromAllocationId,
       carryChainRoot: input.carryChainRootId,
       ...(topUpReason

@@ -81,6 +81,34 @@ export interface IAllocation extends Document {
   pairedDeliberately: boolean
   note?: string
 
+  /**
+   * The PM's answers to the two questions the stand-up asks about this row,
+   * recorded live and frozen onto the `AllocationVariance` at completion.
+   *
+   * They live here rather than only on the variance record because the PM
+   * answers them *during* the stand-up, hours before classification persists
+   * anything — and CC-3 will not let the day complete until they exist.
+   * `revisedRemainingMinutes` mirrors what the revision wrote to the task
+   * (VAR-16); the task keeps the authoritative value and its revision history.
+   */
+  revisedRemainingMinutes?: number
+  revisionReason?: string
+  revisionDetail?: string
+  /** V7 / V4 — why planned time did not happen (§12.2, AC-18). */
+  notStartedReason?: string
+
+  /**
+   * The task's status when this allocation was made.
+   *
+   * Phase 8's classifier needs it to tell V7 from V12: a row with zero logged
+   * hours whose status never moved is `not_started` and the PM owes a reason,
+   * while one whose status advanced anyway is `no_time_logged_but_progressed`
+   * — a warning that accrues no debt until real hours are entered. Nothing
+   * else records it, and reading the task later answers with today's status,
+   * not the status the day was planned against.
+   */
+  taskStatusAtAllocation?: string
+
   /** Set at stand-up completion (RUN-20 step 2). A frozen row is history. */
   frozenAt?: Date
 
@@ -129,6 +157,23 @@ const AllocationSchema = new Schema<IAllocation>(
 
     pairedDeliberately: { type: Boolean, default: false },
     note: { type: String, trim: true, maxlength: 1000 },
+
+    /** Phase 8 — the PM's live answers, before completion freezes them. */
+    revisedRemainingMinutes: {
+      type: Number,
+      min: 0,
+      validate: {
+        validator: (value: number) =>
+          value === undefined || value === null || Number.isInteger(value),
+        message: 'revisedRemainingMinutes must be a whole number of minutes'
+      }
+    },
+    revisionReason: { type: String, trim: true, maxlength: 100 },
+    revisionDetail: { type: String, trim: true, maxlength: 1000 },
+    notStartedReason: { type: String, trim: true, maxlength: 500 },
+
+    /** Phase 8, V7 vs V12. Optional: rows written before Phase 8 have none. */
+    taskStatusAtAllocation: { type: String, trim: true },
 
     frozenAt: { type: Date },
 

@@ -74,6 +74,14 @@ export interface ITask extends Document {
     standup?: mongoose.Types.ObjectId
   }>
   totalLoggedMinutes?: number
+  /**
+   * D-D. The member whose allocation carries this task's *task-scope*
+   * variance and its ledger accrual. Everybody who works the task owns their
+   * own day variance; only the owner owns the task's overrun, or a shared task
+   * accrues its estimate debt twice. Unset until somebody chooses, at which
+   * point `resolveStandupOwner()` falls back to `assignedTo[0]`.
+   */
+  standupOwner?: mongoose.Types.ObjectId
   standupSpillCount?: number
   lastAllocatedStandup?: mongoose.Types.ObjectId
   descopedAt?: Date
@@ -359,6 +367,20 @@ const TaskSchema = new Schema<ITask>({
     type: Number,
     default: 0,
     min: 0
+  },
+  /**
+   * D-D. Whose allocation carries this task's task-scope variance.
+   *
+   * Deliberately without a schema default. A default would have to read
+   * `assignedTo` at creation, which silently picks a winner out of an array
+   * whose order nothing promises — and would leave every task written before
+   * this field existed with no owner anyway. `resolveStandupOwner()` in
+   * `lib/standup/task-ownership.ts` decides at read time instead, and this
+   * field records a real choice when somebody makes one.
+   */
+  standupOwner: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
   },
   /** How many stand-ups this task has carried across (VAR-14 chronic spill). */
   standupSpillCount: {

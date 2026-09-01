@@ -3,10 +3,10 @@
  *
  *   GET /api/standups/:id/checks
  *
- * Panel 7 reads this. It returns all eleven checks — the six Phase 7 can answer
- * and the five that report `not_evaluated` naming their owning phase — plus the
- * blocking subset, so the Complete button's disabled state and its tooltip come
- * from the server rather than being re-derived in the browser.
+ * Panel 7 reads this. It returns all eleven checks — the seven that can be
+ * answered and the four that report `not_evaluated` naming their owning phase —
+ * plus the blocking subset, so the Complete button's disabled state and its
+ * tooltip come from the server rather than being re-derived in the browser.
  *
  * Read-only, and gated on `standup:view`: knowing what stands between the team
  * and a completed stand-up is not a privileged act. Actually completing it is
@@ -21,6 +21,7 @@ import {
   type CheckMember
 } from '@/lib/standup/completion-checks'
 import { minutes } from '@/lib/standup/minutes'
+import { loadVariancePanel } from '@/lib/standup/variance-service'
 import { Task } from '@/models/Task'
 import { ok, withStandupIdPermission } from '@/lib/standup/route-helpers'
 
@@ -67,7 +68,16 @@ export const GET = withStandupIdPermission(
       })
     }))
 
-    const checks = evaluateCompletionChecks({ shape: board.shape as any, members })
+    // CC-3 asks whether yesterday has been explained, so it needs yesterday.
+    // Passing the rows rather than omitting them is what separates "explained"
+    // from "nobody looked".
+    const variance = await loadVariancePanel(standupId)
+
+    const checks = evaluateCompletionChecks({
+      shape: board.shape as any,
+      members,
+      variance: variance.rows
+    })
 
     return ok({
       standupId,

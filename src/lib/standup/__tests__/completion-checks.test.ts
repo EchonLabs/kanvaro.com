@@ -109,11 +109,109 @@ describe('evaluateCompletionChecks', () => {
     }
   })
 
-  describe('the five checks Phase 7 cannot answer', () => {
+  describe('CC-3 — yesterday has been explained (Phase 8)', () => {
+    const varianceRow = (overrides: Record<string, unknown> = {}) => ({
+      allocationId: 'alloc-1',
+      taskKey: 'KAN-214',
+      memberId: 'kasun',
+      requiresRevision: false,
+      requiresReason: false,
+      ...overrides
+    })
+
+    it('fails when an over-consumed row has no revised estimate (AC-13)', () => {
+      const result = check(
+        evaluateCompletionChecks({
+          ...healthy(),
+          variance: [varianceRow({ requiresRevision: true })]
+        }),
+        'CC-3'
+      )
+      expect(result.status).toBe('fail')
+      expect(result.hard).toBe(true)
+      expect(result.entities[0]).toMatchObject({ needs: 'revision', taskKey: 'KAN-214' })
+    })
+
+    it('fails when a not-started row has no reason (AC-18)', () => {
+      const result = check(
+        evaluateCompletionChecks({
+          ...healthy(),
+          variance: [varianceRow({ requiresReason: true, taskKey: 'KAN-231' })]
+        }),
+        'CC-3'
+      )
+      expect(result.status).toBe('fail')
+      expect(result.entities[0]).toMatchObject({ needs: 'reason', taskKey: 'KAN-231' })
+    })
+
+    it('passes once every row is answered', () => {
+      const result = check(
+        evaluateCompletionChecks({
+          ...healthy(),
+          variance: [
+            varianceRow({ requiresRevision: true, revisedRemainingMinutes: minutes(180) }),
+            varianceRow({
+              requiresReason: true,
+              notStartedReason: 'Kasun stayed on the invoice model all day.'
+            })
+          ]
+        }),
+        'CC-3'
+      )
+      expect(result.status).toBe('pass')
+    })
+
+    it('does not accept a blank reason as an answer', () => {
+      const result = check(
+        evaluateCompletionChecks({
+          ...healthy(),
+          variance: [varianceRow({ requiresReason: true, notStartedReason: '   ' })]
+        }),
+        'CC-3'
+      )
+      expect(result.status).toBe('fail')
+    })
+
+    it('passes when there is nothing to explain', () => {
+      expect(check(evaluateCompletionChecks({ ...healthy(), variance: [] }), 'CC-3').status).toBe(
+        'pass'
+      )
+    })
+
+    it('leaves CC-3 not_evaluated when no variance was supplied at all', () => {
+      // Absent is not empty: a caller that forgot to load yesterday must not be
+      // told the day is clean.
+      const result = check(evaluateCompletionChecks(healthy()), 'CC-3')
+      expect(result.status).toBe('not_evaluated')
+      expect(result.ownedBy).toBe('Phase 8')
+    })
+
+    it('passes on a day-one stand-up, which has no yesterday', () => {
+      const result = check(
+        evaluateCompletionChecks({
+          ...healthy(),
+          shape: 'day_one',
+          variance: [varianceRow({ requiresRevision: true })]
+        }),
+        'CC-3'
+      )
+      expect(result.status).toBe('pass')
+    })
+
+    it('blocks completion when it fails', () => {
+      const results = evaluateCompletionChecks({
+        ...healthy(),
+        variance: [varianceRow({ requiresRevision: true })]
+      })
+      expect(blockingFailures(results).map((row) => row.checkId)).toContain('CC-3')
+    })
+  })
+
+  describe('the four checks still unanswerable', () => {
     it('reports them as not_evaluated, never as passing', () => {
       const results = evaluateCompletionChecks(healthy())
 
-      for (const id of ['CC-3', 'CC-4', 'CC-8', 'CC-9', 'CC-11']) {
+      for (const id of ['CC-4', 'CC-8', 'CC-9', 'CC-11']) {
         expect(check(results, id).status).toBe('not_evaluated')
       }
     })
@@ -121,7 +219,6 @@ describe('evaluateCompletionChecks', () => {
     it('names the phase that will implement each one', () => {
       const results = evaluateCompletionChecks(healthy())
 
-      expect(check(results, 'CC-3').ownedBy).toBe('Phase 8')
       expect(check(results, 'CC-4').ownedBy).toBe('Phase 9')
       expect(check(results, 'CC-8').ownedBy).toBe('Phase 11')
       expect(check(results, 'CC-9').ownedBy).toBe('Phase 10')

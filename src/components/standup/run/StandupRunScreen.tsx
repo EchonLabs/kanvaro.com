@@ -4,10 +4,13 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { QuickAddTask } from '@/components/standup/primitives/QuickAddCombobox'
 import { AttendancePanel, type ReassignPromptView } from './AttendancePanel'
+import { VariancePanel, type VariancePanelMember, type VariancePanelRow } from './VariancePanel'
+import { YesterdayPanel, type YesterdayPanelApi } from './YesterdayPanel'
 import { CapacityBoard, type BoardAllocationView } from './CapacityBoard'
 import { CompletionPanel } from './CompletionPanel'
 import { UnassignedPool } from './UnassignedPool'
 import type { PoolTask } from '@/lib/standup/allocation'
+import type { BucketedRows } from '@/lib/standup/yesterday'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
 import {
   blockingFailures,
@@ -20,9 +23,9 @@ import { standupStrings } from '@/lib/standup/strings'
 /**
  * The stand-up run screen (§15.8) — "the screen the module lives or dies on".
  *
- * Phase 7 builds three of its seven panels: 1 (attendance), 5 (allocation) and
- * 7 (completion). The other four render as **stubs naming the phase that owns
- * them**. That is deliberate and is the same decision as `not_evaluated`
+ * Five of its seven panels are built: 1 (attendance), 2 (yesterday) and
+ * 3 (variance) from Phase 8, 5 (allocation) and 7 (completion). The other two
+ * render as **stubs naming the phase that owns them**. That is deliberate and is the same decision as `not_evaluated`
  * completion checks: a screen missing three of its seven steps looks finished,
  * and a PM cannot tell a panel nobody built from a panel with nothing in it.
  *
@@ -65,6 +68,10 @@ export interface RunScreenData {
   members: RunScreenMember[]
   pool: { unassigned: PoolTask[]; assignedNotPlanned: PoolTask[] }
   poolTotal: number
+  /** Panel 2. Absent on a day-one stand-up, which has no yesterday. */
+  yesterday?: { buckets: BucketedRows[]; previousStandupId?: string; previousStandupDate?: string }
+  /** Panel 3. Absent for the same reason. */
+  variance?: { rows: VariancePanelRow[]; members: VariancePanelMember[] }
   /** ALO-20/21. Present only on a day-one stand-up. */
   dayOne?: {
     assignedTasks: number
@@ -103,6 +110,23 @@ export interface RunScreenApi {
     expectedVersion: number
   }): Promise<{ standupVersion: number }>
   refresh(): Promise<RunScreenData>
+
+  // --- Phase 8 -------------------------------------------------------------
+  // Optional so a caller that has not wired Panels 2 and 3 yet still compiles;
+  // the panels only render when their data is present anyway.
+  /** RUN-10 — change a task's status from yesterday's row, on somebody's behalf. */
+  setYesterdayStatus?(input: {
+    taskIds: string[]
+    status: string
+    onBehalfOf?: string
+    expectedVersion: number
+  }): Promise<{ standupVersion: number }>
+  /** RUN-13 — clear the completed bucket in one action. */
+  confirmCompleted?(input: { taskIds: string[]; expectedVersion: number }): Promise<void>
+  openTask?(taskId: string): void
+  reviseEstimate?(row: { allocationId: string; taskId: string }): void
+  giveNotStartedReason?(row: { allocationId: string; taskId: string }): void
+  viewDebtLedger?(memberId: string): void
 }
 
 export interface RunScreenViewer {
@@ -118,10 +142,8 @@ export interface StandupRunScreenProps {
   locale?: string
 }
 
-/** The four panels Phase 7 does not build, and who does. */
+/** The two panels still unbuilt, and who builds them. */
 const PENDING_PANELS: { id: number; label: () => string; phase: string }[] = [
-  { id: 2, label: standupStrings.run.panel2, phase: 'Phase 8' },
-  { id: 3, label: standupStrings.run.panel3, phase: 'Phase 8' },
   { id: 4, label: standupStrings.run.panel4, phase: 'Phase 9' },
   { id: 6, label: standupStrings.run.panel6, phase: 'Phase 10' }
 ]
@@ -265,6 +287,38 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
         setNotice(standupStrings.run.editRejected())
       }
     },
+    [api, reload]
+  )
+
+  /**
+   * Panel 2's actions, adapted to the run screen's version-carrying API.
+   *
+   * The panel owns the optimistic rollback (RUN-25); this only has to reject so
+   * it has something to roll back to, and reload afterwards so the version and
+   * the variance rows move together.
+   */
+  const yesterdayApi: YesterdayPanelApi = useMemo(
+    () => ({
+      async setStatus(input) {
+        if (!api.setYesterdayStatus) throw new Error('Not wired')
+        const result = await api.setYesterdayStatus({
+          ...input,
+          expectedVersion: versionRef.current
+        })
+        versionRef.current = result.standupVersion
+        await reload()
+      },
+      async confirmCompleted(input) {
+        await api.confirmCompleted?.({ ...input, expectedVersion: versionRef.current })
+        await reload()
+      },
+      openTask(taskId) {
+        api.openTask?.(taskId)
+      },
+      reviseEstimate(row) {
+        api.reviseEstimate?.({ allocationId: row.allocationId ?? '', taskId: row.taskId })
+      }
+    }),
     [api, reload]
   )
 
@@ -435,6 +489,28 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
         disabled={readOnly}
         locale={locale}
       />
+
+      {/* Panels 2 and 3 explain yesterday, so day one — which has no
+          yesterday — shows neither (§15.8.10). */}
+      {!isDayOne && board.yesterday && (
+        <YesterdayPanel
+          data={board.yesterday}
+          api={yesterdayApi}
+          disabled={readOnly}
+          locale={locale}
+        />
+      )}
+
+      {!isDayOne && board.variance && (
+        <VariancePanel
+          data={board.variance}
+          onRevise={(row) => api.reviseEstimate?.(row)}
+          onGiveReason={(row) => api.giveNotStartedReason?.(row)}
+          onViewLedger={(memberId) => api.viewDebtLedger?.(memberId)}
+          disabled={readOnly}
+          locale={locale}
+        />
+      )}
 
       {!isDayOne &&
         PENDING_PANELS.filter((panel) => panel.id !== 6).map((panel) => (
