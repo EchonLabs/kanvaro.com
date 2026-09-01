@@ -15,7 +15,8 @@ import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity
 import {
   blockingFailures,
   evaluateCompletionChecks,
-  type CheckMember
+  type CheckMember,
+  type CheckVarianceRow
 } from '@/lib/standup/completion-checks'
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
@@ -391,7 +392,24 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
               pairedDeliberately: row.pairedDeliberately
             }))
           })
-        )
+        ),
+        // Day one has no yesterday to load: `[]` says CC-3 was asked and passes
+        // trivially, where `undefined` would say nobody asked (not_evaluated).
+        variance: board.variance
+          ? board.variance.rows.map(
+              (row): CheckVarianceRow => ({
+                allocationId: row.allocationId,
+                taskKey: row.taskKey,
+                memberId: row.memberId,
+                requiresRevision: row.requiresRevision,
+                requiresReason: row.requiresReason,
+                revisedRemainingMinutes: row.revisedRemainingMinutes,
+                notStartedReason: row.notStartedReason
+              })
+            )
+          : board.shape === 'day_one'
+            ? []
+            : undefined
       }),
     [board]
   )

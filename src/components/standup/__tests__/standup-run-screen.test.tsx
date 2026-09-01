@@ -406,6 +406,48 @@ describe('Panel 7 — completion (§15.8.9)', () => {
     ).toBeInTheDocument()
   })
 
+  it('evaluates CC-3 from Panel 3’s own variance data, not a stub', () => {
+    renderScreen({
+      variance: {
+        rows: [
+          {
+            allocationId: 'a1',
+            taskId: 't1',
+            taskKey: 'KAN-214',
+            title: 'Invoice model',
+            memberId: 'kasun',
+            memberName: 'Kasun',
+            outcome: 'open_over_consumed',
+            plannedMinutes: m(480),
+            loggedMinutesOnDay: m(540),
+            dayVarianceMinutes: m(60),
+            originalEstimateMinutes: m(480),
+            totalLoggedMinutesOnTask: m(540),
+            taskVarianceMinutes: m(60),
+            requiresRevision: true,
+            requiresReason: false,
+            spillChainLength: 0,
+            chronicSpill: false,
+            explanation: 'Ran over today’s plan.'
+          }
+        ],
+        members: []
+      }
+    })
+
+    const button = screen.getByRole('button', { name: standupStrings.run.complete() })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAccessibleDescription(/still needs an answer/)
+  })
+
+  it('passes CC-3 trivially on a day-one stand-up with no yesterday to load', () => {
+    renderScreen({ shape: 'day_one' })
+
+    expect(
+      screen.queryByText(standupStrings.run.checkNotEvaluated({ phase: 'Phase 8' }))
+    ).not.toBeInTheDocument()
+  })
+
   it('enables Complete when nothing blocks', () => {
     renderScreen()
 
