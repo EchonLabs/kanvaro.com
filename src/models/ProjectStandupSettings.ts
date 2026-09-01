@@ -5,8 +5,8 @@ import mongoose, { Schema, Document } from 'mongoose'
  * in two places — the field validator for `save()`, the pre-hook for updates —
  * and both need the same fallbacks when a document has not been created yet.
  */
-const DEFAULT_NOTE_THRESHOLD = 3
-const DEFAULT_ESCALATION_THRESHOLD = 5
+export const DEFAULT_NOTE_THRESHOLD = 3
+export const DEFAULT_ESCALATION_THRESHOLD = 5
 
 const CARRY_FORWARD_THRESHOLD_MESSAGE =
   'Escalation threshold must exceed the note threshold'
