@@ -725,24 +725,3 @@ function JumpLink({ id, label }: { id: number; label: string }) {
     </a>
   )
 }
-
-/**
- * A panel a later phase will build.
- *
- * Rendered rather than omitted so the seven-step run reads as seven steps, and
- * so an unbuilt panel is visibly different from an empty one.
- */
-function PanelStub({ id, label, phase }: { id: number; label: string; phase: string }) {
-  return (
-    <section
-      id={`panel-${id}`}
-      data-testid="panel-stub"
-      className="rounded-md border border-dashed border-border p-3"
-    >
-      <h3 className="text-sm font-semibold text-muted-foreground">{label}</h3>
-      <p className="text-xs text-muted-foreground">
-        {standupStrings.run.panelPending({ phase })}
-      </p>
-    </section>
-  )
-}

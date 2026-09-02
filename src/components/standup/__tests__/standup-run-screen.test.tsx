@@ -191,25 +191,12 @@ describe('the jump bar and the shapes (§15.8.10)', () => {
 })
 
 describe('the panel nobody has built yet', () => {
-  it('renders it as a stub naming its phase, rather than omitting it', () => {
+  it('no longer renders any panel as a stub — Phase 10 built the last one', () => {
     renderScreen()
 
     // A screen missing a step looks finished unless the gap announces
-    // itself. Only blockers (Phase 10) remain after Phase 9.
-    const stubs = screen.getAllByTestId('panel-stub')
-    expect(stubs).toHaveLength(1)
-    expect(stubs[0]).toHaveTextContent(/arrives in Phase/)
-  })
-
-  it('no longer stubs the three panels Phase 8 and 9 built', () => {
-    renderScreen()
-    const stubbed = screen
-      .getAllByTestId('panel-stub')
-      .map((node) => node.textContent ?? '')
-      .join(' ')
-    expect(stubbed).not.toContain(standupStrings.run.panel2())
-    expect(stubbed).not.toContain(standupStrings.run.panel3())
-    expect(stubbed).not.toContain(standupStrings.run.panel4())
+    // itself. All seven panels are now built, so no stub should remain.
+    expect(screen.queryAllByTestId('panel-stub')).toHaveLength(0)
   })
 })
 
