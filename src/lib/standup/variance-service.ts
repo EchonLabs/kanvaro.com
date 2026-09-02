@@ -23,6 +23,9 @@
  * the debt position *including* today's accruals — that is the debt the board
  * showed and the debt the reduce policy took out of today's capacity.
  */
+import { Types } from 'mongoose'
+
+import { Allocation } from '@/models/Allocation'
 import { AllocationVariance } from '@/models/AllocationVariance'
 import { EstimateDebtLedger, type LedgerEntryType } from '@/models/EstimateDebtLedger'
 import { User } from '@/models/User'
@@ -99,12 +102,13 @@ export async function loadVariancePanel(standupId: string): Promise<VariancePane
   const assembled = await assembleClassifyInputs(standupId)
   const computations = classifyAll(assembled.inputs)
 
-  const [positions, persistedRows, names] = await Promise.all([
+  const [positions, persistedRows, names, spillChainLengths] = await Promise.all([
     loadDebtPositions(standupId),
     AllocationVariance.find({
       allocation: { $in: assembled.inputs.map((row) => row.allocationId) }
     }).lean() as Promise<any[]>,
-    resolveNames(assembled)
+    resolveNames(assembled),
+    computeSpillChainLengths(computations, assembled)
   ])
 
   const persistedByAllocation = new Map(
@@ -117,7 +121,7 @@ export async function loadVariancePanel(standupId: string): Promise<VariancePane
     const task = assembled.context.taskById.get(input.taskId)
     const persistedRow = persistedByAllocation.get(computed.allocationId)
 
-    const spillChainLength = spillLengthOf(task, allocation)
+    const spillChainLength = spillChainLengths.get(computed.allocationId) ?? 1
 
     const rawRevision =
       allocation?.revisedRemainingMinutes ?? persistedRow?.revisedRemainingMinutes
@@ -194,6 +198,12 @@ export async function classifyAndPost(input: {
 
   let entriesPosted = 0
   let skipped = 0
+  const postedByMember = new Map<string, { entryType: LedgerEntryType; minutes: number; allocationId?: string }[]>()
+  const recordPosted = (memberId: string, entryType: LedgerEntryType, entryMinutes: number, allocationId?: string) => {
+    const list = postedByMember.get(memberId) ?? []
+    list.push({ entryType, minutes: entryMinutes, ...(allocationId ? { allocationId } : {}) })
+    postedByMember.set(memberId, list)
+  }
 
   // 1 — accruals and credits, keyed by (allocation, entryType).
   for (const computed of computations) {
@@ -206,7 +216,12 @@ export async function classifyAndPost(input: {
         minutes: computed.overrunMinutes,
         sourceAllocation: computed.allocationId
       })
-      posted ? (entriesPosted += 1) : (skipped += 1)
+      if (posted) {
+        entriesPosted += 1
+        recordPosted(row.memberId, 'accrual', computed.overrunMinutes, computed.allocationId)
+      } else {
+        skipped += 1
+      }
     }
     if (computed.creditMinutes > 0) {
       const posted = await postEntry({
@@ -216,7 +231,12 @@ export async function classifyAndPost(input: {
         minutes: computed.creditMinutes,
         sourceAllocation: computed.allocationId
       })
-      posted ? (entriesPosted += 1) : (skipped += 1)
+      if (posted) {
+        entriesPosted += 1
+        recordPosted(row.memberId, 'credit', computed.creditMinutes, computed.allocationId)
+      } else {
+        skipped += 1
+      }
     }
   }
 
@@ -246,7 +266,12 @@ export async function classifyAndPost(input: {
       entryType: 'settlement',
       minutes: settle
     })
-    posted ? (entriesPosted += 1) : (skipped += 1)
+    if (posted) {
+      entriesPosted += 1
+      recordPosted(memberId, 'settlement', settle)
+    } else {
+      skipped += 1
+    }
   }
 
   // 3 — the variance rows themselves.
@@ -276,21 +301,27 @@ export async function classifyAndPost(input: {
     )
   )
 
-  await recordAudit({
-    actor: userActor(input.actor),
-    organizationId: String(standup.organization),
-    projectId: String(standup.project),
-    action: 'variance_computed',
-    entityType: 'standup',
-    entityId: String(standup._id),
-    before: null,
-    after: { classified, entriesPosted, skipped },
-    context: {
-      standupId: String(standup._id),
-      previousStandupId: assembled.previousStandupId,
-      date: standup.standupDate
-    }
-  })
+  // 5 — one audit entry per member, naming the entries posted for them.
+  await Promise.all(
+    Array.from(postedByMember.entries()).map(([memberId, entries]) =>
+      recordAudit({
+        actor: userActor(input.actor),
+        organizationId: String(standup.organization),
+        projectId: String(standup.project),
+        action: 'variance_computed',
+        entityType: 'standup',
+        entityId: String(standup._id),
+        before: null,
+        after: { entries },
+        context: {
+          standupId: String(standup._id),
+          previousStandupId: assembled.previousStandupId,
+          date: standup.standupDate,
+          memberId
+        }
+      })
+    )
+  )
 
   return { classified, entriesPosted, skipped }
 }
@@ -524,15 +555,62 @@ async function resolveNames(assembled: AssembledInputs): Promise<Map<string, str
 }
 
 /**
- * VAR-14's chain length. `Task.standupSpillCount` is maintained by Phase 9's
- * register; until that exists the carry chain on the allocation is the honest
- * answer, and one allocation with no chain is a chain of one.
+ * VAR-14's chain length, batched for every row on the panel in one query.
+ *
+ * `Task.standupSpillCount` is maintained by Phase 9's register; until it is
+ * set the carry chain on the allocation is the honest answer. A chain's root
+ * allocation carries no `carryChainRoot` of its own (it *is* the root), and
+ * every allocation carried forward from it stores that same root id (never a
+ * pointer to the previous link — see `prefill.ts`), so the chain's length is
+ * "how many allocations, across every stand-up, point at this root, plus the
+ * root itself" — one aggregate grouped by the effective root answers that for
+ * every row on the panel at once. An allocation with no chain is a chain of
+ * one.
  */
-function spillLengthOf(task: any, allocation: any): number {
-  if (Number.isInteger(task?.standupSpillCount) && task.standupSpillCount > 0) {
-    return task.standupSpillCount
+async function computeSpillChainLengths(
+  computations: VarianceComputation[],
+  assembled: AssembledInputs
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>()
+  const rootIds = new Set<string>()
+
+  for (const computed of computations) {
+    const input = inputFor(assembled, computed.allocationId)
+    const task = assembled.context.taskById.get(input.taskId)
+    if (Number.isInteger(task?.standupSpillCount) && task.standupSpillCount > 0) {
+      result.set(computed.allocationId, task.standupSpillCount)
+      continue
+    }
+    const allocation = assembled.context.allocationById.get(computed.allocationId)
+    const rootId = allocation?.carryChainRoot ? String(allocation.carryChainRoot) : undefined
+    if (rootId) rootIds.add(rootId)
   }
-  return allocation?.carryChainRoot ? 2 : 1
+
+  if (rootIds.size > 0) {
+    const rootObjectIds = Array.from(rootIds).map((id) => new Types.ObjectId(id))
+    const counts = (await Allocation.aggregate([
+      {
+        $match: {
+          $or: [{ _id: { $in: rootObjectIds } }, { carryChainRoot: { $in: rootObjectIds } }]
+        }
+      },
+      { $group: { _id: { $ifNull: ['$carryChainRoot', '$_id'] }, count: { $sum: 1 } } }
+    ])) as { _id: unknown; count: number }[]
+    const countByRoot = new Map(counts.map((row) => [String(row._id), row.count]))
+
+    for (const computed of computations) {
+      if (result.has(computed.allocationId)) continue
+      const allocation = assembled.context.allocationById.get(computed.allocationId)
+      const rootId = allocation?.carryChainRoot ? String(allocation.carryChainRoot) : undefined
+      result.set(computed.allocationId, rootId ? (countByRoot.get(rootId) ?? 2) : 1)
+    }
+  }
+
+  for (const computed of computations) {
+    if (!result.has(computed.allocationId)) result.set(computed.allocationId, 1)
+  }
+
+  return result
 }
 
 /** §15.8.5's sentence, per outcome. All copy comes from the catalogue (NFR-19). */

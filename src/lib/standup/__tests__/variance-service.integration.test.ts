@@ -17,6 +17,8 @@
  * Everything writes through the service. Nothing asserts against a row the
  * test itself planted.
  */
+import mongoose from 'mongoose'
+
 import { AllocationVariance } from '@/models/AllocationVariance'
 import { Allocation } from '@/models/Allocation'
 import { EstimateDebtLedger } from '@/models/EstimateDebtLedger'
@@ -119,6 +121,52 @@ describe('loadVariancePanel — the provisional view (AC-13)', () => {
     )
     expect(panel.members.find((row) => row.needingRevision > 0)!.needingRevision).toBe(1)
   })
+
+  it('counts the full carry-forward chain rather than a flat two (VAR-14, E41)', async () => {
+    const { day4, allocations, sprintId, projectId, organizationId, kasunId, kan214, pmId } =
+      await seedWorkedExample()
+
+    // A five-stand-up chain: the root plus three earlier carried links plus
+    // day 3's own allocation, which is what `loadVariancePanel(day4)` classifies.
+    // The earlier links belong to stand-ups this fixture never seeds — only
+    // their id needs to exist for the unique (standup, member, task) index.
+    const root = await Allocation.create({
+      standup: new mongoose.Types.ObjectId(),
+      sprint: sprintId,
+      project: projectId,
+      organization: organizationId,
+      member: kasunId,
+      task: kan214,
+      plannedMinutes: 60,
+      source: 'carried_forward',
+      taskStatusAtAllocation: 'in_progress',
+      createdBy: pmId
+    })
+    for (let i = 0; i < 3; i += 1) {
+      await Allocation.create({
+        standup: new mongoose.Types.ObjectId(),
+        sprint: sprintId,
+        project: projectId,
+        organization: organizationId,
+        member: kasunId,
+        task: kan214,
+        plannedMinutes: 60,
+        source: 'carried_forward',
+        taskStatusAtAllocation: 'in_progress',
+        carryChainRoot: root._id,
+        createdBy: pmId
+      })
+    }
+    await Allocation.updateOne(
+      { _id: allocations['KAN-214'] },
+      { $set: { carryChainRoot: root._id } }
+    )
+
+    const panel = await loadVariancePanel(day4)
+    const kan214Row = rowFor(panel, 'KAN-214')
+    expect(kan214Row.spillChainLength).toBe(5)
+    expect(kan214Row.chronicSpill).toBe(true)
+  })
 })
 
 describe('classifyAndPost — persistence and the ledger (AC-14)', () => {
@@ -189,6 +237,59 @@ describe('classifyAndPost — persistence and the ledger (AC-14)', () => {
     await classifyAndPost({ standupId: day4, actor: { userId: pmId } })
     const { ActivityLog } = await import('@/models/ActivityLog')
     expect(await ActivityLog.countDocuments({ action: 'variance_computed' })).toBe(1)
+  })
+
+  it('records one audit entry per member, not one per run', async () => {
+    const { day3, day4, kasunId, amalId, pmId, organizationId, projectId, sprintId } =
+      await seedWorkedExample()
+
+    // Amal delivers a second task under estimate, so both she and Kasun end
+    // up with posted entries from the same completion.
+    const kan999 = await Task.create({
+      title: 'Amal delivers under',
+      organization: organizationId,
+      project: projectId,
+      sprint: sprintId,
+      createdBy: pmId,
+      assignedTo: [{ user: amalId, assignedAt: new Date() }],
+      taskNumber: 999,
+      displayId: 'KAN-999',
+      status: 'done',
+      originalEstimateMinutes: 240,
+      remainingEstimateMinutes: 240,
+      estimateLockedAt: new Date(`${FIXTURE_DAY_3}T00:00:00.000Z`)
+    })
+    await Allocation.create({
+      standup: day3,
+      sprint: sprintId,
+      project: projectId,
+      organization: organizationId,
+      member: amalId,
+      task: kan999._id,
+      plannedMinutes: 240,
+      source: 'assigned_in_standup',
+      taskStatusAtAllocation: 'done',
+      createdBy: pmId
+    })
+    await TimeEntry.create({
+      user: amalId,
+      organization: organizationId,
+      project: projectId,
+      task: kan999._id,
+      description: 'finished early',
+      startTime: new Date(`${FIXTURE_DAY_3}T09:00:00+05:30`),
+      duration: 180,
+      isBillable: false,
+      status: 'completed'
+    })
+
+    await classifyAndPost({ standupId: day4, actor: { userId: pmId } })
+
+    const { ActivityLog } = await import('@/models/ActivityLog')
+    const entries = (await ActivityLog.find({ action: 'variance_computed' }).lean()) as any[]
+    expect(entries).toHaveLength(2)
+    const memberIds = entries.map((entry) => entry.details?.memberId)
+    expect(new Set(memberIds)).toEqual(new Set([kasunId, amalId]))
   })
 
   it('does nothing for a stand-up with no predecessor', async () => {
