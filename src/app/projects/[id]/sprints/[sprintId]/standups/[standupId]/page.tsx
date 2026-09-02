@@ -166,6 +166,26 @@ export default function StandupRunPage({
         expectedVersion
       })
     },
+    async adjustLoggedHours({ taskId, memberId, loggedMinutes, expectedVersion }) {
+      return unwrap(
+        await mutate(`/api/standups/${standupId}/yesterday`, 'PATCH', {
+          taskIds: [taskId],
+          onBehalfOf: memberId,
+          loggedMinutes,
+          expectedVersion
+        })
+      )
+    },
+    async addNote({ taskId, memberId, note, expectedVersion }) {
+      return unwrap(
+        await mutate(`/api/standups/${standupId}/yesterday`, 'PATCH', {
+          taskIds: [taskId],
+          onBehalfOf: memberId,
+          note,
+          expectedVersion
+        })
+      )
+    },
     openTask(taskId) {
       router.push(`/tasks/${taskId}`)
     },

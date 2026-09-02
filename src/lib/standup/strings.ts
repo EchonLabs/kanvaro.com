@@ -775,7 +775,10 @@ export const standupStrings = {
     previousStatus: () => 'Was',
     currentStatus: () => 'Now',
     /** RUN-11 — a status the PM changed for somebody else. */
-    changedOnBehalfOf: ({ name }: { name: string }) => `Changed by the facilitator for ${name}`
+    changedOnBehalfOf: ({ name }: { name: string }) => `Changed by the facilitator for ${name}`,
+    /** RUN-10 — the one-line note action. */
+    saveNote: () => 'Add note',
+    noteSaved: () => 'Saved'
   },
 
   /**

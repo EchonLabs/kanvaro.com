@@ -57,6 +57,8 @@ const panelData = (rows: YesterdayRow[]) => ({
 const makeApi = () => ({
   setStatus: jest.fn().mockResolvedValue(undefined),
   confirmCompleted: jest.fn().mockResolvedValue(undefined),
+  adjustLoggedHours: jest.fn().mockResolvedValue(undefined),
+  addNote: jest.fn().mockResolvedValue(undefined),
   openTask: jest.fn(),
   reviseEstimate: jest.fn()
 })
@@ -180,6 +182,54 @@ describe('YesterdayPanel', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(standupStrings.run.editRejected())
     await waitFor(() => expect(select).toHaveValue('in_progress'))
+  })
+
+  it('adjusts a member\'s logged hours for the day (RUN-10)', async () => {
+    const api = makeApi()
+    render(<YesterdayPanel data={panelData([row()])} api={api} />)
+
+    const hours = screen.getByLabelText('Logged hours for KAN-214')
+    fireEvent.change(hours, { target: { value: '7.5' } })
+    fireEvent.blur(hours)
+
+    await waitFor(() =>
+      expect(api.adjustLoggedHours).toHaveBeenCalledWith({
+        taskId: 'task-214',
+        memberId: 'kasun',
+        loggedMinutes: m(450)
+      })
+    )
+  })
+
+  it('rolls a logged-hours edit back and raises a toast when the server refuses (RUN-25)', async () => {
+    const api = makeApi()
+    api.adjustLoggedHours.mockRejectedValueOnce(new Error('STALE_STANDUP'))
+    render(<YesterdayPanel data={panelData([row()])} api={api} />)
+
+    const hours = screen.getByLabelText('Logged hours for KAN-214')
+    fireEvent.change(hours, { target: { value: '7.5' } })
+    fireEvent.blur(hours)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(standupStrings.run.editRejected())
+    await waitFor(() => expect(hours).toHaveValue(8))
+  })
+
+  it('adds a one-line note on the row (RUN-10)', async () => {
+    const api = makeApi()
+    render(<YesterdayPanel data={panelData([row()])} api={api} />)
+
+    fireEvent.change(screen.getByLabelText('Note for KAN-214'), {
+      target: { value: 'Blocked on review' }
+    })
+    fireEvent.click(screen.getByTestId('note-save'))
+
+    await waitFor(() =>
+      expect(api.addNote).toHaveBeenCalledWith({
+        taskId: 'task-214',
+        memberId: 'kasun',
+        note: 'Blocked on review'
+      })
+    )
   })
 
   it('renders the empty state for a day-one stand-up, which has no yesterday', () => {

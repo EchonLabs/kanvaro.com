@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
+import { formatMinutesAsHours, hoursToMinutes, minutes as toMinutes, roundToStep, type Minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import type { BucketedRows, YesterdayBucket, YesterdayRow } from '@/lib/standup/yesterday'
 
@@ -30,6 +30,10 @@ import type { BucketedRows, YesterdayBucket, YesterdayRow } from '@/lib/standup/
 export interface YesterdayPanelApi {
   setStatus(input: { taskIds: string[]; status: string; onBehalfOf?: string }): Promise<void>
   confirmCompleted(input: { taskIds: string[] }): Promise<void>
+  /** RUN-10 — adjust that member's logged hours for the day, in minutes. */
+  adjustLoggedHours(input: { taskId: string; memberId: string; loggedMinutes: Minutes }): Promise<void>
+  /** RUN-10 — a one-line note on the row. */
+  addNote(input: { taskId: string; memberId?: string; note: string }): Promise<void>
   openTask(taskId: string): void
   reviseEstimate(row: YesterdayRow): void
 }
@@ -61,11 +65,16 @@ export function YesterdayPanel({
   // left to decide.
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ completed: true })
   const [optimisticStatus, setOptimisticStatus] = useState<Record<string, string>>({})
+  const [optimisticLogged, setOptimisticLogged] = useState<Record<string, Minutes>>({})
+  const [loggedDraft, setLoggedDraft] = useState<Record<string, string>>({})
+  const [noteDraft, setNoteDraft] = useState<Record<string, string>>({})
+  const [noteStatus, setNoteStatus] = useState<Record<string, 'saving' | 'saved'>>({})
   const [toast, setToast] = useState<string | null>(null)
 
   const hasYesterday = Boolean(data.previousStandupId)
 
   const statusOf = (row: YesterdayRow) => optimisticStatus[row.taskId] ?? row.currentStatus
+  const loggedOf = (row: YesterdayRow) => optimisticLogged[row.taskId] ?? row.loggedMinutes
 
   const changeStatus = async (row: YesterdayRow, next: string) => {
     const previous = statusOf(row)
@@ -81,6 +90,50 @@ export function YesterdayPanel({
       })
     } catch {
       setOptimisticStatus((current) => ({ ...current, [row.taskId]: previous }))
+      setToast(standupStrings.run.editRejected())
+    }
+  }
+
+  const commitLoggedHours = async (row: YesterdayRow) => {
+    const draft = loggedDraft[row.taskId]
+    if (draft === undefined) return
+    const parsed = Number(draft)
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setLoggedDraft((current) => ({ ...current, [row.taskId]: hoursText(loggedOf(row)) }))
+      return
+    }
+
+    const snapped = roundToStep(hoursToMinutes(parsed), toMinutes(15))
+    const previous = loggedOf(row)
+    setLoggedDraft((current) => ({ ...current, [row.taskId]: hoursText(snapped) }))
+    if (snapped === previous) return
+
+    setOptimisticLogged((current) => ({ ...current, [row.taskId]: snapped }))
+    setToast(null)
+    try {
+      await api.adjustLoggedHours({ taskId: row.taskId, memberId: row.memberId, loggedMinutes: snapped })
+    } catch {
+      setOptimisticLogged((current) => ({ ...current, [row.taskId]: previous }))
+      setLoggedDraft((current) => ({ ...current, [row.taskId]: hoursText(previous) }))
+      setToast(standupStrings.run.editRejected())
+    }
+  }
+
+  const submitNote = async (row: YesterdayRow) => {
+    const note = (noteDraft[row.taskId] ?? '').trim()
+    if (!note) return
+    setNoteStatus((current) => ({ ...current, [row.taskId]: 'saving' }))
+    setToast(null)
+    try {
+      await api.addNote({ taskId: row.taskId, memberId: row.memberId, note })
+      setNoteDraft((current) => ({ ...current, [row.taskId]: '' }))
+      setNoteStatus((current) => ({ ...current, [row.taskId]: 'saved' }))
+    } catch {
+      setNoteStatus((current) => {
+        const next = { ...current }
+        delete next[row.taskId]
+        return next
+      })
       setToast(standupStrings.run.editRejected())
     }
   }
@@ -173,7 +226,7 @@ export function YesterdayPanel({
                         {formatMinutesAsHours(row.plannedMinutes, { locale })}
                       </span>
                       <span data-testid="logged">
-                        {formatMinutesAsHours(row.loggedMinutes, { locale })}
+                        {formatMinutesAsHours(loggedOf(row), { locale })}
                       </span>
                       <span data-testid="day-variance">
                         {formatMinutesAsHours(row.dayVarianceMinutes, { locale, signed: true })}
@@ -181,6 +234,71 @@ export function YesterdayPanel({
                       <span data-testid="remaining">
                         {formatMinutesAsHours(row.remainingEstimateMinutes, { locale })}
                       </span>
+
+                      <label className="sr-only" htmlFor={`logged-${row.taskId}`}>
+                        {`Logged hours for ${row.taskKey ?? row.taskId}`}
+                      </label>
+                      <input
+                        id={`logged-${row.taskId}`}
+                        data-testid="logged-hours-edit"
+                        aria-label={`Logged hours for ${row.taskKey ?? row.taskId}`}
+                        type="number"
+                        inputMode="decimal"
+                        step={0.25}
+                        min={0}
+                        disabled={disabled}
+                        value={loggedDraft[row.taskId] ?? hoursText(loggedOf(row))}
+                        onChange={(event) =>
+                          setLoggedDraft((current) => ({ ...current, [row.taskId]: event.target.value }))
+                        }
+                        onBlur={() => commitLoggedHours(row)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            commitLoggedHours(row)
+                          }
+                        }}
+                        className="h-7 w-16 rounded-md border border-border bg-background px-2 text-right text-sm tabular-nums disabled:opacity-40"
+                      />
+
+                      <label className="sr-only" htmlFor={`note-${row.taskId}`}>
+                        {`Note for ${row.taskKey ?? row.taskId}`}
+                      </label>
+                      <input
+                        id={`note-${row.taskId}`}
+                        data-testid="note-input"
+                        aria-label={`Note for ${row.taskKey ?? row.taskId}`}
+                        type="text"
+                        placeholder="Add a note"
+                        disabled={disabled}
+                        value={noteDraft[row.taskId] ?? ''}
+                        onChange={(event) => {
+                          setNoteDraft((current) => ({ ...current, [row.taskId]: event.target.value }))
+                          setNoteStatus((current) => {
+                            const next = { ...current }
+                            delete next[row.taskId]
+                            return next
+                          })
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            submitNote(row)
+                          }
+                        }}
+                        className="h-7 w-32 rounded-md border border-border bg-background px-2 text-sm disabled:opacity-40"
+                      />
+                      <button
+                        type="button"
+                        data-testid="note-save"
+                        disabled={disabled || !((noteDraft[row.taskId] ?? '').trim())}
+                        onClick={() => submitNote(row)}
+                        className="text-xs underline disabled:opacity-40"
+                      >
+                        {noteStatus[row.taskId] === 'saved'
+                          ? standupStrings.yesterday.noteSaved()
+                          : standupStrings.yesterday.saveNote()}
+                      </button>
 
                       {row.ageInStandups > 1 && (
                         <span data-testid="age-badge" className="rounded bg-muted px-1.5 py-0.5 text-xs">
@@ -236,6 +354,10 @@ export function YesterdayPanel({
         })}
     </section>
   )
+}
+
+function hoursText(value: Minutes): string {
+  return String(Number((value / 60).toFixed(2)))
 }
 
 function initialsOf(name: string): string {

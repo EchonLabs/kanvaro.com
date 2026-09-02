@@ -20,7 +20,7 @@ import {
   requireStandupVersion,
   withStandupIdPermission
 } from '@/lib/standup/route-helpers'
-import { loadYesterdayPanel } from '@/lib/standup/yesterday-service'
+import { adjustLoggedMinutes, loadYesterdayPanel } from '@/lib/standup/yesterday-service'
 import { Standup } from '@/models/Standup'
 import { Task } from '@/models/Task'
 
@@ -36,6 +36,11 @@ interface PatchBody {
   taskIds: string[]
   status?: string
   note?: string
+  /**
+   * RUN-10's logged-hours adjustment, in minutes. Only meaningful for a
+   * single row — bulk-confirm never carries this field.
+   */
+  loggedMinutes?: number
   /** The member the change is being made for, when it is not the actor. */
   onBehalfOf?: string
 }
@@ -62,12 +67,30 @@ export const PATCH = withStandupIdPermission(
       })
     }
 
+    if (body.loggedMinutes !== undefined && taskIds.length !== 1) {
+      throw new StandupError(
+        'VALIDATION_FAILED',
+        'A logged-hours adjustment applies to exactly one row.',
+        { field: 'loggedMinutes' }
+      )
+    }
+
     const tasks = (await Task.find({ _id: { $in: taskIds }, project: projectId })
       .select('displayId status assignedTo')
       .lean()) as any[]
 
     if (tasks.length !== taskIds.length) {
       throw new StandupError('NOT_FOUND', 'One of those tasks no longer exists.', { taskIds })
+    }
+
+    if (body.loggedMinutes !== undefined) {
+      await adjustLoggedMinutes({
+        standupId,
+        taskId: taskIds[0],
+        memberId: body.onBehalfOf ?? userId,
+        requestedMinutes: Number(body.loggedMinutes),
+        actor: { userId }
+      })
     }
 
     for (const task of tasks) {

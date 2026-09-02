@@ -130,6 +130,20 @@ export interface RunScreenApi {
   }): Promise<{ standupVersion: number }>
   /** RUN-13 — clear the completed bucket in one action. */
   confirmCompleted?(input: { taskIds: string[]; expectedVersion: number }): Promise<void>
+  /** RUN-10 — adjust that member's logged hours for the day, in minutes. */
+  adjustLoggedHours?(input: {
+    taskId: string
+    memberId: string
+    loggedMinutes: Minutes
+    expectedVersion: number
+  }): Promise<{ standupVersion: number }>
+  /** RUN-10 — a one-line note on the row, on somebody's behalf. */
+  addNote?(input: {
+    taskId: string
+    memberId?: string
+    note: string
+    expectedVersion: number
+  }): Promise<{ standupVersion: number }>
   openTask?(taskId: string): void
   reviseEstimate?(row: { allocationId: string; taskId: string }): void
   giveNotStartedReason?(row: { allocationId: string; taskId: string }): void
@@ -320,6 +334,20 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
       async confirmCompleted(input) {
         await api.confirmCompleted?.({ ...input, expectedVersion: versionRef.current })
         await reload()
+      },
+      async adjustLoggedHours(input) {
+        if (!api.adjustLoggedHours) throw new Error('Not wired')
+        const result = await api.adjustLoggedHours({
+          ...input,
+          expectedVersion: versionRef.current
+        })
+        versionRef.current = result.standupVersion
+        await reload()
+      },
+      async addNote(input) {
+        if (!api.addNote) throw new Error('Not wired')
+        const result = await api.addNote({ ...input, expectedVersion: versionRef.current })
+        versionRef.current = result.standupVersion
       },
       openTask(taskId) {
         api.openTask?.(taskId)

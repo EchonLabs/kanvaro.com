@@ -12,8 +12,13 @@
  */
 import { Allocation } from '@/models/Allocation'
 import { Task } from '@/models/Task'
+import { TimeEntry } from '@/models/TimeEntry'
 import { User } from '@/models/User'
 
+import { STANDUP_MANUAL_TIME_ENTRY_CATEGORY } from '@/lib/time-tracking-server'
+
+import { recordAudit } from './audit'
+import { dayBoundsInTimezone } from './calendar-dates'
 import { loadCalendarContext } from './calendar-service'
 import {
   findPreviousStandup,
@@ -22,7 +27,7 @@ import {
 import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 import { Standup } from '@/models/Standup'
 import { StandupError } from './errors'
-import { minutes, subtractMinutes, ZERO_MINUTES, type Minutes } from './minutes'
+import { formatMinutesAsHours, minutes, subtractMinutes, ZERO_MINUTES, type Minutes } from './minutes'
 import { loadLoggedMinutes } from './time-logs'
 import {
   partitionYesterday,
@@ -183,6 +188,111 @@ function ageOf(task: any, allocation: any): number {
     return task.standupSpillCount
   }
   return allocation?.carriedFromAllocation || allocation?.carryChainRoot ? 2 : 1
+}
+
+/**
+ * RUN-10's "adjust that member's logged hours for that day", without
+ * rewriting a timer entry someone else owns.
+ *
+ * A row's `loggedMinutes` is a sum over every `TimeEntry` that day (§12.1);
+ * there is no single number to edit. So the PM's adjustment is written as its
+ * own entry, tagged `STANDUP_MANUAL_TIME_ENTRY_CATEGORY`, sized to make the
+ * *total* equal what the PM typed — increase it, and the entry's duration
+ * grows; decrease it, and the entry's duration shrinks, floored at zero. It
+ * can never go negative, so a request to reduce the total below what real
+ * timer entries already logged that day is refused rather than silently
+ * clamped: the honest answer is "delete or edit those entries directly",
+ * not a number that quietly stops matching the timesheet.
+ */
+export async function adjustLoggedMinutes(input: {
+  standupId: string
+  taskId: string
+  memberId: string
+  requestedMinutes: number
+  actor: { userId: string }
+}): Promise<{ loggedMinutes: Minutes }> {
+  const standup = (await Standup.findById(input.standupId).lean()) as any
+  if (!standup) {
+    throw new StandupError('NOT_FOUND', 'That stand-up no longer exists.', {
+      standupId: input.standupId
+    })
+  }
+
+  if (!Number.isInteger(input.requestedMinutes) || input.requestedMinutes < 0) {
+    throw new StandupError(
+      'VALIDATION_FAILED',
+      'Logged hours must be zero or a positive whole number of minutes.',
+      { field: 'loggedMinutes' }
+    )
+  }
+
+  const previous = await findPreviousStandup(standup)
+  if (!previous) {
+    throw new StandupError('VALIDATION_FAILED', 'There is no previous day to adjust.', {
+      standupId: input.standupId
+    })
+  }
+
+  const calendar = await loadCalendarContext(
+    String(standup.project),
+    previous.standupDate,
+    previous.standupDate
+  )
+  const { from, to } = dayBoundsInTimezone(previous.standupDate, calendar.timezone)
+
+  const entries = (await TimeEntry.find({
+    task: input.taskId,
+    user: input.memberId,
+    status: 'completed',
+    startTime: { $gte: from, $lt: to }
+  }).lean()) as any[]
+
+  const manual = entries.find((entry) => entry.category === STANDUP_MANUAL_TIME_ENTRY_CATEGORY)
+  const otherMinutes = entries
+    .filter((entry) => String(entry._id) !== String(manual?._id))
+    .reduce((sum, entry) => sum + Math.round(entry.duration ?? 0), 0)
+
+  const manualMinutes = input.requestedMinutes - otherMinutes
+  if (manualMinutes < 0) {
+    throw new StandupError(
+      'VALIDATION_FAILED',
+      `Cannot reduce logged hours below the ${formatMinutesAsHours(minutes(otherMinutes))} already tracked outside the stand-up.`,
+      { otherMinutes }
+    )
+  }
+
+  const before = { loggedMinutes: otherMinutes + (manual?.duration ?? 0) }
+
+  if (manual) {
+    await TimeEntry.updateOne({ _id: manual._id }, { $set: { duration: manualMinutes } })
+  } else if (manualMinutes > 0) {
+    await TimeEntry.create({
+      user: input.memberId,
+      organization: standup.organization,
+      project: standup.project,
+      task: input.taskId,
+      description: 'Logged hours adjusted during stand-up',
+      startTime: from,
+      duration: manualMinutes,
+      isBillable: false,
+      status: 'completed',
+      category: STANDUP_MANUAL_TIME_ENTRY_CATEGORY
+    })
+  }
+
+  await recordAudit({
+    actor: { type: 'user', userId: input.actor.userId },
+    organizationId: String(standup.organization),
+    projectId: String(standup.project),
+    action: 'standup_attendance_set',
+    entityType: 'task',
+    entityId: input.taskId,
+    before,
+    after: { loggedMinutes: input.requestedMinutes },
+    context: { standupId: input.standupId, memberId: input.memberId, adjustedLoggedHours: true }
+  })
+
+  return { loggedMinutes: minutes(input.requestedMinutes) }
 }
 
 export type { YesterdayRow, BucketedRows }
