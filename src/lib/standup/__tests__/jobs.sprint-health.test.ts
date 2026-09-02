@@ -176,4 +176,35 @@ describe('runSprintHealthJob', () => {
     expect(second.created).toBe(0)
     expect(notify).toHaveBeenCalledTimes(1)
   })
+
+  it('does not resend when the "live" stand-up rotates to a later day', async () => {
+    // One Standup document per day (day 1 and day 2), matching how the real
+    // schedule is generated. Day 1 is live on the first call; by the time the
+    // job runs again day 1 has completed and day 2 has become the live one —
+    // the anchor must stay pinned to day 1 regardless.
+    const day1 = await seedStandup('2026-08-17', 1, 'In_Progress')
+    const day2 = await seedStandup('2026-08-18', 2, 'Scheduled')
+    await seedCapacity(60)
+    await seedTask(10_000)
+
+    const first = await runSprintHealthJob(new Date('2026-08-17T09:00:00.000Z'))
+    expect(first.created).toBe(1)
+    expect(notify).toHaveBeenCalledTimes(1)
+
+    // Day 1 finishes, day 2 becomes the live stand-up — the naive "whichever
+    // stand-up is live right now" anchor would rotate here and re-claim.
+    await Standup.updateOne({ _id: day1._id }, { $set: { status: 'Completed' } })
+    await Standup.updateOne({ _id: day2._id }, { $set: { status: 'In_Progress' } })
+
+    const second = await runSprintHealthJob(new Date('2026-08-18T09:00:00.000Z'))
+
+    expect(second.created).toBe(0)
+    expect(notify).toHaveBeenCalledTimes(1)
+
+    // The ledger key lives on day 1 — the fixed anchor — not day 2.
+    const storedDay1 = (await Standup.findById(day1._id).lean()) as any
+    const storedDay2 = (await Standup.findById(day2._id).lean()) as any
+    expect(storedDay1.notificationsSent?.[`N12:${sprintId}`]).toBeInstanceOf(Date)
+    expect(storedDay2.notificationsSent?.[`N12:${sprintId}`]).toBeUndefined()
+  })
 })

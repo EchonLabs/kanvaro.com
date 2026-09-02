@@ -10,9 +10,21 @@
  * Emits N12 once per sprint per detection, not once per stand-up — a sprint
  * whose scope already exceeds capacity does not need to be told again every
  * single day. `sendStandupNotificationOnce`'s ledger lives on a stand-up
- * document, so this job anchors the claim to the sprint's current live
- * stand-up (falling back to its most recent one), the same anchor a PM
- * actually looking at N12 would land on.
+ * document, so this job needs one to claim the key against — but which one
+ * matters: this codebase has one `Standup` document per day, so "the sprint's
+ * current live stand-up" is not one document, it is a different one every day
+ * the sprint runs. Anchoring to it would make the ledger key rotate along
+ * with it: day 1 claims `N12:<sprintId>` on day 1's document, day 1 completes
+ * and drops off `LIVE_STATUSES`, day 2 becomes "the live one" and has no
+ * ledger entry of its own, so the claim succeeds again and N12 resends —
+ * every day the sprint stays over capacity. `escalate-carry-forward.ts`
+ * already solved this exact problem for N9 by anchoring to
+ * `item.originStandup`, a field fixed once and never re-derived. This job
+ * does the same: {@link loadAnchorStandup} always returns the sprint's
+ * *earliest* stand-up by date — a single fixed document for the sprint's
+ * whole life, live or not — so the ledger key is claimed against the same
+ * row on every call regardless of which day's stand-up happens to be running
+ * right now.
  *
  * `loadSprintHealthTotals` is a fresh aggregate, not a reuse. Nothing in
  * `capacity-context.ts`, `capacity.ts` or `debt-position.ts` computes a
@@ -49,9 +61,6 @@ import { minutes } from '../minutes'
 import { computeSprintHealth, type SprintHealthInput } from '../sprint-health'
 import { sendStandupNotificationOnce } from './notify'
 import { emptyResult, type JobResult } from './result'
-
-/** Stand-ups a sprint's N12 may anchor to, live ones preferred. */
-const LIVE_STATUSES = ['Scheduled', 'Ready', 'In_Progress']
 
 export interface SprintHealthOutcome {
   sent: number
@@ -132,19 +141,15 @@ export async function runSprintHealthJob(now: Date = new Date()): Promise<JobRes
 }
 
 /**
- * The stand-up N12's ledger key anchors to: the sprint's earliest still-live
- * stand-up, or — once the sprint has none left running — its most recent one.
- * Either way it is a real document a PM completing this sprint would open.
+ * The stand-up N12's ledger key always anchors to: the sprint's earliest
+ * stand-up by date, whatever its current status. Fixed for the sprint's whole
+ * life, the same way `escalate-carry-forward.ts` fixes N9's anchor to
+ * `item.originStandup` rather than re-deriving "the current one" on every
+ * call — see the module docblock for why that distinction is the whole fix.
  */
 async function loadAnchorStandup(sprintId: string): Promise<any | null> {
-  const live = (await Standup.findOne({ sprint: sprintId, status: { $in: LIVE_STATUSES } })
-    .sort({ standupDate: 1 })
-    .select('_id facilitator')
-    .lean()) as any
-  if (live) return live
-
   return (await Standup.findOne({ sprint: sprintId })
-    .sort({ standupDate: -1 })
+    .sort({ standupDate: 1 })
     .select('_id facilitator')
     .lean()) as any
 }
