@@ -1,0 +1,239 @@
+/**
+ * RUN-19–22. The completion saga.
+ *
+ * No Mongo transaction exists on this platform, so RUN-21's "a partial
+ * completion must never be persisted" is delivered by resumability, not
+ * atomicity: every step is either read-only, idempotent (safe to redo), or
+ * itself the write of a uniquely-keyed idempotent record (variance rows,
+ * ledger entries, carry-forward items, notification sends — all already
+ * proven idempotent by their own phases). `completionState` on the Standup
+ * document remembers the last *completed* step name; a re-entrant call
+ * (retry after a crash, or the client double-clicking Complete) resumes from
+ * there rather than re-running finished steps or, worse, skipping unfinished
+ * ones.
+ *
+ * The very last step flips `status: 'Completed'`. Everything before it can
+ * safely re-run; that one cannot, which is why it is last, not first.
+ *
+ * **N9 (aged carry-forward escalation) is deliberately not fired from this
+ * saga.** `buildCarryForwardSet`'s `BuildCarryForwardResult` reports only
+ * counts (`created`/`aged`/`autoClosed`/`totalOpen`), not which item ids
+ * crossed a threshold on this run. Re-deriving that here would mean either
+ * changing Phase 9's already-tested return shape or re-querying
+ * `CarryForwardItem` and duplicating `ageBandFor`'s threshold logic — both
+ * out of this task's "delegate all actual logic to the modules it calls"
+ * mandate. `jobs/escalate-carry-forward.ts`'s nightly sweep already covers
+ * every aged item, keyed by `item.originStandup` and `item._id`
+ * (`N9_escalated_<id>` / `N9_chronic_<id>`), and `sendStandupNotificationOnce`'s
+ * ledger makes it safe for that job to be the sole sender regardless of
+ * timing relative to this saga.
+ */
+import { Allocation } from '@/models/Allocation'
+import { Standup } from '@/models/Standup'
+import { StandupSummary } from '@/models/StandupSummary'
+
+import { runSaga, type SagaCheckpoint, type SagaStep } from './saga'
+import {
+  evaluateCompletionChecks,
+  blockingFailures,
+  type EvaluateCompletionChecksInput
+} from './completion-checks'
+import { classifyAndPost } from './variance-service'
+import { buildCarryForwardSet } from './carry-forward-service'
+import { buildSummaryDocument, type BuildSummaryInput } from './summary'
+import {
+  notifyPersonalCommitment,
+  notifyStandupCompleted,
+  notifyNotAllocated
+} from './notifications'
+import { checkSprintHealth } from './jobs/sprint-health'
+import { recordAudit } from './audit'
+import { alreadyCompleted, completionChecksFailed, staleStandup } from './errors'
+
+export interface CompletionContext {
+  runId: string
+  standupId: string
+  sprintId: string
+  projectId: string
+  organizationId: string
+  completedBy: string
+  notes?: string
+  checkInput: EvaluateCompletionChecksInput
+  expectedVersion: number
+  // Everything the notification/summary steps need, assembled by the route
+  // from the same board load the checks used — see Task 17.
+  attendeeIds: string[]
+  adminRecipientIds: string[]
+  memberCommitments: Array<{ memberId: string; hasAnyAllocation: boolean }>
+  summaryInputs: Omit<BuildSummaryInput, 'standupId' | 'sprintId' | 'projectId' | 'organizationId'>
+  summaryUrl: string
+}
+
+export interface CompletionResult {
+  status: 'completed'
+  summaryId: string
+}
+
+function standupCheckpoint(standupId: string): SagaCheckpoint {
+  return {
+    async load(runId) {
+      const doc = await Standup.findById(standupId, { completionState: 1 }).lean()
+      if (!doc?.completionState || doc.completionState.runId !== runId) {
+        return { lastCompletedStep: null }
+      }
+      return { lastCompletedStep: doc.completionState.lastCompletedStep }
+    },
+    async save(runId, lastCompletedStep) {
+      await Standup.updateOne(
+        { _id: standupId },
+        { $set: { completionState: { runId, lastCompletedStep, updatedAt: new Date() } } }
+      )
+    },
+    async finish(_runId) {
+      await Standup.updateOne({ _id: standupId }, { $unset: { completionState: 1 } })
+    }
+  }
+}
+
+export async function runCompletionSaga(ctx: CompletionContext): Promise<CompletionResult> {
+  const standup = await Standup.findById(ctx.standupId)
+  if (!standup) throw new Error('Standup not found')
+  if (standup.status === 'Completed') throw alreadyCompleted()
+  if (standup.version !== ctx.expectedVersion) throw staleStandup(standup.version, standup)
+
+  // RUN-19: re-run the checks server-side against server-loaded data.
+  const results = evaluateCompletionChecks(ctx.checkInput)
+  const blocking = blockingFailures(results)
+  if (blocking.length > 0) throw completionChecksFailed(blocking)
+
+  let summaryId = ''
+
+  const steps: SagaStep<CompletionContext>[] = [
+    {
+      name: 'freeze-allocations',
+      async run() {
+        // Idempotent: re-running just stamps a later `frozenAt` on the same
+        // rows, which no downstream reader treats as meaningfully different
+        // from the first stamp.
+        await Allocation.updateMany({ standup: ctx.standupId }, { $set: { frozenAt: new Date() } })
+      }
+    },
+    {
+      name: 'classify-and-post-variance',
+      async run() {
+        // Idempotent per Phase 8's own unique indexes — safe to re-run.
+        await classifyAndPost({ standupId: ctx.standupId, actor: { userId: ctx.completedBy } })
+      }
+    },
+    {
+      name: 'build-carry-forward-set',
+      async run() {
+        // Idempotent per Phase 9's own discovery/ageing design — safe to re-run.
+        await buildCarryForwardSet({
+          standupId: ctx.standupId,
+          actor: { type: 'user', userId: ctx.completedBy }
+        })
+      }
+    },
+    {
+      name: 'persist-summary',
+      async run() {
+        const doc = buildSummaryDocument({
+          standupId: ctx.standupId,
+          sprintId: ctx.sprintId,
+          projectId: ctx.projectId,
+          organizationId: ctx.organizationId,
+          ...ctx.summaryInputs
+        })
+        // Upsert keyed on the unique `standup` index — a re-run overwrites
+        // its own prior (possibly partial) write rather than duplicating it.
+        const saved = await StandupSummary.findOneAndUpdate(
+          { standup: ctx.standupId },
+          { $set: doc },
+          { upsert: true, new: true }
+        )
+        summaryId = String(saved._id)
+      }
+    },
+    {
+      name: 'notify-members',
+      async run() {
+        for (const attendeeId of ctx.attendeeIds) {
+          await notifyPersonalCommitment({
+            standupId: ctx.standupId,
+            projectId: ctx.projectId,
+            organizationId: ctx.organizationId,
+            memberId: attendeeId,
+            summaryUrl: ctx.summaryUrl
+          })
+        }
+        for (const member of ctx.memberCommitments) {
+          if (!member.hasAnyAllocation) {
+            await notifyNotAllocated({
+              standupId: ctx.standupId,
+              projectId: ctx.projectId,
+              organizationId: ctx.organizationId,
+              memberId: member.memberId
+            })
+          }
+        }
+      }
+    },
+    {
+      name: 'notify-completion',
+      async run() {
+        await notifyStandupCompleted({
+          standupId: ctx.standupId,
+          projectId: ctx.projectId,
+          organizationId: ctx.organizationId,
+          recipientIds: ctx.adminRecipientIds,
+          summaryUrl: ctx.summaryUrl
+        })
+      }
+    },
+    {
+      name: 'sprint-health-check',
+      async run() {
+        // §18.1: the completion saga calls the per-sprint unit of work
+        // directly, not the daily sweep — `runSprintHealthJob` iterates every
+        // active sprint in the whole system, which is not what completing one
+        // stand-up should trigger.
+        await checkSprintHealth(ctx.sprintId)
+      }
+    },
+    {
+      name: 'audit-completion',
+      async run() {
+        await recordAudit({
+          actor: { type: 'user', userId: ctx.completedBy },
+          organizationId: ctx.organizationId,
+          action: 'standup_completed',
+          entityType: 'standup',
+          entityId: ctx.standupId,
+          projectId: ctx.projectId,
+          before: null,
+          after: { notes: ctx.notes }
+        })
+      }
+    },
+    {
+      name: 'finalize',
+      async run() {
+        // `IStandup` has no `completedBy` field (only `completedAt`) — who
+        // completed it is already on the `standup_completed` audit entry the
+        // previous step wrote, per SEC-3.
+        await Standup.updateOne(
+          { _id: ctx.standupId },
+          {
+            $set: { status: 'Completed', completedAt: new Date() },
+            $inc: { version: 1 }
+          }
+        )
+      }
+    }
+  ]
+
+  await runSaga(steps, ctx, standupCheckpoint(ctx.standupId))
+
+  return { status: 'completed', summaryId }
+}

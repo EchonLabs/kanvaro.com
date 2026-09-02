@@ -15,6 +15,8 @@ export const STANDUP_ERROR_CODES = {
   STANDUP_NOT_STARTABLE: 409,
   /** Duplicate completion — the second request changes nothing. */
   STANDUP_ALREADY_COMPLETED: 409,
+  /** A previous completion attempt did not finish; a resume action is required. */
+  COMPLETION_INTERRUPTED: 409,
   /** Optimistic-concurrency mismatch; details carry the current server state. */
   STALE_STANDUP: 409,
   /** Details list every failing completion check. */
@@ -234,3 +236,40 @@ export const invalidJustification = () =>
 
 export const overrideNotPermitted = (type: string) =>
   new StandupError('OVERRIDE_NOT_PERMITTED', `${type} cannot be overridden.`, { type })
+
+/** RUN-22: a second completion attempt on a stand-up that already completed. */
+export const alreadyCompleted = () =>
+  new StandupError(
+    'STANDUP_ALREADY_COMPLETED',
+    'This stand-up has already been completed.'
+  )
+
+/**
+ * RUN-19: the server re-ran the completion checks and at least one hard check
+ * still fails. `failingChecks` is deliberately untyped here (`unknown[]`
+ * rather than `CompletionCheckResult[]`) — this module has no dependencies by
+ * design (see {@link readValidationFailures}'s comment) so routes running on
+ * the Edge runtime can import it safely; the caller passes whatever shape
+ * `blockingFailures()` returned.
+ */
+export const completionChecksFailed = (failingChecks: unknown[]) =>
+  new StandupError(
+    'COMPLETION_CHECKS_FAILED',
+    'This stand-up cannot be completed until its failing checks are resolved.',
+    { failingChecks }
+  )
+
+/**
+ * R2's blocking banner (plan risk register): a prior completion attempt
+ * crashed or was interrupted partway through the saga and left
+ * `completionState` pointing at the last step that finished. The UI reads
+ * this to show a "completion was interrupted — resume" banner rather than
+ * silently retrying or, worse, letting the stand-up look editable while a
+ * saga run is still logically in flight.
+ */
+export const completionInterrupted = (lastCompletedStep: string | null) =>
+  new StandupError(
+    'COMPLETION_INTERRUPTED',
+    'A previous attempt to complete this stand-up did not finish. Resume it to continue.',
+    { lastCompletedStep }
+  )
