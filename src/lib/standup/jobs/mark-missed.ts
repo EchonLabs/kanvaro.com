@@ -44,6 +44,9 @@ export interface MissedRollForward {
   toStandupId: string | null
   toDate: IsoDate | null
   origin: 'missed_standup'
+  sprintId: string
+  projectId: string
+  organizationId: string
 }
 
 export type MissedRollForwardHandler = (input: MissedRollForward) => Promise<void>
@@ -126,7 +129,10 @@ export async function markMissed(
         missedDate: standup.standupDate,
         toStandupId: next ? String(next._id) : null,
         toDate: next ? next.standupDate : null,
-        origin: 'missed_standup'
+        origin: 'missed_standup',
+        sprintId: standup.sprint.toString(),
+        projectId,
+        organizationId: standup.organization.toString()
       })
 
       await sendStandupNotificationOnce({

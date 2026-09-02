@@ -296,12 +296,52 @@ describe('rollForwardMissedStandup (jobs/mark-missed.ts SCH-13 seam)', () => {
       missedDate: '2026-08-18',
       toStandupId: String(next._id),
       toDate: '2026-08-19',
-      origin: 'missed_standup'
+      origin: 'missed_standup',
+      sprintId: String(sprintId),
+      projectId: String(project),
+      organizationId: String(organization)
     })
 
     const rolled = (await CarryForwardItem.findById(item._id).lean()) as any
     expect(String(rolled.currentStandup)).toBe(String(next._id))
     expect(rolled.tags).toContain('from_missed_standup')
+  })
+
+  it('§13.2: also creates a distinct missed_standup_rollup item for the gap itself', async () => {
+    const missed = await seedStandup('2026-08-18', 2, { status: 'Missed' })
+    const next = await seedStandup('2026-08-19', 3, { status: 'Scheduled' })
+
+    const input = {
+      missedStandupId: String(missed._id),
+      missedDate: '2026-08-18',
+      toStandupId: String(next._id),
+      toDate: '2026-08-19',
+      origin: 'missed_standup' as const,
+      sprintId: String(sprintId),
+      projectId: String(project),
+      organizationId: String(organization)
+    }
+
+    await rollForwardMissedStandup(input)
+
+    const rollups = (await CarryForwardItem.find({
+      type: 'missed_standup_rollup',
+      originStandup: missed._id
+    }).lean()) as any[]
+
+    expect(rollups).toHaveLength(1)
+    expect(String(rollups[0].currentStandup)).toBe(String(next._id))
+    expect(rollups[0].originDate).toBe('2026-08-18')
+    expect(rollups[0].status).toBe('open')
+    expect(rollups[0].tags).toContain('from_missed_standup')
+
+    // SCH-17: a re-run for the same missed stand-up must not duplicate the row.
+    await rollForwardMissedStandup(input)
+    const again = await CarryForwardItem.countDocuments({
+      type: 'missed_standup_rollup',
+      originStandup: missed._id
+    })
+    expect(again).toBe(1)
   })
 })
 

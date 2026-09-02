@@ -422,6 +422,12 @@ export async function countOpenCarryForwardItems(standupId: string): Promise<num
  * onto it, plus whatever the last completed stand-up left open — rolls into
  * the next stand-up, tagged `from_missed_standup` so the register visibly
  * shows there was a gap.
+ *
+ * §13.2's `missed_standup_rollup` row is a distinct item type, not just a tag:
+ * the day itself is the obligation, separate from whatever it happened to be
+ * carrying, and it closes only when a PM explicitly acknowledges it — a team
+ * that missed a stand-up with nothing outstanding that day must still see that
+ * a gap occurred, not have it vanish for lack of any other item to tag.
  */
 export async function rollForwardMissedStandup(input: MissedRollForward): Promise<void> {
   const openOnMissed = (await CarryForwardItem.find({
@@ -444,6 +450,30 @@ export async function rollForwardMissedStandup(input: MissedRollForward): Promis
       )
     )
   )
+
+  // Idempotent the same way `upsertOpenItem` is: a re-run of this job for the
+  // same missed stand-up (SCH-17) must not create a second rollup row.
+  const alreadyRolled = await CarryForwardItem.findOne({
+    type: 'missed_standup_rollup',
+    originStandup: input.missedStandupId
+  })
+    .select('_id')
+    .lean()
+
+  if (!alreadyRolled) {
+    await CarryForwardItem.create({
+      sprint: input.sprintId,
+      project: input.projectId,
+      organization: input.organizationId,
+      type: 'missed_standup_rollup',
+      originStandup: input.missedStandupId,
+      originDate: input.missedDate,
+      currentStandup: input.toStandupId,
+      ageInStandups: 1,
+      status: 'open',
+      tags: ['from_missed_standup']
+    })
+  }
 }
 
 // --- Panel 4 read model, note and resolve (CFW-5, CFW-7, CFW-10, CFW-11) --
