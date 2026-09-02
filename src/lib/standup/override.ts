@@ -33,7 +33,7 @@ export function validateJustification(
   // Whitespace-only or punctuation-only collapses to nothing meaningful once
   // word characters are stripped, so it fails the length check honestly
   // rather than needing a second regex branch.
-  const meaningful = trimmed.replace(/[^\p{L}\p{N}]/gu, '')
+  const meaningful = trimmed.replace(new RegExp('[^\\p{L}\\p{N}]', 'gu'), '')
 
   if (trimmed.length < JUSTIFICATION_MIN_LENGTH || meaningful.length === 0) {
     return {
