@@ -5,14 +5,14 @@
  * in the spec's table order, and `blockingFailures()` says whether the Complete
  * button may enable.
  *
- * **Eight of the eleven are answered** — CC-1, CC-2, CC-5, CC-6, CC-7, CC-10
- * from Phase 7, CC-3 from Phase 8's variance engine, and CC-4 from Phase 9's
- * carry-forward register. The other three need blockers and sprint health
- * (Phase 10) and the final-day disposition (Phase 11).
+ * **Ten of the eleven are answered** — CC-1, CC-2, CC-5, CC-6, CC-7, CC-10
+ * from Phase 7, CC-3 from Phase 8's variance engine, CC-4 from Phase 9's
+ * carry-forward register, and CC-9/CC-11 from this phase's blockers and
+ * sprint health. The last, CC-8, needs the final-day disposition (Phase 11).
  *
- * They are returned anyway, as `not_evaluated` naming the owning phase. Two
+ * CC-8 is returned anyway, as `not_evaluated` naming the owning phase. Two
  * reasons. A PM reading Panel 7 must not see a complete-looking list that never
- * asked whether the aged carry-forward items have notes; and "could not be
+ * asked whether the final-day dispositions are set; and "could not be
  * evaluated" is a genuinely different state from "passed", so the payload has
  * to be able to say which. An unbuilt check blocks nothing — it has failed
  * nothing — but it is visible.
@@ -22,6 +22,7 @@
  */
 import type { AttendanceStatus, CapacityBreakdown } from './capacity'
 import type { Minutes } from './minutes'
+import { computeSprintHealth, type SprintHealthInput } from './sprint-health'
 
 export type CheckId =
   | 'CC-1'
@@ -101,6 +102,19 @@ export interface CheckCarryForwardItem {
   notedToday: boolean
 }
 
+/**
+ * One blocker, as CC-9 needs to see it (spec §10.3).
+ *
+ * `taskKey` is optional the same way it is on `CheckAllocation` — a blocker
+ * need not be tied to a task the board already knows the key for.
+ */
+export interface CheckBlocker {
+  blockerId: string
+  taskKey?: string
+  hasOwner: boolean
+  hasTargetDate: boolean
+}
+
 export interface CheckMember {
   memberId: string
   name?: string
@@ -130,9 +144,19 @@ export interface EvaluateCompletionChecksInput {
    * genuinely holds no aged items.
    */
   carryForward?: CheckCarryForwardItem[]
+  /**
+   * Blockers raised this stand-up (Phase 10). Same absent-vs-empty rule as
+   * `variance` and `carryForward`: `undefined` means CC-9 was never asked.
+   */
+  blockers?: CheckBlocker[]
+  /**
+   * Sprint-wide remaining estimate and capacity (Phase 10). `undefined` means
+   * CC-11 was never asked.
+   */
+  sprintHealth?: SprintHealthInput
 }
 
-/** The three checks still unanswerable, and who will answer them. */
+/** The one check still unanswerable, and who will answer it. */
 const DEFERRED: Record<string, { phase: string; hard: boolean; overridable: boolean; what: string }> =
   {
     'CC-8': {
@@ -140,18 +164,6 @@ const DEFERRED: Record<string, { phase: string; hard: boolean; overridable: bool
       hard: true,
       overridable: false,
       what: 'Final-day dispositions need the sprint-close panel.'
-    },
-    'CC-9': {
-      phase: 'Phase 10',
-      hard: false,
-      overridable: false,
-      what: 'Blocker owners and target dates need the blocker panel.'
-    },
-    'CC-11': {
-      phase: 'Phase 10',
-      hard: false,
-      overridable: false,
-      what: 'Sprint health needs the projected-burn calculation.'
     }
   }
 
@@ -182,9 +194,9 @@ export function evaluateCompletionChecks(
     cc6(members),
     cc7(members),
     deferred('CC-8'),
-    deferred('CC-9'),
+    cc9(input.blockers),
     cc10(liveRows),
-    deferred('CC-11')
+    cc11(input.sprintHealth)
   ]
 }
 
@@ -450,6 +462,62 @@ function cc10(rows: readonly CheckAllocation[]): CompletionCheckResult {
       key: group[0].taskKey,
       memberIds: Array.from(new Set(group.map((row) => row.memberId)))
     }))
+  }
+}
+
+/* --- the two Phase 10 checks ---------------------------------------------- */
+
+/** CC-9 (soft). Every blocker raised this stand-up has an owner and a target date. */
+function cc9(blockers: readonly CheckBlocker[] | undefined): CompletionCheckResult {
+  const base = { checkId: 'CC-9' as const, hard: false, overridable: false }
+
+  if (blockers === undefined) {
+    return {
+      ...base,
+      status: 'not_evaluated',
+      message: 'Blockers were not loaded, so this could not be checked.',
+      entities: [],
+      ownedBy: 'Phase 10'
+    }
+  }
+
+  const offenders = blockers.filter((b) => !b.hasOwner || !b.hasTargetDate)
+
+  return {
+    ...base,
+    status: offenders.length ? 'warn' : 'pass',
+    message: offenders.length
+      ? `${count(offenders.length, 'blocker')} still ${
+          offenders.length === 1 ? 'needs' : 'need'
+        } an owner or target date.`
+      : 'Every blocker has an owner and a target date.',
+    entities: offenders.map((b) => ({ blockerId: b.blockerId, taskKey: b.taskKey }))
+  }
+}
+
+/** CC-11 (soft). Sprint-to-date allocation plus remaining estimates fit remaining sprint capacity. */
+function cc11(sprintHealth: EvaluateCompletionChecksInput['sprintHealth']): CompletionCheckResult {
+  const base = { checkId: 'CC-11' as const, hard: false, overridable: false }
+
+  if (sprintHealth === undefined) {
+    return {
+      ...base,
+      status: 'not_evaluated',
+      message: 'Sprint health was not loaded, so this could not be checked.',
+      entities: [],
+      ownedBy: 'Phase 10'
+    }
+  }
+
+  const result = computeSprintHealth(sprintHealth)
+
+  return {
+    ...base,
+    status: result.exceedsCapacity ? 'warn' : 'pass',
+    message: result.exceedsCapacity
+      ? `Remaining sprint scope exceeds remaining capacity by ${(result.overageMinutes / 60).toFixed(1)}h.`
+      : 'Remaining sprint scope fits remaining capacity.',
+    entities: []
   }
 }
 

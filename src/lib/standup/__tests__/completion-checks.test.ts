@@ -538,4 +538,97 @@ describe('evaluateCompletionChecks', () => {
       expect(blockingFailures(results)).toEqual([])
     })
   })
+
+  describe('CC-9 — every blocker has an owner and a target date (Phase 10)', () => {
+    const blocker = (overrides: Record<string, unknown> = {}) => ({
+      blockerId: 'b1',
+      taskKey: 'KAN-214',
+      hasOwner: true,
+      hasTargetDate: true,
+      ...overrides
+    })
+
+    it('is not_evaluated when no blockers were supplied at all', () => {
+      const result = check(evaluateCompletionChecks(healthy()), 'CC-9')
+      expect(result.status).toBe('not_evaluated')
+      expect(result.ownedBy).toBe('Phase 10')
+    })
+
+    it('warns when a blocker lacks an owner or a target date', () => {
+      const result = check(
+        evaluateCompletionChecks({ ...healthy(), blockers: [blocker({ hasOwner: false })] }),
+        'CC-9'
+      )
+      expect(result.status).toBe('warn')
+      expect(result.entities).toEqual([{ blockerId: 'b1', taskKey: 'KAN-214' }])
+    })
+
+    it('passes when every blocker has an owner and a target date', () => {
+      const result = check(
+        evaluateCompletionChecks({ ...healthy(), blockers: [blocker()] }),
+        'CC-9'
+      )
+      expect(result.status).toBe('pass')
+    })
+
+    it('is soft — never appears among blocking failures', () => {
+      const results = evaluateCompletionChecks({
+        ...healthy(),
+        blockers: [blocker({ hasOwner: false, hasTargetDate: false })]
+      })
+      expect(check(results, 'CC-9').hard).toBe(false)
+      expect(blockingFailures(results).map((r) => r.checkId)).not.toContain('CC-9')
+    })
+  })
+
+  describe('CC-11 — remaining scope fits remaining sprint capacity (Phase 10)', () => {
+    it('is not_evaluated when sprint health was not supplied', () => {
+      const result = check(evaluateCompletionChecks(healthy()), 'CC-11')
+      expect(result.status).toBe('not_evaluated')
+      expect(result.ownedBy).toBe('Phase 10')
+    })
+
+    it('passes when remaining estimate fits remaining capacity', () => {
+      const result = check(
+        evaluateCompletionChecks({
+          ...healthy(),
+          sprintHealth: { remainingEstimateMinutes: m(100), remainingCapacityMinutes: m(200) }
+        }),
+        'CC-11'
+      )
+      expect(result.status).toBe('pass')
+    })
+
+    it('warns when remaining estimate exceeds remaining capacity', () => {
+      const result = check(
+        evaluateCompletionChecks({
+          ...healthy(),
+          sprintHealth: { remainingEstimateMinutes: m(300), remainingCapacityMinutes: m(200) }
+        }),
+        'CC-11'
+      )
+      expect(result.status).toBe('warn')
+      expect(result.message).toContain('1.7h')
+    })
+
+    it('treats an exact match as not exceeding', () => {
+      const result = check(
+        evaluateCompletionChecks({
+          ...healthy(),
+          sprintHealth: { remainingEstimateMinutes: m(200), remainingCapacityMinutes: m(200) }
+        }),
+        'CC-11'
+      )
+      expect(result.status).toBe('pass')
+    })
+
+    it('is soft — never appears among blocking failures', () => {
+      const results = evaluateCompletionChecks({
+        ...healthy(),
+        sprintHealth: { remainingEstimateMinutes: m(300), remainingCapacityMinutes: m(200) }
+      })
+      expect(check(results, 'CC-11').hard).toBe(false)
+      expect(blockingFailures(results).map((r) => r.checkId)).not.toContain('CC-11')
+    })
+  })
 })
