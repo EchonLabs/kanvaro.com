@@ -225,3 +225,12 @@ export const estimateImmutable = (taskId: string) =>
     'The original estimate cannot be changed after planning. Revise the remaining estimate instead.',
     { taskId }
   )
+
+export const invalidJustification = () =>
+  new StandupError(
+    'INVALID_JUSTIFICATION',
+    'That justification is too short or not specific enough.'
+  )
+
+export const overrideNotPermitted = (type: string) =>
+  new StandupError('OVERRIDE_NOT_PERMITTED', `${type} cannot be overridden.`, { type })
