@@ -10,6 +10,7 @@
  * behalf) yet still refuse to double-send a retried, identical change.
  */
 import { Standup } from '@/models/Standup'
+import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 import { notificationService } from '@/lib/notification-service'
 
 import {
@@ -17,8 +18,10 @@ import {
   notifyOverrideIssued,
   notifyPersonalCommitment,
   notifyStandupCompleted,
-  notifyStatusChangedOnBehalf
+  notifyStatusChangedOnBehalf,
+  type StandupNotificationId
 } from '../notifications'
+import { sendStandupNotificationOnce } from '../jobs/notify'
 import { ids, useMongo } from './helpers/mongo'
 
 const { organization, project, sprint, member, otherMember, user } = ids
@@ -293,5 +296,79 @@ describe('N11 notifyStatusChangedOnBehalf', () => {
 
     expect(sent).toBe(1)
     expect(createNotification).toHaveBeenCalledTimes(2)
+  })
+})
+
+/**
+ * Task 20 (Phase 10 degradation audit), step 1.
+ *
+ * N4/N5/N6/N7/N11 (this phase, Task 15), N9 (`jobs/escalate-carry-forward.ts`,
+ * Phase 9) and the sprint-health N12 (`jobs/sprint-health.ts`, Task 13) all
+ * fire through this one choke point — `sendStandupNotificationOnce` calling
+ * `isNotificationEnabled(input.projectId, input.notificationId)` before it
+ * ever claims the ledger or calls `createNotification`. The individual send
+ * functions' own suites (above, and `jobs.sprint-health.test.ts`,
+ * `jobs.escalate-carry-forward.test.ts`) test dedup and payload shape but
+ * never a disabled switch — this closes that gap once, generically, for
+ * every id that funnels through the shared primitive, rather than
+ * reimplementing the same project-settings fixture seven times per send
+ * function.
+ *
+ * (There is a second, unrelated notification that also tags its metadata
+ * `notificationId: 'N12'` — `debt-service.ts`'s debt write-off notice
+ * (VAR-8/E44), predating this phase. It sends via
+ * `notificationService.createNotification` directly, not through this
+ * primitive, so it is not gated by the project switch at all and is outside
+ * this test's (and this phase's) scope — see the Task 20 report.)
+ */
+describe('Task 20 / step 1 — the project switch suppresses every id sent through sendStandupNotificationOnce', () => {
+  useMongo()
+
+  const phaseTenIds: StandupNotificationId[] = ['N4', 'N5', 'N6', 'N7', 'N9', 'N11', 'N12']
+
+  it.each(phaseTenIds)('suppresses %s when the project has switched it off', async (notificationId) => {
+    const standupId = await seedStandup()
+    await ProjectStandupSettings.create({
+      project,
+      organization,
+      notificationSwitches: { [notificationId]: false }
+    })
+
+    const sent = await sendStandupNotificationOnce({
+      standupId,
+      projectId: project.toString(),
+      organizationId: organization.toString(),
+      notificationId,
+      recipientIds: [user.toString()],
+      title: 'Test notification',
+      message: 'This should not be sent.'
+    })
+
+    expect(sent).toBe(0)
+    expect(createNotification).not.toHaveBeenCalled()
+
+    // And nothing claimed the ledger either — a later re-enable must still be
+    // able to send, not find the key already taken by the suppressed attempt.
+    const standup = await Standup.findById(standupId).lean()
+    expect(standup!.notificationsSent?.[notificationId]).toBeUndefined()
+  })
+
+  it.each(phaseTenIds)('sends %s when the project switch is on (default, unconfigured project)', async (notificationId) => {
+    const standupId = await seedStandup()
+    // Deliberately no ProjectStandupSettings document — `isNotificationEnabled`
+    // must default every id but N3 to enabled.
+
+    const sent = await sendStandupNotificationOnce({
+      standupId,
+      projectId: project.toString(),
+      organizationId: organization.toString(),
+      notificationId,
+      recipientIds: [user.toString()],
+      title: 'Test notification',
+      message: 'This should be sent.'
+    })
+
+    expect(sent).toBe(1)
+    expect(createNotification).toHaveBeenCalledTimes(1)
   })
 })
