@@ -1016,6 +1016,92 @@ export const standupStrings = {
     filterAgeBand: () => 'Age',
     filterStatus: () => 'Status',
     sortedByAge: () => 'Sorted oldest first'
+  },
+
+  /**
+   * The override modal (§15.12, OVR-1..7).
+   *
+   * §14.2's checks are refusals by default — this is the one screen where a
+   * PM can push past one, so every string here leans toward accountability:
+   * the modal names who is doing this and why, and the attribution notice is
+   * never optional copy.
+   */
+  override: {
+    title: ({ type }: { type: string }) => {
+      switch (type) {
+        case 'over_allocation':
+          return 'Override: allocate beyond capacity'
+        case 'skip_reestimate':
+          return 'Override: defer the re-estimate'
+        case 'duplicate_allocation':
+          return 'Override: allow duplicate allocation'
+        case 'under_allocation':
+        default:
+          return 'Override: allocate below capacity'
+      }
+    },
+
+    gapLine: ({
+      name,
+      gapMinutes,
+      allocatedMinutes,
+      effectiveMinutes
+    }: {
+      name: string
+      gapMinutes: number
+      allocatedMinutes: number
+      effectiveMinutes: number
+    }) =>
+      `${name}: ${Math.round(allocatedMinutes / 60)}h of ${Math.round(effectiveMinutes / 60)}h planned, ${Math.round(Math.abs(gapMinutes) / 60)}h gap.`,
+
+    reasonLabel: ({ code }: { code: string }) => {
+      switch (code) {
+        case 'no_work_available':
+          return 'No work available'
+        case 'blocked_capacity':
+          return 'Blocked on something outside their control'
+        case 'skills_mismatch':
+          return 'No task matching their skills'
+        case 'awaiting_dependency':
+          return 'Waiting on a dependency'
+        case 'training_or_ceremony':
+          return 'Training or ceremony'
+        case 'support_rota':
+          return 'On support rota'
+        case 'part_day_unrecorded':
+          return 'Part day, not recorded as attendance'
+        case 'onboarding':
+          return 'Onboarding'
+        case 'deliberate_buffer':
+          return 'Deliberate buffer'
+        case 'member_agreed_overtime':
+          return 'Member agreed to overtime'
+        case 'estimates_conservative':
+          return 'Estimates were conservative'
+        case 'catching_up_debt':
+          return 'Catching up on estimate debt'
+        case 'critical_deadline':
+          return 'Critical deadline'
+        case 'task_will_split':
+          return 'Task will be split tomorrow'
+        case 'other':
+        default:
+          return 'Other'
+      }
+    },
+
+    justificationLabel: () => 'Why is this being overridden?',
+    justificationPlaceholder: () => 'Explain what actually happened. This is recorded on the audit trail.',
+
+    /** OVR-6 — required only for `over_allocation`. */
+    acknowledgement: () => 'The member has agreed to this overtime.',
+
+    /** SEC-3 — the override, who issued it and why, is never anonymous. */
+    attributionNotice: () =>
+      'This override is recorded against your name and is visible on the audit trail.',
+
+    cancel: () => 'Cancel',
+    submit: () => 'Override'
   }
 } as const
 
