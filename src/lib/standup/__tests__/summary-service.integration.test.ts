@@ -78,8 +78,18 @@ describe('renderSummaryMarkdown', () => {
       { memberId: 'member-2', name: 'Nadeesha', status: 'absent_planned' }
     ],
     completedYesterday: [{ taskId: 'task-1', taskKey: 'KAN-1', title: 'Wire the health job' }],
-    varianceTable: [],
-    debtMovements: [],
+    varianceTable: [
+      {
+        allocationId: 'alloc-1',
+        taskKey: 'KAN-4',
+        memberId: 'member-1',
+        outcome: 'delivered_over',
+        dayVarianceMinutes: -30
+      }
+    ],
+    debtMovements: [
+      { memberId: 'member-1', outstandingDebtMinutes: 60, surplusMinutes: 0 }
+    ],
     memberCommitments: [
       {
         memberId: 'member-1',
@@ -87,10 +97,27 @@ describe('renderSummaryMarkdown', () => {
         allocations: [{ taskId: 'task-2', taskKey: 'KAN-2', plannedMinutes: 120 }]
       }
     ],
-    blockersRaised: [],
-    blockersResolved: [],
-    carryForwardState: [],
-    overridesIssued: [{ id: 'override-1', type: 'under_allocation', justification: 'On support rota.' }],
+    blockersRaised: [
+      {
+        blockerId: 'blocker-1',
+        description: 'Waiting on vendor sandbox',
+        blockerType: 'external_party',
+        severity: 'high',
+        status: 'open'
+      }
+    ],
+    blockersResolved: [{ blockerId: 'blocker-2', resolutionNote: 'Vendor restored access.' }],
+    carryForwardState: [
+      { itemId: 'cfw-1', taskKey: 'KAN-5', ageBand: '3-5', status: 'open' }
+    ],
+    overridesIssued: [
+      {
+        overrideId: 'override-1',
+        type: 'under_allocation',
+        reasonCode: 'support_rota',
+        justification: 'On support rota.'
+      }
+    ],
     pmNotes: 'Solid day.'
   } as unknown as SummaryDocument
 
@@ -112,9 +139,34 @@ describe('renderSummaryMarkdown', () => {
     expect(output).toContain('- KAN-2 (2.0h)')
   })
 
-  it('keeps override justification text in full, per UI-10', () => {
+  it('renders overrides as readable prose, not a JSON dump, keeping the justification text in full (UI-10)', () => {
     const output = renderSummaryMarkdown(fixture)
-    expect(output).toContain('On support rota.')
+    expect(output).toContain('## Overrides issued')
+    expect(output).toContain('- **under_allocation** (support_rota): On support rota.')
+    // Never a raw JSON blob — that was the reviewed-away failure mode.
+    expect(output).not.toContain('"overrideId"')
+    expect(output).not.toContain('{"')
+  })
+
+  it('renders variance rows with the member name, outcome and hours — not JSON', () => {
+    const output = renderSummaryMarkdown(fixture)
+    expect(output).toContain('- KAN-4 (Kasun): delivered_over, -0.5h day variance')
+  })
+
+  it('renders debt movements with the member name and hours — not JSON', () => {
+    const output = renderSummaryMarkdown(fixture)
+    expect(output).toContain('- Kasun: 1.0h outstanding debt, 0.0h surplus')
+  })
+
+  it('renders blockers raised/resolved as prose — not JSON', () => {
+    const output = renderSummaryMarkdown(fixture)
+    expect(output).toContain('- Waiting on vendor sandbox (external_party, high) — open')
+    expect(output).toContain('- Vendor restored access.')
+  })
+
+  it('renders carry-forward rows as prose — not JSON', () => {
+    const output = renderSummaryMarkdown(fixture)
+    expect(output).toContain('- KAN-5 (3-5) — open')
   })
 
   it('renders pmNotes under its own heading only when present', () => {
@@ -127,7 +179,17 @@ describe('renderSummaryMarkdown', () => {
   })
 
   it('says "Nothing recorded" for empty sections rather than omitting the heading', () => {
-    const output = renderSummaryMarkdown(fixture)
+    const emptyFixture = {
+      ...fixture,
+      varianceTable: [],
+      debtMovements: [],
+      blockersRaised: [],
+      blockersResolved: [],
+      carryForwardState: [],
+      overridesIssued: []
+    } as unknown as SummaryDocument
+
+    const output = renderSummaryMarkdown(emptyFixture)
     expect(output).toContain('## Variance')
     expect(output).toContain('## Estimate debt movements')
     expect(output).toContain('## Blockers raised')

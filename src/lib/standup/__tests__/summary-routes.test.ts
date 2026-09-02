@@ -79,6 +79,14 @@ async function seedSummary(standupId: mongoose.Types.ObjectId, overrides: Record
       durationMinutes: 15
     },
     attendance: [{ memberId: member, name: 'Kasun', status: 'present' }],
+    overridesIssued: [
+      {
+        overrideId: 'override-1',
+        type: 'under_allocation',
+        reasonCode: 'support_rota',
+        justification: 'On support rota.'
+      }
+    ],
     ...overrides
   })
 }
@@ -179,6 +187,11 @@ describe('GET /api/standups/:id/summary/export', () => {
     expect(response.headers.get('Content-Type')).toContain('text/markdown')
     expect(text).toContain('# Stand-up — 2026-08-17 (Day 1 of 5)')
     expect(text).toContain('Kasun: present')
+
+    // UI-10/OVR-10: the override renders as readable prose with its
+    // justification intact, never as a raw JSON dump.
+    expect(text).toContain('- **under_allocation** (support_rota): On support rota.')
+    expect(text).not.toContain('"overrideId"')
   })
 
   it('defaults to markdown when no format is given', async () => {

@@ -66,6 +66,24 @@ interface SummaryPayload {
 
 const s = standupStrings.summary
 
+/**
+ * Reads a field off a row typed as `Record<string, unknown>` in the payload
+ * (variance, debt, blockers, carry-forward, overrides all are — the schema
+ * stores them as Mixed). Mirrors `summary-service.ts`'s own `field` helper so
+ * the screen and the markdown export never disagree about what a missing
+ * field renders as.
+ */
+function field(row: Record<string, unknown>, key: string): string | undefined {
+  const value = row[key]
+  if (value === undefined || value === null) return undefined
+  return String(value)
+}
+
+function minutesToHours(value: unknown): string {
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? (n / 60).toFixed(1) : '0.0'
+}
+
 export default function StandupSummaryPage({
   params
 }: {
@@ -117,6 +135,11 @@ export default function StandupSummaryPage({
   const printSummary = useCallback(() => {
     window.print()
   }, [])
+
+  const nameFor = (memberId: unknown): string => {
+    const match = summary?.attendance.find((row) => row.memberId === memberId)
+    return match?.name ?? String(memberId ?? '')
+  }
 
   return (
     <MainLayout>
@@ -217,7 +240,18 @@ export default function StandupSummaryPage({
               {summary.varianceTable.length === 0 ? (
                 <Empty text={s.emptyVariance()} />
               ) : (
-                <RawRows rows={summary.varianceTable} />
+                <ul className="space-y-1 text-sm">
+                  {summary.varianceTable.map((row, index) => {
+                    const taskKey = field(row, 'taskKey') ?? field(row, 'allocationId') ?? 'Task'
+                    const outcome = field(row, 'outcome') ?? 'unknown'
+                    return (
+                      <li key={index}>
+                        {taskKey} ({nameFor(row.memberId)}): {outcome},{' '}
+                        {minutesToHours(row.dayVarianceMinutes)}h day variance
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </Section>
 
@@ -225,7 +259,14 @@ export default function StandupSummaryPage({
               {summary.debtMovements.length === 0 ? (
                 <Empty text={s.emptyDebtMovements()} />
               ) : (
-                <RawRows rows={summary.debtMovements} />
+                <ul className="space-y-1 text-sm">
+                  {summary.debtMovements.map((row, index) => (
+                    <li key={index}>
+                      {nameFor(row.memberId)}: {minutesToHours(row.outstandingDebtMinutes)}h
+                      outstanding debt, {minutesToHours(row.surplusMinutes)}h surplus
+                    </li>
+                  ))}
+                </ul>
               )}
             </Section>
 
@@ -255,7 +296,22 @@ export default function StandupSummaryPage({
               {summary.blockersRaised.length === 0 ? (
                 <Empty text={s.emptyBlockersRaised()} />
               ) : (
-                <RawRows rows={summary.blockersRaised} />
+                <ul className="space-y-1 text-sm">
+                  {summary.blockersRaised.map((row, index) => {
+                    const description = field(row, 'description') ?? 'Blocker'
+                    const meta = [field(row, 'blockerType'), field(row, 'severity')]
+                      .filter(Boolean)
+                      .join(', ')
+                    const status = field(row, 'status')
+                    return (
+                      <li key={index}>
+                        {description}
+                        {meta ? ` (${meta})` : ''}
+                        {status ? ` — ${status}` : ''}
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </Section>
 
@@ -263,7 +319,11 @@ export default function StandupSummaryPage({
               {summary.blockersResolved.length === 0 ? (
                 <Empty text={s.emptyBlockersResolved()} />
               ) : (
-                <RawRows rows={summary.blockersResolved} />
+                <ul className="space-y-1 text-sm">
+                  {summary.blockersResolved.map((row, index) => (
+                    <li key={index}>{field(row, 'resolutionNote') ?? 'Resolved.'}</li>
+                  ))}
+                </ul>
               )}
             </Section>
 
@@ -271,7 +331,20 @@ export default function StandupSummaryPage({
               {summary.carryForwardState.length === 0 ? (
                 <Empty text={s.emptyCarryForward()} />
               ) : (
-                <RawRows rows={summary.carryForwardState} />
+                <ul className="space-y-1 text-sm">
+                  {summary.carryForwardState.map((row, index) => {
+                    const taskKey = field(row, 'taskKey') ?? field(row, 'itemId') ?? 'Item'
+                    const ageBand = field(row, 'ageBand')
+                    const status = field(row, 'status')
+                    return (
+                      <li key={index}>
+                        {taskKey}
+                        {ageBand ? ` (${ageBand})` : ''}
+                        {status ? ` — ${status}` : ''}
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </Section>
 
@@ -279,7 +352,20 @@ export default function StandupSummaryPage({
               {summary.overridesIssued.length === 0 ? (
                 <Empty text={s.emptyOverrides()} />
               ) : (
-                <RawRows rows={summary.overridesIssued} />
+                <ul className="space-y-1 text-sm">
+                  {summary.overridesIssued.map((row, index) => {
+                    const type = field(row, 'type') ?? 'override'
+                    const reasonCode = field(row, 'reasonCode')
+                    const justification = field(row, 'justification')
+                    return (
+                      <li key={index}>
+                        <strong>{type}</strong>
+                        {reasonCode ? ` (${reasonCode})` : ''}
+                        {justification ? `: ${justification}` : ''}
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </Section>
 
@@ -306,24 +392,4 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Empty({ text }: { text: string }) {
   return <p className="text-sm text-muted-foreground">{text}</p>
-}
-
-/**
- * Overrides, variance rows, blockers etc. are stored as loosely-typed
- * `Record<string, unknown>` rows (see `StandupSummary.ts`'s own docblock) —
- * they carry whatever shape the completion saga wrote at the time. This
- * screen surfaces them faithfully rather than guessing at a stricter shape;
- * a JSON dump preserves override justification text in full, which UI-10
- * requires ("overrides issued with full justification text").
- */
-function RawRows({ rows }: { rows: Array<Record<string, unknown>> }) {
-  return (
-    <ul className="space-y-1 text-sm">
-      {rows.map((row, index) => (
-        <li key={index} className="whitespace-pre-wrap break-words">
-          {JSON.stringify(row)}
-        </li>
-      ))}
-    </ul>
-  )
 }

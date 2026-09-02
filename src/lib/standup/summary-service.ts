@@ -16,6 +16,27 @@ import { StandupError } from './errors'
 export type SummaryDocument = Awaited<ReturnType<typeof getSummary>>
 
 /**
+ * Reads a field off a row typed as `Record<string, unknown>` in the schema
+ * (variance, debt, blockers, carry-forward, overrides all are — see
+ * `StandupSummary.ts`'s own docblock) without `any` spreading through every
+ * call site. The persisted shape is concrete as of the completion route
+ * (`src/app/api/standups/[id]/complete/route.ts`'s `summaryInputs`), but this
+ * stays defensive — a `String()`/fallback rather than a throw — so an older
+ * or hand-seeded summary document renders something readable instead of
+ * crashing the export.
+ */
+function field(row: Record<string, unknown>, key: string): string | undefined {
+  const value = row[key]
+  if (value === undefined || value === null) return undefined
+  return String(value)
+}
+
+function minutesToHours(value: unknown): string {
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? (n / 60).toFixed(1) : '0.0'
+}
+
+/**
  * Loads the persisted summary for a stand-up.
  *
  * Throws `NOT_FOUND` when none exists yet — a stand-up that has not been
@@ -42,6 +63,10 @@ export async function getSummary(standupId: string): Promise<IStandupSummary> {
  */
 export function renderSummaryMarkdown(summary: SummaryDocument): string {
   const lines: string[] = []
+  const nameById = new Map(
+    (summary.attendance ?? []).map((row: any) => [String(row.memberId), row.name])
+  )
+  const nameFor = (memberId: unknown) => nameById.get(String(memberId)) ?? String(memberId ?? '')
 
   lines.push(
     `# Stand-up — ${summary.headerFacts.standupDate} (Day ${summary.headerFacts.dayNumber} of ${summary.headerFacts.totalDays})`
@@ -64,12 +89,23 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
 
   lines.push('## Variance')
   if (summary.varianceTable.length === 0) lines.push('Nothing recorded.')
-  for (const row of summary.varianceTable) lines.push(`- ${JSON.stringify(row)}`)
+  for (const row of summary.varianceTable as unknown as Record<string, unknown>[]) {
+    const taskKey = field(row, 'taskKey') ?? field(row, 'allocationId') ?? 'Task'
+    const memberName = nameFor(row.memberId)
+    const outcome = field(row, 'outcome') ?? 'unknown'
+    const variance = minutesToHours(row.dayVarianceMinutes)
+    lines.push(`- ${taskKey} (${memberName}): ${outcome}, ${variance}h day variance`)
+  }
   lines.push('')
 
   lines.push('## Estimate debt movements')
   if (summary.debtMovements.length === 0) lines.push('Nothing recorded.')
-  for (const row of summary.debtMovements) lines.push(`- ${JSON.stringify(row)}`)
+  for (const row of summary.debtMovements as unknown as Record<string, unknown>[]) {
+    const memberName = nameFor(row.memberId)
+    const debt = minutesToHours(row.outstandingDebtMinutes)
+    const surplus = minutesToHours(row.surplusMinutes)
+    lines.push(`- ${memberName}: ${debt}h outstanding debt, ${surplus}h surplus`)
+  }
   lines.push('')
 
   lines.push('## Today’s commitments')
@@ -84,22 +120,44 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
 
   lines.push('## Blockers raised')
   if (summary.blockersRaised.length === 0) lines.push('None.')
-  for (const row of summary.blockersRaised) lines.push(`- ${JSON.stringify(row)}`)
+  for (const row of summary.blockersRaised as unknown as Record<string, unknown>[]) {
+    const description = field(row, 'description') ?? 'Blocker'
+    const blockerType = field(row, 'blockerType')
+    const severity = field(row, 'severity')
+    const status = field(row, 'status')
+    const meta = [blockerType, severity].filter(Boolean).join(', ')
+    lines.push(`- ${description}${meta ? ` (${meta})` : ''}${status ? ` — ${status}` : ''}`)
+  }
   lines.push('')
 
   lines.push('## Blockers resolved')
   if (summary.blockersResolved.length === 0) lines.push('None.')
-  for (const row of summary.blockersResolved) lines.push(`- ${JSON.stringify(row)}`)
+  for (const row of summary.blockersResolved as unknown as Record<string, unknown>[]) {
+    const note = field(row, 'resolutionNote')
+    lines.push(`- ${note ?? 'Resolved.'}`)
+  }
   lines.push('')
 
   lines.push('## Carry forward')
   if (summary.carryForwardState.length === 0) lines.push('Nothing carried forward.')
-  for (const row of summary.carryForwardState) lines.push(`- ${JSON.stringify(row)}`)
+  for (const row of summary.carryForwardState as unknown as Record<string, unknown>[]) {
+    const taskKey = field(row, 'taskKey') ?? field(row, 'itemId') ?? 'Item'
+    const ageBand = field(row, 'ageBand')
+    const status = field(row, 'status')
+    lines.push(`- ${taskKey}${ageBand ? ` (${ageBand})` : ''}${status ? ` — ${status}` : ''}`)
+  }
   lines.push('')
 
   lines.push('## Overrides issued')
   if (summary.overridesIssued.length === 0) lines.push('None.')
-  for (const o of summary.overridesIssued) lines.push(`- ${JSON.stringify(o)}`)
+  for (const row of summary.overridesIssued as unknown as Record<string, unknown>[]) {
+    const type = field(row, 'type') ?? 'override'
+    const reasonCode = field(row, 'reasonCode')
+    const justification = field(row, 'justification')
+    lines.push(
+      `- **${type}**${reasonCode ? ` (${reasonCode})` : ''}${justification ? `: ${justification}` : ''}`
+    )
+  }
 
   if (summary.pmNotes) {
     lines.push('')
