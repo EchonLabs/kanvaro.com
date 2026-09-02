@@ -400,6 +400,77 @@ export function withCarryForwardItemPermission(
   }
 }
 
+/**
+ * Like {@link withCarryForwardItemPermission}, but keyed by **blocker** id
+ * (RUN-14..18). `/api/blockers/:id` carries neither a project nor a standup
+ * id, so the blocker is loaded first — it denormalises its own `project` and
+ * `organization` the same way `CarryForwardItem` does — and that drives both
+ * the org-isolation check and the permission check.
+ */
+export function withBlockerPermission(
+  options: { permission: Permission; blockerIdParam?: string },
+  handler: (
+    request: NextRequest,
+    context: StandupRouteContext & { blockerId: string; blocker: any }
+  ) => Promise<NextResponse> | NextResponse
+) {
+  return async (request: NextRequest, routeContext?: { params?: Record<string, string> }) => {
+    try {
+      await connectDB()
+
+      const authResult = await authenticateUser()
+      if ('error' in authResult) {
+        return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+      }
+
+      const params = routeContext?.params ?? {}
+      const blockerId = params[options.blockerIdParam ?? 'id']
+
+      const { StandupBlocker } = await import('@/models/StandupBlocker')
+      const blocker = await StandupBlocker.findById(blockerId).lean()
+
+      const missing = NextResponse.json(
+        { error: { code: 'NOT_FOUND', message: 'That blocker no longer exists.' } },
+        { status: 404 }
+      )
+
+      if (!blocker) return missing
+
+      if ((blocker as any).organization?.toString() !== authResult.user.organization?.toString()) {
+        return missing
+      }
+
+      const projectId = (blocker as any).project?.toString()
+
+      const allowed = await PermissionService.hasPermission(
+        authResult.user.id,
+        options.permission,
+        projectId
+      )
+
+      if (!allowed) {
+        return NextResponse.json(
+          { error: { code: 'FORBIDDEN', message: 'You do not have permission to do that.' } },
+          { status: 403 }
+        )
+      }
+
+      return await handler(request, {
+        userId: authResult.user.id,
+        organizationId: authResult.user.organization,
+        projectId,
+        params,
+        blockerId,
+        blocker
+      })
+    } catch (error) {
+      const { status, body } = toErrorResponse(error)
+      if (status === 500) console.error('Blocker route error:', error)
+      return NextResponse.json(body, { status })
+    }
+  }
+}
+
 export { STANDUP_VERSION_HEADER }
 
 /**
