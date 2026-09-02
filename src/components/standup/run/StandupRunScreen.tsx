@@ -459,6 +459,7 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
           ? board.variance.rows.map(
               (row): CheckVarianceRow => ({
                 allocationId: row.allocationId,
+                taskId: row.taskId,
                 taskKey: row.taskKey,
                 memberId: row.memberId,
                 requiresRevision: row.requiresRevision,

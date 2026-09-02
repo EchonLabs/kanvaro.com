@@ -56,6 +56,7 @@ import {
   blockingFailures,
   type EvaluateCompletionChecksInput
 } from './completion-checks'
+import { filterOverriddenFailures } from './override'
 import { classifyAndPost } from './variance-service'
 import { buildCarryForwardSet } from './carry-forward-service'
 import { buildSummaryDocument, type BuildSummaryInput } from './summary'
@@ -94,8 +95,22 @@ export interface CompletionContext {
   attendeeIds: string[]
   adminRecipientIds: string[]
   memberCommitments: Array<{ memberId: string; hasAnyAllocation: boolean }>
-  /** RUN-20 step 9 / AC-10: drives one N7 per override, sent to `adminRecipientIds`. */
-  overridesIssued: Array<{ overrideId: string; type: string }>
+  /**
+   * Dual purpose. RUN-20 step 9 / AC-10: drives one N7 per override, sent to
+   * `adminRecipientIds`. **Also** (Task 21): the guard just below
+   * `evaluateCompletionChecks` reconciles each hard-blocking failure against
+   * these records via `filterOverriddenFailures` — an override only unblocks
+   * completion when it actually names the specific member/task a failure is
+   * about, so `affectedMemberIds`/`affectedTaskIds` must be populated
+   * alongside `type`, not left as an empty array, or reconciliation silently
+   * resolves nothing.
+   */
+  overridesIssued: Array<{
+    overrideId: string
+    type: string
+    affectedMemberIds: string[]
+    affectedTaskIds: string[]
+  }>
   summaryInputs: Omit<BuildSummaryInput, 'standupId' | 'sprintId' | 'projectId' | 'organizationId'>
   summaryUrl: string
 }
@@ -135,7 +150,10 @@ export async function runCompletionSaga(ctx: CompletionContext): Promise<Complet
   // RUN-19: re-run the checks server-side against server-loaded data.
   const results = evaluateCompletionChecks(ctx.checkInput)
   const blocking = blockingFailures(results)
-  if (blocking.length > 0) throw completionChecksFailed(blocking)
+  // §14 / AC-10: an issued override only unblocks the specific member/task
+  // failure it actually names — see `filterOverriddenFailures`'s own docblock.
+  const unresolved = filterOverriddenFailures(blocking, ctx.overridesIssued)
+  if (unresolved.length > 0) throw completionChecksFailed(unresolved)
 
   let summaryId = ''
 

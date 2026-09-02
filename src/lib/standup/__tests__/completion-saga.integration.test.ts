@@ -15,6 +15,7 @@ import { CarryForwardItem, OPEN_CARRY_FORWARD_STATUSES } from '@/models/CarryFor
 import { EstimateDebtLedger } from '@/models/EstimateDebtLedger'
 import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
+import { StandupOverride } from '@/models/StandupOverride'
 import { StandupSummary } from '@/models/StandupSummary'
 import { Task } from '@/models/Task'
 
@@ -390,7 +391,11 @@ describe('runCompletionSaga', () => {
     const overrideId = new mongoose.Types.ObjectId().toString()
 
     const ctx: CompletionContext = {
-      ...baseContext({ overridesIssued: [{ overrideId, type: 'over_allocation' }] }),
+      ...baseContext({
+        overridesIssued: [
+          { overrideId, type: 'over_allocation', affectedMemberIds: [], affectedTaskIds: [] }
+        ]
+      }),
       standupId: String(day2._id),
       expectedVersion: 0
     }
@@ -423,7 +428,11 @@ describe('runCompletionSaga', () => {
 
     const overrideId = new mongoose.Types.ObjectId().toString()
     const ctx: CompletionContext = {
-      ...baseContext({ overridesIssued: [{ overrideId, type: 'over_allocation' }] }),
+      ...baseContext({
+        overridesIssued: [
+          { overrideId, type: 'over_allocation', affectedMemberIds: [], affectedTaskIds: [] }
+        ]
+      }),
       standupId: String(day2._id),
       expectedVersion: 0
     }
@@ -444,5 +453,149 @@ describe('runCompletionSaga', () => {
       (call) => call[2]?.data?.metadata?.notificationId === `N7:${overrideId}`
     ).length
     expect(n7CallsAfterSecond).toBe(1)
+  })
+
+  // --- Task 21 / §14 / AC-10 — an issued override actually unblocks completion ---
+
+  /** A CC-1 (under-allocation) check input for one member, 3h under capacity. */
+  function underAllocatedCheckInput(memberId: string) {
+    return {
+      shape: 'mid_sprint' as const,
+      members: [
+        {
+          memberId,
+          name: 'Kasun',
+          attendance: 'present' as const,
+          capacity: {
+            memberId,
+            date: '2026-08-18',
+            nominalMinutes: minutes(480),
+            adjustments: [],
+            adjustedMinutes: minutes(480),
+            outstandingDebtMinutes: minutes(0),
+            overrunPolicy: 'absorb' as const,
+            effectiveMinutes: minutes(480),
+            allocatedMinutes: minutes(300),
+            gapMinutes: minutes(180),
+            status: 'under' as const,
+            isUnavailable: false,
+            strandedMinutes: minutes(0)
+          },
+          allocations: []
+        }
+      ],
+      variance: [],
+      carryForward: [],
+      blockers: [],
+      sprintHealth: { remainingEstimateMinutes: minutes(0), remainingCapacityMinutes: minutes(1000) }
+    }
+  }
+
+  it('AC-10: CC-1 blocks completion for the under-allocated member until a matching under_allocation override is issued, then completion succeeds', async () => {
+    const day1 = await seedStandup('2026-08-17', 1)
+    const day2 = await seedStandup('2026-08-18', 2)
+    const task = await seedTask()
+    await seedAllocation(day1._id, task._id)
+    await seedAllocation(day2._id, task._id)
+
+    const blockedCtx: CompletionContext = {
+      ...baseContext({ checkInput: underAllocatedCheckInput(String(member)) }),
+      standupId: String(day2._id),
+      expectedVersion: 0
+    }
+
+    // Before the override: CC-1 blocks, naming Kasun with the 3h gap.
+    const failure = await runCompletionSaga(blockedCtx).catch((error) => error)
+    expect(failure.code).toBe('COMPLETION_CHECKS_FAILED')
+    expect(failure.details.failingChecks).toEqual([
+      expect.objectContaining({
+        checkId: 'CC-1',
+        entities: [expect.objectContaining({ memberId: String(member), gapMinutes: minutes(180) })]
+      })
+    ])
+    expect((await Standup.findById(day2._id).lean())!.status).toBe('In_Progress')
+
+    // Issue a matching under_allocation override naming Kasun.
+    const override = await StandupOverride.create({
+      standup: day2._id,
+      sprint: sprintId,
+      project,
+      organization,
+      type: 'under_allocation',
+      affectedMemberIds: [member],
+      affectedTaskIds: [],
+      reasonCode: 'blocked_capacity',
+      justification: "All of Kasun's remaining work is blocked on the vendor sandbox today.",
+      gapMinutes: 180,
+      issuedBy: user
+    })
+
+    // Same completion attempt, now carrying that override: CC-1's failure for
+    // Kasun is resolved, and completion succeeds.
+    const unblockedCtx: CompletionContext = {
+      ...blockedCtx,
+      overridesIssued: [
+        {
+          overrideId: String(override._id),
+          type: 'under_allocation',
+          affectedMemberIds: [String(member)],
+          affectedTaskIds: []
+        }
+      ]
+    }
+
+    const result = await runCompletionSaga(unblockedCtx)
+    expect(result.status).toBe('completed')
+
+    const standup = await Standup.findById(day2._id).lean()
+    expect(standup!.status).toBe('Completed')
+  })
+
+  it('AC-10 negative: an override naming a different member does not unblock the original failure', async () => {
+    const day1 = await seedStandup('2026-08-17', 1)
+    const day2 = await seedStandup('2026-08-18', 2)
+    const task = await seedTask()
+    await seedAllocation(day1._id, task._id)
+    await seedAllocation(day2._id, task._id)
+
+    const override = await StandupOverride.create({
+      standup: day2._id,
+      sprint: sprintId,
+      project,
+      organization,
+      type: 'under_allocation',
+      affectedMemberIds: [otherMember],
+      affectedTaskIds: [],
+      reasonCode: 'blocked_capacity',
+      justification: "All of Amal's remaining work is blocked on the vendor sandbox today.",
+      gapMinutes: 90,
+      issuedBy: user
+    })
+
+    const ctx: CompletionContext = {
+      ...baseContext({
+        checkInput: underAllocatedCheckInput(String(member)),
+        overridesIssued: [
+          {
+            overrideId: String(override._id),
+            type: 'under_allocation',
+            affectedMemberIds: [String(otherMember)],
+            affectedTaskIds: []
+          }
+        ]
+      }),
+      standupId: String(day2._id),
+      expectedVersion: 0
+    }
+
+    const failure = await runCompletionSaga(ctx).catch((error) => error)
+    expect(failure.code).toBe('COMPLETION_CHECKS_FAILED')
+    expect(failure.details.failingChecks).toEqual([
+      expect.objectContaining({
+        checkId: 'CC-1',
+        entities: [expect.objectContaining({ memberId: String(member) })]
+      })
+    ])
+    expect((await Standup.findById(day2._id).lean())!.status).toBe('In_Progress')
   })
 })

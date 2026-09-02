@@ -161,6 +161,7 @@ async function assembleCompletionContext(input: {
     ? []
     : variance.rows.map((row) => ({
         allocationId: row.allocationId,
+        taskId: row.taskId,
         taskKey: row.taskKey,
         memberId: row.memberId,
         requiresRevision: row.requiresRevision,
@@ -208,7 +209,9 @@ async function assembleCompletionContext(input: {
 
   const overridesIssued = overrideDocs.map((override) => ({
     overrideId: String(override._id),
-    type: String(override.type)
+    type: String(override.type),
+    affectedMemberIds: (override.affectedMemberIds ?? []).map(String),
+    affectedTaskIds: (override.affectedTaskIds ?? []).map(String)
   }))
 
   // §15.13's summary — assembled from the same reads above, so what the PM

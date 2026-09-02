@@ -26,7 +26,9 @@ import { NextRequest } from 'next/server'
 import { Allocation } from '@/models/Allocation'
 import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
+import { StandupOverride } from '@/models/StandupOverride'
 import { StandupSummary } from '@/models/StandupSummary'
+import { Task } from '@/models/Task'
 
 import { notificationService } from '@/lib/notification-service'
 import { STANDUP_VERSION_HEADER } from '@/lib/standup/version-header'
@@ -278,5 +280,89 @@ describe('POST /api/standups/:id/complete', () => {
     const completed = await Standup.findById(standup._id).lean()
     expect(completed!.status).toBe('Completed')
     expect(completed!.completionState).toBeUndefined()
+  })
+
+  // --- Task 21 / AC-10: assembleCompletionContext must populate the richer
+  // overridesIssued shape (affectedMemberIds/affectedTaskIds) from the real
+  // StandupOverride documents, not just {overrideId, type} — otherwise the
+  // saga's reconciliation always sees empty arrays and never actually unblocks
+  // anything, even though the saga-level unit tests pass.
+
+  it('AC-10: a present, unallocated member blocks completion on CC-1, and a matching under_allocation override (read from a real StandupOverride document) unblocks it', async () => {
+    const standup = await Standup.create({
+      project,
+      sprint: sprintId,
+      organization,
+      standupDate: '2026-08-17',
+      scheduledStartAt: new Date('2026-08-17T03:30:00.000Z'),
+      durationMinutes: 15,
+      sprintDayNumber: 1,
+      totalSprintDays: 5,
+      shape: 'day_one',
+      status: 'In_Progress',
+      facilitator: user,
+      expectedAttendees: [member],
+      attendance: [{ user: member, state: 'present' }],
+      version: 0
+    })
+
+    // A real, but small, allocation: `allocationStatus` treats zero allocated
+    // minutes as `zero` (not `under`), so CC-1's own offender needs *some*
+    // hours planned, just far short of the member's nominal capacity.
+    const task = await Task.create({
+      title: 'Route test task',
+      organization,
+      project,
+      sprint: sprintId,
+      createdBy: user,
+      taskNumber: 9001,
+      displayId: 'KAN-9001',
+      status: 'in_progress',
+      remainingEstimateMinutes: 100,
+      originalEstimateMinutes: 100,
+      assignedTo: [{ user: member }]
+    })
+    await Allocation.create({
+      standup: standup._id,
+      sprint: sprintId,
+      project,
+      organization,
+      member,
+      task: task._id,
+      plannedMinutes: 100,
+      source: 'assigned_in_standup',
+      excludedFromCapacity: false,
+      createdBy: user
+    })
+
+    const blocked = await invoke(String(standup._id), 0)
+    const blockedPayload = await blocked.json()
+    expect(blocked.status).toBe(422)
+    expect(blockedPayload.error.code).toBe('COMPLETION_CHECKS_FAILED')
+    const cc1 = blockedPayload.error.details.failingChecks.find((c: any) => c.checkId === 'CC-1')
+    expect(cc1).toBeDefined()
+    expect(cc1.entities).toEqual([expect.objectContaining({ memberId: String(member) })])
+
+    await StandupOverride.create({
+      standup: standup._id,
+      sprint: sprintId,
+      project,
+      organization,
+      type: 'under_allocation',
+      affectedMemberIds: [member],
+      affectedTaskIds: [],
+      reasonCode: 'blocked_capacity',
+      justification: "All of this member's remaining work is blocked on the vendor sandbox today.",
+      gapMinutes: 480,
+      issuedBy: user
+    })
+
+    const unblocked = await invoke(String(standup._id), 0)
+    const unblockedPayload = await unblocked.json()
+    expect(unblocked.status).toBe(200)
+    expect(unblockedPayload.status).toBe('completed')
+
+    const after = await Standup.findById(standup._id).lean()
+    expect(after!.status).toBe('Completed')
   })
 })

@@ -77,6 +77,15 @@ export interface CheckAllocation {
 export interface CheckVarianceRow {
   allocationId: string
   taskKey?: string
+  /**
+   * The task's real id, so a `skip_reestimate` override (which names tasks,
+   * not allocations or display keys — `StandupOverride.affectedTaskIds`
+   * stores task ObjectIds) can be matched back to this failure by
+   * `filterOverriddenFailures` in `override.ts`. Optional: a caller that
+   * cannot supply it degrades safely to "this row's failure cannot be
+   * resolved by an override," not a crash.
+   */
+  taskId?: string
   memberId: string
   /** V5 with nothing left, and every V6 (§12.2). */
   requiresRevision: boolean
@@ -276,7 +285,8 @@ function cc3(
 const identity = (row: CheckVarianceRow) => ({
   allocationId: row.allocationId,
   taskKey: row.taskKey,
-  memberId: row.memberId
+  memberId: row.memberId,
+  ...(row.taskId === undefined ? {} : { taskId: row.taskId })
 })
 
 /**
