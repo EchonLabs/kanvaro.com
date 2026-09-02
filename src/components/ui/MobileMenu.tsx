@@ -282,7 +282,16 @@ const navigationItems = [
     label: 'Documentation',
     icon: BookOpen,
     path: '/docs',
-    permission: Permission.SETTINGS_VIEW
+    permission: Permission.SETTINGS_VIEW,
+    children: [
+      {
+        id: 'document-templates',
+        label: 'Document Templates',
+        icon: FileText,
+        path: '/document-templates',
+        permission: Permission.DOCUMENTATION_VIEW
+      }
+    ]
   },
   {
     id: 'settings',
