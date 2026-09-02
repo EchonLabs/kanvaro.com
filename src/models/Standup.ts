@@ -125,6 +125,18 @@ export interface IStandup extends Document {
    */
   notificationsSent: Record<string, Date>
 
+  /**
+   * NFR-6's completion saga checkpoint (plan D-A). Backs `SagaCheckpoint`
+   * (`src/lib/standup/saga.ts`) directly: `lastCompletedStep` is that
+   * interface's field verbatim, plus `runId` and `updatedAt` so a stale or
+   * unrelated run's checkpoint is never mistaken for the current one.
+   */
+  completionState?: {
+    runId: string
+    lastCompletedStep: string | null
+    updatedAt: Date
+  }
+
   createdAt: Date
   updatedAt: Date
 }
@@ -200,7 +212,13 @@ const StandupSchema = new Schema<IStandup>(
     snapshot: { type: Schema.Types.Mixed },
     snapshotBuiltAt: { type: Date },
 
-    notificationsSent: { type: Schema.Types.Mixed, default: () => ({}) }
+    notificationsSent: { type: Schema.Types.Mixed, default: () => ({}) },
+
+    completionState: {
+      runId: { type: String },
+      lastCompletedStep: { type: String, default: null },
+      updatedAt: { type: Date }
+    }
   },
   { timestamps: true }
 )
