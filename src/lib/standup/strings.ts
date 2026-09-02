@@ -887,7 +887,33 @@ export const standupStrings = {
       `${label} has been open for ${age} stand-ups without closing.`,
     carryForwardChronicTitle: () => 'A carry-forward item is now chronic',
     carryForwardChronicMessage: ({ label, age }: { label: string; age: number }) =>
-      `${label} has been open for ${age} stand-ups. It needs a documented decision: continue, descope, or split.`
+      `${label} has been open for ${age} stand-ups. It needs a documented decision: continue, descope, or split.`,
+
+    /** N4 — UI-10/UI-11: each member's own commitment summary, on completion. */
+    personalCommitmentTitle: () => 'Your stand-up summary is ready',
+    personalCommitmentMessage: () =>
+      'Today’s stand-up is complete. Your personal commitment summary is ready to review.',
+
+    /** N5 — the facilitator/admin/stakeholder digest, on completion. */
+    completedTitle: () => 'Stand-up completed',
+    completedMessage: () => 'Today’s stand-up is complete. The summary is ready to review.',
+
+    /** N6 — a member who received no allocation for the day. */
+    notAllocatedTitle: () => 'You were not allocated any work today',
+    notAllocatedMessage: () =>
+      'Today’s stand-up completed without allocating you any work. If that is unexpected, check with your facilitator.',
+
+    /** N7 — an override was issued during the stand-up (spec AC-11). */
+    overrideIssuedTitle: () => 'An override was issued',
+    overrideIssuedMessage: ({ type }: { type: string }) =>
+      `An override of type "${type}" was issued for today's stand-up.`,
+
+    /** N11 — RUN-11: a status change made on behalf of another member. */
+    statusChangedOnBehalfTitle: () => 'Your task status was updated on your behalf',
+    statusChangedOnBehalfMessage: ({ taskKey }: { taskKey: string }) =>
+      taskKey
+        ? `${taskKey} was updated on your behalf during today's stand-up.`
+        : 'One of your tasks was updated on your behalf during today’s stand-up.'
   },
 
   /**

@@ -79,6 +79,13 @@ describe('permission gating (SEC-1)', () => {
   })
 })
 
+describe('RUN-11 — N11 fires through the shared send-once primitive', () => {
+  it('calls notifyStatusChangedOnBehalf rather than notificationService ad hoc', () => {
+    expect(yesterday).toContain('notifyStatusChangedOnBehalf')
+    expect(yesterday).not.toContain('notificationService')
+  })
+})
+
 describe('the version guard (RUN-23)', () => {
   it('reads the version on every mutating route', () => {
     expect(variance).toContain('requireStandupVersion')

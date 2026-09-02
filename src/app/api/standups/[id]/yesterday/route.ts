@@ -10,10 +10,10 @@
  * person it was made for. Editing another person's record silently is how a
  * stand-up screen becomes something people stop trusting.
  */
-import { notificationService } from '@/lib/notification-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { recordAudit } from '@/lib/standup/audit'
 import { StandupError } from '@/lib/standup/errors'
+import { notifyStatusChangedOnBehalf } from '@/lib/standup/notifications'
 import {
   ok,
   readJson,
@@ -119,22 +119,24 @@ export const PATCH = withStandupIdPermission(
 
       // RUN-11's N11. Never blocks the change: the status is already saved, and
       // a downed transport must not report a failure that did not happen.
+      //
+      // Dedup key is `standupId:taskId:newStatus` rather than a timestamp: this
+      // PATCH carries no request id or client nonce of its own, so a retried,
+      // identical submission is indistinguishable from the original except by
+      // its effect — same task, same resulting status. Keying on that effect
+      // lets a genuine retry dedupe through `sendStandupNotificationOnce`'s
+      // ledger while still letting a *different* status change to the same task
+      // later in the pass send its own N11, which RUN-11 requires.
       if (body.onBehalfOf && String(body.onBehalfOf) !== userId) {
-        await notificationService
-          .createNotification(String(body.onBehalfOf), organizationId, {
-            type: 'standup',
-            title: 'Your task was updated in stand-up',
-            message: `${task.displayId} was moved to ${body.status ?? task.status} during today's stand-up.`,
-            data: {
-              entityType: 'task',
-              entityId: String(task._id),
-              action: 'updated',
-              priority: 'low',
-              url: `/tasks/${task._id}`,
-              metadata: { notificationId: 'N11', standupId }
-            }
-          })
-          .catch(() => undefined)
+        await notifyStatusChangedOnBehalf({
+          standupId,
+          projectId: String(projectId),
+          organizationId,
+          assigneeId: String(body.onBehalfOf),
+          taskId: String(task._id),
+          newStatus: String(body.status ?? task.status),
+          taskKey: task.displayId
+        }).catch(() => undefined)
       }
     }
 

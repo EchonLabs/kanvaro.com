@@ -15,6 +15,7 @@ import { notificationService } from '@/lib/notification-service'
 import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 
 import type { CalendarImpactItem } from './calendar-impact'
+import { sendStandupNotificationOnce } from './jobs/notify'
 import { standupStrings } from './strings'
 
 /** The §9.5 notification ids. Used as keys into `notificationSwitches`. */
@@ -139,6 +140,154 @@ export async function notifyCalendarChangeSafely(
     console.error('[standup] N10 calendar-change notification failed', error)
     return 0
   }
+}
+
+/**
+ * N4 — UI-10/UI-11: each member's own commitment summary, sent once the
+ * stand-up completes. `perRecipient` on the shared primitive is what keeps
+ * this to at most one per member per stand-up even if the completion path
+ * that calls it is itself retried.
+ */
+export async function notifyPersonalCommitment(input: {
+  standupId: string
+  projectId: string
+  organizationId: string
+  memberId: string
+  summaryUrl: string
+}): Promise<number> {
+  return sendStandupNotificationOnce({
+    standupId: input.standupId,
+    projectId: input.projectId,
+    organizationId: input.organizationId,
+    notificationId: 'N4',
+    recipientIds: [input.memberId],
+    perRecipient: true,
+    title: standupStrings.notifications.personalCommitmentTitle(),
+    message: standupStrings.notifications.personalCommitmentMessage(),
+    url: input.summaryUrl
+  })
+}
+
+/**
+ * N5 — the facilitator/admin/stakeholder digest, sent once the stand-up
+ * completes.
+ */
+export async function notifyStandupCompleted(input: {
+  standupId: string
+  projectId: string
+  organizationId: string
+  recipientIds: string[]
+  summaryUrl: string
+}): Promise<number> {
+  return sendStandupNotificationOnce({
+    standupId: input.standupId,
+    projectId: input.projectId,
+    organizationId: input.organizationId,
+    notificationId: 'N5',
+    recipientIds: input.recipientIds,
+    perRecipient: true,
+    title: standupStrings.notifications.completedTitle(),
+    message: standupStrings.notifications.completedMessage(),
+    url: input.summaryUrl
+  })
+}
+
+/**
+ * N6 — tells a member their stand-up completed with no work allocated to
+ * them, so an empty day reads as a deliberate fact rather than a silent gap.
+ */
+export async function notifyNotAllocated(input: {
+  standupId: string
+  projectId: string
+  organizationId: string
+  memberId: string
+}): Promise<number> {
+  return sendStandupNotificationOnce({
+    standupId: input.standupId,
+    projectId: input.projectId,
+    organizationId: input.organizationId,
+    notificationId: 'N6',
+    recipientIds: [input.memberId],
+    perRecipient: true,
+    title: standupStrings.notifications.notAllocatedTitle(),
+    message: standupStrings.notifications.notAllocatedMessage()
+  })
+}
+
+/**
+ * N7 — an override was issued during the stand-up (AC-11).
+ *
+ * `variantKey` is keyed on `overrideId`, not the notification id alone: a
+ * stand-up can carry several distinct overrides (spec §14.2 allows more than
+ * one), and each is newsworthy in its own right. Reusing `notifyOverrideIssued`
+ * with the same overrideId twice — the retry case — still resolves to the
+ * same ledger key and sends once.
+ */
+export async function notifyOverrideIssued(input: {
+  standupId: string
+  projectId: string
+  organizationId: string
+  recipientIds: string[]
+  overrideType: string
+  overrideId: string
+}): Promise<number> {
+  return sendStandupNotificationOnce({
+    standupId: input.standupId,
+    projectId: input.projectId,
+    organizationId: input.organizationId,
+    notificationId: 'N7',
+    variantKey: `N7:${input.overrideId}`,
+    recipientIds: input.recipientIds,
+    perRecipient: true,
+    title: standupStrings.notifications.overrideIssuedTitle(),
+    message: standupStrings.notifications.overrideIssuedMessage({ type: input.overrideType })
+  })
+}
+
+/**
+ * N11 — RUN-11: a status change the PM made on somebody else's behalf.
+ *
+ * Unlike N4-N7 (once per stand-up), N11 must be able to fire several times for
+ * the same assignee on the same stand-up — a PM can change several of that
+ * person's tasks in one Yesterday-review pass, and each is its own piece of
+ * news. What it must not do is double-send when the *same* change is retried
+ * (e.g. a client double-submitting one PATCH).
+ *
+ * The `yesterday` route's PATCH is keyed by `taskIds` and is otherwise a plain
+ * "set this task's status" write with no request-id or client-nonce of its
+ * own — so a retried, identical PATCH is indistinguishable from the original
+ * except by its *effect*: same task, same resulting status. That effect is
+ * exactly what `variantKey` is built from (`standupId:taskId:newStatus`)
+ * rather than a wall-clock value: a genuine retry recomputes the same key and
+ * is deduped by the ledger, while two different edits to the same task later
+ * in the pass (different resulting status) get their own keys and each
+ * notify, matching RUN-11's "must trigger notification N11" for every real
+ * change.
+ */
+export async function notifyStatusChangedOnBehalf(input: {
+  standupId: string
+  projectId: string
+  organizationId: string
+  assigneeId: string
+  taskId: string
+  newStatus: string
+  taskKey?: string
+}): Promise<number> {
+  return sendStandupNotificationOnce({
+    standupId: input.standupId,
+    projectId: input.projectId,
+    organizationId: input.organizationId,
+    notificationId: 'N11',
+    variantKey: `N11:${input.standupId}:${input.taskId}:${input.newStatus}`,
+    recipientIds: [input.assigneeId],
+    perRecipient: true,
+    priority: 'low',
+    title: standupStrings.notifications.statusChangedOnBehalfTitle(),
+    message: standupStrings.notifications.statusChangedOnBehalfMessage({
+      taskKey: input.taskKey ?? ''
+    }),
+    url: `/tasks/${input.taskId}`
+  })
 }
 
 /**
