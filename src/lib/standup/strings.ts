@@ -1166,6 +1166,48 @@ export const standupStrings = {
     resolve: () => 'Resolve',
     empty: () => 'No blockers right now.',
     general: () => 'General'
+  },
+
+  /**
+   * The read-only summary screen (§15.13, UI-10/UI-11).
+   */
+  summary: {
+    title: () => 'Stand-up summary',
+    loading: () => 'Loading the summary…',
+    notAvailable: () =>
+      'This stand-up has no summary yet. Summaries are generated when a stand-up completes.',
+    loadFailed: () => 'Could not load this summary.',
+
+    dayOf: ({ day, total }: { day: number; total: number }) => `Day ${day} of ${total}`,
+    facilitator: ({ name }: { name: string }) => `Facilitator: ${name}`,
+    duration: ({ minutes }: { minutes: number }) => `${minutes} minutes`,
+
+    sectionAttendance: () => 'Attendance',
+    sectionCompletedYesterday: () => 'Completed yesterday',
+    sectionVariance: () => 'Variance',
+    sectionDebtMovements: () => 'Estimate debt movements',
+    sectionCommitments: () => "Today's commitments",
+    sectionBlockersRaised: () => 'Blockers raised',
+    sectionBlockersResolved: () => 'Blockers resolved',
+    sectionCarryForward: () => 'Carry forward',
+    sectionOverrides: () => 'Overrides issued',
+    sectionNotes: () => 'PM notes',
+
+    emptyAttendance: () => 'Nothing recorded.',
+    emptyCompletedYesterday: () => 'Nothing completed.',
+    emptyVariance: () => 'Nothing recorded.',
+    emptyDebtMovements: () => 'Nothing recorded.',
+    emptyCommitments: () => 'Nothing planned.',
+    emptyBlockersRaised: () => 'None.',
+    emptyBlockersResolved: () => 'None.',
+    emptyCarryForward: () => 'Nothing carried forward.',
+    emptyOverrides: () => 'None.',
+
+    /** UI-10's two export actions. */
+    copyAsText: () => 'Copy as text',
+    copied: () => 'Copied to clipboard',
+    copyFailed: () => 'Could not copy the summary.',
+    printOrSave: () => 'Print / Save as PDF'
   }
 } as const
 
