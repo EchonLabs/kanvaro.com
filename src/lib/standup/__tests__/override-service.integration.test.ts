@@ -7,6 +7,7 @@
  */
 import { issueOverride, detectChronicUnderAllocation } from '../override-service'
 import { StandupOverride } from '@/models/StandupOverride'
+import { CarryForwardItem } from '@/models/CarryForwardItem'
 import { ids, useMongo } from './helpers/mongo'
 
 useMongo()
@@ -49,6 +50,22 @@ describe('issueOverride', () => {
     await expect(
       issueOverride(baseInput({ type: 'over_allocation', memberAcknowledged: false }))
     ).rejects.toMatchObject({ code: 'INVALID_JUSTIFICATION' })
+  })
+
+  it('creates an override_followup carry-forward item for skip_reestimate', async () => {
+    const override = await issueOverride(
+      baseInput({ type: 'skip_reestimate', affectedTaskIds: ['507f1f77bcf86cd799439020'] })
+    )
+    const item = await CarryForwardItem.findOne({ type: 'override_followup', task: '507f1f77bcf86cd799439020' })
+    expect(item).not.toBeNull()
+    expect(String(override.linkedCarryForwardId)).toBe(String(item!._id))
+  })
+
+  it('refuses a second skip_reestimate override for the same task while the first is still open', async () => {
+    await issueOverride(baseInput({ type: 'skip_reestimate', affectedTaskIds: ['507f1f77bcf86cd799439020'] }))
+    await expect(
+      issueOverride(baseInput({ type: 'skip_reestimate', affectedTaskIds: ['507f1f77bcf86cd799439020'] }))
+    ).rejects.toThrow(/already been deferred once/)
   })
 })
 

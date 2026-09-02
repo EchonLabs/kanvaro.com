@@ -8,10 +8,12 @@
  * member has been under-allocated on three consecutive stand-ups.
  */
 import { StandupOverride, type OverrideType } from '@/models/StandupOverride'
+import { CarryForwardItem, OPEN_CARRY_FORWARD_STATUSES } from '@/models/CarryForwardItem'
 import { isOverridable, validateJustification, OVERRIDE_TABLE, type AnyOverrideType } from './override'
-import { invalidJustification, overrideNotPermitted } from './errors'
+import { invalidJustification, overrideNotPermitted, StandupError } from './errors'
 import { recordAudit } from './audit'
 import { sendStandupNotificationOnce } from './jobs/notify'
+import { createOverrideFollowupItem } from './carry-forward-service'
 
 /** §14.2's non-overridable types (O6–O10), derived from the same table `isOverridable` reads. */
 export const OVERRIDE_NOT_PERMITTED_TYPES: AnyOverrideType[] = (
@@ -54,6 +56,28 @@ export async function issueOverride(input: IssueOverrideInput) {
     throw invalidJustification()
   }
 
+  // OVR-7: a re-estimate can be deferred once, not twice in a row — the
+  // second attempt on the same task must revise the estimate instead of
+  // stacking another deferral on top of the still-open one.
+  let skipReestimateTaskId: string | undefined
+  if (input.type === 'skip_reestimate') {
+    skipReestimateTaskId = input.affectedTaskIds?.[0]
+    if (!skipReestimateTaskId) throw invalidJustification() // defensive — the route must always pass exactly one task for O3
+
+    const alreadyDeferred = await CarryForwardItem.exists({
+      task: skipReestimateTaskId,
+      type: 'override_followup',
+      status: { $in: OPEN_CARRY_FORWARD_STATUSES }
+    })
+    if (alreadyDeferred) {
+      throw new StandupError(
+        'VALIDATION_FAILED',
+        'This estimate has already been deferred once. Revise it now.',
+        { taskId: skipReestimateTaskId }
+      )
+    }
+  }
+
   const override = await StandupOverride.create({
     standup: input.standupId,
     sprint: input.sprintId,
@@ -79,6 +103,18 @@ export async function issueOverride(input: IssueOverrideInput) {
     projectId: input.projectId,
     after: { type: override.type, gapMinutes: override.gapMinutes }
   })
+
+  if (input.type === 'skip_reestimate' && skipReestimateTaskId) {
+    const followup = await createOverrideFollowupItem({
+      taskId: skipReestimateTaskId,
+      standupId: input.standupId,
+      sprintId: input.sprintId,
+      projectId: input.projectId,
+      organizationId: input.organizationId
+    })
+    await StandupOverride.updateOne({ _id: override._id }, { $set: { linkedCarryForwardId: followup._id } })
+    override.linkedCarryForwardId = followup._id as any
+  }
 
   // N7 — project admin, delivery lead, on completion. Issuing an override
   // happens *during* the run, but N7's spec timing is "on completion" (§9.5),

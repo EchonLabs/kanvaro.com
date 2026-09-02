@@ -62,7 +62,7 @@ import {
 import { assembleClassifyInputs } from './debt-position'
 import { recordAudit, type AuditActor } from './audit'
 import { StandupError } from './errors'
-import type { IsoDate } from './calendar-dates'
+import { isoOfStoredDate, type IsoDate } from './calendar-dates'
 import type { CarryForwardMove } from './reconcile'
 import type { MissedRollForward } from './jobs/mark-missed'
 import { classifyAll } from './variance'
@@ -390,6 +390,43 @@ async function upsertOpenItem(
  */
 function systemUserPlaceholder(actor: AuditActor): string | undefined {
   return actor.type === 'user' ? actor.userId : undefined
+}
+
+export interface CreateOverrideFollowupItemInput {
+  taskId: string
+  standupId: string
+  sprintId: string
+  projectId: string
+  organizationId: string
+}
+
+/**
+ * OVR-7. The carry-forward register's one deliberately manual row (the
+ * exception `CarryForwardItem.ts` carves out in its own doc comment): a
+ * deferred re-estimate is an obligation the override itself creates, not
+ * something a board-discovery pass like `upsertOpenItem` can infer, and there
+ * is no `Standup` document guaranteed loaded at the call site the way
+ * `buildCarryForwardSet` has one throughout — so this stays a small sibling
+ * of `upsertOpenItem` rather than a forced reuse of it. Same shape otherwise:
+ * age starts at 1, the item opens directly onto the stand-up that issued the
+ * override.
+ */
+export async function createOverrideFollowupItem(
+  input: CreateOverrideFollowupItemInput
+): Promise<ICarryForwardItem> {
+  return CarryForwardItem.create({
+    sprint: input.sprintId,
+    project: input.projectId,
+    organization: input.organizationId,
+    type: 'override_followup',
+    task: input.taskId,
+    originStandup: input.standupId,
+    originDate: isoOfStoredDate(new Date()),
+    currentStandup: input.standupId,
+    ageInStandups: 1,
+    status: 'open',
+    tags: []
+  })
 }
 
 // --- CFW-6's two upstream seams (reconcile.ts, jobs/mark-missed.ts) --------
