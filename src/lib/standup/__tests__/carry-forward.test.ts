@@ -154,11 +154,11 @@ describe('summarise', () => {
   it('CFW-11: counts open, needing a note today, escalated and resolved-today', () => {
     const summary = summarise(
       [
-        { status: 'open', ageInStandups: 1 },
-        { status: 'noted', ageInStandups: 3 },
-        { status: 'escalated', ageInStandups: 5 },
-        { status: 'resolved', ageInStandups: 2, resolvedOnDate: '2026-08-20' },
-        { status: 'closed_descoped', ageInStandups: 2, resolvedOnDate: '2026-08-19' }
+        { status: 'open', ageInStandups: 1, notedToday: false },
+        { status: 'noted', ageInStandups: 3, notedToday: false },
+        { status: 'escalated', ageInStandups: 5, notedToday: false },
+        { status: 'resolved', ageInStandups: 2, notedToday: false, resolvedOnDate: '2026-08-20' },
+        { status: 'closed_descoped', ageInStandups: 2, notedToday: false, resolvedOnDate: '2026-08-19' }
       ],
       thresholds,
       '2026-08-20'
@@ -170,5 +170,21 @@ describe('summarise', () => {
       escalated: 1,
       resolvedYesterday: 1
     })
+  })
+
+  it('drops an item from needingNoteToday once it has today’s note, same as CC-4', () => {
+    // A PM working through the panel note by note must see this count fall as
+    // they go — otherwise "3 need a note today" sitting frozen after the third
+    // note reads as the notes never having saved.
+    const summary = summarise(
+      [
+        { status: 'noted', ageInStandups: 3, notedToday: true },
+        { status: 'escalated', ageInStandups: 5, notedToday: false }
+      ],
+      thresholds,
+      '2026-08-20'
+    )
+
+    expect(summary.needingNoteToday).toBe(1)
   })
 })

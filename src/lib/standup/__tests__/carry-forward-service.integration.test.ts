@@ -405,6 +405,21 @@ describe('addCarryForwardNote', () => {
     expect(view.notes).toHaveLength(1)
     expect(view.notes[0].text).toBe('Vendor responded, fix expected tomorrow.')
   })
+
+  it('CFW-11: the summary strip drops the item from needingNoteToday once noted, not just CC-4', async () => {
+    const before = await loadCarryForwardPanel(standupId)
+    expect(before.summary.needingNoteToday).toBe(1)
+
+    await addCarryForwardNote({
+      itemId,
+      standupId,
+      text: 'Vendor responded, fix expected tomorrow.',
+      actor: { userId: String(user) }
+    })
+
+    const after = await loadCarryForwardPanel(standupId)
+    expect(after.summary.needingNoteToday).toBe(0)
+  })
 })
 
 describe('resolveCarryForwardItem', () => {

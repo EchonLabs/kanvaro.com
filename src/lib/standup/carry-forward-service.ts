@@ -595,10 +595,11 @@ export async function loadCarryForwardPanel(standupId: string): Promise<CarryFor
     standupId,
     items: sortByAgeDescending(views.map((view) => ({ ...view, id: view.itemId }))),
     summary: summarise(
-      items.map((item) => ({
-        status: item.status,
-        ageInStandups: item.ageInStandups,
-        resolvedOnDate: item.resolution ? standup.standupDate : undefined
+      views.map((view) => ({
+        status: view.status,
+        ageInStandups: view.ageInStandups,
+        notedToday: view.notedToday,
+        resolvedOnDate: view.resolution ? standup.standupDate : undefined
       })),
       thresholds,
       standup.standupDate

@@ -141,6 +141,8 @@ export function summarise(
   items: readonly {
     status: CarryForwardStatus
     ageInStandups: number
+    /** Whether the item's newest note was already written for today's round. */
+    notedToday: boolean
     resolvedOnDate?: string
   }[],
   thresholds: AgeThresholds,
@@ -152,8 +154,12 @@ export function summarise(
 
   return {
     totalOpen: open.length,
-    needingNoteToday: open.filter((item) => requiresNoteToday(item.ageInStandups, thresholds))
-      .length,
+    // Not "eligible for a note" — "still owed one". Otherwise a PM who notes
+    // every aged item one by one watches this count sit frozen all meeting,
+    // which reads as the note never having been recorded.
+    needingNoteToday: open.filter(
+      (item) => requiresNoteToday(item.ageInStandups, thresholds) && !item.notedToday
+    ).length,
     escalated: open.filter((item) => item.status === 'escalated').length,
     resolvedYesterday: items.filter(
       (item) => item.status !== 'open' && item.status !== 'noted' && item.status !== 'escalated' &&
