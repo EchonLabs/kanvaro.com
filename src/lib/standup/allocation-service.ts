@@ -414,6 +414,13 @@ export interface AllocationBoard {
    * means adding the view later is not a breaking API change (R7).
    */
   computedAt: string
+  /**
+   * Task 17 / R2's blocking banner: non-null when a previous `/complete`
+   * attempt crashed partway through the saga. The run screen reads this on
+   * every board load — not only after a failed retry — so the PM sees the
+   * "completion was interrupted" banner *before* clicking Complete again.
+   */
+  completionState: { runId: string; lastCompletedStep: string | null } | null
 }
 
 /** The whole of Panel 5, in one read. */
@@ -492,7 +499,13 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
       })),
       doneStatuses
     ),
-    computedAt: new Date().toISOString()
+    computedAt: new Date().toISOString(),
+    completionState: context.standup.completionState
+      ? {
+          runId: context.standup.completionState.runId,
+          lastCompletedStep: context.standup.completionState.lastCompletedStep ?? null
+        }
+      : null
   }
 }
 

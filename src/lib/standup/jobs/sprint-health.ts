@@ -157,8 +157,12 @@ async function loadAnchorStandup(sprintId: string): Promise<any | null> {
 /**
  * CC-11's two totals, assembled fresh (see the module docblock for why no
  * existing loader covers this).
+ *
+ * Exported so Task 17's `/complete` route can populate
+ * `EvaluateCompletionChecksInput.sprintHealth` with the same figures this
+ * job uses, rather than a second, possibly-diverging computation.
  */
-async function loadSprintHealthTotals(
+export async function loadSprintHealthTotals(
   sprint: { _id: unknown; project: unknown; endDate: Date },
   now: Date
 ): Promise<SprintHealthInput> {

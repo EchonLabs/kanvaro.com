@@ -451,6 +451,17 @@ export const standupStrings = {
     completeReady: () => 'All checks passed.',
     jumpToFailure: () => 'Fix',
 
+    /** Task 17 — `POST /complete`'s outcomes. */
+    completeSuccess: () => 'Stand-up completed.',
+    completeAlreadyDone: () => 'This stand-up has already been completed.',
+    completeChecksFailed: () =>
+      'This stand-up cannot be completed until its failing checks above are resolved.',
+    completeFailed: () => 'That could not be completed.',
+    /** R2's blocking banner: a previous attempt did not finish. */
+    completionInterruptedBanner: () =>
+      'A previous attempt to complete this stand-up did not finish. Resume it to continue.',
+    completionInterruptedResume: () => 'Resume completion',
+
     /** Day one (§15.8.10, ALO-20/21). */
     dayOneProgress: ({
       assigned,

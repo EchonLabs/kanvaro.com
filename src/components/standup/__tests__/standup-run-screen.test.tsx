@@ -94,7 +94,8 @@ const okApi = () => ({
   removeAllocation: jest.fn().mockResolvedValue({ standupVersion: 4 }),
   addAllocation: jest.fn().mockResolvedValue({ standupVersion: 4 }),
   reassignDetached: jest.fn().mockResolvedValue({ standupVersion: 4 }),
-  refresh: jest.fn().mockResolvedValue(data())
+  refresh: jest.fn().mockResolvedValue(data()),
+  completeStandup: jest.fn().mockResolvedValue({ status: 'completed', summaryId: 'summary-1' })
 })
 
 const renderScreen = (

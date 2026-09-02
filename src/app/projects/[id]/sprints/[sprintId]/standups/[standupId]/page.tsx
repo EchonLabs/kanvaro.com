@@ -156,6 +156,15 @@ export default function StandupRunPage({
     },
     refresh: load,
 
+    async completeStandup({ notes, expectedVersion }) {
+      return unwrap(
+        await mutate(`/api/standups/${standupId}/complete`, 'POST', {
+          ...(notes ? { notes } : {}),
+          expectedVersion
+        })
+      )
+    },
+
     // --- Phase 8 -------------------------------------------------------
     async setYesterdayStatus(input) {
       return unwrap(await mutate(`/api/standups/${standupId}/yesterday`, 'PATCH', input))
@@ -480,7 +489,8 @@ function toRunScreenData(
       (board.pool?.assignedNotPlanned?.length ?? 0),
     ...(variance ? { variance: toVarianceView(variance) } : {}),
     ...(yesterday ? { yesterday: toYesterdayView(yesterday) } : {}),
-    ...(carryForward ? { carryForward: toCarryForwardView(carryForward) } : {})
+    ...(carryForward ? { carryForward: toCarryForwardView(carryForward) } : {}),
+    completionState: board.completionState ?? null
   }
 }
 

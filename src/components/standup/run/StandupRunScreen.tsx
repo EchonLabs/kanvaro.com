@@ -95,6 +95,13 @@ export interface RunScreenData {
     sprintCapacityMinutes: Minutes
     stillUnassigned?: number
   }
+  /**
+   * Task 17 / R2. Non-null when a previous `/complete` call died mid-saga.
+   * Read from the board GET on every load — not only after a failed
+   * retry — so the interrupted banner shows before the PM clicks Complete
+   * again.
+   */
+  completionState?: { runId: string; lastCompletedStep: string | null } | null
 }
 
 export interface RunScreenApi {
@@ -125,6 +132,15 @@ export interface RunScreenApi {
     expectedVersion: number
   }): Promise<{ standupVersion: number }>
   refresh(): Promise<RunScreenData>
+
+  /**
+   * RUN-19..22 (Task 17). Resuming an interrupted completion is the same
+   * call — the server reads its own checkpoint and continues from there.
+   */
+  completeStandup(input: {
+    notes?: string
+    expectedVersion: number
+  }): Promise<{ status: string; summaryId: string }>
 
   // --- Phase 8 -------------------------------------------------------------
   // Optional so a caller that has not wired Panels 2 and 3 yet still compiles;
@@ -475,6 +491,43 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
 
   const blocking = useMemo(() => blockingFailures(checks), [checks])
 
+  const [completing, setCompleting] = useState(false)
+
+  /**
+   * RUN-19..22. `STALE_STANDUP` reloads with a toast, matching every other
+   * mutation on this screen. `COMPLETION_CHECKS_FAILED` surfaces the
+   * failures Panel 7 already lists in detail — no separate override-per-
+   * check flow here (Task 17's scope call): the panel's own fail rows
+   * already carry each message and RUN-19's jump link, and `/overrides`
+   * exists as its own route for a PM who decides to override one.
+   * `STANDUP_ALREADY_COMPLETED` reloads so a stale button click resolves to
+   * the board's real (now completed) state rather than a dead-end toast.
+   */
+  const onComplete = useCallback(async () => {
+    setCompleting(true)
+    setNotice(null)
+    try {
+      await api.completeStandup({ expectedVersion: versionRef.current })
+      setNotice(standupStrings.run.completeSuccess())
+      await reload()
+    } catch (error) {
+      const code = (error as { code?: string })?.code
+      if (code === 'STALE_STANDUP') {
+        setNotice(standupStrings.run.staleReload())
+        await reload()
+      } else if (code === 'STANDUP_ALREADY_COMPLETED') {
+        setNotice(standupStrings.run.completeAlreadyDone())
+        await reload()
+      } else if (code === 'COMPLETION_CHECKS_FAILED') {
+        setNotice(standupStrings.run.completeChecksFailed())
+      } else {
+        setNotice(standupStrings.run.completeFailed())
+      }
+    } finally {
+      setCompleting(false)
+    }
+  }, [api, reload])
+
   const selectedMember = board.members.find(
     (member) => member.memberId === selectedMemberId
   )
@@ -554,6 +607,26 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
       {readOnly && (
         <p className="rounded-md border border-border bg-muted p-2 text-sm text-muted-foreground">
           {standupStrings.run.lockedForMembers()}
+        </p>
+      )}
+
+      {/* R2's blocking banner: a previous /complete call died mid-saga.
+          Non-dismissible — resuming (a plain re-POST) is the only way past
+          it, so there is nothing for a dismiss action to safely do. */}
+      {board.completionState && (
+        <p
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-sm"
+        >
+          <span>{standupStrings.run.completionInterruptedBanner()}</span>
+          <button
+            type="button"
+            onClick={() => void onComplete()}
+            disabled={completing}
+            className="rounded-md border border-border bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40"
+          >
+            {standupStrings.run.completionInterruptedResume()}
+          </button>
         </p>
       )}
 
@@ -705,11 +778,8 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
       <CompletionPanel
         checks={checks}
         blocking={blocking}
-        disabled={readOnly}
-        onComplete={() => {
-          // Phase 10 owns the completion saga. Until then the button's only job
-          // is to be correctly enabled or disabled by the checks above it.
-        }}
+        disabled={readOnly || completing}
+        onComplete={() => void onComplete()}
       />
     </div>
   )
