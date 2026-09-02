@@ -36,7 +36,7 @@ import type { CarryForwardItemRow } from '@/components/standup/run/CarryForwardP
 import type { Degradation } from '@/lib/standup/degradation'
 import type { DebtPosition } from '@/lib/standup/debt'
 import { minutes, type Minutes } from '@/lib/standup/minutes'
-import { STANDUP_VERSION_HEADER } from '@/lib/standup/route-helpers'
+import { STANDUP_VERSION_HEADER } from '@/lib/standup/version-header'
 import { standupStrings } from '@/lib/standup/strings'
 
 export default function StandupRunPage({

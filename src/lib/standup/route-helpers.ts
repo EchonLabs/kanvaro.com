@@ -18,6 +18,7 @@ import { PermissionService } from '@/lib/permissions/permission-service'
 import type { Permission } from '@/lib/permissions/permission-definitions'
 
 import { StandupError, toErrorResponse } from './errors'
+import { STANDUP_VERSION_HEADER } from './version-header'
 
 export interface StandupRouteContext {
   userId: string
@@ -399,15 +400,7 @@ export function withCarryForwardItemPermission(
   }
 }
 
-/**
- * The header every mutating stand-up request carries (RUN-23).
- *
- * Named here rather than typed into each route so the client and the server
- * cannot drift on its spelling — a mismatch would silently disable the guard
- * rather than fail loudly, which is the worst possible failure mode for a
- * concurrency control.
- */
-export const STANDUP_VERSION_HEADER = 'x-standup-version'
+export { STANDUP_VERSION_HEADER }
 
 /**
  * Reads and validates the caller's stand-up version.
