@@ -10,6 +10,7 @@
 import {
   STANDUP_ERROR_CODES,
   StandupError,
+  completionInterrupted,
   estimateImmutable,
   immutableCompletedStandup,
   isStandupError,
@@ -43,6 +44,7 @@ const SPEC_CODES: Record<string, number> = {
 
 /** Deliberate additions beyond §17.2, documented in `errors.ts`. */
 const ADDITIONS: Record<string, number> = {
+  COMPLETION_INTERRUPTED: 409,
   VALIDATION_FAILED: 422,
   NOT_FOUND: 404
 }
@@ -58,7 +60,7 @@ describe('§17.2 catalogue', () => {
     }
   })
 
-  it('adds exactly the two generic codes and no others', () => {
+  it('adds exactly the three generic codes and no others', () => {
     const extra = Object.keys(STANDUP_ERROR_CODES).filter((code) => !(code in SPEC_CODES))
     expect(extra.sort()).toEqual(Object.keys(ADDITIONS).sort())
   })
@@ -168,6 +170,14 @@ describe('constructors', () => {
     const error = estimateImmutable('task-id')
     expect(error.code).toBe('ESTIMATE_IMMUTABLE')
     expect(error.message).toContain('Revise the remaining estimate')
+  })
+
+  it('completionInterrupted carries the last completed step', () => {
+    const error = completionInterrupted('create_summary')
+    expect(error.code).toBe('COMPLETION_INTERRUPTED')
+    expect(error.status).toBe(409)
+    expect(error.message).toContain('did not finish')
+    expect(error.details).toEqual({ lastCompletedStep: 'create_summary' })
   })
 })
 
