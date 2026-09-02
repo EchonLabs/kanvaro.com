@@ -13,6 +13,7 @@ import { generationAudit } from './generation-audit'
 import { markMissed } from './mark-missed'
 import { promoteToReady } from './promote-to-ready'
 import { sendReminders } from './send-reminders'
+import { runSprintHealthJob } from './sprint-health'
 
 export {
   emptyResult,
@@ -36,16 +37,16 @@ export const STANDUP_JOB_NAMES: readonly StandupJobName[] = [
 /**
  * The jobs that exist today.
  *
- * Four land in Phase 5, `escalate-carry-forward` in Phase 9. `sprint-health`
- * waits for the blocker and burn-projection work (Phase 10), and
- * `readmodel-refresh` has nothing to refresh while D-J keeps the board view
- * computed live. The runner treats an unregistered name as a skip, not an
- * error, so the ticker is unaffected by the gaps.
+ * Four land in Phase 5, `escalate-carry-forward` in Phase 9, `sprint-health` in
+ * Phase 10. `readmodel-refresh` has nothing to refresh while D-J keeps the
+ * board view computed live. The runner treats an unregistered name as a skip,
+ * not an error, so the ticker is unaffected by that one remaining gap.
  */
 export const STANDUP_JOBS: Partial<Record<StandupJobName, StandupJob>> = {
   'promote-to-ready': promoteToReady,
   'send-reminders': sendReminders,
   'mark-missed': markMissed,
   'generation-audit': generationAudit,
-  'escalate-carry-forward': escalateCarryForward
+  'escalate-carry-forward': escalateCarryForward,
+  'sprint-health': runSprintHealthJob
 }
