@@ -17,6 +17,7 @@ export const ACTIVITY_ENTITY_TYPES = [
   'estimate_debt_entry',
   'carry_forward_item',
   'standup_override',
+  'standup_blocker',
   'working_calendar',
   'member_capacity',
   'planning_session',
@@ -74,6 +75,9 @@ export const ACTIVITY_ACTIONS = [
   'carry_forward_resolved',
   // Overrides and gate (OVR-*, PLN-16..19)
   'override_issued',
+  // Blockers (RUN-14..18)
+  'standup_blocker_raised',
+  'standup_blocker_updated',
   'planning_session_started',
   'planning_session_updated',
   'planning_session_completed',

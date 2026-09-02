@@ -429,6 +429,90 @@ export async function createOverrideFollowupItem(
   })
 }
 
+export interface CreateOpenBlockerItemInput {
+  standupId: string
+  sprintId: string
+  projectId: string
+  organizationId: string
+  taskId?: string
+}
+
+/**
+ * RUN-17. Opens the `open_blocker` carry-forward register row a freshly
+ * raised blocker requires. The same small sibling of `upsertOpenItem` that
+ * `createOverrideFollowupItem` (OVR-7) already established: `raiseBlocker`
+ * has its own `standupId` in hand but, like `issueOverride`, no `Standup`
+ * document loaded the way `buildCarryForwardSet` keeps one throughout, so
+ * this stays a light peer of `upsertOpenItem` rather than a forced reuse of
+ * it. Same shape otherwise: age starts at 1, the item opens directly onto
+ * the stand-up that raised the blocker.
+ *
+ * The link back to the `StandupBlocker` that caused this row lives only on
+ * the blocker side (`StandupBlocker.linkedCarryForwardId`) — the register's
+ * schema (`CarryForwardItem.ts`, out of this task's scope) has no reverse
+ * pointer, the same one-directional shape `linkedOverride` already uses.
+ */
+export async function createOpenBlockerItem(
+  input: CreateOpenBlockerItemInput
+): Promise<ICarryForwardItem> {
+  return CarryForwardItem.create({
+    sprint: input.sprintId,
+    project: input.projectId,
+    organization: input.organizationId,
+    type: 'open_blocker',
+    ...(input.taskId ? { task: input.taskId } : {}),
+    originStandup: input.standupId,
+    originDate: isoOfStoredDate(new Date()),
+    currentStandup: input.standupId,
+    ageInStandups: 1,
+    status: 'open',
+    tags: []
+  })
+}
+
+export interface ResolveLinkedOpenBlockerItemInput {
+  itemId: string
+  resolvedBy: string
+  resolutionType: CarryForwardResolutionType
+  comment?: string
+}
+
+/**
+ * RUN-18/CFW-7's manual-close path for the one `open_blocker` row a raised
+ * blocker links to. Adapted from `resolveCarryForwardItem` below, reusing
+ * its `RESOLUTION_STATUS` map and `isResolutionValidForType` check, but
+ * trimmed for this call site: `updateBlocker` already knows the blocker's
+ * outcome and returns the `StandupBlocker` itself, not a panel view, so
+ * there is no `loadCarryForwardPanel` read-back here.
+ */
+export async function resolveLinkedOpenBlockerItem(
+  input: ResolveLinkedOpenBlockerItemInput
+): Promise<void> {
+  const item = (await CarryForwardItem.findById(input.itemId)) as ICarryForwardItem | null
+  if (!item) {
+    throw new StandupError('NOT_FOUND', 'That carry-forward item no longer exists.', {
+      itemId: input.itemId
+    })
+  }
+
+  if (!isResolutionValidForType(item.type, input.resolutionType)) {
+    throw new StandupError(
+      'VALIDATION_FAILED',
+      `"${input.resolutionType}" is not a valid resolution for a ${item.type} item.`,
+      { itemId: input.itemId, type: item.type, resolutionType: input.resolutionType }
+    )
+  }
+
+  item.status = RESOLUTION_STATUS[input.resolutionType]
+  item.resolution = {
+    resolvedAt: new Date(),
+    resolvedBy: input.resolvedBy as any,
+    resolutionType: input.resolutionType,
+    ...(input.comment ? { comment: input.comment } : {})
+  }
+  await item.save()
+}
+
 // --- CFW-6's two upstream seams (reconcile.ts, jobs/mark-missed.ts) --------
 
 /**
