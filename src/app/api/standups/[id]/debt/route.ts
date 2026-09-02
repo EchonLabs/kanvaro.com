@@ -69,8 +69,17 @@ export const POST = withStandupIdPermission(
   async (request, { standupId, standup, userId }) => {
     const body = await readJson<WriteOffBody>(request)
     // A write-off changes what the board shows, so it carries the version like
-    // every other mutation (RUN-23).
-    requireStandupVersion(request)
+    // every other mutation (RUN-23) — and, like every other mutation, that
+    // version is checked against the standup's current one, not just parsed.
+    const expectedVersion = requireStandupVersion(request)
+    const currentVersion = (standup as any).version ?? 0
+    if (currentVersion !== expectedVersion) {
+      throw new StandupError(
+        'STALE_STANDUP',
+        'Somebody else changed this stand-up while you were working.',
+        { currentVersion, standupId, status: (standup as any).status }
+      )
+    }
 
     const position = await writeOffDebt({
       sprintId: String((standup as any).sprint),

@@ -90,6 +90,7 @@ describe('the version guard (RUN-23)', () => {
   it('refuses a stale version rather than posting against numbers nobody saw', () => {
     expect(variance).toContain('STALE_STANDUP')
     expect(yesterday).toContain('STALE_STANDUP')
+    expect(debt).toContain('STALE_STANDUP')
   })
 })
 
