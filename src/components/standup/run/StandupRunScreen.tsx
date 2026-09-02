@@ -5,6 +5,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import type { QuickAddTask } from '@/components/standup/primitives/QuickAddCombobox'
 import { AttendancePanel, type ReassignPromptView } from './AttendancePanel'
 import { CarryForwardPanel, type CarryForwardItemRow, type CarryForwardPanelData } from './CarryForwardPanel'
+import { BlockerPanel, type BlockerRow } from './BlockerPanel'
 import { VariancePanel, type VariancePanelMember, type VariancePanelRow } from './VariancePanel'
 import { YesterdayPanel, type YesterdayPanelApi } from './YesterdayPanel'
 import { CapacityBoard, type BoardAllocationView } from './CapacityBoard'
@@ -79,6 +80,13 @@ export interface RunScreenData {
   variance?: { rows: VariancePanelRow[]; members: VariancePanelMember[] }
   /** Panel 4 (Phase 9). Absent for the same reason as Panels 2 and 3. */
   carryForward?: CarryForwardPanelData
+  /**
+   * Panel 6 (Phase 10). No stand-up shape omits blockers the way day one
+   * omits yesterday, so this defaults to an empty list rather than being
+   * optional like the panels above — the panel itself renders the empty
+   * state when there is nothing to show.
+   */
+  blockers?: readonly BlockerRow[]
   /** ALO-20/21. Present only on a day-one stand-up. */
   dayOne?: {
     assignedTasks: number
@@ -681,7 +689,18 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
         </div>
       </section>
 
-      <PanelStub id={6} label={standupStrings.run.panel6()} phase="Phase 10" />
+      <BlockerPanel
+        blockers={board.blockers ?? []}
+        today={board.date}
+        onRaise={() => {
+          // Phase 10 does not yet wire a raise-blocker action — no API
+          // method exists to call. This button has nowhere to send its
+          // click until that surface is built.
+        }}
+        onResolve={() => {
+          // Same as above: blocker resolution has no API method yet.
+        }}
+      />
 
       <CompletionPanel
         checks={checks}

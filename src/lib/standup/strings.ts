@@ -1119,6 +1119,16 @@ export const standupStrings = {
 
     cancel: () => 'Cancel',
     submit: () => 'Override'
+  },
+
+  /**
+   * Panel 6 — blockers (§13, RUN-14..18).
+   */
+  blocker: {
+    raise: () => 'Raise a blocker',
+    resolve: () => 'Resolve',
+    empty: () => 'No blockers right now.',
+    general: () => 'General'
   }
 } as const
 
