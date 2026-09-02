@@ -15,6 +15,24 @@
  * The very last step flips `status: 'Completed'`. Everything before it can
  * safely re-run; that one cannot, which is why it is last, not first.
  *
+ * **`runId` must be reused, not re-minted, for a call to actually resume.**
+ * `standupCheckpoint.load` only recognises a stored checkpoint whose
+ * `completionState.runId` matches `ctx.runId` exactly; a different `runId` —
+ * e.g. a fresh UUID generated per HTTP request — reads as "no prior run" and
+ * the saga restarts from `freeze-allocations` instead of resuming. Every step
+ * here tolerates that (each is independently idempotent), so a restart is not
+ * *incorrect*, but it defeats the point of resuming. Whoever builds the
+ * `/complete` route (Task 17) must read `standup.completionState?.runId` back
+ * off the document when one is already present and pass that same id in,
+ * rather than generating a new one on every request.
+ *
+ * **N7 (override issued) fires from here, not from `issueOverride`.**
+ * `override-service.ts`'s own docblock says so explicitly: issuing an
+ * override happens *during* the run, but N7's spec timing is "on completion"
+ * (§9.5, RUN-20 step 9, AC-10), so `ctx.overridesIssued` — the override
+ * records the route already loaded to build the summary's `overridesIssued`
+ * list — drives one `notifyOverrideIssued` call per override here.
+ *
  * **N9 (aged carry-forward escalation) is deliberately not fired from this
  * saga.** `buildCarryForwardSet`'s `BuildCarryForwardResult` reports only
  * counts (`created`/`aged`/`autoClosed`/`totalOpen`), not which item ids
@@ -44,13 +62,24 @@ import { buildSummaryDocument, type BuildSummaryInput } from './summary'
 import {
   notifyPersonalCommitment,
   notifyStandupCompleted,
-  notifyNotAllocated
+  notifyNotAllocated,
+  notifyOverrideIssued
 } from './notifications'
 import { checkSprintHealth } from './jobs/sprint-health'
 import { recordAudit } from './audit'
 import { alreadyCompleted, completionChecksFailed, staleStandup } from './errors'
 
 export interface CompletionContext {
+  /**
+   * Identifies one completion attempt across retries. **Must be the same
+   * value on a resume call as it was on the attempt being resumed** — read it
+   * back from `standup.completionState?.runId` when that field is already
+   * present, rather than minting a fresh id per request. A mismatched
+   * `runId` is indistinguishable from "no prior run" to
+   * {@link standupCheckpoint}, so the saga restarts from `freeze-allocations`
+   * instead of resuming (harmless, since every step tolerates it, but not a
+   * resume). See the module docblock.
+   */
   runId: string
   standupId: string
   sprintId: string
@@ -65,6 +94,8 @@ export interface CompletionContext {
   attendeeIds: string[]
   adminRecipientIds: string[]
   memberCommitments: Array<{ memberId: string; hasAnyAllocation: boolean }>
+  /** RUN-20 step 9 / AC-10: drives one N7 per override, sent to `adminRecipientIds`. */
+  overridesIssued: Array<{ overrideId: string; type: string }>
   summaryInputs: Omit<BuildSummaryInput, 'standupId' | 'sprintId' | 'projectId' | 'organizationId'>
   summaryUrl: string
 }
@@ -189,6 +220,25 @@ export async function runCompletionSaga(ctx: CompletionContext): Promise<Complet
           recipientIds: ctx.adminRecipientIds,
           summaryUrl: ctx.summaryUrl
         })
+      }
+    },
+    {
+      name: 'notify-overrides-issued',
+      async run() {
+        // N7 — deliberately not sent from `issueOverride` itself; see the
+        // module docblock. `sendStandupNotificationOnce`'s ledger is keyed
+        // per `overrideId` (`N7:<overrideId>:<recipient>`), so a re-run here
+        // sends nothing twice even if several overrides were issued today.
+        for (const override of ctx.overridesIssued) {
+          await notifyOverrideIssued({
+            standupId: ctx.standupId,
+            projectId: ctx.projectId,
+            organizationId: ctx.organizationId,
+            recipientIds: ctx.adminRecipientIds,
+            overrideType: override.type,
+            overrideId: override.overrideId
+          })
+        }
       }
     },
     {

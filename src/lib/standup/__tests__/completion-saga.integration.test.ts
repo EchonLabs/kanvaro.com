@@ -139,6 +139,7 @@ function baseContext(overrides: Partial<CompletionContext> = {}): Omit<Completio
     attendeeIds: [String(member)],
     adminRecipientIds: [String(user)],
     memberCommitments: [{ memberId: String(member), hasAnyAllocation: true }],
+    overridesIssued: [],
     summaryInputs: {
       headerFacts: {
         standupDate: '2026-08-18',
@@ -337,9 +338,17 @@ describe('runCompletionSaga', () => {
 
   // --- INV-8 -----------------------------------------------------------------
 
-  it('INV-8: every undisposed carry-forward item from the completed stand-up appears on the register', async () => {
+  it('INV-8: every undisposed carry-forward item from the completed stand-up is anchored onto the next stand-up', async () => {
     const day1 = await seedStandup('2026-08-17', 1)
     const day2 = await seedStandup('2026-08-18', 2)
+    // CFW-6's discovery pass only places a fresh item on "the next stand-up in
+    // the sprint" when one already exists and is Scheduled/Ready — mirroring
+    // `carry-forward-service.integration.test.ts`'s own fixture pattern
+    // (`CFW-1/CFW-6` case), which asserts the same `currentStandup` anchoring.
+    // Without this, `buildCarryForwardSet` falls back to anchoring on the
+    // *completing* stand-up itself, which would make this test pass even if
+    // next-stand-up anchoring were broken — exactly the gap being closed here.
+    const day3 = await seedStandup('2026-08-19', 3, { status: 'Scheduled' })
     // A task nobody finishes stays open, so it must land on the register as
     // `unfinished_task` once day2 completes and builds its carry-forward set.
     const task = await seedTask({ status: 'in_progress' })
@@ -363,6 +372,77 @@ describe('runCompletionSaga', () => {
     expect(undisposed.length).toBeGreaterThan(0)
     for (const item of undisposed) {
       expect(OPEN_CARRY_FORWARD_STATUSES).toContain(item.status)
+      // The register's actual claim: the item is on the *next* stand-up's
+      // board, not merely open somewhere in the sprint.
+      expect(String(item.currentStandup)).toBe(String(day3._id))
     }
+  })
+
+  // --- N7 / RUN-20 step 9 / AC-10 --------------------------------------------
+
+  it('RUN-20 step 9 / AC-10: N7 fires once per override issued during the stand-up, to the admin recipients', async () => {
+    const day1 = await seedStandup('2026-08-17', 1)
+    const day2 = await seedStandup('2026-08-18', 2)
+    const task = await seedTask()
+    await seedAllocation(day1._id, task._id)
+    await seedAllocation(day2._id, task._id)
+
+    const overrideId = new mongoose.Types.ObjectId().toString()
+
+    const ctx: CompletionContext = {
+      ...baseContext({ overridesIssued: [{ overrideId, type: 'over_allocation' }] }),
+      standupId: String(day2._id),
+      expectedVersion: 0
+    }
+
+    await runCompletionSaga(ctx)
+
+    // Claimed against the ledger — the real, DB-verified fact that N7 sent,
+    // not just that the mocked notification client was called.
+    const standup = await Standup.findById(day2._id).lean()
+    const ledgerKey = `N7:${overrideId}:${String(user)}`
+    expect(standup!.notificationsSent?.[ledgerKey]).toBeDefined()
+
+    expect(createNotification).toHaveBeenCalledWith(
+      String(user),
+      String(organization),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadata: expect.objectContaining({ notificationId: `N7:${overrideId}` })
+        })
+      })
+    )
+  })
+
+  it('N7 is not re-sent on a double-submission of an already-completed stand-up', async () => {
+    const day1 = await seedStandup('2026-08-17', 1)
+    const day2 = await seedStandup('2026-08-18', 2)
+    const task = await seedTask()
+    await seedAllocation(day1._id, task._id)
+    await seedAllocation(day2._id, task._id)
+
+    const overrideId = new mongoose.Types.ObjectId().toString()
+    const ctx: CompletionContext = {
+      ...baseContext({ overridesIssued: [{ overrideId, type: 'over_allocation' }] }),
+      standupId: String(day2._id),
+      expectedVersion: 0
+    }
+
+    createNotification.mockClear()
+    await runCompletionSaga(ctx)
+    const n7CallsAfterFirst = createNotification.mock.calls.filter(
+      (call) => call[2]?.data?.metadata?.notificationId === `N7:${overrideId}`
+    ).length
+    expect(n7CallsAfterFirst).toBe(1)
+
+    // RUN-22's guard rejects the second call before any step — including
+    // `notify-overrides-issued` — runs again.
+    await expect(runCompletionSaga({ ...ctx, expectedVersion: 1 })).rejects.toMatchObject({
+      code: alreadyCompleted().code
+    })
+    const n7CallsAfterSecond = createNotification.mock.calls.filter(
+      (call) => call[2]?.data?.metadata?.notificationId === `N7:${overrideId}`
+    ).length
+    expect(n7CallsAfterSecond).toBe(1)
   })
 })
