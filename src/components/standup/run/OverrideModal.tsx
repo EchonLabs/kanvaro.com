@@ -5,6 +5,7 @@ import { useState } from 'react'
 import {
   UNDER_ALLOCATION_REASON_CODES,
   OVER_ALLOCATION_REASON_CODES,
+  JUSTIFICATION_MIN_LENGTH,
   validateJustification
 } from '@/lib/standup/override'
 import { standupStrings } from '@/lib/standup/strings'
@@ -103,7 +104,10 @@ export function OverrideModal({ type, affected, onCancel, onSubmit }: OverrideMo
 
       {!validation.valid && justification.length > 0 && (
         <p role="alert" className="text-xs text-destructive">
-          {validation.message}
+          {standupStrings.override.validationError({
+            code: validation.code,
+            minLength: JUSTIFICATION_MIN_LENGTH
+          })}
         </p>
       )}
 

@@ -1093,6 +1093,23 @@ export const standupStrings = {
     justificationLabel: () => 'Why is this being overridden?',
     justificationPlaceholder: () => 'Explain what actually happened. This is recorded on the audit trail.',
 
+    /**
+     * OVR-5. Mirrors `validateJustification`'s two failure codes
+     * (`override.ts`) with the copy actually shown to the person overriding —
+     * the validation *decision* stays in `override.ts`, but the sentence the
+     * reader sees belongs in this catalogue like every other user-facing
+     * string in the module.
+     */
+    validationError: ({ code, minLength }: { code: 'TOO_SHORT' | 'LOW_VALUE'; minLength: number }) => {
+      switch (code) {
+        case 'TOO_SHORT':
+          return `A justification needs at least ${minLength} characters.`
+        case 'LOW_VALUE':
+        default:
+          return 'That justification does not explain anything. Say what actually happened.'
+      }
+    },
+
     /** OVR-6 — required only for `over_allocation`. */
     acknowledgement: () => 'The member has agreed to this overtime.',
 
