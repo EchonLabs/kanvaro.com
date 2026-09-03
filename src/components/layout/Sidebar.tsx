@@ -326,7 +326,7 @@ const navigationItems = [
         id: 'document-templates',
         label: 'Document Templates',
         icon: FileText,
-        path: '/document-templates',
+        path: '/docs/templates',
         permission: Permission.DOCUMENTATION_VIEW
       }
     ]
