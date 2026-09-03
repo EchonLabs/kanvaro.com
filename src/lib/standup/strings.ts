@@ -451,6 +451,17 @@ export const standupStrings = {
     completeReady: () => 'All checks passed.',
     jumpToFailure: () => 'Fix',
 
+    /**
+     * Task 22 — Panel 7's Override action, wiring §15.12's modal to a
+     * failing, overridable check instead of leaving OVR-1..7 unreachable
+     * from the run screen.
+     */
+    override: () => 'Override',
+    overrideSuccess: () => 'Override recorded.',
+    overrideFailed: () => 'That override could not be recorded.',
+    overrideUnavailable: () =>
+      "This check can't be overridden from here yet — the affected task couldn't be identified.",
+
     /** Task 17 — `POST /complete`'s outcomes. */
     completeSuccess: () => 'Stand-up completed.',
     completeAlreadyDone: () => 'This stand-up has already been completed.',

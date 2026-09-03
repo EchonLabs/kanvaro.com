@@ -13,15 +13,19 @@ import { cn } from '@/lib/utils'
  * wrote looks like a clean bill of health, and a PM reading "all checks passed"
  * would have no way to know it never asked about carry-forward notes.
  *
- * No override control is rendered. `overridable` is data on the result and
- * Phase 10 owns the override path; showing a button that does nothing would be
- * worse than showing none.
+ * Task 22 — an Override action is rendered on every failing, `overridable`
+ * check, alongside RUN-19's jump link. This panel does not decide *how* to
+ * override a check (the entities-to-`OverrideModal`-props mapping is
+ * `StandupRunScreen`'s job, since it needs `board` data this panel does not
+ * have); it only reports which check the PM clicked.
  */
 
 export interface CompletionPanelProps {
   checks: readonly CompletionCheckResult[]
   blocking: readonly CompletionCheckResult[]
   onComplete: () => void
+  /** Task 22. Omitted entirely, the check row renders no Override action. */
+  onOverride?: (check: CompletionCheckResult) => void
   disabled?: boolean
 }
 
@@ -43,6 +47,7 @@ export function CompletionPanel({
   checks,
   blocking,
   onComplete,
+  onOverride,
   disabled = false
 }: CompletionPanelProps) {
   const firstBlocker = blocking[0]
@@ -80,6 +85,18 @@ export function CompletionPanel({
               >
                 {standupStrings.run.jumpToFailure()}
               </a>
+            )}
+
+            {/* Task 22 — AC-10's whole point: a PM must be able to knowingly
+                accept this exception instead of only being blocked by it. */}
+            {check.status === 'fail' && check.overridable && onOverride && (
+              <button
+                type="button"
+                onClick={() => onOverride(check)}
+                className="shrink-0 text-xs underline"
+              >
+                {standupStrings.run.override()}
+              </button>
             )}
           </li>
         ))}

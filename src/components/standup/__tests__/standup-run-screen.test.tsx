@@ -95,8 +95,24 @@ const okApi = () => ({
   addAllocation: jest.fn().mockResolvedValue({ standupVersion: 4 }),
   reassignDetached: jest.fn().mockResolvedValue({ standupVersion: 4 }),
   refresh: jest.fn().mockResolvedValue(data()),
-  completeStandup: jest.fn().mockResolvedValue({ status: 'completed', summaryId: 'summary-1' })
+  completeStandup: jest.fn().mockResolvedValue({ status: 'completed', summaryId: 'summary-1' }),
+  issueOverride: jest.fn().mockResolvedValue({
+    type: 'under_allocation',
+    affectedMemberIds: ['kasun'],
+    affectedTaskIds: []
+  })
 })
+
+/** A CC-1 (under-allocation) failure: Kasun present but planned to 0 of 480. */
+const underAllocatedMember = () => [
+  {
+    memberId: 'kasun',
+    name: 'Kasun',
+    attendance: 'present' as const,
+    capacity: capacity({ allocatedMinutes: m(0), gapMinutes: m(480), status: 'under' as const }),
+    allocations: []
+  }
+]
 
 const renderScreen = (
   overrides: Partial<RunScreenData> = {},
@@ -510,5 +526,127 @@ describe('Panel 7 — completion (§15.8.9)', () => {
     expect(
       screen.getAllByRole('link', { name: standupStrings.run.jumpToFailure() }).length
     ).toBeGreaterThan(0)
+  })
+})
+
+describe('Panel 7 — the Override action (Task 22)', () => {
+  it('opens the modal with the right type and affected member on a CC-1 failure', () => {
+    renderScreen({ members: underAllocatedMember() })
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.override() }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(
+      within(dialog).getByText(standupStrings.override.title({ type: 'under_allocation' }))
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByText(
+        standupStrings.override.gapLine({
+          name: 'Kasun',
+          gapMinutes: 480,
+          allocatedMinutes: 0,
+          effectiveMinutes: 480
+        })
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('submits the override to the right endpoint with the right body', async () => {
+    const api = okApi()
+    renderScreen({ members: underAllocatedMember() }, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.override() }))
+    const dialog = screen.getByRole('dialog')
+
+    fireEvent.change(
+      within(dialog).getByLabelText(standupStrings.override.justificationLabel()),
+      { target: { value: 'Kasun is covering the support rota all day today.' } }
+    )
+    fireEvent.click(within(dialog).getByRole('button', { name: standupStrings.override.submit() }))
+
+    await waitFor(() =>
+      expect(api.issueOverride).toHaveBeenCalledWith({
+        type: 'under_allocation',
+        affectedMemberIds: ['kasun'],
+        affectedTaskIds: [],
+        reasonCode: 'no_work_available',
+        justification: 'Kasun is covering the support rota all day today.',
+        memberAcknowledged: false
+      })
+    )
+  })
+
+  it('re-enables Complete client-side after a successful override, without a reload', async () => {
+    const api = okApi()
+    // `refresh()` returns the same still-failing board — proving the local
+    // `overridesIssued` state, not the reload, is what lifts the block.
+    api.refresh.mockResolvedValue(data({ members: underAllocatedMember() }))
+    renderScreen({ members: underAllocatedMember() }, api)
+
+    const completeButton = screen.getByRole('button', { name: standupStrings.run.complete() })
+    expect(completeButton).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.override() }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(
+      within(dialog).getByLabelText(standupStrings.override.justificationLabel()),
+      { target: { value: 'Kasun is covering the support rota all day today.' } }
+    )
+    fireEvent.click(within(dialog).getByRole('button', { name: standupStrings.override.submit() }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(
+      screen.getByRole('button', { name: standupStrings.run.complete() })
+    ).not.toBeDisabled()
+    expect(api.refresh).toHaveBeenCalled()
+  })
+
+  it('closes without submitting when the PM cancels', () => {
+    const api = okApi()
+    renderScreen({ members: underAllocatedMember() }, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.override() }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: standupStrings.override.cancel() }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(api.issueOverride).not.toHaveBeenCalled()
+  })
+
+  it('shows an error notice and keeps the modal open when the server refuses', async () => {
+    const api = okApi()
+    api.issueOverride.mockRejectedValue({ code: 'INVALID_JUSTIFICATION' })
+    renderScreen({ members: underAllocatedMember() }, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.override() }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(
+      within(dialog).getByLabelText(standupStrings.override.justificationLabel()),
+      { target: { value: 'Kasun is covering the support rota all day today.' } }
+    )
+    fireEvent.click(within(dialog).getByRole('button', { name: standupStrings.override.submit() }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      standupStrings.run.overrideFailed()
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('does not render an Override action for a non-overridable failing check', () => {
+    renderScreen({
+      members: [
+        {
+          memberId: 'kasun',
+          name: 'Kasun',
+          attendance: undefined,
+          capacity: capacity(),
+          allocations: []
+        }
+      ]
+    })
+
+    // CC-7 (missing attendance) fails here and is never overridable.
+    expect(
+      screen.queryByRole('button', { name: standupStrings.run.override() })
+    ).not.toBeInTheDocument()
   })
 })

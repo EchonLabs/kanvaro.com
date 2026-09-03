@@ -10,6 +10,7 @@ import { VariancePanel, type VariancePanelMember, type VariancePanelRow } from '
 import { YesterdayPanel, type YesterdayPanelApi } from './YesterdayPanel'
 import { CapacityBoard, type BoardAllocationView } from './CapacityBoard'
 import { CompletionPanel } from './CompletionPanel'
+import { OverrideModal, type OverridableType, type OverrideModalAffectedMember, type OverrideModalSubmitInput } from './OverrideModal'
 import { UnassignedPool } from './UnassignedPool'
 import type { PoolTask } from '@/lib/standup/allocation'
 import type { BucketedRows } from '@/lib/standup/yesterday'
@@ -19,10 +20,146 @@ import {
   evaluateCompletionChecks,
   type CheckCarryForwardItem,
   type CheckMember,
-  type CheckVarianceRow
+  type CheckVarianceRow,
+  type CompletionCheckResult
 } from '@/lib/standup/completion-checks'
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
+import {
+  filterOverriddenFailures,
+  OVERRIDE_TABLE,
+  type IssuedOverrideForReconciliation
+} from '@/lib/standup/override'
 import { standupStrings } from '@/lib/standup/strings'
+
+/**
+ * checkId -> override type, inverted from `OVERRIDE_TABLE` (§14.2's table).
+ * Only the four overridable hard checks this screen can build an
+ * `OverrideModal` for appear here — CC-2/CC-4/CC-5/CC-7 are never
+ * overridable, and the rest of the table names types with no `checkId`
+ * (e.g. `complete_with_absent_facilitator_role`) that Panel 7 does not emit.
+ */
+const CHECK_ID_TO_OVERRIDE_TYPE: Partial<Record<string, OverridableType>> = Object.fromEntries(
+  Object.entries(OVERRIDE_TABLE)
+    .filter(([, entry]) => entry.overridable && entry.checkId)
+    .map(([type, entry]) => [entry.checkId as string, type as OverridableType])
+)
+
+interface OverrideContext {
+  type: OverridableType
+  affected: OverrideModalAffectedMember[]
+  affectedMemberIds: string[]
+  affectedTaskIds: string[]
+}
+
+/**
+ * Builds `OverrideModal`'s props and the override submission's
+ * `affectedMemberIds`/`affectedTaskIds` from one failing check's `entities`.
+ *
+ * CC-1/CC-6 map directly — their entities already carry
+ * `{memberId, name, gapMinutes, effectiveMinutes, allocatedMinutes}`, exactly
+ * `OverrideModalAffectedMember`'s shape (`completion-checks.ts`, `cc1`/`cc6`).
+ *
+ * CC-3/CC-10 do not: their entities are task-scoped
+ * (`{allocationId, taskKey, memberId, needs, taskId?}` and
+ * `{taskId, key, memberIds}` respectively), and `override.ts`'s
+ * `entityIsCovered` resolves both by `affectedTaskIds`, not member id. So the
+ * modal's member list here is display-only (gap/effective/allocated default
+ * to 0 — those numbers are not meaningful for a skipped re-estimate or a
+ * duplicate allocation), built by looking member names up on `members`; what
+ * actually unblocks the check on resubmission is `affectedTaskIds`.
+ *
+ * Returns `null` when the check cannot be attributed to any of the four
+ * overridable hard checks, or — for CC-3/CC-10 — when none of its entities
+ * carry a `taskId` at all. `filterOverriddenFailures`'s own `entityIsCovered`
+ * already documents that an entity with no `taskId` "can never be resolved";
+ * this mirrors that by declining to offer an override that could not
+ * possibly lift the block, rather than submitting one that silently does
+ * nothing.
+ */
+function deriveOverrideContext(
+  check: CompletionCheckResult,
+  members: readonly RunScreenMember[]
+): OverrideContext | null {
+  const type = CHECK_ID_TO_OVERRIDE_TYPE[check.checkId]
+  if (!type) return null
+
+  const nameFor = (memberId: string) =>
+    members.find((member) => member.memberId === memberId)?.name ?? memberId
+
+  if (check.checkId === 'CC-1' || check.checkId === 'CC-6') {
+    const affected = check.entities.map((entity) => ({
+      memberId: String(entity.memberId),
+      name: String(entity.name ?? entity.memberId),
+      gapMinutes: Number(entity.gapMinutes ?? 0),
+      effectiveMinutes: Number(entity.effectiveMinutes ?? 0),
+      allocatedMinutes: Number(entity.allocatedMinutes ?? 0)
+    }))
+    return {
+      type,
+      affected,
+      affectedMemberIds: affected.map((member) => member.memberId),
+      affectedTaskIds: []
+    }
+  }
+
+  if (check.checkId === 'CC-10') {
+    const taskIds = Array.from(
+      new Set(
+        check.entities
+          .map((entity) => entity.taskId)
+          .filter((taskId): taskId is string => typeof taskId === 'string')
+      )
+    )
+    if (taskIds.length === 0) return null
+
+    const memberIds = Array.from(
+      new Set(
+        check.entities.flatMap((entity) =>
+          Array.isArray(entity.memberIds) ? (entity.memberIds as string[]) : []
+        )
+      )
+    )
+    const affected = memberIds.map((memberId) => ({
+      memberId,
+      name: nameFor(memberId),
+      gapMinutes: 0,
+      effectiveMinutes: 0,
+      allocatedMinutes: 0
+    }))
+
+    return { type, affected, affectedMemberIds: memberIds, affectedTaskIds: taskIds }
+  }
+
+  if (check.checkId === 'CC-3') {
+    const taskIds = Array.from(
+      new Set(
+        check.entities
+          .map((entity) => entity.taskId)
+          .filter((taskId): taskId is string => typeof taskId === 'string')
+      )
+    )
+    if (taskIds.length === 0) return null
+
+    const memberIds = Array.from(
+      new Set(
+        check.entities
+          .map((entity) => entity.memberId)
+          .filter((memberId): memberId is string => typeof memberId === 'string')
+      )
+    )
+    const affected = memberIds.map((memberId) => ({
+      memberId,
+      name: nameFor(memberId),
+      gapMinutes: 0,
+      effectiveMinutes: 0,
+      allocatedMinutes: 0
+    }))
+
+    return { type, affected, affectedMemberIds: memberIds, affectedTaskIds: taskIds }
+  }
+
+  return null
+}
 
 /**
  * The stand-up run screen (§15.8) — "the screen the module lives or dies on".
@@ -180,6 +317,22 @@ export interface RunScreenApi {
     resolutionType: string
     comment?: string
   }): Promise<void>
+
+  // --- Task 22 (Phase 10's override path, wired from the run screen) --------
+  /**
+   * `POST /api/standups/:id/overrides`. Returns the created override — the
+   * screen tracks its `type`/`affectedMemberIds`/`affectedTaskIds` locally in
+   * `overridesIssued` so `filterOverriddenFailures` can lift the block
+   * immediately, without a board-payload change carrying override history.
+   */
+  issueOverride?(input: {
+    type: string
+    affectedMemberIds: string[]
+    affectedTaskIds: string[]
+    reasonCode: string
+    justification: string
+    memberAcknowledged: boolean
+  }): Promise<IssuedOverrideForReconciliation>
 }
 
 export interface RunScreenViewer {
@@ -490,17 +643,77 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
     [board]
   )
 
-  const blocking = useMemo(() => blockingFailures(checks), [checks])
+  /**
+   * Task 22. Overrides issued this session, tracked client-side from each
+   * successful `POST /overrides` response body (which carries `type`,
+   * `affectedMemberIds`, `affectedTaskIds`). `board` has no field carrying
+   * previously-issued overrides — the board-view payload was never extended
+   * to include them — so this local list, not a reload, is what actually
+   * narrows `blocking`.
+   */
+  const [overridesIssued, setOverridesIssued] = useState<IssuedOverrideForReconciliation[]>([])
+  const blocking = useMemo(
+    () => filterOverriddenFailures(blockingFailures(checks), overridesIssued),
+    [checks, overridesIssued]
+  )
+
+  const [overridingCheck, setOverridingCheck] = useState<CompletionCheckResult | null>(null)
+  const overrideContext = useMemo(
+    () => (overridingCheck ? deriveOverrideContext(overridingCheck, board.members) : null),
+    [overridingCheck, board.members]
+  )
+
+  const onOverride = useCallback(
+    (check: CompletionCheckResult) => {
+      const context = deriveOverrideContext(check, board.members)
+      if (!context) {
+        setNotice(standupStrings.run.overrideUnavailable())
+        return
+      }
+      setNotice(null)
+      setOverridingCheck(check)
+    },
+    [board.members]
+  )
+
+  const onCancelOverride = useCallback(() => setOverridingCheck(null), [])
+
+  const onSubmitOverride = useCallback(
+    async (input: OverrideModalSubmitInput) => {
+      if (!overridingCheck || !overrideContext || !api.issueOverride) return
+      setNotice(null)
+      try {
+        const created = await api.issueOverride({
+          type: overrideContext.type,
+          affectedMemberIds: overrideContext.affectedMemberIds,
+          affectedTaskIds: overrideContext.affectedTaskIds,
+          reasonCode: input.reasonCode,
+          justification: input.justification,
+          memberAcknowledged: input.memberAcknowledged
+        })
+        setOverridesIssued((current) => [...current, created])
+        setOverridingCheck(null)
+        setNotice(standupStrings.run.overrideSuccess())
+        await reload()
+      } catch {
+        // Deliberately left open on failure (INVALID_JUSTIFICATION,
+        // OVERRIDE_NOT_PERMITTED, ...) — the PM's in-progress reason and
+        // justification text stay put so they can fix it, rather than losing
+        // the input to a silently closed modal.
+        setNotice(standupStrings.run.overrideFailed())
+      }
+    },
+    [api, overridingCheck, overrideContext, reload]
+  )
 
   const [completing, setCompleting] = useState(false)
 
   /**
    * RUN-19..22. `STALE_STANDUP` reloads with a toast, matching every other
    * mutation on this screen. `COMPLETION_CHECKS_FAILED` surfaces the
-   * failures Panel 7 already lists in detail — no separate override-per-
-   * check flow here (Task 17's scope call): the panel's own fail rows
-   * already carry each message and RUN-19's jump link, and `/overrides`
-   * exists as its own route for a PM who decides to override one.
+   * failures Panel 7 already lists in detail — the panel's own fail rows
+   * already carry each message, RUN-19's jump link, and (Task 22) an
+   * Override action for the ones §14.2 allows a PM to knowingly accept.
    * `STANDUP_ALREADY_COMPLETED` reloads so a stale button click resolves to
    * the board's real (now completed) state rather than a dead-end toast.
    */
@@ -781,7 +994,21 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
         blocking={blocking}
         disabled={readOnly || completing}
         onComplete={() => void onComplete()}
+        onOverride={onOverride}
       />
+
+      {/* Task 22. `overrideContext` is null whenever `overridingCheck` is —
+          and also, for CC-3/CC-10, when no entity carried a resolvable
+          `taskId` — so this only ever renders with props the modal can act
+          on. */}
+      {overridingCheck && overrideContext && (
+        <OverrideModal
+          type={overrideContext.type}
+          affected={overrideContext.affected}
+          onCancel={onCancelOverride}
+          onSubmit={(input) => void onSubmitOverride(input)}
+        />
+      )}
     </div>
   )
 }

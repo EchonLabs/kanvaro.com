@@ -250,6 +250,16 @@ export default function StandupRunPage({
         body: JSON.stringify({ resolutionType, comment, standupId })
       })
       await unwrap(response)
+    },
+
+    // --- Task 22 (Phase 10's override path) -------------------------------
+    async issueOverride(input) {
+      const response = await fetch(`/api/standups/${standupId}/overrides`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input)
+      })
+      return unwrap(response)
     }
   }
 
