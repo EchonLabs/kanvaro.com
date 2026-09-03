@@ -31,7 +31,7 @@ const formatBytes = (bytes: number) => {
 
 export default function DocumentTemplatesPage() {
   const { hasPermission, loading: permissionsLoading } = usePermissions()
-  const canManageTemplates = hasPermission(Permission.DOCUMENTATION_CREATE)
+  const canManageTemplates = hasPermission(Permission.DOCUMENTATION_MANAGE_PERMISSIONS)
 
   const [documents, setDocuments] = useState<DocumentTemplateItem[]>([])
   const [loading, setLoading] = useState(true)
