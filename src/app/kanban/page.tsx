@@ -575,8 +575,8 @@ export default function KanbanPage() {
 
   const filteredProjectOptions = useMemo(() => {
     const q = projectFilterQuery.trim().toLowerCase()
-    if (!q) return projects
-    return projects.filter(p => p.name.toLowerCase().includes(q))
+    if (!q) return projects.slice().sort((a, b) => a.name.localeCompare(b.name))
+    return projects.filter(p => p.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name))
   }, [projects, projectFilterQuery])
 
   const priorityOptions = [

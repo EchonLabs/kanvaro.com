@@ -147,7 +147,7 @@ export default function TimerPage() {
 
   const filteredProjects = projects.filter((project) =>
     project.name.toLowerCase().includes(projectSearch.toLowerCase())
-  )
+  ).sort((a, b) => a.name.localeCompare(b.name))
 
   const showInitialTasksLoading = tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)
 
@@ -908,7 +908,7 @@ export default function TimerPage() {
                                 if (taskNumStr.includes(searchLower) || (searchNormalized !== searchLower && taskNumStr.includes(searchNormalized))) return true
                               }
                               return false
-                            }).map((task) => {
+                            }).sort((a, b) => (a.title || '').localeCompare(b.title || '')).map((task) => {
                               const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
                               return (
                                 <SelectItem

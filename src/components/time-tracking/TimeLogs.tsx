@@ -176,11 +176,10 @@ export function TimeLogs({
 
   // Filtered lists based on search queries
   const filteredProjects = useMemo(() => {
-    if (!projectSearch.trim()) return filterProjects
-    const searchLower = projectSearch.toLowerCase()
-    return filterProjects.filter(project =>
-      project.name?.toLowerCase().includes(searchLower)
+    const result = filterProjects.filter(project =>
+      project.name?.toLowerCase().includes(projectSearch.toLowerCase())
     )
+    return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   }, [filterProjects, projectSearch])
 
   const filteredTasks = useMemo(() => {
@@ -192,17 +191,16 @@ export function TimeLogs({
         truncated,
         isTruncated
       }
-    })
+    }).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
   }, [filterTasks])
 
   const filteredEmployees = useMemo(() => {
-    if (!employeeSearch.trim()) return filterEmployees
-    const searchLower = employeeSearch.toLowerCase()
-    return filterEmployees.filter(employee => {
+    const result = filterEmployees.filter(employee => {
       const fullName = `${employee.firstName || ''} ${employee.lastName || ''}`.toLowerCase()
       const email = employee.email?.toLowerCase() || ''
-      return fullName.includes(searchLower) || email.includes(searchLower)
+      return fullName.includes(employeeSearch.toLowerCase()) || email.includes(employeeSearch.toLowerCase())
     })
+    return result.sort((a, b) => `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`))
   }, [filterEmployees, employeeSearch])
 
   const statusOptions = [
@@ -250,20 +248,18 @@ export function TimeLogs({
   const [modalEmployeeSearch, setModalEmployeeSearch] = useState('')
 
   const filteredModalProjects = useMemo(() => {
-    if (!modalProjectSearch.trim()) return projects
-    const searchLower = modalProjectSearch.toLowerCase()
-    return projects.filter(project =>
-      project.name?.toLowerCase().includes(searchLower)
+    const result = projects.filter(project =>
+      project.name?.toLowerCase().includes(modalProjectSearch.toLowerCase())
     )
+    return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   }, [projects, modalProjectSearch])
 
   const filteredModalTasks = useMemo(() => {
-    if (!modalTaskSearch.trim()) return tasks
-    const searchLower = modalTaskSearch.toLowerCase()
-    return tasks.filter(task =>
-      task.title?.toLowerCase().includes(searchLower) ||
-      task.displayId?.toLowerCase().includes(searchLower)
+    const result = tasks.filter(task =>
+      task.title?.toLowerCase().includes(modalTaskSearch.toLowerCase()) ||
+      task.displayId?.toLowerCase().includes(modalTaskSearch.toLowerCase())
     )
+    return result.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
   }, [tasks, modalTaskSearch])
 
   const selectedTaskForLogObject = useMemo(() =>
@@ -272,13 +268,12 @@ export function TimeLogs({
   )
 
   const filteredModalEmployees = useMemo(() => {
-    if (!modalEmployeeSearch.trim()) return filterEmployees
-    const searchLower = modalEmployeeSearch.toLowerCase()
-    return filterEmployees.filter(emp => {
+    const result = filterEmployees.filter(emp => {
       const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
       const email = emp.email?.toLowerCase() || ''
-      return fullName.includes(searchLower) || email.includes(searchLower)
+      return fullName.includes(modalEmployeeSearch.toLowerCase()) || email.includes(modalEmployeeSearch.toLowerCase())
     })
+    return result.sort((a, b) => `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`))
   }, [filterEmployees, modalEmployeeSearch])
   const [manualLogData, setManualLogData] = useState({
     startDate: '',
