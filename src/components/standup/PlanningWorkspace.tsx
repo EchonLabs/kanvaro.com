@@ -121,6 +121,13 @@ export function PlanningWorkspace({
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([])
   const [voterIds, setVoterIds] = useState<string[] | null>(null)
   const [choosingVoters, setChoosingVoters] = useState(false)
+  // E20 — reopening an already-planned sprint is legal, but it must be a
+  // deliberate choice. Without this, "no open session" looks identical
+  // whether planning has never run or has already completed once, and the
+  // plain "Start planning" button lets a PM loop plan -> complete -> plan
+  // indefinitely without ever starting the sprint.
+  const [history, setHistory] = useState<any[]>([])
+  const [confirmingReopen, setConfirmingReopen] = useState(false)
 
   // UI-4 — the checklist is live. Every mutation on this screen ends by
   // refetching it, so what the PM sees and what the server will enforce cannot
@@ -149,6 +156,7 @@ export function PlanningWorkspace({
       if (checklistResponse.ok) setData(checklistPayload.data)
       if (sessionResponse.ok) {
         setSession(sessionPayload.data.session)
+        setHistory(sessionPayload.data.history ?? [])
         if (sessionPayload.data.session?.sprintGoal !== undefined) {
           setGoal(sessionPayload.data.session.sprintGoal ?? '')
         }
@@ -450,20 +458,57 @@ export function PlanningWorkspace({
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] p-4">
           <div>
             <p className="text-[13px] font-medium text-[var(--apple-label)]">
-              No planning session is open
+              {history.length > 0 ? 'This sprint has already been planned' : 'No planning session is open'}
             </p>
             <p className="text-[12px] text-[var(--apple-tertiary-label)]">
-              Stand-ups cannot run until this sprint has been planned.
+              {history.length > 0
+                ? `Planning was completed ${history.length > 1 ? `${history.length} times` : 'once'} already. Reopening starts a new round and re-evaluates every check.`
+                : 'Stand-ups cannot run until this sprint has been planned.'}
             </p>
           </div>
-          {canFacilitate && (
-            <Button onClick={openSession} disabled={busy}>
-              <PlayCircle className="mr-1.5 h-4 w-4" />
-              Start planning
-            </Button>
-          )}
+          {canFacilitate &&
+            (history.length > 0 ? (
+              <Button variant="outline" onClick={() => setConfirmingReopen(true)} disabled={busy}>
+                <PlayCircle className="mr-1.5 h-4 w-4" />
+                Reopen planning
+              </Button>
+            ) : (
+              <Button onClick={openSession} disabled={busy}>
+                <PlayCircle className="mr-1.5 h-4 w-4" />
+                Start planning
+              </Button>
+            ))}
         </div>
       )}
+
+      {/* E20 — reopening is legal but must be deliberate, not a side effect of
+          the button always reading "Start planning" after a completion. */}
+      <ResponsiveDialog
+        open={confirmingReopen}
+        onOpenChange={setConfirmingReopen}
+        title="Reopen planning for this sprint?"
+        description={`This sprint was already planned${
+          history.length > 0 && history[0]?.completedAt
+            ? ` on ${new Date(history[0].completedAt).toLocaleDateString()}`
+            : ''
+        }. Reopening starts a new planning session, re-runs every check, and can change the sprint's schedule and locked estimates once you complete it again.`}
+      >
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setConfirmingReopen(false)} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              setConfirmingReopen(false)
+              await openSession()
+            }}
+            disabled={busy}
+          >
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Reopen planning
+          </Button>
+        </div>
+      </ResponsiveDialog>
 
       {totals && (
         <div className="grid gap-3 sm:grid-cols-3">
