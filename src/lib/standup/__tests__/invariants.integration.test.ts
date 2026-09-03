@@ -32,19 +32,16 @@
  * reachable gap, not a theoretical one — see the report for the exact
  * reproduction and file references.
  *
- * **INV-5**'s second disjunct ("...or an override exists naming the member")
- * is asserted below only as "the override record correctly names the
- * member" — a real, true fact about `StandupOverride` documents. What is
- * NOT true, and is also documented in the report: issuing an override never
- * changes whether `CC-1`/`CC-3`/`CC-6`/`CC-10` pass. `evaluateCompletionChecks`
- * takes no override input at all, and `assembleCompletionContext` only reads
- * `StandupOverride` documents to build the summary and drive N7 — never to
- * exempt a failing hard check from `blockingFailures`. In the *current*
- * system this does not let a bad state through (the check still blocks
- * completion outright, overridden or not, so a completed stand-up's
- * capacity always genuinely matches — asserted below), but it does mean the
- * override mechanism does not function as OVR-1..9 and the §10.3 check
- * table describe it. Flagged, not silently worked around.
+ * **INV-5** now holds in full, both disjuncts, and is asserted below as
+ * such. `filterOverriddenFailures` in `override.ts` reconciles issued
+ * `StandupOverride` records against failing `CC-1`/`CC-3`/`CC-6`/`CC-10`
+ * checks by entity, and `completion-saga.ts`'s guard applies that filter
+ * before refusing completion — so a stand-up with a real capacity mismatch
+ * now genuinely completes once a matching override is issued, not merely
+ * "has an override record naming the member somewhere". The fuller original
+ * of this is `completion-saga.integration.test.ts`'s `AC-10` test; this
+ * section re-proves the same real disjunct against its own fixture, as part
+ * of this file's one-place sweep.
  */
 import mongoose from 'mongoose'
 
@@ -358,9 +355,8 @@ describe('Task 20 — INV-1 through INV-10, against real (unmocked) data', () =>
     // INV-5. A completed stand-up's allocated hours equal effective
     // capacity within tolerance, or an override exists naming the member.
     //
-    // First disjunct: real, and enforced by construction — `CC-1` is a hard,
-    // unwaivable-in-practice block (see the module docblock on the override
-    // gap), so every stand-up that reaches `Completed` necessarily had
+    // First disjunct: real, and enforced by construction — `CC-1` is a hard
+    // block, so every stand-up that reaches `Completed` necessarily had
     // `evaluateCompletionChecks` report no `CC-1`/`CC-6` failures for the
     // `checkInput` it was completed against. Asserted here by re-running the
     // same evaluator this fixture's own board would have produced.
@@ -380,11 +376,66 @@ describe('Task 20 — INV-1 through INV-10, against real (unmocked) data', () =>
     const checksOnPassingBoard = evaluateCompletionChecks({ ...passingCheckInput(), members: passingMembers })
     expect(blockingFailures(checksOnPassingBoard).find((c) => c.checkId === 'CC-1')).toBeUndefined()
 
-    // Second disjunct: an issued override genuinely names the affected
-    // member — a real `StandupOverride` document, not a stub.
+    // Second disjunct, the real one: a stand-up with a genuine capacity
+    // mismatch is refused, and only a matching override — reconciled by
+    // `filterOverriddenFailures` — lets that same completion succeed. A
+    // self-contained sprint/standup pair, separate from the shared fixture
+    // above, so this doesn't perturb the carry-forward/variance/ledger state
+    // INV-6..INV-10 read below.
+    const inv5SprintId = await seedSprint({ name: 'INV-5 override sprint' })
+    const inv5Day1 = await seedStandup(inv5SprintId, '2026-08-17', 1)
+    const inv5Day2 = await seedStandup(inv5SprintId, '2026-08-18', 2)
+    const inv5Task = await seedTask(inv5SprintId)
+    await seedAllocation(inv5Day1._id, inv5SprintId, inv5Task._id)
+    await seedAllocation(inv5Day2._id, inv5SprintId, inv5Task._id)
+
+    const underAllocatedCheckInput = {
+      shape: 'mid_sprint' as const,
+      members: [
+        {
+          memberId: String(member),
+          name: 'Kasun',
+          attendance: 'present' as const,
+          capacity: {
+            memberId: String(member),
+            date: '2026-08-18',
+            nominalMinutes: minutes(480),
+            adjustments: [],
+            adjustedMinutes: minutes(480),
+            outstandingDebtMinutes: minutes(0),
+            overrunPolicy: 'absorb' as const,
+            effectiveMinutes: minutes(480),
+            allocatedMinutes: minutes(300),
+            gapMinutes: minutes(180),
+            status: 'under' as const,
+            isUnavailable: false,
+            strandedMinutes: minutes(0)
+          },
+          allocations: []
+        }
+      ] as unknown as CheckMember[],
+      variance: [],
+      carryForward: [],
+      blockers: [],
+      sprintHealth: { remainingEstimateMinutes: minutes(0), remainingCapacityMinutes: minutes(1000) }
+    }
+
+    const blockedCtx: CompletionContext = {
+      ...baseContext(inv5SprintId, { checkInput: underAllocatedCheckInput }),
+      standupId: String(inv5Day2._id),
+      expectedVersion: 0
+    }
+
+    // Real capacity mismatch, no override yet: completion is refused.
+    const blockedFailure = await runCompletionSaga(blockedCtx).catch((error) => error)
+    expect(blockedFailure.code).toBe('COMPLETION_CHECKS_FAILED')
+    expect((await Standup.findById(inv5Day2._id).lean())!.status).toBe('In_Progress')
+
+    // An issued override genuinely names the affected member — a real
+    // `StandupOverride` document, not a stub.
     const override = await issueOverride({
-      standupId: String(day1._id),
-      sprintId: String(sprintId),
+      standupId: String(inv5Day2._id),
+      sprintId: String(inv5SprintId),
       projectId: String(project),
       organizationId: String(organization),
       type: 'under_allocation',
@@ -395,6 +446,24 @@ describe('Task 20 — INV-1 through INV-10, against real (unmocked) data', () =>
       adminRecipientIds: []
     })
     expect(override.affectedMemberIds.map(String)).toContain(String(member))
+
+    // Same completion attempt, now carrying that override: the CC-1 failure
+    // for the member is reconciled away and completion genuinely succeeds —
+    // the real disjunct, not just "a record exists naming the member".
+    const unblockedCtx: CompletionContext = {
+      ...blockedCtx,
+      overridesIssued: [
+        {
+          overrideId: String(override._id),
+          type: 'under_allocation',
+          affectedMemberIds: [String(member)],
+          affectedTaskIds: []
+        }
+      ]
+    }
+    const unblockedResult = await runCompletionSaga(unblockedCtx)
+    expect(unblockedResult.status).toBe('completed')
+    expect((await Standup.findById(inv5Day2._id).lean())!.status).toBe('Completed')
 
     // ------------------------------------------------------------------
     // INV-6. Every allocation on a completed stand-up has exactly one
