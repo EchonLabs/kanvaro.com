@@ -73,6 +73,8 @@ export const ACTIVITY_ACTIONS = [
   'carry_forward_created',
   'carry_forward_noted',
   'carry_forward_resolved',
+  // Sprint close readiness (CC-8, §15.8.11)
+  'sprint_close_disposition_set',
   // Overrides and gate (OVR-*, PLN-16..19)
   'override_issued',
   // Blockers (RUN-14..18)
