@@ -11,6 +11,15 @@ import {
 export const TASK_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
 export type TaskStatus = typeof TASK_STATUS_VALUES[number]
 
+/** CC-8 / §15.8.11. The four dispositions a still-open task may receive on the final day. */
+export const SPRINT_CLOSE_DISPOSITION_TYPES = [
+  'finish_today',
+  'descope',
+  'move_to_next_sprint',
+  'split_and_move_remainder'
+] as const
+export type SprintCloseDispositionType = typeof SPRINT_CLOSE_DISPOSITION_TYPES[number]
+
 export interface ITaskSubtask {
   _id?: mongoose.Types.ObjectId
   title: string
@@ -82,6 +91,17 @@ export interface ITask extends Document {
    * point `resolveStandupOwner()` falls back to `assignedTo[0]`.
    */
   standupOwner?: mongoose.Types.ObjectId
+  /**
+   * CC-8 / §15.8.11. Set only from the final-day Sprint-close-readiness panel.
+   * Unlike `standupOwner`, this has no fallback resolver — an unset value is
+   * exactly "not yet dispositioned," which is what blocks completion.
+   */
+  sprintCloseDisposition?: {
+    type: SprintCloseDispositionType
+    setAt: Date
+    setBy: mongoose.Types.ObjectId
+    note?: string
+  }
   standupSpillCount?: number
   lastAllocatedStandup?: mongoose.Types.ObjectId
   descopedAt?: Date
@@ -381,6 +401,15 @@ const TaskSchema = new Schema<ITask>({
   standupOwner: {
     type: Schema.Types.ObjectId,
     ref: 'User'
+  },
+  sprintCloseDisposition: {
+    type: {
+      type: String,
+      enum: SPRINT_CLOSE_DISPOSITION_TYPES
+    },
+    setAt: { type: Date },
+    setBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    note: { type: String, maxlength: 1000 }
   },
   /** How many stand-ups this task has carried across (VAR-14 chronic spill). */
   standupSpillCount: {
