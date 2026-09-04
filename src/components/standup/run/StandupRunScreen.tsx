@@ -12,6 +12,12 @@ import { CapacityBoard, type BoardAllocationView } from './CapacityBoard'
 import { CompletionPanel } from './CompletionPanel'
 import { OverrideModal, type OverridableType, type OverrideModalAffectedMember, type OverrideModalSubmitInput } from './OverrideModal'
 import { UnassignedPool } from './UnassignedPool'
+import { SprintCloseReadinessPanel } from './SprintCloseReadinessPanel'
+import {
+  evaluateFinalDayCarryForwardDisposition,
+  evaluateTaskDispositions,
+  type OpenTaskReadiness
+} from '@/lib/standup/sprint-close'
 import type { PoolTask } from '@/lib/standup/allocation'
 import type { BucketedRows } from '@/lib/standup/yesterday'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
@@ -239,6 +245,11 @@ export interface RunScreenData {
    * again.
    */
   completionState?: { runId: string; lastCompletedStep: string | null } | null
+  /** Phase 11. Present only on `final_day`. */
+  sprintClose?: {
+    openTasks: OpenTaskReadiness[]
+    carryForwardItems: import('@/lib/standup/sprint-close').CarryForwardDispositionRow[]
+  }
 }
 
 export interface RunScreenApi {
@@ -333,6 +344,9 @@ export interface RunScreenApi {
     justification: string
     memberAcknowledged: boolean
   }): Promise<IssuedOverrideForReconciliation>
+
+  // --- Phase 11 --------------------------------------------------------------
+  setTaskDisposition?(input: { taskId: string; type: string }): Promise<void>
 }
 
 export interface RunScreenViewer {
@@ -638,7 +652,8 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
             )
           : board.shape === 'day_one'
             ? []
-            : undefined
+            : undefined,
+        openTasks: board.sprintClose?.openTasks
       }),
     [board]
   )
@@ -655,6 +670,14 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
   const blocking = useMemo(
     () => filterOverriddenFailures(blockingFailures(checks), overridesIssued),
     [checks, overridesIssued]
+  )
+
+  const carryForwardCloseFailures = useMemo(
+    () =>
+      board.sprintClose
+        ? evaluateFinalDayCarryForwardDisposition(board.sprintClose.carryForwardItems).offenders
+        : [],
+    [board.sprintClose]
   )
 
   const [overridingCheck, setOverridingCheck] = useState<CompletionCheckResult | null>(null)
@@ -707,6 +730,9 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
   )
 
   const [completing, setCompleting] = useState(false)
+
+  const completeDisabled =
+    readOnly || completing || blocking.length > 0 || carryForwardCloseFailures.length > 0
 
   /**
    * RUN-19..22. `STALE_STANDUP` reloads with a toast, matching every other
@@ -976,6 +1002,25 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
         </div>
       </section>
 
+      {board.shape === 'final_day' && board.sprintClose && (
+        <SprintCloseReadinessPanel
+          openTasks={board.sprintClose.openTasks}
+          carryForwardOffenders={carryForwardCloseFailures}
+          disabled={readOnly}
+          locale={locale}
+          onSetDisposition={(taskId, type) => {
+            void (async () => {
+              try {
+                await api.setTaskDisposition?.({ taskId, type })
+                await reload()
+              } catch {
+                setNotice(standupStrings.run.editRejected())
+              }
+            })()
+          }}
+        />
+      )}
+
       <BlockerPanel
         blockers={board.blockers ?? []}
         today={board.date}
@@ -992,7 +1037,7 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
       <CompletionPanel
         checks={checks}
         blocking={blocking}
-        disabled={readOnly || completing}
+        disabled={readOnly || completing || carryForwardCloseFailures.length > 0}
         onComplete={() => void onComplete()}
         onOverride={onOverride}
       />

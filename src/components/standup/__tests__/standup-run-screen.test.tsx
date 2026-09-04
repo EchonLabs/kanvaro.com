@@ -650,3 +650,47 @@ describe('Panel 7 — the Override action (Task 22)', () => {
     ).not.toBeInTheDocument()
   })
 })
+
+describe('final-day sprint close', () => {
+  it('renders the readiness panel only when shape is final_day and sprintClose data is present', () => {
+    renderScreen({ shape: 'final_day', sprintClose: { openTasks: [], carryForwardItems: [] } })
+    expect(screen.getByText(/sprint close readiness/i)).toBeInTheDocument()
+  })
+
+  it('omits the panel on a mid_sprint stand-up even if sprintClose data is present', () => {
+    renderScreen({ shape: 'mid_sprint', sprintClose: { openTasks: [], carryForwardItems: [] } })
+    expect(screen.queryByText(/sprint close readiness/i)).not.toBeInTheDocument()
+  })
+
+  it('blocks Complete when an open task has no disposition, independent of the eleven checks', () => {
+    renderScreen({
+      shape: 'final_day',
+      members: [],
+      sprintClose: {
+        openTasks: [
+          {
+            taskId: 't1',
+            taskKey: 'KAN-1',
+            remainingEstimateMinutes: m(60),
+            hoursAvailableTodayMinutes: m(60),
+            projectedOutcome: 'will_finish'
+          }
+        ],
+        carryForwardItems: []
+      }
+    })
+    expect(screen.getByText(/complete stand-up/i)).toBeDisabled()
+  })
+
+  it('blocks Complete when a carry-forward item is still open on the final day, even with CC-8 satisfied', () => {
+    renderScreen({
+      shape: 'final_day',
+      members: [],
+      sprintClose: {
+        openTasks: [],
+        carryForwardItems: [{ itemId: 'c1', taskKey: 'KAN-2', status: 'open', hasResolution: false }]
+      }
+    })
+    expect(screen.getByText(/complete stand-up/i)).toBeDisabled()
+  })
+})
