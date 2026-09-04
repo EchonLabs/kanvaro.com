@@ -581,6 +581,54 @@ describe('evaluateCompletionChecks', () => {
     })
   })
 
+  describe('CC-8', () => {
+    const openTask = (overrides: Partial<import('../sprint-close').OpenTaskReadiness> = {}) => ({
+      taskId: 't1',
+      taskKey: 'KAN-1',
+      remainingEstimateMinutes: minutes(60),
+      hoursAvailableTodayMinutes: minutes(60),
+      projectedOutcome: 'will_finish' as const,
+      ...overrides
+    })
+
+    it('is not_evaluated when openTasks is undefined, on any shape', () => {
+      const [, , , , , , , cc8] = evaluateCompletionChecks({ shape: 'final_day', members: [] })
+      expect(cc8.checkId).toBe('CC-8')
+      expect(cc8.status).toBe('not_evaluated')
+      expect(cc8.ownedBy).toBe('Phase 11')
+    })
+
+    it('fails when an open task has no disposition on the final day', () => {
+      const [, , , , , , , cc8] = evaluateCompletionChecks({
+        shape: 'final_day',
+        members: [],
+        openTasks: [openTask()]
+      })
+      expect(cc8.status).toBe('fail')
+      expect(cc8.hard).toBe(true)
+      expect(cc8.overridable).toBe(false)
+      expect(cc8.entities).toHaveLength(1)
+    })
+
+    it('passes when every open task has a disposition', () => {
+      const [, , , , , , , cc8] = evaluateCompletionChecks({
+        shape: 'final_day',
+        members: [],
+        openTasks: [openTask({ disposition: 'finish_today' })]
+      })
+      expect(cc8.status).toBe('pass')
+    })
+
+    it('passes trivially on a non-final-day shape even with undispositioned tasks', () => {
+      const [, , , , , , , cc8] = evaluateCompletionChecks({
+        shape: 'mid_sprint',
+        members: [],
+        openTasks: [openTask()]
+      })
+      expect(cc8.status).toBe('pass')
+    })
+  })
+
   describe('CC-11 — remaining scope fits remaining sprint capacity (Phase 10)', () => {
     it('is not_evaluated when sprint health was not supplied', () => {
       const result = check(evaluateCompletionChecks(healthy()), 'CC-11')

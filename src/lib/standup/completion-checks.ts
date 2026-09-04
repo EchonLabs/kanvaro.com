@@ -5,17 +5,9 @@
  * in the spec's table order, and `blockingFailures()` says whether the Complete
  * button may enable.
  *
- * **Ten of the eleven are answered** — CC-1, CC-2, CC-5, CC-6, CC-7, CC-10
- * from Phase 7, CC-3 from Phase 8's variance engine, CC-4 from Phase 9's
- * carry-forward register, and CC-9/CC-11 from this phase's blockers and
- * sprint health. The last, CC-8, needs the final-day disposition (Phase 11).
- *
- * CC-8 is returned anyway, as `not_evaluated` naming the owning phase. Two
- * reasons. A PM reading Panel 7 must not see a complete-looking list that never
- * asked whether the final-day dispositions are set; and "could not be
- * evaluated" is a genuinely different state from "passed", so the payload has
- * to be able to say which. An unbuilt check blocks nothing — it has failed
- * nothing — but it is visible.
+ * **All eleven are answered.** CC-1, CC-2, CC-5, CC-6, CC-7, CC-10 from Phase
+ * 7, CC-3 from Phase 8, CC-4 from Phase 9, CC-9/CC-11 from Phase 10, and CC-8
+ * from this phase's final-day sprint-close readiness.
  *
  * **No override path is built here.** That is Phase 10. `overridable` on a
  * result is data, transcribed from the spec's table, not a control.
@@ -23,6 +15,7 @@
 import type { AttendanceStatus, CapacityBreakdown } from './capacity'
 import type { Minutes } from './minutes'
 import { computeSprintHealth, type SprintHealthInput } from './sprint-health'
+import { evaluateTaskDispositions, type OpenTaskReadiness } from './sprint-close'
 
 export type CheckId =
   | 'CC-1'
@@ -163,18 +156,18 @@ export interface EvaluateCompletionChecksInput {
    * CC-11 was never asked.
    */
   sprintHealth?: SprintHealthInput
+  /**
+   * CC-8 (Phase 11). Every currently-open sprint task, for the final-day
+   * disposition gate. `undefined` means not asked (`not_evaluated`); on any
+   * shape other than `final_day` the check passes trivially regardless,
+   * because CC-8 only applies on the sprint's last working day.
+   */
+  openTasks?: OpenTaskReadiness[]
 }
 
-/** The one check still unanswerable, and who will answer it. */
+/** Checks still unanswerable, and who will answer them. */
 const DEFERRED: Record<string, { phase: string; hard: boolean; overridable: boolean; what: string }> =
-  {
-    'CC-8': {
-      phase: 'Phase 11',
-      hard: true,
-      overridable: false,
-      what: 'Final-day dispositions need the sprint-close panel.'
-    }
-  }
+  {}
 
 export function evaluateCompletionChecks(
   input: EvaluateCompletionChecksInput
@@ -202,7 +195,7 @@ export function evaluateCompletionChecks(
     cc5(liveRows),
     cc6(members),
     cc7(members),
-    deferred('CC-8'),
+    cc8(input.openTasks, input.shape),
     cc9(input.blockers),
     cc10(liveRows),
     cc11(input.sprintHealth)
@@ -472,6 +465,55 @@ function cc10(rows: readonly CheckAllocation[]): CompletionCheckResult {
       key: group[0].taskKey,
       memberIds: Array.from(new Set(group.map((row) => row.memberId)))
     }))
+  }
+}
+
+/* --- the Phase 11 check ---------------------------------------------------- */
+
+/**
+ * CC-8. Every open sprint task has a final-day disposition. Hard and never
+ * overridable — O10 is a listed hard block (§14.2), so no Override action may
+ * ever render for this row.
+ *
+ * Trivially passes on any shape but `final_day`: the check exists to gate the
+ * sprint's last stand-up, not every stand-up.
+ */
+function cc8(
+  openTasks: readonly OpenTaskReadiness[] | undefined,
+  shape: EvaluateCompletionChecksInput['shape']
+): CompletionCheckResult {
+  const base = { checkId: 'CC-8' as const, hard: true, overridable: false }
+
+  if (openTasks === undefined) {
+    return {
+      ...base,
+      status: 'not_evaluated',
+      message: 'Final-day dispositions were not loaded, so this could not be checked.',
+      entities: [],
+      ownedBy: 'Phase 11'
+    }
+  }
+
+  if (shape !== 'final_day') {
+    return {
+      ...base,
+      status: 'pass',
+      message: 'Not the sprint’s final day.',
+      entities: []
+    }
+  }
+
+  const { offenders } = evaluateTaskDispositions(openTasks)
+
+  return {
+    ...base,
+    status: offenders.length ? 'fail' : 'pass',
+    message: offenders.length
+      ? `${count(offenders.length, 'task')} still ${
+          offenders.length === 1 ? 'needs' : 'need'
+        } a disposition before the sprint can close.`
+      : 'Every open task has a disposition.',
+    entities: offenders.map((task) => ({ taskId: task.taskId, key: task.taskKey }))
   }
 }
 
