@@ -404,6 +404,21 @@ export const standupStrings = {
     panel6: () => 'Blockers',
     panel7: () => 'Complete',
 
+    /** §15.8.11's inserted panel — final day only. */
+    sprintCloseTitle: () => 'Sprint close readiness',
+    sprintCloseDispositionFor: ({ key }: { key: string }) => `Disposition for ${key}`,
+    sprintCloseOutcomeWillFinish: () => 'Will finish',
+    sprintCloseOutcomeAtRisk: () => 'At risk',
+    sprintCloseOutcomeCannotFinish: () => 'Cannot finish',
+    sprintCloseNoDisposition: () => 'Choose one…',
+    sprintCloseDispositionFinishToday: () => 'Finish today',
+    sprintCloseDispositionDescope: () => 'Descope',
+    sprintCloseDispositionMoveToNextSprint: () => 'Move to next sprint',
+    sprintCloseDispositionSplitAndMoveRemainder: () => 'Split and move remainder',
+    sprintCloseCarryForwardTitle: () => 'Open carry-forward items',
+    sprintCloseCarryForwardHint: () =>
+      'Resolve these from the carry forward panel above before completing.',
+
     /**
      * A panel this release cannot fill yet.
      *
