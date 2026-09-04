@@ -15,7 +15,6 @@ import { UnassignedPool } from './UnassignedPool'
 import { SprintCloseReadinessPanel } from './SprintCloseReadinessPanel'
 import {
   evaluateFinalDayCarryForwardDisposition,
-  evaluateTaskDispositions,
   type OpenTaskReadiness
 } from '@/lib/standup/sprint-close'
 import type { PoolTask } from '@/lib/standup/allocation'
@@ -730,9 +729,6 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
   )
 
   const [completing, setCompleting] = useState(false)
-
-  const completeDisabled =
-    readOnly || completing || blocking.length > 0 || carryForwardCloseFailures.length > 0
 
   /**
    * RUN-19..22. `STALE_STANDUP` reloads with a toast, matching every other
