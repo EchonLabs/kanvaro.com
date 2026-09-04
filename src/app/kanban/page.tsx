@@ -104,7 +104,7 @@ interface Project {
 }
 
 interface PersonOption { id: string; name: string; email?: string }
-interface TaskOption { id: string; label: string; fullLabel: string }
+interface TaskOption { id: string; label: string; fullLabel: string; title: string }
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 
@@ -562,9 +562,9 @@ export default function KanbanPage() {
       const identifier = task.displayId || (task.taskNumber ? String(task.taskNumber) : null)
       const fullLabel = identifier ? `#${identifier} - ${task.title}` : task.title
       const { truncated } = truncateText(fullLabel, TRUNCATION_LENGTH)
-      map.set(id, { id, label: truncated, fullLabel })
+      map.set(id, { id, label: truncated, fullLabel, title: task.title })
     })
-    return Array.from(map.values()).sort((a, b) => a.fullLabel.localeCompare(b.fullLabel))
+    return Array.from(map.values()).sort((a, b) => a.title.localeCompare(b.title))
   }, [tasks])
 
   const filteredTaskNumberOptions = useMemo(() => {
