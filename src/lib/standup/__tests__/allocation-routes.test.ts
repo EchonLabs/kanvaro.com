@@ -163,3 +163,280 @@ describe('the role matrix behind those permissions (NFR-13, SEC-1)', () => {
     }
   })
 })
+
+// --- Appended to src/lib/standup/__tests__/allocation-routes.test.ts ---
+import mongoose from 'mongoose'
+import { Standup } from '@/models/Standup'
+import { Task } from '@/models/Task'
+import { Allocation } from '@/models/Allocation'
+import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
+import { WorkingCalendar } from '@/models/WorkingCalendar'
+import { ids, useMongo } from './helpers/mongo'
+
+const hasPermission2 = jest.fn()
+
+jest.mock('@/lib/db-config', () => ({
+  __esModule: true,
+  default: jest.fn().mockResolvedValue(undefined)
+}))
+jest.mock('@/lib/auth-utils', () => ({
+  authenticateUser: jest.fn(async () => ({
+    user: { id: String(mockMemberId2), organization: String(mockOrgId2) }
+  }))
+}))
+jest.mock('@/lib/permissions/permission-service', () => ({
+  PermissionService: {
+    hasPermission: (...args: unknown[]) => hasPermission2(...args),
+    requireProjectAccess: jest.fn().mockResolvedValue(undefined)
+  }
+}))
+
+let mockMemberId2: mongoose.Types.ObjectId
+let mockOrgId2: mongoose.Types.ObjectId
+
+import * as boardRouteLive from '@/app/api/standups/[id]/allocations/route'
+
+const { organization: org2, project: proj2, sprint: spr2, member: mem2 } = ids
+
+async function seedSelfSelectFixture(overrides: Record<string, unknown> = {}) {
+  await WorkingCalendar.create({
+    scope: 'project',
+    organization: org2,
+    project: proj2,
+    workingDaysOfWeek: [1, 2, 3, 4, 5],
+    standardMinutesPerDay: 480,
+    timezone: 'Asia/Colombo',
+    subscribedHolidaySets: [],
+    overrides: []
+  })
+  await ProjectStandupSettings.create({
+    project: proj2,
+    organization: org2,
+    enabled: true,
+    standupLocalTime: '09:00',
+    defaultFacilitator: mem2,
+    allowSelfSelect: true
+  })
+  const standup = await Standup.create({
+    project: proj2,
+    sprint: spr2,
+    organization: org2,
+    standupDate: '2026-09-05',
+    scheduledStartAt: new Date('2026-09-05T03:30:00.000Z'),
+    durationMinutes: 15,
+    sprintDayNumber: 3,
+    totalSprintDays: 5,
+    shape: 'mid_sprint',
+    status: 'Ready',
+    facilitator: mem2,
+    expectedAttendees: [mem2],
+    ...overrides
+  })
+  const task = await Task.create({
+    title: 'Pool task',
+    description: '',
+    status: 'todo',
+    priority: 'medium',
+    type: 'task',
+    organization: org2,
+    project: proj2,
+    sprint: spr2,
+    taskNumber: 1,
+    displayId: 'KAN-1',
+    createdBy: mem2,
+    remainingEstimateMinutes: 60,
+    labels: [],
+    dependencies: [],
+    attachments: []
+  })
+  return { standup, task }
+}
+
+const buildPost = (url: string, body: unknown, version = 0) =>
+  new (require('next/server').NextRequest)(`http://localhost${url}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      [STANDUP_VERSION_HEADER]: String(version)
+    },
+    body: JSON.stringify(body)
+  })
+
+describe('POST /api/standups/:id/allocations — self-select and top-up (ALO-22/23)', () => {
+  useMongo()
+
+  beforeAll(() => {
+    mockMemberId2 = mem2
+    mockOrgId2 = org2
+  })
+
+  beforeEach(() => {
+    hasPermission2.mockReset().mockResolvedValue(true)
+  })
+
+  it('lets a member self-select a task onto their own day', async () => {
+    const { standup, task } = await seedSelfSelectFixture()
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(mem2),
+        taskId: String(task._id),
+        selfSelect: true
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(payload.data.allocation.source).toBe('self_selected')
+  })
+
+  it('refuses a member self-selecting onto somebody else\'s day', async () => {
+    const { standup, task } = await seedSelfSelectFixture({
+      expectedAttendees: [mem2, ids.otherMember]
+    })
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(ids.otherMember),
+        taskId: String(task._id),
+        selfSelect: true
+      }),
+      { params: { id: String(standup._id) } }
+    )
+
+    expect(response.status).toBe(422)
+  })
+
+  it('refuses the POST outright when the caller holds neither allocate permission', async () => {
+    const { standup, task } = await seedSelfSelectFixture()
+    hasPermission2.mockResolvedValue(false)
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(mem2),
+        taskId: String(task._id),
+        selfSelect: true
+      }),
+      { params: { id: String(standup._id) } }
+    )
+
+    expect(response.status).toBe(403)
+  })
+
+  it('lets a top-up add to a Completed stand-up with a reason (ALO-22)', async () => {
+    const { standup, task } = await seedSelfSelectFixture({ status: 'Completed', version: 1 })
+
+    const response = await boardRouteLive.POST(
+      buildPost(
+        `/api/standups/${standup._id}/allocations`,
+        {
+          memberId: String(mem2),
+          taskId: String(task._id),
+          topUp: { reason: 'Extra work done, forgot to log it' }
+        },
+        1
+      ),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(payload.data.allocation.addedAfterCompletion).toBe(true)
+  })
+
+  it('rejects a top-up with an empty reason', async () => {
+    const { standup, task } = await seedSelfSelectFixture({ status: 'Completed', version: 1 })
+
+    const response = await boardRouteLive.POST(
+      buildPost(
+        `/api/standups/${standup._id}/allocations`,
+        { memberId: String(mem2), taskId: String(task._id), topUp: { reason: '' } },
+        1
+      ),
+      { params: { id: String(standup._id) } }
+    )
+
+    expect(response.status).toBe(422)
+  })
+
+  it('refuses a member holding only allocate_own from acting on someone else\'s row', async () => {
+    // The outer gate (standup:allocate_own) still passes — only the route's
+    // own inner standup:allocate check must fail, in isolation from the outer
+    // one, or this proves nothing about the new branch. The route throws this
+    // refusal as a StandupError('VALIDATION_FAILED', ...), which the catalogue
+    // (errors.ts) maps to 422, not a raw 403 — same shape as createAllocation's
+    // own ALO-23 ownership check, and asserted on message too so this failure
+    // is distinguishable from that one: selfSelect is not set here, so
+    // createAllocation's ownership branch never even runs — this 422 can only
+    // have come from the route's new inner check.
+    hasPermission2.mockImplementation(
+      async (_userId: string, permission: string) => permission !== Permission.STANDUP_ALLOCATE
+    )
+    const { standup, task } = await seedSelfSelectFixture({
+      expectedAttendees: [mem2, ids.otherMember]
+    })
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(ids.otherMember),
+        taskId: String(task._id)
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(payload.error.message).toBe('You can only add work to your own day.')
+  })
+
+  it('refuses a member holding only allocate_own from topping up their own row', async () => {
+    // Same isolation as above: no selfSelect on this request, so the only way
+    // this call could 422 with this message is the route's inner
+    // standup:allocate check refusing the topUp — createAllocation's own
+    // ownership check is not in play, since it only fires for selfSelect.
+    hasPermission2.mockImplementation(
+      async (_userId: string, permission: string) => permission !== Permission.STANDUP_ALLOCATE
+    )
+    const { standup, task } = await seedSelfSelectFixture({ status: 'Completed', version: 1 })
+
+    const response = await boardRouteLive.POST(
+      buildPost(
+        `/api/standups/${standup._id}/allocations`,
+        {
+          memberId: String(mem2),
+          taskId: String(task._id),
+          topUp: { reason: 'Extra work done, forgot to log it' }
+        },
+        1
+      ),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(payload.error.message).toBe('You can only add work to your own day.')
+  })
+
+  it('lets a PM allocate an ordinary task to a different member end to end', async () => {
+    // hasPermission2 resolves true for every permission here (beforeEach's
+    // default), simulating a caller who holds the full standup:allocate — the
+    // regression this task must not break: a PM allocating to somebody else,
+    // with no selfSelect and no topUp, must still succeed exactly as before.
+    const { standup, task } = await seedSelfSelectFixture({
+      expectedAttendees: [mem2, ids.otherMember]
+    })
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(ids.otherMember),
+        taskId: String(task._id)
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(payload.data.allocation.source).toBe('assigned_in_standup')
+  })
+})
