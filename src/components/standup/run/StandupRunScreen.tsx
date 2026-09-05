@@ -774,14 +774,16 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
   }, [api, reload])
 
   /**
-   * §15.17 (Task 14). Mirrors the `disabled` condition `CompletionPanel`
-   * computes for its own Complete button (`disabled || blocking.length > 0`,
-   * with `disabled` passed as `readOnly || completing ||
-   * carryForwardCloseFailures.length > 0`): `Ctrl/Cmd+Enter` should not be
-   * able to fire the completion call the on-screen button itself refuses.
+   * §15.17 (Task 14). `completionPanelDisabled` is the single source of truth
+   * for the `disabled` prop passed to `<CompletionPanel>` below — `Ctrl/Cmd+Enter`
+   * derives `completeDisabled` from that same variable (adding
+   * `blocking.length > 0`, which `CompletionPanel` itself ORs in internally)
+   * rather than retyping the condition, so the keyboard shortcut and the
+   * visible Complete button can never silently drift apart.
    */
-  const completeDisabled =
-    readOnly || completing || blocking.length > 0 || carryForwardCloseFailures.length > 0
+  const completionPanelDisabled =
+    readOnly || completing || carryForwardCloseFailures.length > 0
+  const completeDisabled = completionPanelDisabled || blocking.length > 0
 
   useStandupShortcuts({
     'jump-panel-1': () => document.getElementById('panel-1')?.scrollIntoView(),
@@ -1073,7 +1075,7 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
       <CompletionPanel
         checks={checks}
         blocking={blocking}
-        disabled={readOnly || completing || carryForwardCloseFailures.length > 0}
+        disabled={completionPanelDisabled}
         onComplete={() => void onComplete()}
         onOverride={onOverride}
       />
