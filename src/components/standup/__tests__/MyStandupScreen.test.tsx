@@ -3,21 +3,41 @@
  */
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MyStandupScreen } from '../my/MyStandupScreen'
+import type { CapacityBreakdown } from '@/lib/standup/capacity'
 import { minutes } from '@/lib/standup/minutes'
+
+/**
+ * Builds a complete `CapacityBreakdown` fixture. `MyStandupMember.capacity`
+ * keeps the full type (not narrowed) because Task 15's read-only leave
+ * display reads `member.capacity.adjustments` — matching how
+ * `RunScreenMember.capacity: CapacityBreakdown` already works in
+ * `StandupRunScreen.tsx`. Mirrors the `capacity()` helper in
+ * `standup-run-screen.test.tsx`.
+ */
+function capacity(overrides: Partial<CapacityBreakdown> = {}): CapacityBreakdown {
+  return {
+    memberId: 'u1',
+    date: '2026-09-05',
+    nominalMinutes: minutes(480),
+    adjustments: [],
+    adjustedMinutes: minutes(480),
+    outstandingDebtMinutes: minutes(0),
+    overrunPolicy: 'absorb',
+    effectiveMinutes: minutes(480),
+    allocatedMinutes: minutes(120),
+    gapMinutes: minutes(360),
+    status: 'under',
+    isUnavailable: false,
+    strandedMinutes: minutes(0),
+    ...overrides
+  }
+}
 
 const member = {
   memberId: 'u1',
   name: 'Amal',
   attendance: 'present' as const,
-  capacity: {
-    status: 'under' as const,
-    nominalMinutes: minutes(480),
-    effectiveMinutes: minutes(480),
-    allocatedMinutes: minutes(120),
-    gapMinutes: minutes(360),
-    strandedMinutes: minutes(0),
-    adjustments: []
-  },
+  capacity: capacity(),
   allocations: [
     {
       allocationId: 'a1',
