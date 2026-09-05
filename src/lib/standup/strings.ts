@@ -507,6 +507,20 @@ export const standupStrings = {
         : `${count} tasks are still unassigned. They will appear in tomorrow’s pool.`
   },
 
+  /**
+   * `/my/standup` (UI-12), the mobile-first single-member slice of the run
+   * screen. RUN-26's lock banner is distinct from `run.lockedForMembers`
+   * because this screen's whole layout — not just a row — is read-only.
+   */
+  my: {
+    title: () => 'My Stand-up',
+    noStandup: () => 'You have no stand-up open right now.',
+    readOnlyBanner: () => 'The stand-up has started. Your day is now read-only.',
+    hoursFor: ({ title }: { title: string }) => `Hours for ${title}`,
+    addTask: ({ key }: { key: string }) => `Add ${key}`,
+    selfSelectHint: () => 'Adding this notifies your PM.'
+  },
+
   config: {
     title: () => 'Stand-up Configuration',
     subtitle: () => 'When the stand-up runs, and the rules it holds the team to.',
