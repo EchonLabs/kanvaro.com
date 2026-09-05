@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 
 import { standupStrings } from '@/lib/standup/strings'
+import { formatDualTimezone } from '@/lib/standup/timezone'
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
 import type { BoardAllocationView } from '@/components/standup/run/CapacityBoard'
@@ -58,6 +59,13 @@ export interface MyStandupScreenProps {
   allowSelfSelect: boolean
   api: MyStandupApi
   locale?: string
+  /**
+   * NFR-20. All three optional and only rendered together — when any is
+   * absent the header falls back to the plain `date` string unchanged.
+   */
+  scheduledStartAt?: string
+  viewerTimeZone?: string
+  projectTimeZone?: string
 }
 
 /**
@@ -74,7 +82,10 @@ export function MyStandupScreen({
   poolTasks,
   allowSelfSelect,
   api,
-  locale
+  locale,
+  scheduledStartAt,
+  viewerTimeZone,
+  projectTimeZone
 }: MyStandupScreenProps) {
   const [version, setVersion] = useState(standupVersion)
   const readOnly = status !== 'Ready'
@@ -104,7 +115,15 @@ export function MyStandupScreen({
     <div className="flex flex-col gap-4 p-4">
       <header className="flex flex-col gap-1">
         <h1 className="text-lg font-semibold">{standupStrings.my.title()}</h1>
-        <span className="text-sm text-muted-foreground">{date}</span>
+        <span className="text-sm text-muted-foreground">
+          {scheduledStartAt && viewerTimeZone && projectTimeZone
+            ? formatDualTimezone({
+                instant: new Date(scheduledStartAt),
+                viewerTimeZone,
+                projectTimeZone
+              })
+            : date}
+        </span>
       </header>
 
       {readOnly && (

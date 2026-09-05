@@ -157,6 +157,21 @@ describe('the header (§15.8.2)', () => {
     renderScreen()
     expect(screen.queryByTestId('presence-avatars')).not.toBeInTheDocument()
   })
+
+  it('falls back to the plain date when the dual-timezone fields are absent (NFR-20)', () => {
+    renderScreen()
+    expect(screen.getByText('2026-08-17')).toBeInTheDocument()
+  })
+
+  it('renders the dual-timezone string once all three fields are present (NFR-20)', () => {
+    renderScreen({
+      scheduledStartAt: '2026-09-05T09:00:00Z',
+      viewerTimeZone: 'America/New_York',
+      projectTimeZone: 'Asia/Colombo'
+    })
+    expect(screen.getByText(/05:00.*project time.*14:30/i)).toBeInTheDocument()
+    expect(screen.queryByText('2026-08-17')).not.toBeInTheDocument()
+  })
 })
 
 describe('the jump bar and the shapes (§15.8.10)', () => {

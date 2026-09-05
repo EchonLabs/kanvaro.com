@@ -103,4 +103,19 @@ describe('MyStandupScreen', () => {
       expect.objectContaining({ taskId: 't2', memberId: 'u1', selfSelect: true })
     )
   })
+
+  it('falls back to the plain date when the dual-timezone fields are absent (NFR-20)', () => {
+    setup()
+    expect(screen.getByText('2026-09-05')).toBeInTheDocument()
+  })
+
+  it('renders the dual-timezone string once all three fields are present (NFR-20)', () => {
+    setup({
+      scheduledStartAt: '2026-09-05T09:00:00Z',
+      viewerTimeZone: 'America/New_York',
+      projectTimeZone: 'Asia/Colombo'
+    })
+    expect(screen.getByText(/05:00.*project time.*14:30/i)).toBeInTheDocument()
+    expect(screen.queryByText('2026-09-05')).not.toBeInTheDocument()
+  })
 })

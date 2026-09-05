@@ -17,6 +17,7 @@ import {
   evaluateFinalDayCarryForwardDisposition,
   type OpenTaskReadiness
 } from '@/lib/standup/sprint-close'
+import { formatDualTimezone } from '@/lib/standup/timezone'
 import type { PoolTask } from '@/lib/standup/allocation'
 import type { BucketedRows } from '@/lib/standup/yesterday'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
@@ -249,6 +250,13 @@ export interface RunScreenData {
     openTasks: OpenTaskReadiness[]
     carryForwardItems: import('@/lib/standup/sprint-close').CarryForwardDispositionRow[]
   }
+  /**
+   * NFR-20. All three optional and only rendered together — when any is
+   * absent the header falls back to the plain `date` string unchanged.
+   */
+  scheduledStartAt?: string
+  viewerTimeZone?: string
+  projectTimeZone?: string
 }
 
 export interface RunScreenApi {
@@ -791,7 +799,15 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
             total: board.totalSprintDays
           })}
         </h2>
-        <span className="text-sm text-muted-foreground">{board.date}</span>
+        <span className="text-sm text-muted-foreground">
+          {board.scheduledStartAt && board.viewerTimeZone && board.projectTimeZone
+            ? formatDualTimezone({
+                instant: new Date(board.scheduledStartAt),
+                viewerTimeZone: board.viewerTimeZone,
+                projectTimeZone: board.projectTimeZone
+              })
+            : board.date}
+        </span>
         <span className="rounded-full border border-border px-2 py-0.5 text-xs">
           {board.status}
         </span>
