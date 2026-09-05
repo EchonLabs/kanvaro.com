@@ -13,6 +13,7 @@ import { CompletionPanel } from './CompletionPanel'
 import { OverrideModal, type OverridableType, type OverrideModalAffectedMember, type OverrideModalSubmitInput } from './OverrideModal'
 import { UnassignedPool } from './UnassignedPool'
 import { SprintCloseReadinessPanel } from './SprintCloseReadinessPanel'
+import { useStandupShortcuts } from './useStandupShortcuts'
 import {
   evaluateFinalDayCarryForwardDisposition,
   type OpenTaskReadiness
@@ -771,6 +772,29 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
       setCompleting(false)
     }
   }, [api, reload])
+
+  /**
+   * §15.17 (Task 14). Mirrors the `disabled` condition `CompletionPanel`
+   * computes for its own Complete button (`disabled || blocking.length > 0`,
+   * with `disabled` passed as `readOnly || completing ||
+   * carryForwardCloseFailures.length > 0`): `Ctrl/Cmd+Enter` should not be
+   * able to fire the completion call the on-screen button itself refuses.
+   */
+  const completeDisabled =
+    readOnly || completing || blocking.length > 0 || carryForwardCloseFailures.length > 0
+
+  useStandupShortcuts({
+    'jump-panel-1': () => document.getElementById('panel-1')?.scrollIntoView(),
+    'jump-panel-2': () => document.getElementById('panel-2')?.scrollIntoView(),
+    'jump-panel-3': () => document.getElementById('panel-3')?.scrollIntoView(),
+    'jump-panel-4': () => document.getElementById('panel-4')?.scrollIntoView(),
+    'jump-panel-5': () => document.getElementById('panel-5')?.scrollIntoView(),
+    'jump-panel-6': () => document.getElementById('panel-6')?.scrollIntoView(),
+    'jump-panel-7': () => document.getElementById('panel-7')?.scrollIntoView(),
+    'attempt-complete': () => {
+      if (!completeDisabled) void onComplete()
+    }
+  })
 
   const selectedMember = board.members.find(
     (member) => member.memberId === selectedMemberId
