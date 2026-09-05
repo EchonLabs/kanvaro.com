@@ -118,4 +118,18 @@ describe('MyStandupScreen', () => {
     expect(screen.getByText(/05:00.*project time.*14:30/i)).toBeInTheDocument()
     expect(screen.queryByText('2026-09-05')).not.toBeInTheDocument()
   })
+
+  it('shows a read-only leave line from the capacity breakdown, never an edit control', () => {
+    setup({
+      member: {
+        ...member,
+        capacity: {
+          ...member.capacity,
+          adjustments: [{ type: 'leave', label: 'Approved leave', minutes: minutes(240) }]
+        }
+      }
+    })
+    expect(screen.getByText(/Approved leave/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit leave/i })).not.toBeInTheDocument()
+  })
 })

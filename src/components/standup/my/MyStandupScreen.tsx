@@ -126,6 +126,16 @@ export function MyStandupScreen({
         </span>
       </header>
 
+      {member.capacity.adjustments.length > 0 && (
+        <ul className="flex flex-col gap-1 rounded-md border border-border p-2 text-xs text-muted-foreground">
+          {member.capacity.adjustments.map((adjustment, index) => (
+            <li key={`${adjustment.type}-${index}`}>
+              {adjustment.label}: {formatMinutesAsHours(adjustment.minutes, { locale })}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {readOnly && (
         <p className="rounded-md border border-border bg-muted p-2 text-sm text-muted-foreground">
           {standupStrings.my.readOnlyBanner()}
