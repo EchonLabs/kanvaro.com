@@ -15,6 +15,7 @@
  * to *display*.
  */
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
 import { MainLayout } from '@/components/layout/MainLayout'
@@ -67,10 +68,22 @@ function toMemberView(member: any): MyStandupMember {
 
 export default function MyStandupDetailPage({ params }: { params: { standupId: string } }) {
   const { standupId } = params
-  const { user } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
+  const router = useRouter()
   const [board, setBoard] = useState<MyStandupBoard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
+
+  // The auth check runs asynchronously (`useAuth`'s `checkAuth`); until it
+  // settles, `user` is indistinguishable from "genuinely no session" — both
+  // are `null`. Waiting on `authLoading` before redirecting avoids bouncing a
+  // signed-in viewer to /login on first paint, while still sending a viewer
+  // with an expired/missing session there instead of spinning forever (this
+  // route is not in `middleware.ts`'s protected list, so the client is the
+  // only backstop).
+  useEffect(() => {
+    if (!authLoading && !user) router.push('/login')
+  }, [authLoading, user, router])
 
   useEffect(() => {
     if (!user) return
@@ -107,7 +120,11 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
     return () => {
       cancelled = true
     }
-  }, [standupId, user, reloadToken])
+    // `user` itself is intentionally not a dependency: `useAuth()`'s periodic
+    // 5-minute `checkAuth()` calls `setUser` with a freshly-parsed object of
+    // the same id each time, which would otherwise refetch the board every
+    // heartbeat. `user?.id` only changes on an actual sign-in/sign-out.
+  }, [standupId, user?.id, reloadToken])
 
   const api: MyStandupApi = {
     async addAllocation(input) {
@@ -123,8 +140,8 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
           selfSelect: input.selfSelect
         })
       })
+      if (!response.ok) throw await asError(response)
       const payload = await response.json()
-      if (!response.ok) throw payload.error
       setReloadToken((token) => token + 1)
       return { standupVersion: payload.data.standupVersion }
     },
@@ -140,8 +157,8 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
           body: JSON.stringify({ plannedMinutes: input.plannedMinutes })
         }
       )
+      if (!response.ok) throw await asError(response)
       const payload = await response.json()
-      if (!response.ok) throw payload.error
       return { standupVersion: payload.data.standupVersion }
     },
     async removeAllocation(input) {
@@ -152,8 +169,8 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
           headers: { [STANDUP_VERSION_HEADER]: String(input.expectedVersion) }
         }
       )
+      if (!response.ok) throw await asError(response)
       const payload = await response.json()
-      if (!response.ok) throw payload.error
       return { standupVersion: payload.data.standupVersion }
     }
   }
@@ -185,4 +202,17 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
       </div>
     </MainLayout>
   )
+}
+
+/** Turns a failed response into a real `Error`, same shape the reference run
+ *  screen page's `asError()` builds — a thrown plain object is truthy enough
+ *  for today's callers, but an `Error` is what anything downstream will
+ *  eventually expect (a toast, `console.error`, error reporting). */
+async function asError(response: Response): Promise<Error & { code?: string }> {
+  const payload = await response.json().catch(() => null)
+  const error = new Error(payload?.error?.message ?? 'Request failed') as Error & {
+    code?: string
+  }
+  error.code = payload?.error?.code
+  return error
 }
