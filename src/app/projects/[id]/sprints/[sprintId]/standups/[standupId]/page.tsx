@@ -51,13 +51,19 @@ export default function StandupRunPage({
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async (): Promise<RunScreenData> => {
-    const [boardResponse, varianceResponse, yesterdayResponse, carryForwardResponse] =
-      await Promise.all([
-        fetch(`/api/standups/${standupId}/allocations`),
-        fetch(`/api/standups/${standupId}/variance`),
-        fetch(`/api/standups/${standupId}/yesterday`),
-        fetch(`/api/standups/${standupId}/carry-forward`)
-      ])
+    const [
+      boardResponse,
+      varianceResponse,
+      yesterdayResponse,
+      carryForwardResponse,
+      sprintCloseResponse
+    ] = await Promise.all([
+      fetch(`/api/standups/${standupId}/allocations`),
+      fetch(`/api/standups/${standupId}/variance`),
+      fetch(`/api/standups/${standupId}/yesterday`),
+      fetch(`/api/standups/${standupId}/carry-forward`),
+      fetch(`/api/standups/${standupId}/sprint-close`)
+    ])
     if (!boardResponse.ok) throw await asError(boardResponse)
 
     const boardPayload = await boardResponse.json()
@@ -66,12 +72,15 @@ export default function StandupRunPage({
     const variancePayload = varianceResponse.ok ? await varianceResponse.json() : null
     const yesterdayPayload = yesterdayResponse.ok ? await yesterdayResponse.json() : null
     const carryForwardPayload = carryForwardResponse.ok ? await carryForwardResponse.json() : null
+    // Phase 11's final-day panel, on the same terms as the three above.
+    const sprintClosePayload = sprintCloseResponse.ok ? await sprintCloseResponse.json() : null
 
     return toRunScreenData(
       boardPayload.data ?? boardPayload,
       variancePayload?.data ?? variancePayload,
       yesterdayPayload?.data ?? yesterdayPayload,
-      carryForwardPayload?.data ?? carryForwardPayload
+      carryForwardPayload?.data ?? carryForwardPayload,
+      sprintClosePayload?.data ?? sprintClosePayload
     )
   }, [standupId])
 
@@ -250,6 +259,23 @@ export default function StandupRunPage({
         body: JSON.stringify({ resolutionType, comment, standupId })
       })
       await unwrap(response)
+    },
+
+    // --- Phase 11 ---------------------------------------------------------
+    /**
+     * CC-8. The panel's dropdown had nowhere to send its selection until this
+     * existed — `RunScreenApi.setTaskDisposition` is optional, so its absence
+     * failed silently rather than loudly.
+     */
+    async setTaskDisposition({ taskId, type }) {
+      await unwrap(
+        await mutate(
+          `/api/standups/${standupId}/sprint-close/tasks/${taskId}`,
+          'PATCH',
+          { type, expectedVersion: data?.standupVersion ?? 0 }
+        )
+      )
+      setData(await load())
     },
 
     // --- Task 22 (Phase 10's override path) -------------------------------
@@ -457,7 +483,8 @@ function toRunScreenData(
   board: any,
   variance?: any,
   yesterday?: any,
-  carryForward?: any
+  carryForward?: any,
+  sprintClose?: any
 ): RunScreenData {
   return {
     standupId: board.standupId,
@@ -500,7 +527,32 @@ function toRunScreenData(
     ...(variance ? { variance: toVarianceView(variance) } : {}),
     ...(yesterday ? { yesterday: toYesterdayView(yesterday) } : {}),
     ...(carryForward ? { carryForward: toCarryForwardView(carryForward) } : {}),
+    ...(sprintClose ? { sprintClose: toSprintCloseView(sprintClose) } : {}),
     completionState: board.completionState ?? null
+  }
+}
+
+/**
+ * Phase 11's final-day payload. Minutes rebranded like every other adapter
+ * here; the panel itself only renders on `shape === 'final_day'`.
+ */
+function toSprintCloseView(sprintClose: any): NonNullable<RunScreenData['sprintClose']> {
+  return {
+    openTasks: (sprintClose.openTasks ?? []).map((task: any) => ({
+      taskId: task.taskId,
+      taskKey: task.taskKey,
+      ownerName: task.ownerName,
+      remainingEstimateMinutes: minutes(task.remainingEstimateMinutes ?? 0),
+      hoursAvailableTodayMinutes: minutes(task.hoursAvailableTodayMinutes ?? 0),
+      projectedOutcome: task.projectedOutcome,
+      disposition: task.disposition
+    })),
+    carryForwardItems: (sprintClose.carryForwardItems ?? []).map((item: any) => ({
+      itemId: item.itemId,
+      taskKey: item.taskKey,
+      status: item.status,
+      hasResolution: item.hasResolution ?? false
+    }))
   }
 }
 

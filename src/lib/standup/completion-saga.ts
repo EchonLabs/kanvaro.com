@@ -61,6 +61,10 @@ import { classifyAndPost } from './variance-service'
 import { buildCarryForwardSet } from './carry-forward-service'
 import { buildSummaryDocument, type BuildSummaryInput } from './summary'
 import {
+  evaluateFinalDayCarryForwardDisposition,
+  type CarryForwardDispositionRow
+} from './sprint-close'
+import {
   notifyPersonalCommitment,
   notifyStandupCompleted,
   notifyNotAllocated,
@@ -113,6 +117,19 @@ export interface CompletionContext {
   }>
   summaryInputs: Omit<BuildSummaryInput, 'standupId' | 'sprintId' | 'projectId' | 'organizationId'>
   summaryUrl: string
+  /**
+   * CFW-9 (Phase 11). The still-open carry-forward register, for the final-day
+   * gate. Deliberately *not* one of the eleven `CheckId`s — CFW-9 governs the
+   * carry-forward register (§13), which has its own resolution vocabulary, so
+   * P11-1 evaluates it as a sibling of `evaluateCompletionChecks` rather than
+   * inventing a twelfth check. It still has to be a hard server-side block, or
+   * the run screen's client-side version of it is the only thing standing
+   * between a PM and closing a sprint with unresolved items.
+   *
+   * `undefined` (or an empty list) means nothing to answer for — the check is
+   * only consulted on `final_day` anyway.
+   */
+  carryForwardCloseItems?: CarryForwardDispositionRow[]
 }
 
 export interface CompletionResult {
@@ -154,6 +171,17 @@ export async function runCompletionSaga(ctx: CompletionContext): Promise<Complet
   // failure it actually names — see `filterOverriddenFailures`'s own docblock.
   const unresolved = filterOverriddenFailures(blocking, ctx.overridesIssued)
   if (unresolved.length > 0) throw completionChecksFailed(unresolved)
+
+  // CFW-9, the second final-day gate (P11-1). Reuses the same
+  // COMPLETION_CHECKS_FAILED (422) path the client's `onComplete()` already
+  // catches and surfaces, so an unresolved carry-forward item refuses
+  // completion exactly the way a failing CC-* check does.
+  if (ctx.checkInput.shape === 'final_day') {
+    const { offenders } = evaluateFinalDayCarryForwardDisposition(
+      ctx.carryForwardCloseItems ?? []
+    )
+    if (offenders.length > 0) throw completionChecksFailed(offenders)
+  }
 
   let summaryId = ''
 

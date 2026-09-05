@@ -44,6 +44,7 @@ import { runCompletionSaga, type CompletionContext } from '@/lib/standup/complet
 import { loadCarryForwardPanel } from '@/lib/standup/carry-forward-service'
 import { toErrorResponse } from '@/lib/standup/errors'
 import { loadSprintHealthTotals } from '@/lib/standup/jobs/sprint-health'
+import { loadSprintCloseReadiness } from '@/lib/standup/sprint-close-service'
 import { minutes } from '@/lib/standup/minutes'
 import {
   readJson,
@@ -107,16 +108,28 @@ async function assembleCompletionContext(input: {
   // Reuse the in-flight run's id on a resume call — see the module docblock.
   const runId: string = standup.completionState?.runId ?? globalThis.crypto.randomUUID()
 
-  const [board, variance, carryForward, blockerDocs, overrideDocs, sprint, adminRecipientIds] =
-    await Promise.all([
-      loadAllocationBoard(standupId),
-      loadVariancePanel(standupId),
-      loadCarryForwardPanel(standupId),
-      StandupBlocker.find({ standup: standupId }).lean() as Promise<any[]>,
-      StandupOverride.find({ standup: standupId }).lean() as Promise<any[]>,
-      Sprint.findById(sprintId).select('project organization endDate').lean() as Promise<any>,
-      loadProjectAdmins(projectId)
-    ])
+  const [
+    board,
+    variance,
+    carryForward,
+    blockerDocs,
+    overrideDocs,
+    sprint,
+    adminRecipientIds,
+    sprintCloseReadiness
+  ] = await Promise.all([
+    loadAllocationBoard(standupId),
+    loadVariancePanel(standupId),
+    loadCarryForwardPanel(standupId),
+    StandupBlocker.find({ standup: standupId }).lean() as Promise<any[]>,
+    StandupOverride.find({ standup: standupId }).lean() as Promise<any[]>,
+    Sprint.findById(sprintId).select('project organization endDate').lean() as Promise<any>,
+    loadProjectAdmins(projectId),
+    // CC-8 and CFW-9 (Phase 11). Without this the server-side re-check reads
+    // CC-8 as `not_evaluated` and CFW-9 as nothing at all — the final-day gate
+    // would exist only in the browser.
+    loadSprintCloseReadiness(standupId)
+  ])
 
   // `loadAllocationBoard` already resolves each allocation row's task
   // (`taskKey`, `remainingEstimateMinutes`) via its own Task join, so CC-2's
@@ -197,7 +210,10 @@ async function assembleCompletionContext(input: {
     variance: varianceRows,
     carryForward: carryForwardRows,
     blockers,
-    sprintHealth
+    sprintHealth,
+    // Straight pass-through: `loadSprintCloseReadiness().openTasks` is already
+    // `OpenTaskReadiness[]`, exactly what `cc8()` consumes.
+    openTasks: sprintCloseReadiness.openTasks
   }
 
   const attendeeIds: string[] = (standup.expectedAttendees ?? []).map(String)
@@ -303,7 +319,8 @@ async function assembleCompletionContext(input: {
     memberCommitments,
     overridesIssued,
     summaryInputs,
-    summaryUrl: `/standups/${standupId}`
+    summaryUrl: `/standups/${standupId}`,
+    carryForwardCloseItems: sprintCloseReadiness.carryForwardItems
   }
 }
 

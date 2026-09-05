@@ -24,6 +24,7 @@ import mongoose from 'mongoose'
 import { NextRequest } from 'next/server'
 
 import { Allocation } from '@/models/Allocation'
+import { CarryForwardItem } from '@/models/CarryForwardItem'
 import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
 import { StandupOverride } from '@/models/StandupOverride'
@@ -364,5 +365,136 @@ describe('POST /api/standups/:id/complete', () => {
 
     const after = await Standup.findById(standup._id).lean()
     expect(after!.status).toBe('Completed')
+  })
+
+  /**
+   * Phase 11's headline feature, end to end. Both evaluators were built and
+   * unit-tested by the original plan, but neither input ever reached the
+   * server: `assembleCompletionContext` did not load
+   * `loadSprintCloseReadiness`, so CC-8 re-evaluated as `not_evaluated` at
+   * completion time and CFW-9 had no server-side existence at all. A PM could
+   * close the sprint's last stand-up over both.
+   */
+  describe('the final-day gate (CC-8, CFW-9)', () => {
+    async function seedFinalDayStandup() {
+      return Standup.create({
+        project,
+        sprint: sprintId,
+        organization,
+        standupDate: '2026-08-21',
+        scheduledStartAt: new Date('2026-08-21T03:30:00.000Z'),
+        durationMinutes: 15,
+        sprintDayNumber: 5,
+        totalSprintDays: 5,
+        shape: 'final_day',
+        status: 'In_Progress',
+        facilitator: user,
+        expectedAttendees: [member],
+        attendance: [{ user: member, state: 'absent_planned' }],
+        version: 0
+      })
+    }
+
+    const openTask = (taskNumber: number) =>
+      Task.create({
+        title: 'Still open on the last day',
+        organization,
+        project,
+        sprint: sprintId,
+        createdBy: user,
+        taskNumber,
+        displayId: `KAN-${taskNumber}`,
+        status: 'in_progress',
+        remainingEstimateMinutes: 120,
+        originalEstimateMinutes: 120
+      })
+
+    it('CC-8: an undispositioned open task blocks completion, and dispositioning it unblocks', async () => {
+      const standup = await seedFinalDayStandup()
+      const task = await openTask(8001)
+
+      const blocked = await invoke(String(standup._id), 0)
+      const blockedPayload = await blocked.json()
+
+      expect(blocked.status).toBe(422)
+      expect(blockedPayload.error.code).toBe('COMPLETION_CHECKS_FAILED')
+      const cc8 = blockedPayload.error.details.failingChecks.find(
+        (check: any) => check.checkId === 'CC-8'
+      )
+      expect(cc8).toMatchObject({ checkId: 'CC-8', status: 'fail', hard: true })
+      expect(cc8.entities).toEqual([
+        expect.objectContaining({ taskId: String(task._id), key: 'KAN-8001' })
+      ])
+
+      await Task.updateOne(
+        { _id: task._id },
+        { $set: { sprintCloseDisposition: { type: 'move_to_next_sprint', setAt: new Date(), setBy: user } } }
+      )
+
+      const unblocked = await invoke(String(standup._id), 0)
+      expect(unblocked.status).toBe(200)
+      expect((await Standup.findById(standup._id).lean())!.status).toBe('Completed')
+    })
+
+    it('CFW-9: an unresolved open carry-forward item blocks completion, and resolving it unblocks', async () => {
+      const standup = await seedFinalDayStandup()
+      // Dispositioned, so CC-8 is satisfied and only CFW-9 is left to refuse.
+      const task = await openTask(8002)
+      await Task.updateOne(
+        { _id: task._id },
+        { $set: { sprintCloseDisposition: { type: 'descope', setAt: new Date(), setBy: user } } }
+      )
+
+      const item = await CarryForwardItem.create({
+        sprint: sprintId,
+        project,
+        organization,
+        type: 'unfinished_task',
+        task: task._id,
+        member,
+        originStandup: standup._id,
+        originDate: '2026-08-20',
+        currentStandup: standup._id,
+        ageInStandups: 2,
+        status: 'open'
+      })
+
+      const blocked = await invoke(String(standup._id), 0)
+      const blockedPayload = await blocked.json()
+
+      expect(blocked.status).toBe(422)
+      expect(blockedPayload.error.code).toBe('COMPLETION_CHECKS_FAILED')
+      // CFW-9's offenders are carry-forward rows, not `CheckId` results — it is
+      // a sibling gate (P11-1), reusing the same error envelope.
+      expect(blockedPayload.error.details.failingChecks).toEqual([
+        expect.objectContaining({ itemId: String(item._id), hasResolution: false })
+      ])
+
+      await CarryForwardItem.updateOne(
+        { _id: item._id },
+        {
+          $set: {
+            resolution: {
+              resolvedAt: new Date(),
+              resolvedBy: user,
+              resolutionType: 'sprint_end_moved'
+            }
+          }
+        }
+      )
+
+      const unblocked = await invoke(String(standup._id), 0)
+      expect(unblocked.status).toBe(200)
+      expect((await Standup.findById(standup._id).lean())!.status).toBe('Completed')
+    })
+
+    it('leaves a mid-sprint stand-up alone: neither gate applies before the last day', async () => {
+      const standup = await seedCleanStandup({ shape: 'mid_sprint', sprintDayNumber: 3 })
+      await openTask(8003)
+
+      const response = await invoke(String(standup._id), 0)
+
+      expect(response.status).toBe(200)
+    })
   })
 })
