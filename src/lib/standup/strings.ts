@@ -518,7 +518,14 @@ export const standupStrings = {
     readOnlyBanner: () => 'The stand-up has started. Your day is now read-only.',
     hoursFor: ({ title }: { title: string }) => `Hours for ${title}`,
     addTask: ({ key }: { key: string }) => `Add ${key}`,
-    selfSelectHint: () => 'Adding this notifies your PM.'
+    selfSelectHint: () => 'Adding this notifies your PM.',
+    /**
+     * This screen applies nothing optimistically, so — unlike
+     * `run.editRejected` — there is no board to put back; the wording says
+     * only that the change did not save.
+     */
+    editRejected: () => 'That change could not be saved.',
+    addRejected: () => 'That task could not be added to your day.'
   },
 
   config: {

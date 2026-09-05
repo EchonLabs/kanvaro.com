@@ -5,7 +5,7 @@
  * them here, the same split `completion-checks.ts` and its `sprint-health.ts`
  * neighbour already use.
  */
-import { minutes, ZERO_MINUTES, type Minutes } from './minutes'
+import { ZERO_MINUTES, type Minutes } from './minutes'
 import type { SprintCloseDispositionType } from '@/models/Task'
 
 export type ProjectedOutcome = 'will_finish' | 'at_risk' | 'cannot_finish'
@@ -53,6 +53,11 @@ export interface CarryForwardDispositionRow {
   hasResolution: boolean
 }
 
+/**
+ * `OPEN_CARRY_FORWARD_STATUSES` in `@/models/CarryForwardItem`, restated
+ * rather than imported: this module is pure and DB-free by contract (a client
+ * component imports it), and that constant lives in a Mongoose model file.
+ */
 const OPEN_STATUSES = new Set(['open', 'noted', 'escalated'])
 
 /** CFW-9. Every still-open carry-forward item must be resolved before completion. */
@@ -65,5 +70,3 @@ export function evaluateFinalDayCarryForwardDisposition(
     )
   }
 }
-
-export { minutes }

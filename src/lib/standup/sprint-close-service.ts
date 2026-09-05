@@ -9,6 +9,8 @@ import { loadCarryForwardPanel } from './carry-forward-service'
 import { recordAudit, type AuditActor } from './audit'
 import {
   computeProjectedOutcome,
+  evaluateFinalDayCarryForwardDisposition,
+  evaluateTaskDispositions,
   type CarryForwardDispositionRow,
   type OpenTaskReadiness
 } from './sprint-close'
@@ -76,10 +78,13 @@ export async function loadSprintCloseReadiness(
     shape: context.standup.shape,
     openTasks,
     carryForwardItems,
-    taskFailures: openTasks.filter((t) => t.disposition === undefined).length,
-    carryForwardFailures: carryForwardItems.filter(
-      (i) => ['open', 'noted', 'escalated'].includes(i.status) && !i.hasResolution
-    ).length
+    // Counted by the same two pure evaluators the run screen and the
+    // completion saga use, rather than by a third inline copy of CC-8's and
+    // CFW-9's rules — a copy that could (and did) drift from the open-status
+    // set they actually test against.
+    taskFailures: evaluateTaskDispositions(openTasks).offenders.length,
+    carryForwardFailures: evaluateFinalDayCarryForwardDisposition(carryForwardItems).offenders
+      .length
   }
 }
 

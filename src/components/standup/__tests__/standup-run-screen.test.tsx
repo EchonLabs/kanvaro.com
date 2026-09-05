@@ -708,4 +708,20 @@ describe('final-day sprint close', () => {
     })
     expect(screen.getByText(/complete stand-up/i)).toBeDisabled()
   })
+
+  it('does not let CFW-9 block Complete on a non-final-day board', () => {
+    // The panel that would explain the block is `final_day`-only, so an
+    // ungated CFW-9 memo disables Complete with nothing on screen saying why.
+    // `cc8()` and the panel's own render condition both self-gate on shape;
+    // this memo now does too.
+    renderScreen({
+      shape: 'mid_sprint',
+      members: [],
+      sprintClose: {
+        openTasks: [],
+        carryForwardItems: [{ itemId: 'c1', taskKey: 'KAN-2', status: 'open', hasResolution: false }]
+      }
+    })
+    expect(screen.getByText(/complete stand-up/i)).not.toBeDisabled()
+  })
 })

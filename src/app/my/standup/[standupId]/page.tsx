@@ -160,19 +160,9 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
       if (!response.ok) throw await asError(response)
       const payload = await response.json()
       return { standupVersion: payload.data.standupVersion }
-    },
-    async removeAllocation(input) {
-      const response = await fetch(
-        `/api/standups/${standupId}/allocations/${input.allocationId}`,
-        {
-          method: 'DELETE',
-          headers: { [STANDUP_VERSION_HEADER]: String(input.expectedVersion) }
-        }
-      )
-      if (!response.ok) throw await asError(response)
-      const payload = await response.json()
-      return { standupVersion: payload.data.standupVersion }
     }
+    // No `removeAllocation`: ALO-22's member surface is additions only, the
+    // screen renders no control for it, and the DELETE route stays PM-only.
   }
 
   return (
@@ -190,6 +180,12 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
             date={board.date}
             member={board.member}
             poolTasks={board.poolTasks}
+            /* Deliberately unconditional. P11-6 makes the server the real gate:
+               `createAllocation` refuses a self-select when the project has
+               `allowSelfSelect` off, and the screen now surfaces that refusal
+               (`my.addRejected`). A client-side pre-check would be a second,
+               fetch-hungry copy of a rule the server already owns — and one
+               that could disagree with it. */
             allowSelfSelect
             api={api}
           />

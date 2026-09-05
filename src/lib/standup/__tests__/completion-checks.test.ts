@@ -207,7 +207,11 @@ describe('evaluateCompletionChecks', () => {
     })
   })
 
-  describe('the four checks still unanswerable', () => {
+  // CC-8 is answered as of Phase 11 — `cc8()` is real and the completion route
+  // now feeds it `openTasks`. What these cases still prove is the *shape of
+  // silence*: any of these four reports `not_evaluated` (never a false pass)
+  // when its own input is absent from `EvaluateCompletionChecksInput`.
+  describe('the checks that report not_evaluated when their input is not supplied', () => {
     it('reports them as not_evaluated, never as passing', () => {
       const results = evaluateCompletionChecks(healthy())
 

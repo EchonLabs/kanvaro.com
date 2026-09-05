@@ -31,6 +31,7 @@ import {
   type CompletionCheckResult
 } from '@/lib/standup/completion-checks'
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
+import { isOwnRowReadOnly } from '@/lib/standup/own-row'
 import {
   filterOverriddenFailures,
   OVERRIDE_TABLE,
@@ -398,8 +399,12 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
    * and not once it has started. A PM is never locked out — they are the one
    * running it.
    */
-  const readOnly =
-    viewer !== undefined && !viewer.canAllocateOthers && board.status !== 'Ready'
+  const readOnly = isOwnRowReadOnly({
+    status: board.status,
+    // No viewer means the caller did not say who is looking — the pre-existing
+    // behaviour treats that as "not locked", which is what `true` produces here.
+    canAllocateOthers: viewer === undefined ? true : viewer.canAllocateOthers
+  })
 
   const reload = useCallback(async () => {
     const fresh = await api.refresh()
@@ -680,12 +685,18 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
     [checks, overridesIssued]
   )
 
+  /**
+   * CFW-9. Shape-gated exactly like `cc8()` and the panel's own render
+   * condition: the register only has to be clear on the sprint's last day, and
+   * an ungated memo would disable Complete on a mid-sprint board with nothing
+   * on screen explaining why.
+   */
   const carryForwardCloseFailures = useMemo(
     () =>
-      board.sprintClose
+      board.shape === 'final_day' && board.sprintClose
         ? evaluateFinalDayCarryForwardDisposition(board.sprintClose.carryForwardItems).offenders
         : [],
-    [board.sprintClose]
+    [board.shape, board.sprintClose]
   )
 
   const [overridingCheck, setOverridingCheck] = useState<CompletionCheckResult | null>(null)

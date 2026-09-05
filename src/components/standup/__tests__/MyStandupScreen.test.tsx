@@ -5,6 +5,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MyStandupScreen } from '../my/MyStandupScreen'
 import type { CapacityBreakdown } from '@/lib/standup/capacity'
 import { minutes } from '@/lib/standup/minutes'
+import { standupStrings } from '@/lib/standup/strings'
 
 /**
  * Builds a complete `CapacityBreakdown` fixture. `MyStandupMember.capacity`
@@ -54,12 +55,15 @@ const member = {
   ]
 }
 
+/**
+ * No `removeAllocation` mock: `MyStandupApi` no longer declares one. ALO-22's
+ * member surface is additions only, this screen renders no control that could
+ * call it, and the DELETE route stays PM-only.
+ */
 function setup(overrides: Partial<React.ComponentProps<typeof MyStandupScreen>> = {}) {
   const api = {
     addAllocation: jest.fn().mockResolvedValue({ standupVersion: 2 }),
-    changeHours: jest.fn().mockResolvedValue({ standupVersion: 2 }),
-    removeAllocation: jest.fn().mockResolvedValue({ standupVersion: 2 }),
-    refresh: jest.fn()
+    changeHours: jest.fn().mockResolvedValue({ standupVersion: 2 })
   }
   render(
     <MyStandupScreen
@@ -131,5 +135,46 @@ describe('MyStandupScreen', () => {
     })
     expect(screen.getByText(/Approved leave/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit leave/i })).not.toBeInTheDocument()
+  })
+
+  /**
+   * Every refusal here is a server decision the screen cannot predict —
+   * `allowSelfSelect` off, a stale version, the stand-up having moved on. With
+   * no `catch` each was a silent no-op plus an unhandled rejection: the member
+   * is told nothing and believes the change stuck.
+   */
+  describe('when the server refuses', () => {
+    it('says so when an hours edit is rejected', async () => {
+      const api = setup()
+      api.changeHours.mockRejectedValue(new Error('refused'))
+
+      fireEvent.blur(screen.getByLabelText(/hours for Fix the thing/i), {
+        target: { value: '180' }
+      })
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        standupStrings.my.editRejected()
+      )
+    })
+
+    it('says so when self-selecting a task is rejected (e.g. self-select turned off)', async () => {
+      const api = setup({
+        poolTasks: [
+          { taskId: 't2', key: 'KAN-2', title: 'Pool task', remainingEstimateMinutes: minutes(60) }
+        ]
+      })
+      api.addAllocation.mockRejectedValue(new Error('refused'))
+
+      fireEvent.click(screen.getByRole('button', { name: /add kan-2/i }))
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        standupStrings.my.addRejected()
+      )
+    })
+
+    it('shows nothing until something actually fails', () => {
+      setup()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
   })
 })

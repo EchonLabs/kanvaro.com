@@ -30,9 +30,16 @@ export function useStandupShortcuts(
         return
       }
 
-      if (result?.consumesPrefix) {
+      // Any key pressed after `g` settles the chord one way or the other. A
+      // non-matching key used to leave the prefix armed until its 1-second
+      // timeout, during which the hook was deaf to every other shortcut —
+      // clearing it here makes the very next keystroke live again.
+      if (pendingPrefix === 'g') {
         pendingPrefix = null
-        if (prefixTimeout) clearTimeout(prefixTimeout)
+        if (prefixTimeout) {
+          clearTimeout(prefixTimeout)
+          prefixTimeout = null
+        }
       }
 
       if (result) {

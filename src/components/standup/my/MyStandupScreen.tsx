@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react'
 import { standupStrings } from '@/lib/standup/strings'
 import { formatDualTimezone } from '@/lib/standup/timezone'
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
+import { isOwnRowReadOnly } from '@/lib/standup/own-row'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
 import type { BoardAllocationView } from '@/components/standup/run/CapacityBoard'
 
@@ -43,10 +44,10 @@ export interface MyStandupApi {
     plannedMinutes: Minutes
     expectedVersion: number
   }): Promise<{ standupVersion: number }>
-  removeAllocation(input: {
-    allocationId: string
-    expectedVersion: number
-  }): Promise<{ standupVersion: number }>
+  // No `removeAllocation`. ALO-22's member-facing surface is "additions only,
+  // never removals", this screen renders no control that could call one, and
+  // the DELETE route stays PM-only — so declaring it here only invited a
+  // capability the plan never intended.
 }
 
 export interface MyStandupScreenProps {
@@ -70,11 +71,11 @@ export interface MyStandupScreenProps {
 
 /**
  * UI-12 / P11-5. A mobile-first, single-member slice of the run screen — not
- * a second implementation of it. RUN-26's lock uses the identical condition
- * `StandupRunScreen.tsx` uses: `status !== 'Ready'`.
+ * a second implementation of it. RUN-26's lock is the shared
+ * {@link isOwnRowReadOnly}, the same function `StandupRunScreen.tsx` calls —
+ * not a second copy of the condition.
  */
 export function MyStandupScreen({
-  standupId: _standupId,
   standupVersion,
   status,
   date,
@@ -88,25 +89,53 @@ export function MyStandupScreen({
   projectTimeZone
 }: MyStandupScreenProps) {
   const [version, setVersion] = useState(standupVersion)
-  const readOnly = status !== 'Ready'
+  const [notice, setNotice] = useState<string | null>(null)
+  // RUN-26, shared with the run screen rather than restated. A member screen
+  // never has PM-level access, so `canAllocateOthers` is always false here.
+  const readOnly = isOwnRowReadOnly({ status, canAllocateOthers: false })
 
+  /**
+   * Every refusal this screen can meet is a server decision it cannot predict:
+   * `allowSelfSelect` turned off for the project, the stand-up having moved on
+   * since the page loaded, a stale version. Without a visible notice each of
+   * those was a silent no-op plus an unhandled rejection — the member is told
+   * nothing and believes the change stuck.
+   *
+   * Deliberately simpler than `StandupRunScreen`'s optimistic-rollback
+   * machinery: nothing here is applied before the server answers, so there is
+   * nothing to roll back.
+   */
   const onChangeHours = useCallback(
     async (allocationId: string, plannedMinutes: Minutes) => {
-      const result = await api.changeHours({ allocationId, plannedMinutes, expectedVersion: version })
-      setVersion(result.standupVersion)
+      setNotice(null)
+      try {
+        const result = await api.changeHours({
+          allocationId,
+          plannedMinutes,
+          expectedVersion: version
+        })
+        setVersion(result.standupVersion)
+      } catch {
+        setNotice(standupStrings.my.editRejected())
+      }
     },
     [api, version]
   )
 
   const onAdd = useCallback(
     async (taskId: string) => {
-      const result = await api.addAllocation({
-        memberId: member.memberId,
-        taskId,
-        selfSelect: true,
-        expectedVersion: version
-      })
-      setVersion(result.standupVersion)
+      setNotice(null)
+      try {
+        const result = await api.addAllocation({
+          memberId: member.memberId,
+          taskId,
+          selfSelect: true,
+          expectedVersion: version
+        })
+        setVersion(result.standupVersion)
+      } catch {
+        setNotice(standupStrings.my.addRejected())
+      }
     },
     [api, member.memberId, version]
   )
@@ -134,6 +163,14 @@ export function MyStandupScreen({
             </li>
           ))}
         </ul>
+      )}
+
+      {/* `status`, not `alert`: it reports what already happened rather than
+          interrupting — the same choice the run screen's notice makes. */}
+      {notice && (
+        <p role="status" className="rounded-md border border-border bg-muted p-2 text-sm">
+          {notice}
+        </p>
       )}
 
       {readOnly && (
