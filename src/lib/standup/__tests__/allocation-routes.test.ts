@@ -198,7 +198,10 @@ import * as boardRouteLive from '@/app/api/standups/[id]/allocations/route'
 
 const { organization: org2, project: proj2, sprint: spr2, member: mem2 } = ids
 
-async function seedSelfSelectFixture(overrides: Record<string, unknown> = {}) {
+async function seedSelfSelectFixture(
+  overrides: Record<string, unknown> = {},
+  settingsOverrides: Record<string, unknown> = {}
+) {
   await WorkingCalendar.create({
     scope: 'project',
     organization: org2,
@@ -215,7 +218,8 @@ async function seedSelfSelectFixture(overrides: Record<string, unknown> = {}) {
     enabled: true,
     standupLocalTime: '09:00',
     defaultFacilitator: mem2,
-    allowSelfSelect: true
+    allowSelfSelect: true,
+    ...settingsOverrides
   })
   const standup = await Standup.create({
     project: proj2,
@@ -438,5 +442,257 @@ describe('POST /api/standups/:id/allocations — self-select and top-up (ALO-22/
 
     expect(response.status).toBe(201)
     expect(payload.data.allocation.source).toBe('assigned_in_standup')
+  })
+})
+
+/**
+ * The final review's two Critical findings, both on the same route.
+ *
+ * The shared setup is the whole point: `hasPermission` answers `false` for
+ * `standup:allocate` and `true` for everything else, i.e. a real team member
+ * who passes the outer `standup:allocate_own` gate and nothing more. Every
+ * case below sends a *hand-rolled* request — one no screen would build — since
+ * both vulnerabilities were reachable precisely by bypassing the UI.
+ */
+describe('POST /api/standups/:id/allocations — a member cannot escape their own lane', () => {
+  useMongo()
+
+  beforeAll(() => {
+    mockMemberId2 = mem2
+    mockOrgId2 = org2
+  })
+
+  beforeEach(() => {
+    hasPermission2
+      .mockReset()
+      .mockImplementation(
+        async (_userId: string, permission: string) => permission !== Permission.STANDUP_ALLOCATE
+      )
+  })
+
+  it('records an own-row add as self_selected even when the body omits selfSelect', async () => {
+    // Critical 1. `source` used to be whatever the caller asked for, because
+    // `isSelfSelect` came straight off the body.
+    const { standup, task } = await seedSelfSelectFixture()
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(mem2),
+        taskId: String(task._id),
+        source: 'assigned_in_standup'
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(payload.data.allocation.source).toBe('self_selected')
+  })
+
+  it('cannot bypass allowSelfSelect by omitting the flag', async () => {
+    // Critical 1's real damage: with `selfSelect` absent, `createAllocation`
+    // skipped both ALO-23 guards, so a project with self-select turned off
+    // did not actually have it turned off.
+    const { standup, task } = await seedSelfSelectFixture({}, { allowSelfSelect: false })
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(mem2),
+        taskId: String(task._id)
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(payload.error.message).toMatch(/self-select is turned off/i)
+    expect(await Allocation.countDocuments({ standup: standup._id })).toBe(0)
+  })
+
+  it('RUN-26: refuses an own-row add once the stand-up has left Ready', async () => {
+    // Critical 2. `MUTABLE_STATUSES` still allows `In_Progress` — it must, for
+    // the PM — so nothing below the route would have refused this.
+    const { standup, task } = await seedSelfSelectFixture({ status: 'In_Progress' })
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(mem2),
+        taskId: String(task._id),
+        selfSelect: true
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(payload.error.message).toMatch(/only be edited while the stand-up is Ready/i)
+    expect(await Allocation.countDocuments({ standup: standup._id })).toBe(0)
+  })
+
+  it('does not apply the Ready-only lock to a PM holding standup:allocate', async () => {
+    // RUN-26 exempts the person running the stand-up, by design.
+    hasPermission2.mockResolvedValue(true)
+    const { standup, task } = await seedSelfSelectFixture({ status: 'In_Progress' })
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(mem2),
+        taskId: String(task._id)
+      }),
+      { params: { id: String(standup._id) } }
+    )
+
+    expect(response.status).toBe(201)
+  })
+})
+
+/**
+ * RUN-25's "member pre-edit while `Ready`" — the hours input on
+ * `/my/standup` — plus the same RUN-26 lock as above. Before this fix the
+ * PATCH route demanded the full `standup:allocate`, so every member edit 403'd.
+ */
+describe('PATCH /api/standups/:id/allocations/:allocationId — own-row hours', () => {
+  useMongo()
+
+  beforeAll(() => {
+    mockMemberId2 = mem2
+    mockOrgId2 = org2
+  })
+
+  beforeEach(() => {
+    hasPermission2
+      .mockReset()
+      .mockImplementation(
+        async (_userId: string, permission: string) => permission !== Permission.STANDUP_ALLOCATE
+      )
+  })
+
+  const buildPatch = (url: string, body: unknown, version = 0) =>
+    new (require('next/server').NextRequest)(`http://localhost${url}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        [STANDUP_VERSION_HEADER]: String(version)
+      },
+      body: JSON.stringify(body)
+    })
+
+  async function seedRow(
+    memberId: mongoose.Types.ObjectId,
+    standupOverrides: Record<string, unknown> = {}
+  ) {
+    const { standup, task } = await seedSelfSelectFixture({
+      expectedAttendees: [mem2, ids.otherMember],
+      ...standupOverrides
+    })
+    const allocation = await Allocation.create({
+      standup: standup._id,
+      sprint: spr2,
+      project: proj2,
+      organization: org2,
+      member: memberId,
+      task: task._id,
+      plannedMinutes: 60,
+      source: 'assigned_in_standup',
+      createdBy: mem2
+    })
+    return { standup, allocation }
+  }
+
+  it('lets a member change the hours on their own row while Ready', async () => {
+    const { standup, allocation } = await seedRow(mem2)
+
+    const response = await rowRoute.PATCH(
+      buildPatch(
+        `/api/standups/${standup._id}/allocations/${allocation._id}`,
+        { plannedMinutes: 90 }
+      ),
+      { params: { id: String(standup._id), allocationId: String(allocation._id) } }
+    )
+
+    expect(response.status).toBe(200)
+    const after = await Allocation.findById(allocation._id).lean()
+    expect(after!.plannedMinutes).toBe(90)
+  })
+
+  it('refuses a member changing somebody else’s row', async () => {
+    const { standup, allocation } = await seedRow(ids.otherMember)
+
+    const response = await rowRoute.PATCH(
+      buildPatch(
+        `/api/standups/${standup._id}/allocations/${allocation._id}`,
+        { plannedMinutes: 90 }
+      ),
+      { params: { id: String(standup._id), allocationId: String(allocation._id) } }
+    )
+
+    expect(response.status).toBe(403)
+    const after = await Allocation.findById(allocation._id).lean()
+    expect(after!.plannedMinutes).toBe(60)
+  })
+
+  it('RUN-26: refuses an own-row edit once the stand-up has left Ready', async () => {
+    const { standup, allocation } = await seedRow(mem2, { status: 'In_Progress' })
+
+    const response = await rowRoute.PATCH(
+      buildPatch(
+        `/api/standups/${standup._id}/allocations/${allocation._id}`,
+        { plannedMinutes: 90 }
+      ),
+      { params: { id: String(standup._id), allocationId: String(allocation._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(payload.error.message).toMatch(/only be edited while the stand-up is Ready/i)
+    const after = await Allocation.findById(allocation._id).lean()
+    expect(after!.plannedMinutes).toBe(60)
+  })
+
+  it('still lets a PM edit anyone’s row after the stand-up has started', async () => {
+    hasPermission2.mockResolvedValue(true)
+    const { standup, allocation } = await seedRow(ids.otherMember, { status: 'In_Progress' })
+
+    const response = await rowRoute.PATCH(
+      buildPatch(
+        `/api/standups/${standup._id}/allocations/${allocation._id}`,
+        { plannedMinutes: 90 }
+      ),
+      { params: { id: String(standup._id), allocationId: String(allocation._id) } }
+    )
+
+    expect(response.status).toBe(200)
+  })
+
+  it('404s for an allocation that belongs to a different stand-up', async () => {
+    // The ownership read has to confirm the row is on *this* stand-up, or the
+    // member/PM branch above would be deciding about the wrong document.
+    const { allocation } = await seedRow(mem2)
+    const otherStandup = await Standup.create({
+      project: proj2,
+      sprint: spr2,
+      organization: org2,
+      standupDate: '2026-09-06',
+      scheduledStartAt: new Date('2026-09-06T03:30:00.000Z'),
+      durationMinutes: 15,
+      sprintDayNumber: 4,
+      totalSprintDays: 5,
+      shape: 'mid_sprint',
+      status: 'Ready',
+      facilitator: mem2,
+      expectedAttendees: [mem2]
+    })
+
+    const response = await rowRoute.PATCH(
+      buildPatch(
+        `/api/standups/${otherStandup._id}/allocations/${allocation._id}`,
+        { plannedMinutes: 90 }
+      ),
+      { params: { id: String(otherStandup._id), allocationId: String(allocation._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(404)
+    expect(payload.error.code).toBe('NOT_FOUND')
   })
 })

@@ -49,39 +49,59 @@ interface CreateBody {
 /**
  * Gated on `standup:allocate_own` here — the wider `standup:allocate` check
  * happens inside `withStandupIdPermission` and would refuse a member outright.
- * Instead this route accepts either permission and lets `createAllocation`'s
- * own ALO-23 ownership check (input.memberId !== actor.userId) do the actual
- * narrowing, exactly as it already does for self-select. A member holding
- * neither permission never reaches this handler at all.
+ * Instead this route accepts either permission and narrows internally. A member
+ * holding neither permission never reaches this handler at all.
+ *
+ * **`selfSelect` is derived, never trusted.** The body flag used to decide
+ * whether `createAllocation`'s two ALO-23 guards (the project's
+ * `allowSelfSelect` setting, and the ownership check) ran at all — so a member
+ * holding only `standup:allocate_own` could simply omit it and skip both,
+ * landing a row on their own day with a `source` of their choosing even on a
+ * project with self-select turned off. Anyone who does not hold the full
+ * `standup:allocate` is, by definition, self-selecting: their own row is the
+ * only row this handler lets them touch.
+ *
+ * **RUN-26 is enforced here, not only in the two screens.** A member's own row
+ * locks the moment the stand-up leaves `Ready`; `MUTABLE_STATUSES` in
+ * `allocation-service.ts` is wider than that on purpose (a PM keeps writing
+ * through `In_Progress`), so the member-only restriction belongs on the route
+ * that knows who is asking. A PM is deliberately exempt — they are the one
+ * running the stand-up.
  */
 export const POST = withStandupIdPermission(
   { permission: Permission.STANDUP_ALLOCATE_OWN },
-  async (request, { standupId, userId, projectId }) => {
+  async (request, { standupId, userId, projectId, standup }) => {
     const body = await readJson<CreateBody>(request)
     const expectedVersion = requireStandupVersion(request)
 
-    const isSelfSelect = Boolean(body.selfSelect)
     const isOwnRow = String(body.memberId) === userId
+    const canAllocateOthers = await PermissionService.hasPermission(
+      userId,
+      Permission.STANDUP_ALLOCATE,
+      projectId
+    )
 
-    // A member with only STANDUP_ALLOCATE_OWN may act on their own row
-    // (self-select, or their own top-up once ALO-22 opens that to members —
-    // it does not yet, so topUp+own-row still requires STANDUP_ALLOCATE
-    // below). Acting on somebody else's row requires the full STANDUP_ALLOCATE
-    // a PM holds.
-    if (!isOwnRow || body.topUp) {
-      const canAllocateOthers = await PermissionService.hasPermission(
-        userId,
-        Permission.STANDUP_ALLOCATE,
-        projectId
-      )
-      if (!canAllocateOthers) {
+    if (!canAllocateOthers) {
+      // A member with only STANDUP_ALLOCATE_OWN may act on their own row
+      // (self-select, or their own top-up once ALO-22 opens that to members —
+      // it does not yet, so topUp still requires STANDUP_ALLOCATE).
+      if (!isOwnRow || body.topUp) {
         throw new StandupError(
           'VALIDATION_FAILED',
           'You can only add work to your own day.',
           { memberId: body.memberId }
         )
       }
+      if (standup.status !== 'Ready') {
+        throw new StandupError(
+          'VALIDATION_FAILED',
+          'Your own row can only be edited while the stand-up is Ready.',
+          { status: standup.status }
+        )
+      }
     }
+
+    const isSelfSelect = canAllocateOthers ? Boolean(body.selfSelect) : true
 
     const result = await createAllocation({
       standupId,
