@@ -159,7 +159,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
-    const PAGE_SIZE = Math.min(limit, 100)
+    // See the epics route: a picker asking for every sprint must not be handed
+    // the first page and no indication there are more.
+    const wantsAll = searchParams.get('all') === 'true'
+    const PAGE_SIZE = wantsAll ? 500 : Math.min(limit, 100)
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || ''
     const projectFilter = searchParams.get('project') || ''

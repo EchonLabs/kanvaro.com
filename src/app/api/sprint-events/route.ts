@@ -9,6 +9,7 @@ import { hasPermission } from '@/lib/permissions/permission-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { EmailService } from '@/lib/email/EmailService'
+import { LIVE_SPRINT_STATES } from '@/lib/standup/sprint-states'
 
 // Helper function to generate recurring event dates
 function generateRecurringDates(
@@ -334,7 +335,7 @@ export async function GET(req: NextRequest) {
               if (event.project && typeof event.project === 'object' && event.project._id) {
                 const fallbackSprint = await Sprint.findOne({
                   project: event.project._id,
-                  status: { $in: ['planning', 'active'] }
+                  status: { $in: LIVE_SPRINT_STATES }
                 }).select('name status').sort({ createdAt: -1 })
 
                 if (fallbackSprint) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db-config'
+import { isCronRequestAuthorised } from '@/lib/standup/jobs/auth'
 import { SprintEvent } from '@/models/SprintEvent'
 import { User } from '@/models/User'
 import { Notification } from '@/models/Notification'
@@ -181,16 +182,15 @@ async function createReminderNotifications(
 // Main cron handler - should be called periodically (e.g., every 5 minutes)
 export async function GET(req: NextRequest) {
   try {
-    await connectDB()
-    
-    // Check for authorization (you can add a secret key check here)
-    const authHeader = req.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-    
-    // If CRON_SECRET is set, validate it
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    // Enforce-if-set (plan CRON-1): when CRON_SECRET is absent this is a no-op and
+    // behaviour is unchanged, so an upgrade needs no environment edit. Checked
+    // before connecting, so an unauthorised caller cannot make us open a
+    // database connection.
+    if (!isCronRequestAuthorised(req.headers)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    await connectDB()
 
     const now = new Date()
     const results = {

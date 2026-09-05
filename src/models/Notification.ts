@@ -3,11 +3,11 @@ import mongoose, { Schema, Document } from 'mongoose'
 export interface INotification extends Document {
   user: mongoose.Types.ObjectId
   organization: mongoose.Types.ObjectId
-  type: 'task' | 'project' | 'team' | 'system' | 'budget' | 'deadline' | 'reminder' | 'invitation' | 'time_tracking' | 'sprint_event'
+  type: 'task' | 'project' | 'team' | 'system' | 'budget' | 'deadline' | 'reminder' | 'invitation' | 'time_tracking' | 'sprint_event' | 'standup'
   title: string
   message: string
   data?: {
-    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'sprint_event'
+    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'sprint_event' | 'standup' | 'carry_forward_item' | 'standup_override' | 'working_calendar'
     entityId?: mongoose.Types.ObjectId
     action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'completed' | 'overdue' | 'reminder' | 'upcoming'
     priority?: 'low' | 'medium' | 'high' | 'critical'
@@ -33,7 +33,7 @@ const NotificationSchema = new Schema<INotification>({
   organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
   type: { 
     type: String, 
-    enum: ['task', 'project', 'team', 'system', 'budget', 'deadline', 'reminder', 'invitation', 'time_tracking', 'sprint_event'],
+    enum: ['task', 'project', 'team', 'system', 'budget', 'deadline', 'reminder', 'invitation', 'time_tracking', 'sprint_event', 'standup'],
     required: true 
   },
   title: { type: String, required: true },
@@ -41,7 +41,7 @@ const NotificationSchema = new Schema<INotification>({
   data: {
     entityType: { 
       type: String, 
-      enum: ['task', 'project', 'epic', 'sprint', 'story', 'user', 'budget', 'time_entry', 'sprint_event']
+      enum: ['task', 'project', 'epic', 'sprint', 'story', 'user', 'budget', 'time_entry', 'sprint_event', 'standup', 'carry_forward_item', 'standup_override', 'working_calendar']
     },
     entityId: { type: Schema.Types.ObjectId },
     action: { 
