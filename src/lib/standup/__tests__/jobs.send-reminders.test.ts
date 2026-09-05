@@ -107,6 +107,15 @@ describe('send-reminders', () => {
     )
   })
 
+  it('N1: points the reminder at My Stand-up, not the PM run screen', async () => {
+    await seedProject()
+    const standup = await seedStandup()
+
+    await sendReminders(new Date(SCHEDULED_AT.getTime() - 60 * 60_000))
+
+    expect(notify.mock.calls[0][2].data.url).toBe(`/my/standup/${String(standup._id)}`)
+  })
+
   it('does not remind before the lead', async () => {
     await seedProject()
     await seedStandup()

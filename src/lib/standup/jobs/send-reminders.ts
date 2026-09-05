@@ -89,7 +89,7 @@ export async function sendReminders(now: Date = new Date()): Promise<JobResult> 
         message: standupStrings.notifications.reminderMessage({
           localTime: formatInTimeZone(standup.scheduledStartAt, timezone, 'HH:mm')
         }),
-        url: `/standups/${String(standup._id)}`,
+        url: `/my/standup/${String(standup._id)}`,
         // One ledger key per attendee: a member added to the sprint after the
         // first reminder still gets theirs.
         perRecipient: true
