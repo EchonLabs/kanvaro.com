@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { TASK_STATUS_CATEGORIES, type TaskStatusCategory } from '@/constants/taskStatuses'
 
 export interface IProject extends Document {
   name: string
@@ -56,6 +57,10 @@ export interface IProject extends Document {
       title: string
       color?: string
       order: number
+      // What this status means, independent of its label. Optional: when unset,
+      // resolveTaskStatusCategory() falls back to the built-in map, so existing
+      // projects need no migration.
+      category?: TaskStatusCategory
     }>
   }
   tags: string[]
@@ -155,7 +160,8 @@ const ProjectSchema = new Schema<IProject>({
       key: { type: String, required: true },
       title: { type: String, required: true },
       color: String,
-      order: { type: Number, required: true }
+      order: { type: Number, required: true },
+      category: { type: String, enum: TASK_STATUS_CATEGORIES }
     }]
   },
   tags: [{ type: String, trim: true }],

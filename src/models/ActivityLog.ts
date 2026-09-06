@@ -1,40 +1,136 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
-export type ActivityEntityType = 'task' | 'project' | 'sprint' | 'time_entry' | 'timer'
+// Single source of truth: the schema enums below are derived from these arrays
+// so the TypeScript union and the Mongoose validator can never drift apart.
 
-export type ActivityAction =
-  | 'timer_started'
-  | 'timer_stopped'
-  | 'timer_paused'
-  | 'timer_resumed'
-  | 'time_entry_saved'
-  | 'time_entry_updated'
-  | 'time_entry_deleted'
-  | 'task_created'
-  | 'task_updated'
-  | 'task_assigned'
-  | 'task_status_changed'
-  | 'project_created'
-  | 'project_updated'
-  | 'project_member_added'
-  | 'project_member_removed'
-  | 'sprint_created'
-  | 'sprint_updated'
-  | 'sprint_started'
-  | 'sprint_completed'
-  | 'sprint_task_added'
-  | 'sprint_task_removed'
+export const ACTIVITY_ENTITY_TYPES = [
+  'task',
+  'project',
+  'sprint',
+  'time_entry',
+  'timer',
+  // Stand-up module entities. SEC-3 requires an audit entry for every mutation,
+  // so each collection the module writes needs a name here.
+  'standup',
+  'allocation',
+  'allocation_variance',
+  'estimate_debt_entry',
+  'carry_forward_item',
+  'standup_override',
+  'standup_blocker',
+  'working_calendar',
+  'member_capacity',
+  'planning_session',
+  'project_standup_settings'
+] as const
+
+export const ACTIVITY_ACTIONS = [
+  'timer_started',
+  'timer_stopped',
+  'timer_paused',
+  'timer_resumed',
+  'time_entry_saved',
+  'time_entry_updated',
+  'time_entry_deleted',
+  'task_created',
+  'task_updated',
+  'task_assigned',
+  'task_status_changed',
+  'project_created',
+  'project_updated',
+  'project_member_added',
+  'project_member_removed',
+  'sprint_created',
+  'sprint_updated',
+  'sprint_started',
+  'sprint_completed',
+  'sprint_task_added',
+  'sprint_task_removed',
+
+  // --- Stand-up module ---
+  // Schedule and lifecycle (SCH-*, RUN-1..5)
+  'standup_generated',
+  'standup_reconciled',
+  'standup_started',
+  'standup_completed',
+  'standup_reopened',
+  'standup_backfilled',
+  'standup_missed',
+  'standup_skipped',
+  'standup_cancelled',
+  'standup_attendance_set',
+  // Allocation (ALO-*)
+  'allocation_created',
+  'allocation_updated',
+  'allocation_removed',
+  // Estimation and variance (PLN-*, VAR-*)
+  'estimate_set',
+  'estimate_revised',
+  'variance_computed',
+  'debt_entry_posted',
+  'debt_written_off',
+  // Carry forward (CFW-*)
+  'carry_forward_created',
+  'carry_forward_noted',
+  'carry_forward_resolved',
+  // Sprint close readiness (CC-8, §15.8.11)
+  'sprint_close_disposition_set',
+  // Overrides and gate (OVR-*, PLN-16..19)
+  'override_issued',
+  // Blockers (RUN-14..18)
+  'standup_blocker_raised',
+  'standup_blocker_updated',
+  'planning_session_started',
+  'planning_session_updated',
+  'planning_session_completed',
+  'planning_waiver_issued',
+  'planning_waiver_revoked',
+  // Estimation (PLN-11..15, DAT-6/7). `estimate_revised` is declared above
+  // with the variance actions.
+  'task_estimated',
+  'points_to_hours_changed',
+  // Configuration (CAL-*)
+  'working_calendar_updated',
+  'holiday_set_imported',
+  'member_capacity_updated'
+] as const
+
+export type ActivityEntityType = typeof ACTIVITY_ENTITY_TYPES[number]
+
+export type ActivityAction = typeof ACTIVITY_ACTIONS[number]
+
+/**
+ * Before/after payload for an audited mutation.
+ *
+ * SEC-3 requires every mutation to record the previous and new value. The
+ * existing `details` field carries it under a reserved shape so audit entries
+ * stay one collection and existing readers are unaffected.
+ */
+export interface ActivityChangeDetails {
+  before?: Record<string, any> | null
+  after?: Record<string, any> | null
+  [key: string]: any
+}
 
 export interface IActivityLog extends Document {
   organization: mongoose.Types.ObjectId
-  user: mongoose.Types.ObjectId
+  /** Absent only for system-actor entries — see `actorType`. */
+  user?: mongoose.Types.ObjectId
+  /**
+   * Who caused the mutation. INV-10 requires system actions (scheduler jobs,
+   * automatic reconciliation) to be attributed to a system actor rather than to
+   * the last human who happened to touch the record.
+   */
+  actorType: 'user' | 'system'
+  /** For `actorType: 'system'`, which job or process — e.g. `standup:mark-missed`. */
+  systemActor?: string
   action: ActivityAction
   entityType: ActivityEntityType
   entityId?: mongoose.Types.ObjectId
   entityName?: string
   project?: mongoose.Types.ObjectId
   projectName?: string
-  details?: Record<string, any>
+  details?: ActivityChangeDetails
   createdAt: Date
 }
 
@@ -48,24 +144,31 @@ const ActivityLogSchema = new Schema<IActivityLog>(
     user: {
       type: Schema.Types.ObjectId,
       ref: 'User',
+      // Required for human actions, which is every pre-existing entry. System
+      // actors have no User document, so they record `systemActor` instead.
+      required: function (this: { actorType?: string }) {
+        return this.actorType !== 'system'
+      }
+    },
+    actorType: {
+      type: String,
+      enum: ['user', 'system'],
+      default: 'user',
       required: true
+    },
+    systemActor: {
+      type: String,
+      maxlength: 100
     },
     action: {
       type: String,
       required: true,
-      enum: [
-        'timer_started', 'timer_stopped', 'timer_paused', 'timer_resumed',
-        'time_entry_saved', 'time_entry_updated', 'time_entry_deleted',
-        'task_created', 'task_updated', 'task_assigned', 'task_status_changed',
-        'project_created', 'project_updated', 'project_member_added', 'project_member_removed',
-        'sprint_created', 'sprint_updated', 'sprint_started', 'sprint_completed',
-        'sprint_task_added', 'sprint_task_removed'
-      ]
+      enum: [...ACTIVITY_ACTIONS]
     },
     entityType: {
       type: String,
       required: true,
-      enum: ['task', 'project', 'sprint', 'time_entry', 'timer']
+      enum: [...ACTIVITY_ENTITY_TYPES]
     },
     entityId: {
       type: Schema.Types.ObjectId

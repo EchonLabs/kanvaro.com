@@ -5,11 +5,11 @@ import { broadcastNotification, broadcastToUsers } from './notification-broadcas
 import connectDB from './db-config'
 
 export interface NotificationData {
-  type: 'task' | 'project' | 'team' | 'system' | 'budget' | 'deadline' | 'reminder' | 'invitation' | 'time_tracking'
+  type: 'task' | 'project' | 'team' | 'system' | 'budget' | 'deadline' | 'reminder' | 'invitation' | 'time_tracking' | 'standup'
   title: string
   message: string
   data?: {
-    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry'
+    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'standup' | 'carry_forward_item' | 'standup_override' | 'working_calendar'
     entityId?: string
     action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'completed' | 'overdue' | 'reminder'
     priority?: 'low' | 'medium' | 'high' | 'critical'

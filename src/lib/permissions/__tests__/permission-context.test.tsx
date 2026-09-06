@@ -1,3 +1,6 @@
+/**
+ * @jest-environment jsdom
+ */
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { PermissionProvider, usePermissionContext } from '../permission-context';

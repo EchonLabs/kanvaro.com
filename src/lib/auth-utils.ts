@@ -6,6 +6,15 @@ import { cookies, headers } from 'next/headers'
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 
+/**
+ * The authenticated caller, as every route sees them.
+ *
+ * `id` and `organization` are **string primitives**, normalised at each
+ * assignment below. They used to be assigned straight from the mongoose
+ * document, where they are ObjectIds, while this interface claimed `string` —
+ * so `something.toString() === userId` was false for every caller, and any
+ * route that compared an id the honest way locked everybody out.
+ */
 export interface AuthUser {
   id: string
   organization: string
@@ -57,8 +66,8 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
         const user = await User.findById(decoded.userId)
         if (user && user.isActive) {
           userData = {
-            id: user._id,
-            organization: user.organization,
+            id: user._id.toString(),
+            organization: user.organization?.toString(),
             email: user.email,
             role: user.role
           }
@@ -90,8 +99,8 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
               }
 
               userData = {
-                id: user._id,
-                organization: user.organization,
+                id: user._id.toString(),
+                organization: user.organization?.toString(),
                 email: user.email,
                 role: user.role
               }
@@ -125,8 +134,8 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
           })
 
           userData = {
-            id: user._id,
-            organization: user.organization,
+            id: user._id.toString(),
+            organization: user.organization?.toString(),
             email: user.email,
             role: user.role
           }

@@ -67,6 +67,7 @@ import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { Permission } from '@/lib/permissions'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { PermissionGate } from '@/lib/permissions/permission-components'
+import { StandupSettingsPanel } from '@/components/standup/StandupSettingsPanel'
 
 interface Project {
   _id: string
@@ -2526,6 +2527,11 @@ export default function ProjectDetailPage() {
                 </Card> */}
 
                 </div>
+
+                {/* The separator lives inside the panel: it renders nothing for
+                    a member without STANDUP_CONFIGURE, and a bordered empty div
+                    would leave a stray rule at the bottom of the tab. */}
+                <StandupSettingsPanel projectId={projectId} />
               </div>
             </TabsContent>
           </Tabs>

@@ -7,9 +7,11 @@ import { OrganizationSettings } from '@/components/settings/OrganizationSettings
 import { EmailSettings } from '@/components/settings/EmailSettings'
 import { DatabaseSettings } from '@/components/settings/DatabaseSettings'
 import { DocumentationSettings } from '@/components/settings/DocumentationSettings'
+import { HolidaySetManager } from '@/components/standup/HolidaySetManager'
 import { useAuthContext } from '@/contexts/AuthContext'
 import {
   Building2,
+  CalendarDays,
   Mail,
   Database,
   Settings as SettingsIcon,
@@ -29,6 +31,15 @@ const TABS = [
 
 const DOC_TAB = { id: 'documentation', label: 'Documentation', icon: BookOpen }
 
+/**
+ * Organisation holiday calendars (plan DO-1/DO-2).
+ *
+ * Gated on HOLIDAY_MANAGE rather than SETTINGS_UPDATE, so it appears for admins
+ * and HR — HR being the point, since they receive the published gazette — and
+ * stays hidden from everyone else.
+ */
+const HOLIDAY_TAB = { id: 'holidays', label: 'Holidays', icon: CalendarDays }
+
 export default function SettingsPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
   const [activeTab, setActiveTab] = useState('organization')
@@ -43,6 +54,14 @@ export default function SettingsPage() {
       router.push('/login')
     }
   }, [authLoading, isAuthenticated, router])
+
+  // Deep link support: /settings?tab=holidays is where the HOLIDAY_COVERAGE_GAP
+  // degradation points, so the notice lands on the screen that fixes it rather
+  // than on a page the reader then has to navigate from.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('tab')
+    if (requested) setActiveTab(requested)
+  }, [])
 
   if (isLoading) {
     return (
@@ -65,6 +84,7 @@ export default function SettingsPage() {
 
   const canViewSettings = hasPermission(Permission.SETTINGS_VIEW)
   const canManageDocumentation = hasPermission(Permission.DOCUMENTATION_MANAGE_PERMISSIONS)
+  const canManageHolidays = hasPermission(Permission.HOLIDAY_MANAGE)
 
   if (!permissionsLoading && !canViewSettings) {
     return (
@@ -84,7 +104,11 @@ export default function SettingsPage() {
     )
   }
 
-  const visibleTabs = canManageDocumentation ? [...TABS, DOC_TAB] : TABS
+  const visibleTabs = [
+    ...TABS,
+    ...(canManageHolidays ? [HOLIDAY_TAB] : []),
+    ...(canManageDocumentation ? [DOC_TAB] : [])
+  ]
 
   return (
     <MainLayout>
@@ -98,7 +122,7 @@ export default function SettingsPage() {
               Settings
             </h1>
             <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
-              Manage your organization, email, database, and documentation
+              Manage your organization, holidays, email, database, and documentation
             </p>
           </div>
         </div>
@@ -131,6 +155,7 @@ export default function SettingsPage() {
           {activeTab === 'organization' && <OrganizationSettings />}
           {activeTab === 'email'        && <EmailSettings />}
           {activeTab === 'database'     && <DatabaseSettings />}
+          {activeTab === 'holidays'      && canManageHolidays && <HolidaySetManager />}
           {activeTab === 'documentation' && canManageDocumentation && <DocumentationSettings />}
         </div>
 

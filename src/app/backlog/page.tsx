@@ -61,6 +61,7 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import { validateAndCorrectDateRange, validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
 import { extractUserId } from '@/lib/auth/user-utils'
+import { isLiveSprint } from '@/lib/standup/sprint-states'
 
 interface UserSummary {
   _id: string
@@ -900,7 +901,7 @@ export default function BacklogPage() {
       // fetch sprints for that project to narrow down options. 
       // Otherwise, fetch all sprints.
       const url = projectId
-        ? `/api/sprints?limit=200&projectId=${projectId}`
+        ? `/api/sprints?limit=200&project=${encodeURIComponent(projectId)}`
         : '/api/sprints?limit=200'
 
       const response = await fetch(url)
@@ -917,7 +918,7 @@ export default function BacklogPage() {
           : []
 
       const filtered = sprintList.filter(
-        (sprint) => sprint && ['planning', 'active'].includes(sprint.status)
+        (sprint) => sprint && isLiveSprint(sprint.status)
       )
 
       setSprints(filtered)

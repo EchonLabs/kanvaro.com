@@ -114,6 +114,10 @@ TimeEntrySchema.index({ user: 1, startTime: 1 })
 TimeEntrySchema.index({ organization: 1, startTime: 1 })
 TimeEntrySchema.index({ isBillable: 1, isApproved: 1 })
 TimeEntrySchema.index({ status: 1, isApproved: 1 })
+// Backs getLoggedMinutes(taskId, memberId, dateRange) — the stand-up variance
+// engine runs this for every allocation on every stand-up, so it is the hottest
+// read path in that module.
+TimeEntrySchema.index({ task: 1, user: 1, startTime: 1 })
 
 // Virtual for total cost
 TimeEntrySchema.virtual('totalCost').get(function() {

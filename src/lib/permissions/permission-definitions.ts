@@ -35,6 +35,9 @@ export enum PermissionCategory {
   // Test management permissions
   TEST_MANAGEMENT = 'test_management',
 
+  // Sprint stand-up permissions
+  STANDUP = 'standup',
+
   // Documentation permissions
   DOCUMENTATION = 'documentation',
 }
@@ -205,6 +208,41 @@ export enum Permission {
   TEST_REPORT_VIEW = 'test_report:view',
   TEST_REPORT_EXPORT = 'test_report:export',
   TEST_MANAGE = 'test:manage',
+
+  // Stand-up permissions.
+  // Modelled directly on the spec's §3.2 role matrix. Split finely because the
+  // matrix draws real distinctions: a Team Member may edit their own allocation
+  // rows before the stand-up starts but not assign work to others, and only an
+  // Org Admin may approve a planning waiver.
+  STANDUP_CONFIGURE = 'standup:configure',
+  STANDUP_VIEW = 'standup:view',
+  STANDUP_GENERATE = 'standup:generate',
+  STANDUP_RUN = 'standup:run',
+  STANDUP_COMPLETE = 'standup:complete',
+  STANDUP_REOPEN = 'standup:reopen',
+  STANDUP_ALLOCATE = 'standup:allocate',
+  STANDUP_ALLOCATE_OWN = 'standup:allocate_own',
+  STANDUP_OVERRIDE = 'standup:override',
+  STANDUP_REVISE_ESTIMATE = 'standup:revise_estimate',
+  STANDUP_CARRY_FORWARD_NOTE = 'standup:carry_forward_note',
+  STANDUP_BLOCKER_RAISE = 'standup:blocker_raise',
+  STANDUP_VIEW_DEBT = 'standup:view_debt',
+  STANDUP_VIEW_OWN_DEBT = 'standup:view_own_debt',
+  STANDUP_WRITE_OFF_DEBT = 'standup:write_off_debt',
+  STANDUP_VIEW_ANALYTICS = 'standup:view_analytics',
+  STANDUP_PLANNING_WAIVER = 'standup:planning_waiver',
+
+  /**
+   * Organisation-wide holiday calendar administration (plan DO-2).
+   *
+   * Separate from STANDUP_CONFIGURE because the scope differs: stand-up
+   * configuration is per project, while a holiday set is shared by every
+   * project in the organisation. Gating holiday routes on STANDUP_CONFIGURE let
+   * a project manager — and a tester — edit the national holiday calendar for
+   * teams they have nothing to do with, while HR, who actually holds the
+   * published gazette, could not touch it at all.
+   */
+  HOLIDAY_MANAGE = 'holiday:manage',
 
   // Documentation permissions
   DOCUMENTATION_VIEW = 'documentation:view',
@@ -403,6 +441,27 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,
     Permission.DOCUMENTATION_MANAGE_PERMISSIONS,
+
+    // Stand-ups — Org Admin holds every capability in the §3.2 matrix,
+    // including the planning waiver, which is Org Admin only (PLN-16).
+    Permission.STANDUP_CONFIGURE,
+    Permission.HOLIDAY_MANAGE,
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_GENERATE,
+    Permission.STANDUP_RUN,
+    Permission.STANDUP_COMPLETE,
+    Permission.STANDUP_REOPEN,
+    Permission.STANDUP_ALLOCATE,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_OVERRIDE,
+    Permission.STANDUP_REVISE_ESTIMATE,
+    Permission.STANDUP_CARRY_FORWARD_NOTE,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_DEBT,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_WRITE_OFF_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+    Permission.STANDUP_PLANNING_WAIVER,
   ],
 
   // Human Resource role - currently has the same permissions as ADMIN.
@@ -532,6 +591,15 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.CALENDAR_CREATE,
     Permission.CALENDAR_UPDATE,
     Permission.CALENDAR_DELETE,
+    Permission.HOLIDAY_MANAGE,
+    // Organisation-wide on purpose, unlike every other non-admin role: HR owns
+    // the holiday calendar for the whole organisation, and HOLIDAY_COVERAGE_GAP
+    // — the notice saying a sprint runs past the last loaded holiday — is
+    // served by the stand-up health route, which is gated on STANDUP_VIEW. HR
+    // cannot be asked to close a gap it is not allowed to see. Read only: the
+    // attendee permissions come from HR's project role when HR is actually on
+    // a project.
+    Permission.STANDUP_VIEW,
 
     // Kanban
     Permission.KANBAN_READ,
@@ -573,6 +641,27 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.PROJECT_MANAGER]: [
+    // Stand-ups — every capability except the planning waiver, which the §3.2
+    // matrix reserves for Org Admin. SEC-2: any PM on the project may run the
+    // stand-up; whoever starts it becomes facilitator but the rest keep full
+    // edit rights, so this is a plain role grant with no ownership check.
+    Permission.STANDUP_CONFIGURE,
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_GENERATE,
+    Permission.STANDUP_RUN,
+    Permission.STANDUP_COMPLETE,
+    Permission.STANDUP_REOPEN,
+    Permission.STANDUP_ALLOCATE,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_OVERRIDE,
+    Permission.STANDUP_REVISE_ESTIMATE,
+    Permission.STANDUP_CARRY_FORWARD_NOTE,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_DEBT,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_WRITE_OFF_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     // User management
     Permission.USER_CREATE,
     Permission.USER_READ,
@@ -739,6 +828,17 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.TEAM_MEMBER]: [
+    // Stand-ups are granted per project, NOT here — see PROJECT_MEMBER.
+    //
+    // A grant in this table is organisation-wide: `hasPermission` returns true
+    // for a PROJECT-scoped permission as soon as the org role holds it, without
+    // ever consulting the project (permission-service.ts). Listing STANDUP_VIEW
+    // here therefore let every team member in the organisation read every
+    // stand-up in it — including capacity gaps and estimate debt for projects
+    // they are not on. A member of a project resolves to PROJECT_MEMBER, which
+    // carries the §3.2 Team Member set scoped to that project, so the
+    // capability is unchanged and the reach is not.
+
     // User management (own profile only)
     Permission.USER_READ,
     Permission.USER_UPDATE,
@@ -855,6 +955,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.VIEWER]: [
+    // Stand-ups — the spec's read-only "Stakeholder". Deliberately has
+    // STANDUP_VIEW_ANALYTICS but NOT STANDUP_VIEW_DEBT: NFR-13 requires
+    // individual estimate debt and estimation accuracy to be invisible to
+    // stakeholders, who see team aggregates only. The analytics payload filters
+    // on this at field level, not just in the UI.
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     // User management (own profile only)
     Permission.USER_READ,
 
@@ -907,6 +1015,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.QA_ENGINEER]: [
+    // Stand-ups are granted per project, NOT here — see PROJECT_QA_LEAD and
+    // PROJECT_MEMBER. A grant here would be organisation-wide; see the note on
+    // TEAM_MEMBER.
+
     // User management (read only)
     Permission.USER_READ,
     Permission.USER_UPDATE,
@@ -990,6 +1102,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.TESTER]: [
+    // Stand-ups are granted per project, NOT here — see PROJECT_TESTER and
+    // PROJECT_MEMBER. A grant here would be organisation-wide; see the note on
+    // TEAM_MEMBER.
+
     // User management (read only)
     Permission.USER_READ,
 
@@ -1056,6 +1172,25 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 
 export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
   [ProjectRole.PROJECT_MANAGER]: [
+    // Stand-ups — full facilitation rights on this project (SEC-2: any PM may
+    // run it), minus the Org-Admin-only planning waiver.
+    Permission.STANDUP_CONFIGURE,
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_GENERATE,
+    Permission.STANDUP_RUN,
+    Permission.STANDUP_COMPLETE,
+    Permission.STANDUP_REOPEN,
+    Permission.STANDUP_ALLOCATE,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_OVERRIDE,
+    Permission.STANDUP_REVISE_ESTIMATE,
+    Permission.STANDUP_CARRY_FORWARD_NOTE,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_DEBT,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_WRITE_OFF_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     Permission.PROJECT_READ,
     Permission.PROJECT_UPDATE,
     Permission.PROJECT_MANAGE_TEAM,
@@ -1111,6 +1246,14 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
   ],
 
   [ProjectRole.PROJECT_MEMBER]: [
+    // Stand-ups — attends, maintains own row before the stand-up starts,
+    // raises blockers, sees only their own debt (NFR-13 / D2).
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     Permission.PROJECT_READ,
     Permission.TASK_CREATE,
     Permission.TASK_READ,
@@ -1132,6 +1275,11 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
   ],
 
   [ProjectRole.PROJECT_VIEWER]: [
+    // Stand-ups — read only. No STANDUP_VIEW_DEBT: stakeholders see team
+    // aggregates only (NFR-13).
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     Permission.PROJECT_READ,
     Permission.TASK_READ,
     Permission.TEAM_READ,
@@ -1162,6 +1310,15 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
   ],
 
   [ProjectRole.PROJECT_QA_LEAD]: [
+    // Stand-ups — attends as a sprint team member, maintains own row before
+    // the stand-up starts, raises blockers, sees only their own debt
+    // (NFR-13 / D2). Same set as a Team Member per §3.2.
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     Permission.PROJECT_READ,
     Permission.TASK_CREATE,
     Permission.TASK_READ,
@@ -1202,6 +1359,15 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
   ],
 
   [ProjectRole.PROJECT_TESTER]: [
+    // Stand-ups — attends as a sprint team member, maintains own row before
+    // the stand-up starts, raises blockers, sees only their own debt
+    // (NFR-13 / D2). Same set as a Team Member per §3.2.
+    Permission.STANDUP_VIEW,
+    Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_BLOCKER_RAISE,
+    Permission.STANDUP_VIEW_OWN_DEBT,
+    Permission.STANDUP_VIEW_ANALYTICS,
+
     Permission.PROJECT_READ,
     Permission.TASK_CREATE,
     Permission.TASK_READ,
@@ -1279,6 +1445,11 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
     Permission.SETTINGS_MANAGE_SECURITY,
+    // Organisation-wide by design: a holiday set is shared by every project,
+    // so there is no project to scope it to. Without this it fell through to
+    // PROJECT scope, which only worked because the roles that hold it hold it
+    // globally — a custom role granting it would have been scoped wrongly.
+    Permission.HOLIDAY_MANAGE,
   ];
 
   const ownPermissions = [

@@ -4,6 +4,7 @@ import { User, Project, Task, Story, Epic, Sprint } from '@/models'
 import { DocsLoader } from '@/lib/docs/loader'
 import { authenticateUser } from '@/lib/auth-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { applySearchFilters, parseFilterList } from '@/lib/search/filters'
 
 interface SearchFilters {
   type?: string[]
@@ -197,6 +198,14 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'score'
     const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc'
     const includeArchived = searchParams.get('includeArchived') === 'true'
+    // Sent by the search panel since it was built, read by nobody until now.
+    const requestedFilters = {
+      type: parseFilterList(searchParams.get('type')),
+      status: parseFilterList(searchParams.get('status')),
+      priority: parseFilterList(searchParams.get('priority')),
+      assignee: parseFilterList(searchParams.get('assignee')),
+      project: parseFilterList(searchParams.get('project'))
+    }
 
     // Authenticate user for documentation search
     const auth = await authenticateUser()
@@ -644,9 +653,16 @@ export async function GET(request: NextRequest) {
       `project:${query}`
     ].filter(suggestion => suggestion !== query)
     
+    // Aggregations are deliberately computed above on the *unfiltered* results:
+    // they drive the filter chips, and counting only what survives the current
+    // selection would zero out every other chip and trap the user on it.
+    const filtered = applySearchFilters(results, requestedFilters)
+
     const response: SearchResponse = {
-      results: results.slice(0, limit),
-      total: results.length,
+      // `offset` was parsed and then never used, so every page after the first
+      // returned the first one again.
+      results: filtered.slice(offset, offset + limit),
+      total: filtered.length,
       aggregations,
       suggestions,
       took: Date.now() - startTime

@@ -328,6 +328,12 @@ export async function GET(request: NextRequest) {
     const createdBy = searchParams.get('createdBy') || ''
     const createdAtFrom = searchParams.get('createdAtFrom') || ''
     const createdAtTo = searchParams.get('createdAtTo') || ''
+    // The backlog screen has always sent these three. Nothing read them, so the
+    // due-date range and the "assigned by" picker narrowed the UI and changed
+    // nothing about the results.
+    const assignedBy = searchParams.get('assignedBy') || ''
+    const dueDateFrom = searchParams.get('dueDateFrom') || ''
+    const dueDateTo = searchParams.get('dueDateTo') || ''
     const sortBy = searchParams.get('sortBy') || 'created'
     const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc'
 
@@ -352,8 +358,11 @@ export async function GET(request: NextRequest) {
       : {}
 
     const includeTasks = !type || type === 'task'
-    const includeStories = !type || type === 'story'
-    const includeEpics = !type || type === 'epic'
+    // Only tasks carry `assignedBy`. Filtering by it and still listing stories
+    // and epics would quietly return rows the filter cannot apply to — which is
+    // the same silent-pass-through this filter suffered from in the first place.
+    const includeStories = (!type || type === 'story') && !assignedBy
+    const includeEpics = (!type || type === 'epic') && !assignedBy
 
     const projectDocs = await Project.find({ organization: organizationId }).select('_id')
     const projectIds = projectDocs.map(doc => doc._id)
@@ -389,6 +398,10 @@ export async function GET(request: NextRequest) {
       // User can view all tasks, so apply filters as requested
       if (assignedTo) taskFilter['assignedTo.user'] = { $in: [assignedTo] }
       if (createdBy) taskFilter.createdBy = createdBy
+    }
+
+    if (assignedBy && assignedBy !== 'all') {
+      taskFilter.assignedBy = assignedBy
     }
 
     const storyFilter: Record<string, unknown> = {
@@ -456,6 +469,30 @@ export async function GET(request: NextRequest) {
         taskFilter.createdAt = dateFilter
         storyFilter.createdAt = dateFilter
         epicFilter.createdAt = dateFilter
+      }
+    }
+
+    if (dueDateFrom || dueDateTo) {
+      const dueFilter: Record<string, Date> = {}
+      if (dueDateFrom) {
+        const fromDate = new Date(dueDateFrom)
+        if (!isNaN(fromDate.getTime())) {
+          dueFilter.$gte = fromDate
+        }
+      }
+      if (dueDateTo) {
+        const toDate = new Date(dueDateTo)
+        if (!isNaN(toDate.getTime())) {
+          dueFilter.$lte = toDate
+        }
+      }
+
+      // Tasks, stories and epics all carry `dueDate`, so the range means the
+      // same thing on all three.
+      if (Object.keys(dueFilter).length > 0) {
+        taskFilter.dueDate = dueFilter
+        storyFilter.dueDate = dueFilter
+        epicFilter.dueDate = dueFilter
       }
     }
 

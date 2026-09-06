@@ -6,6 +6,7 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { logActivity } from '@/lib/activity-logger'
+import { STARTABLE_SPRINT_STATES, type SprintState } from '@/lib/standup/sprint-states'
 
 export async function POST(
   request: NextRequest,
@@ -54,7 +55,10 @@ export async function POST(
       )
     }
 
-    if (sprint.status !== 'planning') {
+    // `planned` joins `planning` here: the stand-up module's §8.1 state machine
+    // inserts Planned between Planning and Active, so a sprint that has
+    // completed its planning session would otherwise be unstartable.
+    if (!STARTABLE_SPRINT_STATES.includes(sprint.status as SprintState)) {
       return NextResponse.json(
         { error: 'Only sprints in planning can be started' },
         { status: 400 }

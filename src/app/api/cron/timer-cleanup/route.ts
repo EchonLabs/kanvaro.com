@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
+import { isCronRequestAuthorised } from '@/lib/standup/jobs/auth'
 import { ActiveTimer, IActiveTimer } from '@/models/ActiveTimer'
 import { TimeEntry } from '@/models/TimeEntry'
 import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
@@ -204,18 +205,15 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
  */
 export async function GET(request: NextRequest) {
   try {
-    await connectDB()
-
-    // Optional: Add authorization header check for security
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Enforce-if-set (plan CRON-1): when CRON_SECRET is absent this is a no-op and
+    // behaviour is unchanged, so an upgrade needs no environment edit. Checked
+    // before connecting, so an unauthorised caller cannot make us open a
+    // database connection.
+    if (!isCronRequestAuthorised(request.headers)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    await connectDB()
 
     // Find all active timers (don't use .lean() as we need document methods)
     const activeTimers = await ActiveTimer.find({})

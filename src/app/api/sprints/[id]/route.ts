@@ -5,6 +5,13 @@ import { Task } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { isoOfStoredDate } from '@/lib/standup/calendar-dates'
+import { toErrorResponse } from '@/lib/standup/errors'
+import {
+  assertScheduleChangeAllowed,
+  reconcileSprintSchedule,
+  type ReconcileTrigger
+} from '@/lib/standup/reconcile'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { logActivity } from '@/lib/activity-logger'
 
@@ -264,6 +271,46 @@ export async function PUT(
         : []
     }
 
+    // --- SCH-6: the schedule follows the sprint ------------------------------
+    // Moving a sprint's dates changes which days have stand-ups, and cancelling
+    // it cancels them. The check runs *before* the write: SCH-7 refuses a move
+    // that would strand a completed or in-progress stand-up, and a refusal that
+    // had already moved the dates would leave exactly the state the rule exists
+    // to prevent.
+    const previousFrom = isoOfStoredDate(existingSprint.startDate)
+    const previousTo = isoOfStoredDate(existingSprint.endDate)
+    const nextFrom = updateData.startDate
+      ? isoOfStoredDate(new Date(updateData.startDate))
+      : previousFrom
+    const nextTo = updateData.endDate
+      ? isoOfStoredDate(new Date(updateData.endDate))
+      : previousTo
+
+    const datesMoved = nextFrom !== previousFrom || nextTo !== previousTo
+    const beingCancelled =
+      updateData.status === 'cancelled' && existingSprint.status !== 'cancelled'
+
+    if (datesMoved) {
+      try {
+        await assertScheduleChangeAllowed(sprintId, { from: nextFrom, to: nextTo })
+      } catch (error) {
+        const { status, body } = toErrorResponse(error)
+        return NextResponse.json(body, { status })
+      }
+    }
+
+    const reconcileTrigger: ReconcileTrigger | null = beingCancelled
+      ? 'sprint_cancelled'
+      : nextFrom < previousFrom
+        ? 'sprint_start_earlier'
+        : nextFrom > previousFrom
+          ? 'sprint_start_later'
+          : nextTo > previousTo
+            ? 'sprint_end_later'
+            : nextTo < previousTo
+              ? 'sprint_end_earlier'
+              : null
+
     const sprint = await Sprint.findByIdAndUpdate(
       sprintId,
       updatePayload,
@@ -278,6 +325,17 @@ export async function PUT(
         { error: 'Sprint not found or unauthorized' },
         { status: 404 }
       )
+    }
+
+    if (reconcileTrigger) {
+      // The schedule is repaired even if this throws — `generation-audit` finds
+      // the drift within a tick — so a reconcile failure must not fail the
+      // sprint update the user actually asked for.
+      try {
+        await reconcileSprintSchedule(sprintId, reconcileTrigger, { actorId: String(userId) })
+      } catch (error) {
+        console.error('[standup] reconcile after sprint update failed:', error)
+      }
     }
 
     // Log activity: sprint updated (non-blocking)
