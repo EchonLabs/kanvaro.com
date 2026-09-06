@@ -89,7 +89,7 @@ export function HolidaySetManager() {
       const response = await fetch('/api/organization/holiday-sets')
       if (!response.ok) throw new Error('Could not load holiday calendars')
       const data = await response.json()
-      const loaded: HolidaySetSummary[] = data.sets ?? data.data?.sets ?? []
+      const loaded: HolidaySetSummary[] = data.holidaySets ?? data.data?.holidaySets ?? []
       setSets(loaded)
       setSelectedId((current) => current ?? loaded[0]?.id ?? null)
     } catch {
