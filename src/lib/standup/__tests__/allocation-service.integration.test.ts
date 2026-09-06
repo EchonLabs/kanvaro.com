@@ -31,6 +31,7 @@ import {
   removeAllocation,
   updateAllocation
 } from '../allocation-service'
+import { setAttendance } from '../attendance-service'
 import { minutes } from '../minutes'
 import { ids, syncIndexes, useMongo } from './helpers/mongo'
 
@@ -523,6 +524,45 @@ describe('loadAllocationBoard', () => {
     // else must be identical, or the board is deriving something it should be
     // computing.
     expect(JSON.stringify(first)).toBe(JSON.stringify(second))
+  })
+
+  it('reflects a real attendance write, not just the default select value (CC-7)', async () => {
+    await setAttendance({
+      standupId,
+      memberId: String(member),
+      state: 'present',
+      expectedVersion: 3,
+      actor
+    })
+
+    const board = await loadAllocationBoard(standupId)
+
+    const boardMember = board.members.find((m) => m.memberId === String(member))
+    expect(boardMember?.attendance).toBe('present')
+  })
+
+  it('carries partialMinutes for a partial-day attendance state', async () => {
+    await setAttendance({
+      standupId,
+      memberId: String(member),
+      state: 'partial',
+      partialMinutes: minutes(240),
+      expectedVersion: 3,
+      actor
+    })
+
+    const board = await loadAllocationBoard(standupId)
+
+    const boardMember = board.members.find((m) => m.memberId === String(member))
+    expect(boardMember?.attendance).toBe('partial')
+    expect(boardMember?.partialMinutes).toBe(240)
+  })
+
+  it('leaves attendance undefined for a member nobody has set yet (CC-7’s real failure case)', async () => {
+    const board = await loadAllocationBoard(standupId)
+
+    const boardMember = board.members.find((m) => m.memberId === String(member))
+    expect(boardMember?.attendance).toBeUndefined()
   })
 })
 

@@ -501,6 +501,8 @@ function toRunScreenData(
       memberId: member.memberId,
       name: member.name ?? member.memberId,
       attendance: member.attendance,
+      partialMinutes:
+        member.partialMinutes === undefined ? undefined : minutes(member.partialMinutes),
       capacity: member.capacity,
       allocations: (member.allocations ?? []).map((row: any) => ({
         allocationId: String(row._id ?? row.allocationId),

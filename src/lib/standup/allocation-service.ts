@@ -33,7 +33,7 @@ import {
 } from './allocation'
 import { recordAudit, type AuditActor } from './audit'
 import { loadCapacityContext, type CapacityContext } from './capacity-context'
-import type { CapacityBreakdown } from './capacity'
+import type { AttendanceStatus, CapacityBreakdown } from './capacity'
 import {
   StandupError,
   immutableCompletedStandup,
@@ -391,6 +391,16 @@ export interface BoardMember {
   name: string
   capacity: CapacityBreakdown
   allocations: BoardAllocationRow[]
+  /**
+   * Undefined means nobody has recorded this member's attendance yet — CC-7's
+   * real failure case. Read from `context.standup.attendance`, the same rows
+   * `capacity-context.ts` already loads to compute each member's own
+   * breakdown; this was never projected onto the board response, so CC-7
+   * could never observe a write that had already succeeded.
+   */
+  attendance?: AttendanceStatus
+  /** Required when `attendance` is `'partial'` (RUN-6). */
+  partialMinutes?: Minutes
 }
 
 export interface AllocationBoard {
@@ -459,8 +469,22 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
     allocations.filter((row) => !row.detachedReason).map((row) => String(row.task))
   )
 
+  // CC-7 needs this on the board, not only inside `computeFor`'s own
+  // internal (unexported) map — `capacity-context.ts` builds an identical
+  // lookup for its own use but never returns it, so this is a second, small
+  // read of the same already-in-memory `context.standup.attendance` rows,
+  // not a second query.
+  const attendanceByMember = new Map<string, { state: AttendanceStatus; partialMinutes?: number }>()
+  for (const entry of context.standup.attendance ?? []) {
+    attendanceByMember.set(String(entry.user), {
+      state: entry.state,
+      partialMinutes: entry.partialMinutes
+    })
+  }
+
   const members: BoardMember[] = context.memberIds.map((memberId) => {
     const rows = byMember.get(memberId) ?? []
+    const recorded = attendanceByMember.get(memberId)
     return {
       memberId,
       name: nameById.get(memberId) ?? memberId,
@@ -471,7 +495,11 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
           (row) => minutes(row.plannedMinutes)
         )
       }),
-      allocations: rows.map((row) => toBoardRow(row, taskById.get(String(row.task))))
+      allocations: rows.map((row) => toBoardRow(row, taskById.get(String(row.task)))),
+      ...(recorded ? { attendance: recorded.state } : {}),
+      ...(recorded?.partialMinutes === undefined
+        ? {}
+        : { partialMinutes: minutes(recorded.partialMinutes) })
     }
   })
 
