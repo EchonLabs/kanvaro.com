@@ -1,3 +1,12 @@
+## [1.42.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.0...v1.42.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* Kanban board dropdown alphabetically ([6532def](https://github.com/EchonLabs/kanvaro.com/commit/6532def4c3dd39495567c7ea4a874346ff7d2a21))
+* sort dropdowns alphabetically ([9cc1ebe](https://github.com/EchonLabs/kanvaro.com/commit/9cc1ebe967e75779e7a6b37c37bfdd3befdfa82d))
+* update kanban board dropdown ([e75bef1](https://github.com/EchonLabs/kanvaro.com/commit/e75bef12d7ca07c3cc874afde4cf1d9e7ff8f7a2))
+
 # [1.42.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.7...v1.42.0) (2026-08-07)
 
 
