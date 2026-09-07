@@ -453,17 +453,17 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
-    if (!query) return projects
-    return projects.filter((project) => project.name.toLowerCase().includes(query))
+    if (!query) return projects.slice().sort((a, b) => a.name.localeCompare(b.name))
+    return projects.filter((project) => project.name.toLowerCase().includes(query)).sort((a, b) => a.name.localeCompare(b.name))
   }, [projects, projectFilterQuery])
 
   const filteredAssignedToOptions = useMemo(() => {
     const query = assignedToFilterQuery.trim().toLowerCase()
-    if (!query) return users
+    if (!query) return users.slice().sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
     return users.filter((user) =>
       `${user.firstName} ${user.lastName}`.toLowerCase().includes(query) ||
       user.email.toLowerCase().includes(query)
-    )
+    ).sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
   }, [users, assignedToFilterQuery])
 
   const filteredAssignedByOptions = useMemo(() => {
@@ -475,14 +475,14 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       if (!userRole || !ROLE_PERMISSIONS[userRole]) return false
       const rolePermissions = ROLE_PERMISSIONS[userRole] || []
       return rolePermissions.includes(Permission.TIME_TRACKING_APPROVE)
-    })
+    }).sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
 
     // Then apply search filter
     if (!query) return usersWithApprovePermission
     return usersWithApprovePermission.filter((user) =>
       `${user.firstName} ${user.lastName}`.toLowerCase().includes(query) ||
       user.email.toLowerCase().includes(query)
-    )
+    ).sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
   }, [users, assignedByFilterQuery])
 
   const filteredTaskOptions = useMemo(() => {
@@ -493,6 +493,8 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       // Add the selected task to options if it's missing (e.g. not in current search results)
       options.push(selectedTaskDetails)
     }
+
+    options.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
     // Apply smart truncation with capital letter detection
     return options.map(task => {

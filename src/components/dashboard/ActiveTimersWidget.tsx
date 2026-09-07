@@ -321,13 +321,13 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
       member.lastName.toLowerCase().includes(searchLower) ||
       member.email.toLowerCase().includes(searchLower)
     )
-  })
+  }).sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
 
   const filteredProjects = projects.filter(project => {
     if (!projectSearch) return true
     const searchLower = projectSearch.toLowerCase()
     return project.name.toLowerCase().includes(searchLower)
-  })
+  }).sort((a, b) => a.name.localeCompare(b.name))
 
   const filteredTimers = timers.filter(timer => !timer.isPaused)
 

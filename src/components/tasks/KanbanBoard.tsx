@@ -153,8 +153,8 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
 
   const filteredProjects = useMemo(() => {
     const query = projectSearchQuery.trim().toLowerCase()
-    if (!query) return projects
-    return projects.filter((project) => project.name.toLowerCase().includes(query))
+    const result = projects.filter((project) => project.name.toLowerCase().includes(query))
+    return result.sort((a, b) => a.name.localeCompare(b.name))
   }, [projects, projectSearchQuery])
 
   const fetchProject = useCallback(async () => {

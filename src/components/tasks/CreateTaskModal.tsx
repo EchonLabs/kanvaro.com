@@ -709,7 +709,7 @@ export default function CreateTaskModal({
                           className="mb-2"
                         />
                         <div className="max-h-56 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                          {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).map((p) => (
+                          {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).sort((a, b) => a.name.localeCompare(b.name)).map((p) => (
                             <SelectItem key={p._id} value={p._id}>
                               <span className="truncate block">{p.name}</span>
                             </SelectItem>
