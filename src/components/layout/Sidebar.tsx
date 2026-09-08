@@ -321,6 +321,13 @@ const navigationItems = [
         icon: BookOpen,
         path: '/docs/public'
         // No permission required for public docs
+      },
+      {
+        id: 'document-templates',
+        label: 'Document Templates',
+        icon: FileText,
+        path: '/docs/templates',
+        permission: Permission.DOCUMENTATION_VIEW
       }
     ]
   },
