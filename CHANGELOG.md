@@ -1,3 +1,13 @@
+## [1.42.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.1...v1.42.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* correct timer time-logging status response ([f2d1ea9](https://github.com/EchonLabs/kanvaro.com/commit/f2d1ea91ab57bdf52b1cf5fcfcca498b88449b58))
+* document preview, requires the mammoth npm package ([887dfcd](https://github.com/EchonLabs/kanvaro.com/commit/887dfcdfb939d588c3537994b96e31afa6722587))
+* sync package lockfile ([dcc4bb2](https://github.com/EchonLabs/kanvaro.com/commit/dcc4bb29566408393d34ec5cb63b2f24b616f59b))
+* update document templates route path ([888afd3](https://github.com/EchonLabs/kanvaro.com/commit/888afd38bf7c70c80f7de7dbdc5f57edd5b49868))
+
 ## [1.42.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.0...v1.42.1) (2026-09-07)
 
 
