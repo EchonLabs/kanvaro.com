@@ -89,12 +89,29 @@ export default function StandupSummaryPage({
 }: {
   params: { id: string; sprintId: string; standupId: string }
 }) {
-  const { standupId } = params
+  const { id: projectId, sprintId, standupId } = params
 
   const [summary, setSummary] = useState<SummaryPayload | null>(null)
   const [notAvailable, setNotAvailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copyNotice, setCopyNotice] = useState<string | null>(null)
+
+  // Without this, "summary" is dropped by the auto-generator (it follows the
+  // standup id), leaving this screen breadcrumb-identical to the run screen
+  // it summarizes — no way to tell, from the trail alone, which one you're
+  // on. The "Stand-up" crumb links back to the run screen itself. Passed as
+  // a prop, not via `useBreadcrumb()` — see the run screen page for why that
+  // hook silently no-ops when called from a page component.
+  const breadcrumbItems = [
+    { label: 'Projects', href: '/projects' },
+    { label: 'View Project', href: `/projects/${projectId}` },
+    { label: 'View Sprint', href: `/sprints/${sprintId}` },
+    {
+      label: 'Stand-up',
+      href: `/projects/${projectId}/sprints/${sprintId}/standups/${standupId}`
+    },
+    { label: 'Summary' }
+  ]
 
   useEffect(() => {
     let cancelled = false
@@ -142,7 +159,7 @@ export default function StandupSummaryPage({
   }
 
   return (
-    <MainLayout>
+    <MainLayout breadcrumbItems={breadcrumbItems}>
       <style>{`
         @media print {
           .standup-summary-no-print {
@@ -150,7 +167,7 @@ export default function StandupSummaryPage({
           }
         }
       `}</style>
-      <div className="mx-auto w-full max-w-4xl space-y-5 p-4 md:p-6">
+      <div className="space-y-5 p-4 md:p-6">
         <div className="standup-summary-no-print flex items-center justify-between">
           <h1 className="text-lg font-semibold">{s.title()}</h1>
           {summary && (

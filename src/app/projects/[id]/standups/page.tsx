@@ -10,10 +10,11 @@
  * that notice stays silent by design, because "is the calendar complete?" has
  * no answer without saying complete through when.
  */
-import { useCallback, useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, CalendarClock, CheckCircle2, Zap } from 'lucide-react'
 
 import { MainLayout } from '@/components/layout/MainLayout'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DegradationBanner } from '@/components/standup/DegradationBanner'
 import { StandupSchedule } from '@/components/standup/StandupSchedule'
 import type { Degradation } from '@/lib/standup/degradation'
@@ -23,6 +24,35 @@ import { standupStrings } from '@/lib/standup/strings'
 interface SprintOption {
   id: string
   name: string
+}
+
+/** Shape mirrors `DayRow` (StandupSchedule.tsx) so the loading state reads
+ * as "the same list, not yet here" rather than a generic spinner. */
+function DayRowSkeleton() {
+  return (
+    <div className="flex items-start gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card px-4 py-3">
+      <div className="mt-0.5 h-4 w-4 shrink-0 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="h-4 w-40 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
+        <div className="h-3 w-24 rounded bg-[var(--apple-tertiary-fill)] animate-pulse" />
+      </div>
+    </div>
+  )
+}
+
+interface ScheduleStats {
+  completed: number
+  missed: number
+  remaining: number
+  total: number
+}
+
+function summarize(schedule: SprintSchedule | null): ScheduleStats {
+  const days = schedule?.days ?? []
+  const completed = days.filter((day) => day.status === 'Completed').length
+  const missed = days.filter((day) => day.status === 'Missed').length
+  const remaining = days.length - completed - missed
+  return { completed, missed, remaining, total: days.length }
 }
 
 export default function ProjectStandupSchedulePage({
@@ -38,6 +68,18 @@ export default function ProjectStandupSchedulePage({
   const [degradations, setDegradations] = useState<Degradation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // The path-based auto-generator drops any segment right after an ID
+  // ("standups" here) on the assumption the page sets its own breadcrumb —
+  // this is that page doing so, via the `breadcrumbItems` prop rather than
+  // `useBreadcrumb()`: that hook's provider lives *inside* `MainLayout`, and
+  // this component sits above `MainLayout` in the tree, so a page-level
+  // `useBreadcrumb()` call can never reach it and silently no-ops.
+  const breadcrumbItems = [
+    { label: 'Projects', href: '/projects' },
+    { label: 'View Project', href: `/projects/${projectId}` },
+    { label: 'Stand-up schedule' }
+  ]
 
   useEffect(() => {
     let cancelled = false
@@ -101,52 +143,115 @@ export default function ProjectStandupSchedulePage({
     loadSchedule()
   }, [loadSchedule])
 
+  const stats = useMemo(() => summarize(schedule), [schedule])
+
   return (
-    <MainLayout>
-      <div className="mx-auto w-full max-w-4xl space-y-5 p-4 md:p-6">
+    <MainLayout breadcrumbItems={breadcrumbItems}>
+      <div className="space-y-6 p-4 md:p-6">
         {/* §3 rule 1: the banner is the first thing on every stand-up screen. */}
         <DegradationBanner degradations={degradations} />
 
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {standupStrings.schedule.title()}
-            </h1>
-            {schedule ? (
-              <p className="text-sm text-[var(--apple-secondary-label)]">
-                {schedule.sprintName} · {schedule.dateRange.from} to {schedule.dateRange.to} ·{' '}
-                {schedule.timezone}
+        {/* ── Page Header ─────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Zap className="h-8 w-8 flex-shrink-0 text-[var(--apple-system-blue)]" strokeWidth={1.5} />
+            <div>
+              <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
+                {standupStrings.schedule.title()}
+              </h1>
+              <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+                {schedule
+                  ? `${schedule.sprintName} · ${schedule.dateRange.from} to ${schedule.dateRange.to} · ${schedule.timezone}`
+                  : 'See what is scheduled, running, or already done for this sprint'}
               </p>
-            ) : null}
+            </div>
           </div>
 
           {sprints.length > 1 ? (
-            <select
-              aria-label="Sprint"
-              value={sprintId ?? ''}
-              onChange={(event) => setSprintId(event.target.value)}
-              className="apple-transition rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-3 py-2 text-sm"
-            >
-              {sprints.map((sprint) => (
-                <option key={sprint.id} value={sprint.id}>
-                  {sprint.name}
-                </option>
-              ))}
-            </select>
+            <Select value={sprintId ?? ''} onValueChange={(value) => setSprintId(value)}>
+              <SelectTrigger
+                aria-label="Sprint"
+                className="w-44 text-[13px] rounded-[var(--apple-radius-md)] border-[var(--apple-separator)]"
+              >
+                <SelectValue placeholder="Choose sprint" />
+              </SelectTrigger>
+              <SelectContent>
+                {sprints.map((sprint) => (
+                  <SelectItem key={sprint.id} value={sprint.id}>
+                    {sprint.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : null}
         </div>
 
+        {/* ── Stats Bar ───────────────────────────────────────────────── */}
+        {schedule && stats.total > 0 ? (
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              {
+                label: 'Completed',
+                value: stats.completed,
+                icon: CheckCircle2,
+                color: 'text-[var(--apple-system-green)]',
+                bg: 'bg-emerald-50 dark:bg-emerald-950/30'
+              },
+              {
+                label: 'Missed',
+                value: stats.missed,
+                icon: AlertTriangle,
+                color: 'text-[var(--apple-system-red)]',
+                bg: 'bg-red-50 dark:bg-red-950/30'
+              },
+              {
+                label: 'Remaining',
+                value: stats.remaining,
+                icon: CalendarClock,
+                color: 'text-[var(--apple-system-blue)]',
+                bg: 'bg-blue-50 dark:bg-blue-950/30'
+              }
+            ].map((stat) => {
+              const Icon = stat.icon
+              return (
+                <div
+                  key={stat.label}
+                  className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none p-4"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full ${stat.bg}`}>
+                      <Icon className={`h-4 w-4 ${stat.color}`} strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <div className="font-apple-mono text-[20px] font-semibold leading-none text-[var(--apple-label)] tabular-nums">
+                        {stat.value}
+                      </div>
+                      <div className="apple-section-label mt-1 text-[var(--apple-tertiary-label)]">
+                        {stat.label}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
+
         {loading ? (
-          <div className="flex items-center gap-2 text-sm text-[var(--apple-secondary-label)]">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {standupStrings.schedule.loading()}
+          <div className="flex flex-col gap-2" aria-label={standupStrings.schedule.loading()}>
+            <DayRowSkeleton />
+            <DayRowSkeleton />
+            <DayRowSkeleton />
           </div>
         ) : error ? (
-          <p className="text-sm text-[var(--apple-system-red)]">{error}</p>
+          <div className="flex items-center gap-2.5 rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-red)]/30 bg-[var(--apple-system-red)]/[0.06] px-4 py-3">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--apple-system-red)]" />
+            <p className="text-sm text-[var(--apple-system-red)]">{error}</p>
+          </div>
         ) : schedule ? (
           <StandupSchedule schedule={schedule} />
         ) : (
-          <p className="text-sm text-[var(--apple-secondary-label)]">
+          <p className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card px-4 py-6 text-sm text-[var(--apple-secondary-label)]">
             {standupStrings.schedule.empty()}
           </p>
         )}

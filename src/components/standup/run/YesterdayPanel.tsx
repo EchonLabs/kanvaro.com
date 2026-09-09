@@ -39,7 +39,12 @@ export interface YesterdayPanelApi {
 }
 
 export interface YesterdayPanelProps {
-  data: { buckets: BucketedRows[]; previousStandupId?: string; previousStandupDate?: string }
+  data: {
+    buckets: BucketedRows[]
+    addedAfterCompletion: YesterdayRow[]
+    previousStandupId?: string
+    previousStandupDate?: string
+  }
   api: YesterdayPanelApi
   /** The project's workflow, for RUN-10's status control. */
   statusOptions?: string[]
@@ -352,6 +357,46 @@ export function YesterdayPanel({
             </div>
           )
         })}
+
+      {/* I1 — not one of RUN-9's four buckets: the PM was not in the room
+          when these were added, so they are called out separately rather
+          than blending into whichever bucket their task status lands in.
+          Renders only when non-empty (unlike the four buckets above, this
+          is not an "always all four" section). */}
+      {hasYesterday && data.addedAfterCompletion.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h4 className="text-sm font-medium">
+            {standupStrings.yesterday.bucketCount({
+              label: standupStrings.yesterday.addedAfterCompletion(),
+              count: data.addedAfterCompletion.length
+            })}
+          </h4>
+          <ul className="flex flex-col gap-2">
+            {data.addedAfterCompletion.map((row) => (
+              <li
+                key={row.allocationId ?? `${row.memberId}:${row.taskId}`}
+                data-testid={`yesterday-added-row-${row.taskKey ?? row.taskId}`}
+                className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2 text-sm"
+              >
+                <span className="font-medium">{row.taskKey ?? row.taskId}</span>
+                <span className="text-muted-foreground">{row.title}</span>
+                <span aria-label={row.memberName} className="text-xs text-muted-foreground">
+                  {initialsOf(row.memberName)}
+                </span>
+                <span data-testid="added-current-status" className="text-xs text-muted-foreground">
+                  {standupStrings.yesterday.currentStatus()} {row.currentStatus}
+                </span>
+                <span data-testid="planned">
+                  {formatMinutesAsHours(row.plannedMinutes, { locale })}
+                </span>
+                <span data-testid="logged">
+                  {formatMinutesAsHours(row.loggedMinutes, { locale })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }

@@ -18,7 +18,7 @@ import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { useNotify } from '@/lib/notify'
 import { useAuthContext } from '@/contexts/AuthContext'
-import { isLiveSprint, type SprintState } from '@/lib/standup/sprint-states'
+import { hasStandups, isLiveSprint, type SprintState } from '@/lib/standup/sprint-states'
 import {
   ArrowLeft,
   Calendar,
@@ -253,6 +253,12 @@ export default function SprintDetailPage() {
   const canDeleteSprint = hasPermission(Permission.SPRINT_DELETE)
   const canStartSprint = hasPermission(Permission.SPRINT_START)
   const canCompleteSprint = hasPermission(Permission.SPRINT_COMPLETE)
+  // Project-scoped: STANDUP_VIEW is never granted org-wide (see
+  // Role.TEAM_MEMBER in permission-definitions.ts), only per-project via
+  // PROJECT_MEMBER — checking it without a projectId always resolves false
+  // for a plain team member, hiding the button from exactly the sprints they
+  // are on.
+  const canViewStandups = hasPermission(Permission.STANDUP_VIEW, sprint?.project?._id)
 
   const totalTasks = sprint?.progress?.totalTasks ?? sprintTasks.length
   const hasTasks = (totalTasks ?? 0) > 0
@@ -969,6 +975,20 @@ export default function SprintDetailPage() {
                   >
                     <ClipboardCheck className="h-3.5 w-3.5" />
                     {sprint.status === 'planned' ? 'Planning' : 'Plan Sprint'}
+                  </button>
+                )}
+                {/* Once planning has generated a schedule, this is the only
+                    route from the sprint page to it — otherwise the schedule
+                    hub is reachable only through the project's "Stand-ups"
+                    tab, several clicks away from where a PM is already
+                    looking at this sprint. */}
+                {canViewStandups && hasStandups(sprint.status) && (
+                  <button
+                    onClick={() => router.push(`/projects/${sprint.project._id}/standups`)}
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold px-4 h-9 border border-[var(--apple-separator)] text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition"
+                  >
+                    <Calendar className="h-3.5 w-3.5" />
+                    Stand-ups
                   </button>
                 )}
                 {canEditSprint && (

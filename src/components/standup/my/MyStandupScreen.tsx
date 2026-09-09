@@ -5,7 +5,7 @@ import { useCallback, useState } from 'react'
 import { standupStrings } from '@/lib/standup/strings'
 import { formatDualTimezone } from '@/lib/standup/timezone'
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
-import { isOwnRowReadOnly } from '@/lib/standup/own-row'
+import { isOwnRowReadOnly, isSelfSelectDisabled } from '@/lib/standup/own-row'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
 import type { BoardAllocationView } from '@/components/standup/run/CapacityBoard'
 
@@ -93,6 +93,16 @@ export function MyStandupScreen({
   // RUN-26, shared with the run screen rather than restated. A member screen
   // never has PM-level access, so `canAllocateOthers` is always false here.
   const readOnly = isOwnRowReadOnly({ status, canAllocateOthers: false })
+  // E31: the "add a task" self-select control is governed separately from
+  // `readOnly` — it stays enabled on `Completed`, provided the project still
+  // allows self-select, so a member can flag extra work they did after the
+  // stand-up wrapped. Existing rows' hours stay locked under `readOnly`
+  // exactly as before; this only widens the one control meant to widen.
+  const selfSelectDisabled = isSelfSelectDisabled({
+    status,
+    canAllocateOthers: false,
+    allowSelfSelect
+  })
 
   /**
    * Every refusal this screen can meet is a server decision it cannot predict:
@@ -214,7 +224,7 @@ export function MyStandupScreen({
             <button
               key={task.taskId}
               type="button"
-              disabled={readOnly}
+              disabled={selfSelectDisabled}
               onClick={() => void onAdd(task.taskId)}
               className="rounded-md border border-border px-2 py-1 text-left text-sm disabled:opacity-40"
             >

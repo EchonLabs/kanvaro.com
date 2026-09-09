@@ -48,10 +48,11 @@ const row = (overrides: Partial<YesterdayRow> = {}): YesterdayRow => ({
   ...overrides
 })
 
-const panelData = (rows: YesterdayRow[]) => ({
+const panelData = (rows: YesterdayRow[], addedAfterCompletion: YesterdayRow[] = []) => ({
   previousStandupId: 'day-3',
   previousStandupDate: '2026-08-19',
-  buckets: partitionYesterday({ rows, statusSets })
+  buckets: partitionYesterday({ rows, statusSets }),
+  addedAfterCompletion
 })
 
 const makeApi = () => ({
@@ -235,7 +236,7 @@ describe('YesterdayPanel', () => {
   it('renders the empty state for a day-one stand-up, which has no yesterday', () => {
     render(
       <YesterdayPanel
-        data={{ buckets: partitionYesterday({ rows: [], statusSets }) }}
+        data={{ buckets: partitionYesterday({ rows: [], statusSets }), addedAfterCompletion: [] }}
         api={makeApi()}
       />
     )
@@ -252,6 +253,32 @@ describe('YesterdayPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /open KAN-214/i }))
     expect(api.openTask).toHaveBeenCalledWith('task-214')
+  })
+
+  it('renders an "added after completion" section, separate from the four buckets (I1)', () => {
+    const added = row({ taskKey: 'KAN-300', taskId: 'task-300', memberName: 'Nadia Silva' })
+    const data = panelData([row()], [added])
+    render(<YesterdayPanel data={data} api={makeApi()} />)
+
+    expect(
+      screen.getByText(
+        standupStrings.yesterday.bucketCount({
+          label: standupStrings.yesterday.addedAfterCompletion(),
+          count: 1
+        })
+      )
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('yesterday-added-row-KAN-300')).toBeInTheDocument()
+    // Not one of the four buckets — the KAN-214 row from the ordinary
+    // buckets stays separate from the KAN-300 added-after row.
+    expect(screen.getByTestId('yesterday-row-KAN-214')).toBeInTheDocument()
+  })
+
+  it('omits the "added after completion" section entirely when empty', () => {
+    render(<YesterdayPanel data={panelData([row()])} api={makeApi()} />)
+    expect(
+      screen.queryByText(standupStrings.yesterday.addedAfterCompletion())
+    ).not.toBeInTheDocument()
   })
 
   it('disables every control while the stand-up is locked', () => {

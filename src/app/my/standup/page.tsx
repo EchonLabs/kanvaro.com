@@ -1,5 +1,7 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+import { MainLayout } from '@/components/layout/MainLayout'
 import connectDB from '@/lib/db-config'
 import { authenticateUser } from '@/lib/auth-utils'
 import { standupStrings } from '@/lib/standup/strings'
@@ -36,7 +38,23 @@ export default async function MyStandupPage() {
 
   if (!match) {
     return (
-      <div className="p-6 text-sm text-muted-foreground">{standupStrings.my.noStandup()}</div>
+      <MainLayout breadcrumbItems={[{ label: 'My Stand-up' }]}>
+        <div className="flex flex-col items-start gap-3 p-6">
+          <h1 className="text-lg font-semibold text-[var(--apple-label)]">
+            {standupStrings.my.title()}
+          </h1>
+          <p className="text-sm text-[var(--apple-label)]">{standupStrings.my.noStandup()}</p>
+          <p className="text-sm text-[var(--apple-secondary-label)]">
+            {standupStrings.my.noStandupHint()}
+          </p>
+          <Link
+            href="/projects"
+            className="text-sm font-medium text-[var(--apple-system-blue)] hover:underline"
+          >
+            {standupStrings.my.noStandupProjectsLink()}
+          </Link>
+        </div>
+      </MainLayout>
     )
   }
 

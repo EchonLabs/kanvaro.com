@@ -174,6 +174,224 @@ describe('the header (§15.8.2)', () => {
   })
 })
 
+describe('Start stand-up (RUN-2/3, AC-5, Task 1)', () => {
+  it('renders when Ready and api.start is provided', () => {
+    const api = { ...okApi(), start: jest.fn().mockResolvedValue(undefined) }
+    renderScreen({ status: 'Ready' }, api)
+
+    expect(
+      screen.getByRole('button', { name: standupStrings.run.start() })
+    ).toBeInTheDocument()
+  })
+
+  it('does not render once the stand-up has started', () => {
+    const api = { ...okApi(), start: jest.fn().mockResolvedValue(undefined) }
+    renderScreen({ status: 'In_Progress' }, api)
+
+    expect(
+      screen.queryByRole('button', { name: standupStrings.run.start() })
+    ).not.toBeInTheDocument()
+  })
+
+  it('does not render once the stand-up is completed', () => {
+    const api = { ...okApi(), start: jest.fn().mockResolvedValue(undefined) }
+    renderScreen({ status: 'Completed' }, api)
+
+    expect(
+      screen.queryByRole('button', { name: standupStrings.run.start() })
+    ).not.toBeInTheDocument()
+  })
+
+  it('does not render when the api has not wired a start method', () => {
+    renderScreen({ status: 'Ready' })
+
+    expect(
+      screen.queryByRole('button', { name: standupStrings.run.start() })
+    ).not.toBeInTheDocument()
+  })
+
+  // I2: a Scheduled stand-up whose lead boundary has passed is legitimately
+  // startable (promote-to-ready.ts may simply not have ticked yet). The
+  // server (assertStartable) remains the real authority and correctly
+  // refuses a genuinely-too-early attempt; the button must not hide the
+  // option client-side while the background job is stale.
+  it('renders when Scheduled and api.start is provided (I2)', () => {
+    const api = { ...okApi(), start: jest.fn().mockResolvedValue(undefined) }
+    renderScreen({ status: 'Scheduled' }, api)
+
+    expect(
+      screen.getByRole('button', { name: standupStrings.run.start() })
+    ).toBeInTheDocument()
+  })
+
+  it('calls api.start and shows the success notice, then reloads', async () => {
+    const api = { ...okApi(), start: jest.fn().mockResolvedValue(undefined) }
+    renderScreen({ status: 'Ready' }, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      standupStrings.run.startSuccess()
+    )
+    await waitFor(() => expect(api.start).toHaveBeenCalled())
+    await waitFor(() => expect(api.refresh).toHaveBeenCalled())
+  })
+
+  it('names the planning gate when the sprint never completed planning', async () => {
+    const api = {
+      ...okApi(),
+      start: jest.fn().mockRejectedValue({ code: 'PLANNING_GATE_NOT_PASSED' })
+    }
+    renderScreen({ status: 'Ready' }, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      standupStrings.run.startPlanningGateFailed()
+    )
+  })
+
+  it('reloads rather than guessing when the version was stale', async () => {
+    const api = { ...okApi(), start: jest.fn().mockRejectedValue({ code: 'STALE_STANDUP' }) }
+    renderScreen({ status: 'Ready' }, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      standupStrings.run.staleReload()
+    )
+    await waitFor(() => expect(api.refresh).toHaveBeenCalled())
+  })
+
+  it('shows the generic failure notice for anything else', async () => {
+    const api = { ...okApi(), start: jest.fn().mockRejectedValue(new Error('nope')) }
+    renderScreen({ status: 'Ready' }, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      standupStrings.run.startFailed()
+    )
+  })
+})
+
+describe('the elapsed-time timer (E57, §15.8.2)', () => {
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('renders when In_Progress with a startedAt', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-17T10:05:00.000Z'))
+
+    renderScreen({
+      status: 'In_Progress',
+      startedAt: '2026-08-17T10:00:00.000Z',
+      durationMinutes: 15
+    })
+
+    expect(screen.getByTestId('standup-timer')).toBeInTheDocument()
+  })
+
+  it('does not render when Scheduled, even with a startedAt somehow present', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-17T10:05:00.000Z'))
+
+    renderScreen({
+      status: 'Scheduled',
+      startedAt: '2026-08-17T10:00:00.000Z',
+      durationMinutes: 15
+    })
+
+    expect(screen.queryByTestId('standup-timer')).not.toBeInTheDocument()
+  })
+
+  it('does not render when Completed', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-17T10:05:00.000Z'))
+
+    renderScreen({
+      status: 'Completed',
+      startedAt: '2026-08-17T10:00:00.000Z',
+      durationMinutes: 15
+    })
+
+    expect(screen.queryByTestId('standup-timer')).not.toBeInTheDocument()
+  })
+
+  it('does not render when In_Progress but never started', () => {
+    renderScreen({ status: 'In_Progress', durationMinutes: 15 })
+
+    expect(screen.queryByTestId('standup-timer')).not.toBeInTheDocument()
+  })
+
+  it('is neutral before the configured duration elapses', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-17T10:05:00.000Z'))
+
+    renderScreen({
+      status: 'In_Progress',
+      startedAt: '2026-08-17T10:00:00.000Z',
+      durationMinutes: 15
+    })
+
+    // 5 of 15 minutes elapsed.
+    expect(screen.getByTestId('standup-timer')).toHaveAttribute('data-tone', 'timer-neutral')
+  })
+
+  it('turns amber at 100% of the configured duration', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-17T10:05:00.000Z'))
+
+    renderScreen({
+      status: 'In_Progress',
+      startedAt: '2026-08-17T10:00:00.000Z',
+      durationMinutes: 15
+    })
+
+    act(() => {
+      jest.setSystemTime(new Date('2026-08-17T10:16:00.000Z'))
+      jest.advanceTimersByTime(1000)
+    })
+
+    // 16 of 15 minutes elapsed — past 100%, short of 130%.
+    expect(screen.getByTestId('standup-timer')).toHaveAttribute('data-tone', 'timer-amber')
+  })
+
+  it('turns red at 130% of the configured duration', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-17T10:05:00.000Z'))
+
+    renderScreen({
+      status: 'In_Progress',
+      startedAt: '2026-08-17T10:00:00.000Z',
+      durationMinutes: 15
+    })
+
+    act(() => {
+      jest.setSystemTime(new Date('2026-08-17T10:20:00.000Z'))
+      jest.advanceTimersByTime(1000)
+    })
+
+    // 20 of 15 minutes elapsed — 133%, past the 130% threshold.
+    expect(screen.getByTestId('standup-timer')).toHaveAttribute('data-tone', 'timer-red')
+  })
+
+  it('never disables Complete no matter how red the timer runs (advisory-only, D-6)', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-17T10:05:00.000Z'))
+
+    renderScreen({
+      status: 'In_Progress',
+      startedAt: '2026-08-17T10:00:00.000Z',
+      durationMinutes: 15
+    })
+
+    act(() => {
+      jest.setSystemTime(new Date('2026-08-17T10:25:00.000Z'))
+      jest.advanceTimersByTime(1000)
+    })
+
+    expect(screen.getByTestId('standup-timer')).toHaveAttribute('data-tone', 'timer-red')
+    expect(
+      screen.getByRole('button', { name: standupStrings.run.complete() })
+    ).not.toBeDisabled()
+  })
+})
+
 describe('the jump bar and the shapes (§15.8.10)', () => {
   it('lists all seven panels mid-sprint', () => {
     renderScreen()

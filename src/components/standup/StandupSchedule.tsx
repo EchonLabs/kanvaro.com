@@ -75,11 +75,15 @@ function shapeLabel(day: ScheduleDay): string | null {
 function DayRow({
   day,
   timezone,
-  isToday
+  isToday,
+  projectId,
+  sprintId
 }: {
   day: ScheduleDay
   timezone: string
   isToday: boolean
+  projectId: string
+  sprintId: string
 }) {
   const shape = shapeLabel(day)
   const openable = !UNOPENABLE.includes(day.status)
@@ -174,7 +178,7 @@ function DayRow({
   if (!openable) return body
 
   return (
-    <Link href={`/standups/${day.standupId}`} className="block">
+    <Link href={`/projects/${projectId}/sprints/${sprintId}/standups/${day.standupId}`} className="block">
       {body}
     </Link>
   )
@@ -194,16 +198,43 @@ export function StandupSchedule({ schedule }: { schedule: SprintSchedule }) {
   const rest = schedule.days.filter((_, index) => index !== todayIndex)
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-4">
       {/* UI-8: lifted out of the list rather than merely highlighted in place,
           so it is the first thing on screen however long the sprint is. */}
       {today ? (
-        <DayRow day={today} timezone={schedule.timezone} isToday />
+        <div className="flex flex-col gap-2">
+          <span className="apple-section-label px-1 text-[var(--apple-tertiary-label)]">
+            {strings.today()}
+          </span>
+          <DayRow
+            day={today}
+            timezone={schedule.timezone}
+            isToday
+            projectId={schedule.projectId}
+            sprintId={schedule.sprintId}
+          />
+        </div>
       ) : null}
 
-      {rest.map((day) => (
-        <DayRow key={day.standupId} day={day} timezone={schedule.timezone} isToday={false} />
-      ))}
+      {rest.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {today ? (
+            <span className="apple-section-label px-1 text-[var(--apple-tertiary-label)]">
+              {strings.sprintDays()}
+            </span>
+          ) : null}
+          {rest.map((day) => (
+            <DayRow
+              key={day.standupId}
+              day={day}
+              timezone={schedule.timezone}
+              isToday={false}
+              projectId={schedule.projectId}
+              sprintId={schedule.sprintId}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }

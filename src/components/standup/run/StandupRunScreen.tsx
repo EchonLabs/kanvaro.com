@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, RefreshCw, Users, Video, Zap } from 'lucide-react'
 
 import type { QuickAddTask } from '@/components/standup/primitives/QuickAddCombobox'
 import { AttendancePanel, type ReassignPromptView } from './AttendancePanel'
@@ -20,7 +21,7 @@ import {
 } from '@/lib/standup/sprint-close'
 import { formatDualTimezone } from '@/lib/standup/timezone'
 import type { PoolTask } from '@/lib/standup/allocation'
-import type { BucketedRows } from '@/lib/standup/yesterday'
+import type { BucketedRows, YesterdayRow } from '@/lib/standup/yesterday'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
 import {
   blockingFailures,
@@ -220,7 +221,12 @@ export interface RunScreenData {
   pool: { unassigned: PoolTask[]; assignedNotPlanned: PoolTask[] }
   poolTotal: number
   /** Panel 2. Absent on a day-one stand-up, which has no yesterday. */
-  yesterday?: { buckets: BucketedRows[]; previousStandupId?: string; previousStandupDate?: string }
+  yesterday?: {
+    buckets: BucketedRows[]
+    addedAfterCompletion: YesterdayRow[]
+    previousStandupId?: string
+    previousStandupDate?: string
+  }
   /** Panel 3. Absent for the same reason. */
   variance?: { rows: VariancePanelRow[]; members: VariancePanelMember[] }
   /** Panel 4 (Phase 9). Absent for the same reason as Panels 2 and 3. */
@@ -259,6 +265,13 @@ export interface RunScreenData {
   scheduledStartAt?: string
   viewerTimeZone?: string
   projectTimeZone?: string
+  /**
+   * E57/§15.8.2. Both optional so a board payload that has not been wired
+   * to carry them yet still compiles — the elapsed-time indicator below
+   * only renders when both are present and the stand-up is `In_Progress`.
+   */
+  startedAt?: string
+  durationMinutes?: number
 }
 
 export interface RunScreenApi {
@@ -289,6 +302,13 @@ export interface RunScreenApi {
     expectedVersion: number
   }): Promise<{ standupVersion: number }>
   refresh(): Promise<RunScreenData>
+
+  /**
+   * RUN-2/3, AC-5 (Task 1). Transitions a `Ready` stand-up to `In_Progress`.
+   * Optional so a caller that has not wired it yet still compiles — the
+   * button below only renders when it is present.
+   */
+  start?(): Promise<void>
 
   /**
    * RUN-19..22 (Task 17). Resuming an interrupted completion is the same
@@ -358,6 +378,16 @@ export interface RunScreenApi {
   setTaskDisposition?(input: { taskId: string; type: string }): Promise<void>
 }
 
+/** Mirrors `StandupSchedule.tsx`'s `STATUS_TONE`/pill convention so a
+ * stand-up's status reads the same color on the schedule hub and here. */
+const STATUS_PILL: Record<string, string> = {
+  Scheduled: 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]',
+  Ready: 'bg-blue-50 dark:bg-blue-950/30 text-[var(--apple-system-blue)]',
+  In_Progress: 'bg-blue-50 dark:bg-blue-950/30 text-[var(--apple-system-blue)]',
+  Completed: 'bg-emerald-50 dark:bg-emerald-950/30 text-[var(--apple-system-green)]',
+  Reopened: 'bg-orange-50 dark:bg-orange-950/30 text-[var(--apple-system-orange)]'
+}
+
 export interface RunScreenViewer {
   userId: string
   /** True for a PM. False for a team member looking at their own row. */
@@ -369,9 +399,18 @@ export interface StandupRunScreenProps {
   api: RunScreenApi
   viewer?: RunScreenViewer
   locale?: string
+  /**
+   * §15.13's read-only summary lived behind no link anywhere in the app once
+   * a stand-up was `Completed` — this screen is the one place every route
+   * into a completed stand-up (the schedule hub, `/my/standup`, a direct
+   * link) already passes through, so it is also the one place a link out to
+   * the summary needs to exist. Optional so a caller that has not wired a
+   * route for it yet still compiles.
+   */
+  summaryHref?: string
 }
 
-export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreenProps) {
+export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: StandupRunScreenProps) {
   const [board, setBoard] = useState(data)
 
   /**
@@ -748,6 +787,74 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
     [api, overridingCheck, overrideContext, reload]
   )
 
+  const [starting, setStarting] = useState(false)
+
+  /**
+   * RUN-2/3, AC-5 (Task 1). Mirrors `onComplete`'s error handling below:
+   * a `PLANNING_GATE_NOT_PASSED` refusal gets its own named notice — a PM
+   * clicking Start on an unplanned sprint needs to know *why*, not just that
+   * it failed — everything else falls back to the generic failure notice.
+   */
+  const onStart = useCallback(async () => {
+    if (!api.start) return
+    setStarting(true)
+    setNotice(null)
+    try {
+      await api.start()
+      setNotice(standupStrings.run.startSuccess())
+      await reload()
+    } catch (error) {
+      const code = (error as { code?: string })?.code
+      if (code === 'PLANNING_GATE_NOT_PASSED') {
+        setNotice(standupStrings.run.startPlanningGateFailed())
+      } else if (code === 'STALE_STANDUP') {
+        setNotice(standupStrings.run.staleReload())
+        await reload()
+      } else {
+        setNotice(standupStrings.run.startFailed())
+      }
+    } finally {
+      setStarting(false)
+    }
+  }, [api, reload])
+
+  /**
+   * E57/§15.8.2. A live, client-side-only elapsed-time indicator — advisory
+   * only, per D-6, and it must never disable or gate the Complete button or
+   * any other action (see `completionPanelDisabled`/`completeDisabled`
+   * below, which never reference this). Ticks once a second only while the
+   * stand-up is actually `In_Progress` with a recorded `startedAt`; there is
+   * no point ticking a `Completed` or `Scheduled` stand-up.
+   */
+  const timerActive =
+    board.status === 'In_Progress' && Boolean(board.startedAt)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!timerActive) return
+    setNowMs(Date.now())
+    const interval = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(interval)
+  }, [timerActive, board.startedAt])
+
+  const elapsedSeconds = timerActive
+    ? Math.max(0, Math.floor((nowMs - new Date(board.startedAt as string).getTime()) / 1000))
+    : 0
+  const elapsedLabel = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:${String(
+    elapsedSeconds % 60
+  ).padStart(2, '0')}`
+  const durationMinutes = board.durationMinutes ?? 0
+  const elapsedRatio =
+    durationMinutes > 0 ? elapsedSeconds / 60 / durationMinutes : 0
+  const timerTone =
+    elapsedRatio >= 1.3 ? 'timer-red' : elapsedRatio >= 1 ? 'timer-amber' : 'timer-neutral'
+  const timerToneClass =
+    timerTone === 'timer-red'
+      ? 'border-red-500 text-red-600'
+      : timerTone === 'timer-amber'
+        ? 'border-amber-500 text-amber-600'
+        : 'border-border text-muted-foreground'
+
   const [completing, setCompleting] = useState(false)
 
   /**
@@ -829,49 +936,105 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border pb-3">
-        <h2 className="text-lg font-semibold">
-          {standupStrings.run.dayOf({
-            day: board.sprintDayNumber,
-            total: board.totalSprintDays
-          })}
-        </h2>
-        <span className="text-sm text-muted-foreground">
-          {board.scheduledStartAt && board.viewerTimeZone && board.projectTimeZone
-            ? formatDualTimezone({
-                instant: new Date(board.scheduledStartAt),
-                viewerTimeZone: board.viewerTimeZone,
-                projectTimeZone: board.projectTimeZone
-              })
-            : board.date}
-        </span>
-        <span className="rounded-full border border-border px-2 py-0.5 text-xs">
-          {board.status}
-        </span>
-        <span className="text-sm text-muted-foreground">
-          {standupStrings.run.facilitator({ name: board.facilitatorName })}
-        </span>
-        <span className="text-sm text-muted-foreground">
-          {standupStrings.run.presentOf({
-            present: presentCount,
-            total: board.members.length
-          })}
-        </span>
-        {board.meetingUrl && (
-          <a href={board.meetingUrl} className="text-sm underline">
-            {standupStrings.run.joinCall()}
-          </a>
-        )}
-        <button
-          type="button"
-          onClick={() => void reload()}
-          className="rounded-md border border-border px-2 py-1 text-xs"
-        >
-          {standupStrings.run.refresh()}
-        </button>
+      <header className="flex flex-col gap-3 border-b border-[var(--apple-separator)] pb-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Zap className="h-7 w-7 shrink-0 text-[var(--apple-system-blue)]" strokeWidth={1.5} />
+            <div>
+              <h2 className="text-[20px] sm:text-[22px] font-bold tracking-tight text-[var(--apple-label)]">
+                {standupStrings.run.dayOf({
+                  day: board.sprintDayNumber,
+                  total: board.totalSprintDays
+                })}
+              </h2>
+              <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
+                {board.scheduledStartAt && board.viewerTimeZone && board.projectTimeZone
+                  ? formatDualTimezone({
+                      instant: new Date(board.scheduledStartAt),
+                      viewerTimeZone: board.viewerTimeZone,
+                      projectTimeZone: board.projectTimeZone
+                    })
+                  : board.date}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {(board.status === 'Ready' || board.status === 'Scheduled') && api.start && (
+              <button
+                type="button"
+                onClick={() => void onStart()}
+                disabled={starting}
+                className="apple-transition rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] px-3.5 h-9 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40"
+              >
+                {standupStrings.run.start()}
+              </button>
+            )}
+            {board.status === 'Completed' && summaryHref && (
+              <a
+                href={summaryHref}
+                className="apple-transition inline-flex items-center rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] px-3.5 h-9 text-[13px] font-semibold text-white hover:opacity-90"
+              >
+                {standupStrings.run.viewSummary()}
+              </a>
+            )}
+            {board.meetingUrl && (
+              <a
+                href={board.meetingUrl}
+                className="apple-transition inline-flex items-center gap-1.5 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] px-3 h-9 text-[13px] font-medium text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]"
+              >
+                <Video className="h-3.5 w-3.5" strokeWidth={1.75} />
+                {standupStrings.run.joinCall()}
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => void reload()}
+              className="apple-transition inline-flex items-center gap-1.5 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] px-3 h-9 text-[13px] font-medium text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]"
+            >
+              <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
+              {standupStrings.run.refresh()}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-[13px] text-[var(--apple-secondary-label)]">
+          <span
+            className={`apple-section-label rounded-full px-2.5 py-1 ${STATUS_PILL[board.status] ?? 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]'}`}
+          >
+            {standupStrings.schedule.status[board.status] ?? board.status}
+          </span>
+
+          {timerActive && (
+            <span
+              data-testid="standup-timer"
+              data-tone={timerTone}
+              aria-label={standupStrings.run.elapsedTime({
+                elapsed: elapsedLabel,
+                duration: durationMinutes
+              })}
+              className={`font-apple-mono rounded-full border px-2.5 py-1 text-xs tabular-nums ${timerToneClass}`}
+            >
+              {standupStrings.run.elapsedTime({ elapsed: elapsedLabel, duration: durationMinutes })}
+            </span>
+          )}
+
+          <span>{standupStrings.run.facilitator({ name: board.facilitatorName })}</span>
+
+          <span className="inline-flex items-center gap-1">
+            <Users className="h-3.5 w-3.5" strokeWidth={1.75} />
+            {standupStrings.run.presentOf({
+              present: presentCount,
+              total: board.members.length
+            })}
+          </span>
+        </div>
       </header>
 
-      <nav aria-label="Stand-up panels" className="flex flex-wrap gap-2 text-xs">
+      <nav
+        aria-label="Stand-up panels"
+        className="flex flex-wrap gap-1.5 text-xs text-[var(--apple-secondary-label)]"
+      >
         <JumpLink id={1} label={standupStrings.run.panel1()} />
         {!isDayOne && (
           <>
@@ -888,13 +1051,16 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
       {/* RUN-25's rollback notice, and the RUN-23 reload. `status` rather than
           `alert`: it reports what already happened, it does not interrupt. */}
       {notice && (
-        <p role="status" className="rounded-md border border-border bg-muted p-2 text-sm">
+        <p
+          role="status"
+          className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] px-3 py-2 text-[13px] text-[var(--apple-label)]"
+        >
           {notice}
         </p>
       )}
 
       {readOnly && (
-        <p className="rounded-md border border-border bg-muted p-2 text-sm text-muted-foreground">
+        <p className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] px-3 py-2 text-[13px] text-[var(--apple-secondary-label)]">
           {standupStrings.run.lockedForMembers()}
         </p>
       )}
@@ -903,20 +1069,23 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
           Non-dismissible — resuming (a plain re-POST) is the only way past
           it, so there is nothing for a dismiss action to safely do. */}
       {board.completionState && (
-        <p
+        <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-sm"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-red)]/30 bg-[var(--apple-system-red)]/[0.06] px-3 py-2"
         >
-          <span>{standupStrings.run.completionInterruptedBanner()}</span>
+          <span className="flex items-center gap-2 text-[13px] text-[var(--apple-system-red)]">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            {standupStrings.run.completionInterruptedBanner()}
+          </span>
           <button
             type="button"
             onClick={() => void onComplete()}
             disabled={completing}
-            className="rounded-md border border-border bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40"
+            className="apple-transition rounded-[var(--apple-radius-md)] bg-[var(--apple-system-red)] px-3 h-8 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40"
           >
             {standupStrings.run.completionInterruptedResume()}
           </button>
-        </p>
+        </div>
       )}
 
       <AttendancePanel
@@ -973,12 +1142,12 @@ export function StandupRunScreen({ data, api, viewer, locale }: StandupRunScreen
       {/* §15.8.10: on day one the pool takes the primary position and the board
           is secondary but always visible. */}
       <section id="panel-5" aria-labelledby="panel-5-heading" className="flex flex-col gap-3">
-        <h3 id="panel-5-heading" className="text-sm font-semibold">
+        <h3 id="panel-5-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
           {standupStrings.run.panel5()}
         </h3>
 
         {isDayOne && board.dayOne && (
-          <div className="flex flex-col gap-1 rounded-md border border-border p-2 text-sm">
+          <div className="flex flex-col gap-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-3 text-[13px]">
             <p data-testid="day-one-progress">
               {standupStrings.run.dayOneProgress({
                 assigned: board.dayOne.assignedTasks,
@@ -1111,7 +1280,7 @@ function JumpLink({ id, label }: { id: number; label: string }) {
   return (
     <a
       href={`#panel-${id}`}
-      className="rounded-md border border-border px-2 py-1 text-muted-foreground"
+      className="apple-transition rounded-full border border-[var(--apple-separator)] px-2.5 py-1 text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-[var(--apple-label)]"
     >
       {id}. {label}
     </a>

@@ -119,4 +119,39 @@ describe('StandupSchedule', () => {
 
     expect(screen.getByText(/no stand-ups have been generated/i)).toBeInTheDocument()
   })
+
+  it('links each openable day to the real nested run-screen route, not a bare /standups/:id', () => {
+    const testSchedule = {
+      sprintId: 'sprint-1',
+      sprintName: 'Sprint 1',
+      projectId: 'project-1',
+      timezone: 'UTC',
+      today: '2026-08-05',
+      dateRange: { from: '2026-08-01', to: '2026-08-14' },
+      totalSprintDays: 8,
+      days: [
+        {
+          standupId: 'standup-1',
+          date: '2026-08-01',
+          status: 'Completed',
+          shape: 'day_one',
+          sprintDayNumber: 1,
+          totalSprintDays: 8,
+          scheduledStartAt: '2026-08-01T09:15:00.000Z',
+          durationMinutes: 15,
+          facilitatorId: 'pm-1',
+          expectedAttendeeIds: [],
+          wasBackfilled: false
+        }
+      ]
+    }
+
+    render(<StandupSchedule schedule={testSchedule as any} />)
+
+    const link = screen.getByRole('link')
+    expect(link).toHaveAttribute(
+      'href',
+      '/projects/project-1/sprints/sprint-1/standups/standup-1'
+    )
+  })
 })

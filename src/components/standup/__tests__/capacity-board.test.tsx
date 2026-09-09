@@ -371,5 +371,97 @@ describe('CapacityBoard', () => {
       renderBoard()
       expect(screen.queryByTestId('debt-badge')).not.toBeInTheDocument()
     })
+
+    it('renders the exact capacity-reduced sentence when the reduce policy has lowered effective capacity (AC-16)', () => {
+      renderBoard({
+        members: [
+          member({
+            capacity: capacity({
+              nominalMinutes: m(480),
+              adjustedMinutes: m(480),
+              effectiveMinutes: m(360),
+              outstandingDebtMinutes: m(120),
+              overrunPolicy: 'reduce',
+              gapMinutes: m(360),
+              allocatedMinutes: m(0),
+              status: 'under'
+            })
+          })
+        ]
+      })
+
+      expect(
+        screen.getByText('Capacity 8.0h reduced to 6.0h by 2.0h of estimate debt.')
+      ).toBeInTheDocument()
+    })
+
+    it('does not render the sentence under the absorb policy', () => {
+      renderBoard({
+        members: [
+          member({
+            capacity: capacity({
+              nominalMinutes: m(480),
+              adjustedMinutes: m(480),
+              effectiveMinutes: m(360),
+              outstandingDebtMinutes: m(120),
+              overrunPolicy: 'absorb',
+              gapMinutes: m(360),
+              allocatedMinutes: m(0),
+              status: 'under'
+            })
+          })
+        ]
+      })
+
+      expect(
+        screen.queryByText('Capacity 8.0h reduced to 6.0h by 2.0h of estimate debt.')
+      ).not.toBeInTheDocument()
+    })
+
+    it('does not render the sentence when there is no debt', () => {
+      renderBoard({
+        members: [
+          member({
+            capacity: capacity({
+              nominalMinutes: m(480),
+              adjustedMinutes: m(480),
+              effectiveMinutes: m(480),
+              outstandingDebtMinutes: m(0),
+              overrunPolicy: 'reduce',
+              gapMinutes: m(480),
+              allocatedMinutes: m(0),
+              status: 'zero'
+            })
+          })
+        ]
+      })
+
+      expect(
+        screen.queryByText('Capacity 8.0h reduced to 6.0h by 2.0h of estimate debt.')
+      ).not.toBeInTheDocument()
+    })
+
+    it('does not render the sentence when adjusted equals effective', () => {
+      renderBoard({
+        members: [
+          member({
+            capacity: capacity({
+              nominalMinutes: m(480),
+              adjustedMinutes: m(480),
+              effectiveMinutes: m(480),
+              outstandingDebtMinutes: m(120),
+              overrunPolicy: 'reduce',
+              gapMinutes: m(480),
+              allocatedMinutes: m(0),
+              status: 'under'
+            })
+          })
+        ]
+      })
+
+      expect(
+        screen.queryByText('Capacity 8.0h reduced to 6.0h by 2.0h of estimate debt.')
+      ).not.toBeInTheDocument()
+    })
   })
 })

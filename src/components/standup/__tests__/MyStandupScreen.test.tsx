@@ -108,6 +108,42 @@ describe('MyStandupScreen', () => {
     )
   })
 
+  /**
+   * Task 14/E31. The backend route/service now admit a self-select write
+   * against a `Completed` stand-up, but that fix is unreachable by a real
+   * user unless the one button that triggers it is actually enabled in that
+   * state — this is the direct UI-level proof that it is, distinct from the
+   * hours-editing lock (RUN-26) which correctly stays put.
+   */
+  describe('self-select after completion (E31)', () => {
+    const poolTasks = [
+      { taskId: 't2', key: 'KAN-2', title: 'Pool task', remainingEstimateMinutes: minutes(60) }
+    ]
+
+    it('leaves the self-select button enabled once the stand-up is Completed, when allowed', () => {
+      setup({ status: 'Completed', allowSelfSelect: true, poolTasks })
+      expect(screen.getByRole('button', { name: /add kan-2/i })).not.toBeDisabled()
+    })
+
+    it('still locks existing rows’ hours on Completed even though self-select stays open', () => {
+      setup({ status: 'Completed', allowSelfSelect: true, poolTasks })
+      expect(screen.getByLabelText(/hours for Fix the thing/i)).toBeDisabled()
+    })
+
+    it('disables the self-select button on Completed when the project has it turned off', () => {
+      setup({ status: 'Completed', allowSelfSelect: false, poolTasks: [] })
+      // allowSelfSelect off also hides the whole pool section (existing
+      // behaviour, unchanged) — nothing to self-select onto in the first
+      // place, which is itself proof the control cannot be triggered.
+      expect(screen.queryByRole('button', { name: /add kan-2/i })).not.toBeInTheDocument()
+    })
+
+    it('disables the self-select button on a status that is neither Ready nor Completed', () => {
+      setup({ status: 'In_Progress', allowSelfSelect: true, poolTasks })
+      expect(screen.getByRole('button', { name: /add kan-2/i })).toBeDisabled()
+    })
+  })
+
   it('falls back to the plain date when the dual-timezone fields are absent (NFR-20)', () => {
     setup()
     expect(screen.getByText('2026-09-05')).toBeInTheDocument()

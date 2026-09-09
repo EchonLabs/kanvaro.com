@@ -274,6 +274,7 @@ export default function ProjectDetailPage() {
     { id: 'kanban', label: 'Kanban', order: 6 },
     { id: 'calendar', label: 'Calendar', order: 7 },
     { id: 'backlog', label: 'Backlog', order: 8 },
+    { id: 'standups', label: 'Stand-ups', order: 9 },
     ...(canManageTests ? [{ id: 'testing', label: 'Testing' }] : []),
     { id: 'reports', label: 'Reports' },
     { id: 'settings', label: 'Settings' },
@@ -1004,6 +1005,10 @@ export default function ProjectDetailPage() {
           </div>
 
           <Tabs value={activeTab} onValueChange={(value) => {
+            if (value === 'standups') {
+              router.push(`/projects/${projectId}/standups`)
+              return
+            }
             const newSearchParams = new URLSearchParams(searchParams.toString())
             newSearchParams.set('tab', value)
             router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
@@ -1063,7 +1068,7 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             </div>
-            <TabsList className={'mt-2 hidden h-auto w-full gap-1 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-sm sm:grid ' + (canManageTests ? 'sm:grid-cols-11' : 'sm:grid-cols-10')}>
+            <TabsList className={'mt-2 hidden h-auto w-full gap-1 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-sm sm:grid ' + (canManageTests ? 'sm:grid-cols-12' : 'sm:grid-cols-11')}>
               {tabs.map((tab) => (
                 <TabsTrigger key={tab.id} value={tab.id} className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">

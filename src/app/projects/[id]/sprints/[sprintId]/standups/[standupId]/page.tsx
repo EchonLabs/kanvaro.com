@@ -33,6 +33,7 @@ import {
 } from '@/components/standup/run/ReviseEstimateModal'
 import type { VariancePanelMember, VariancePanelRow } from '@/components/standup/run/VariancePanel'
 import type { CarryForwardItemRow } from '@/components/standup/run/CarryForwardPanel'
+import type { BlockerRow } from '@/components/standup/run/BlockerPanel'
 import type { Degradation } from '@/lib/standup/degradation'
 import type { DebtPosition } from '@/lib/standup/debt'
 import { minutes, type Minutes } from '@/lib/standup/minutes'
@@ -44,11 +45,27 @@ export default function StandupRunPage({
 }: {
   params: { id: string; sprintId: string; standupId: string }
 }) {
-  const { id: projectId, standupId } = params
+  const { id: projectId, sprintId, standupId } = params
 
   const [data, setData] = useState<RunScreenData | null>(null)
   const [degradations, setDegradations] = useState<Degradation[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // Left to the auto-generator, "standups" and this standup's id both get
+  // dropped (they immediately follow an id segment), leaving this screen
+  // breadcrumb-identical to the plain sprint detail page. The sprint link
+  // goes to `/sprints/:id` — the sprint's real route — not the
+  // `/projects/:id/sprints/:sprintId` prefix this page's own URL would
+  // otherwise suggest, which resolves to nothing. Passed as a prop rather
+  // than via `useBreadcrumb()`: that hook's provider lives inside
+  // `MainLayout`, below this component in the tree, so a page-level call to
+  // it can never reach the provider and silently no-ops.
+  const breadcrumbItems = [
+    { label: 'Projects', href: '/projects' },
+    { label: 'View Project', href: `/projects/${projectId}` },
+    { label: 'View Sprint', href: `/sprints/${sprintId}` },
+    { label: 'Stand-up' }
+  ]
 
   const load = useCallback(async (): Promise<RunScreenData> => {
     const [
@@ -56,13 +73,15 @@ export default function StandupRunPage({
       varianceResponse,
       yesterdayResponse,
       carryForwardResponse,
-      sprintCloseResponse
+      sprintCloseResponse,
+      blockersResponse
     ] = await Promise.all([
       fetch(`/api/standups/${standupId}/allocations`),
       fetch(`/api/standups/${standupId}/variance`),
       fetch(`/api/standups/${standupId}/yesterday`),
       fetch(`/api/standups/${standupId}/carry-forward`),
-      fetch(`/api/standups/${standupId}/sprint-close`)
+      fetch(`/api/standups/${standupId}/sprint-close`),
+      fetch(`/api/standups/${standupId}/blockers`)
     ])
     if (!boardResponse.ok) throw await asError(boardResponse)
 
@@ -74,13 +93,16 @@ export default function StandupRunPage({
     const carryForwardPayload = carryForwardResponse.ok ? await carryForwardResponse.json() : null
     // Phase 11's final-day panel, on the same terms as the three above.
     const sprintClosePayload = sprintCloseResponse.ok ? await sprintCloseResponse.json() : null
+    // Panel 6 (Phase 10), same read-tolerant terms as the panels above.
+    const blockersPayload = blockersResponse.ok ? await blockersResponse.json() : null
 
     return toRunScreenData(
       boardPayload.data ?? boardPayload,
       variancePayload?.data ?? variancePayload,
       yesterdayPayload?.data ?? yesterdayPayload,
       carryForwardPayload?.data ?? carryForwardPayload,
-      sprintClosePayload?.data ?? sprintClosePayload
+      sprintClosePayload?.data ?? sprintClosePayload,
+      blockersPayload?.data ?? blockersPayload
     )
   }, [standupId])
 
@@ -164,6 +186,19 @@ export default function StandupRunPage({
       )
     },
     refresh: load,
+
+    // Task 1 (RUN-2/3, AC-5). No return value to reconcile — the screen
+    // calls its own `refresh()` (this page's `load`) right after, the same
+    // way it does on every other mutation outcome, so the board's shape
+    // change once `In_Progress` (RUN-26 unlocks members' own rows) is
+    // reflected without this function duplicating that fetch.
+    async start() {
+      await unwrap(
+        await mutate(`/api/standups/${standupId}/start`, 'POST', {
+          expectedVersion: data?.standupVersion ?? 0
+        })
+      )
+    },
 
     async completeStandup({ notes, expectedVersion }) {
       return unwrap(
@@ -354,8 +389,8 @@ export default function StandupRunPage({
   )
 
   return (
-    <MainLayout>
-      <div className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">
+    <MainLayout breadcrumbItems={breadcrumbItems}>
+      <div className="space-y-5 p-4 md:p-6">
         <DegradationBanner degradations={degradations} />
 
         {panelNotice && (
@@ -369,7 +404,11 @@ export default function StandupRunPage({
             {error}
           </p>
         ) : data ? (
-          <StandupRunScreen data={data} api={api} />
+          <StandupRunScreen
+            data={data}
+            api={api}
+            summaryHref={`/projects/${projectId}/sprints/${sprintId}/standups/${standupId}/summary`}
+          />
         ) : (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -484,7 +523,8 @@ function toRunScreenData(
   variance?: any,
   yesterday?: any,
   carryForward?: any,
-  sprintClose?: any
+  sprintClose?: any,
+  blockers?: any
 ): RunScreenData {
   return {
     standupId: board.standupId,
@@ -497,6 +537,11 @@ function toRunScreenData(
     facilitatorName: board.facilitatorName ?? '',
     meetingUrl: board.meetingUrl,
     ceremoniesConsumeCapacity: board.ceremoniesConsumeCapacity,
+    // E57/§15.8.2: feeds the run screen's advisory elapsed-time indicator.
+    // `board.startedAt` arrives as an ISO string once JSON-serialized by the
+    // board GET route, matching `RunScreenData.startedAt`'s type directly.
+    startedAt: board.startedAt,
+    durationMinutes: board.durationMinutes,
     members: (board.members ?? []).map((member: any) => ({
       memberId: member.memberId,
       name: member.name ?? member.memberId,
@@ -530,8 +575,28 @@ function toRunScreenData(
     ...(yesterday ? { yesterday: toYesterdayView(yesterday) } : {}),
     ...(carryForward ? { carryForward: toCarryForwardView(carryForward) } : {}),
     ...(sprintClose ? { sprintClose: toSprintCloseView(sprintClose) } : {}),
+    ...(blockers ? { blockers: toBlockerRows(blockers) } : {}),
     completionState: board.completionState ?? null
   }
+}
+
+/** Panel 6's payload — already row-shaped by `loadBlockerPanel`, so this is a defensive pass-through. */
+function toBlockerRows(blockers: any): readonly BlockerRow[] {
+  return (Array.isArray(blockers) ? blockers : []).map(
+    (row: any): BlockerRow => ({
+      blockerId: row.blockerId,
+      taskKey: row.taskKey,
+      description: row.description ?? '',
+      blockerType: row.blockerType,
+      severity: row.severity,
+      status: row.status,
+      owner: row.owner,
+      targetResolutionDate: row.targetResolutionDate,
+      overdue: row.overdue ?? false,
+      freedMinutes: row.freedMinutes === undefined ? undefined : minutes(row.freedMinutes),
+      blockerLabel: row.blockerLabel ?? ''
+    })
+  )
 }
 
 /**
@@ -661,6 +726,22 @@ function toYesterdayView(yesterday: any): RunScreenData['yesterday'] {
         ageInStandups: row.ageInStandups ?? 1,
         unplanned: row.unplanned ?? false
       }))
+    })),
+    addedAfterCompletion: (yesterday.addedAfterCompletion ?? []).map((row: any) => ({
+      allocationId: row.allocationId,
+      taskId: row.taskId,
+      taskKey: row.taskKey,
+      title: row.title ?? '',
+      memberId: row.memberId,
+      memberName: row.memberName,
+      previousStatus: row.previousStatus,
+      currentStatus: row.currentStatus,
+      plannedMinutes: minutes(row.plannedMinutes),
+      loggedMinutes: minutes(row.loggedMinutes),
+      dayVarianceMinutes: minutes(row.dayVarianceMinutes),
+      remainingEstimateMinutes: minutes(row.remainingEstimateMinutes),
+      ageInStandups: row.ageInStandups ?? 1,
+      unplanned: row.unplanned ?? false
     })),
     previousStandupId: yesterday.previousStandupId,
     previousStandupDate: yesterday.previousStandupDate

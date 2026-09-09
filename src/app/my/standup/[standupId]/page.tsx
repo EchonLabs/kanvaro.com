@@ -74,6 +74,15 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
 
+  // The auto-generator treats 'my' and 'standup' as plain path words rather
+  // than an entity/id pair, so it produced "Home > My > Standup" — a
+  // different shape from every other stand-up screen's "View X" crumbs, and
+  // "My" linked to `/my`, a route that doesn't exist. One crumb matching the
+  // sidebar's own label is both correct and consistent. Passed as a prop,
+  // not via `useBreadcrumb()` — see the run screen page for why that hook
+  // silently no-ops when called from a page component.
+  const breadcrumbItems = [{ label: 'My Stand-up' }]
+
   // The auth check runs asynchronously (`useAuth`'s `checkAuth`); until it
   // settles, `user` is indistinguishable from "genuinely no session" — both
   // are `null`. Waiting on `authLoading` before redirecting avoids bouncing a
@@ -166,8 +175,8 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
   }
 
   return (
-    <MainLayout>
-      <div className="mx-auto w-full max-w-2xl">
+    <MainLayout breadcrumbItems={breadcrumbItems}>
+      <div>
         {error ? (
           <p role="alert" className="p-4 text-sm text-destructive">
             {error}

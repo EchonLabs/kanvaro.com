@@ -27,6 +27,19 @@ export default function SprintPlanningPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // "planning" is dropped by the auto-generator (it follows the sprint id),
+  // leaving this screen breadcrumb-identical to the plain sprint detail page
+  // it's reached from. Passed as a prop, not via `useBreadcrumb()` — that
+  // hook's provider lives inside `MainLayout`, below this component in the
+  // tree, so a page-level call to it can never reach the provider and
+  // silently no-ops. All three `<MainLayout>` render paths below (loading,
+  // error, and the real content) need it passed individually.
+  const breadcrumbItems = [
+    { label: 'Sprints', href: '/sprints' },
+    { label: 'View Sprint', href: `/sprints/${sprintId}` },
+    { label: 'Planning' }
+  ]
+
   const load = useCallback(async () => {
     try {
       const response = await fetch(`/api/sprints/${sprintId}`)
@@ -46,7 +59,7 @@ export default function SprintPlanningPage() {
 
   if (loading) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <div className="flex min-h-[40vh] items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-[var(--apple-tertiary-label)]" />
         </div>
@@ -73,8 +86,8 @@ export default function SprintPlanningPage() {
 
   if (error || !sprint) {
     return (
-      <MainLayout>
-        <div className="mx-auto max-w-2xl p-6 text-center">
+      <MainLayout breadcrumbItems={breadcrumbItems}>
+        <div className="p-6">
           <p className="text-[13px] text-[var(--apple-secondary-label)]">
             {error ?? 'That sprint could not be found.'}
           </p>
@@ -87,8 +100,8 @@ export default function SprintPlanningPage() {
   }
 
   return (
-    <MainLayout>
-      <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
+    <MainLayout breadcrumbItems={breadcrumbItems}>
+      <div className="space-y-5 p-4 sm:p-6">
         <Button
           variant="ghost"
           size="sm"

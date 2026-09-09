@@ -131,6 +131,22 @@ const navigationItems = [
         permission: Permission.SPRINT_VIEW
       },
       {
+        // No `permission` gate: STANDUP_VIEW is deliberately never granted at
+        // the org-wide role level (see Role.TEAM_MEMBER in
+        // permission-definitions.ts) — it is only ever handed out per
+        // project, via PROJECT_MEMBER. PermissionGate checks org-wide
+        // `globalPermissions` when it isn't given a projectId, and this is a
+        // cross-project nav item with no single project to scope it to — so
+        // gating it on STANDUP_VIEW hid it from every plain team member, the
+        // exact audience this screen is for. The destination page already
+        // resolves per-user server-side and shows an explanatory empty state
+        // when there is nothing to show, so no client-side gate is needed.
+        id: 'tasks-my-standup',
+        label: 'My Stand-up',
+        icon: Zap,
+        path: '/my/standup'
+      },
+      {
         id: 'tasks-epics',
         label: 'Epics',
         icon: Columns,
@@ -562,8 +578,8 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
               <div className="px-2 py-1.5 apple-section-label border-b border-[var(--apple-separator)] mb-1">
                 {item.label}
               </div>
-              {item.children.map((child: any) => (
-                <PermissionGate key={child.id} permission={child.permission}>
+              {item.children.map((child: any) => {
+                const link = (
                   <Button
                     variant="ghost"
                     className={cn(
@@ -580,8 +596,18 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
                       {child.label}
                     </Link>
                   </Button>
-                </PermissionGate>
-              ))}
+                )
+                // See the expanded-list branch below for why this is
+                // conditional: an unconditional PermissionGate with
+                // `permission={undefined}` hides the item for every role.
+                return child.permission ? (
+                  <PermissionGate key={child.id} permission={child.permission}>
+                    {link}
+                  </PermissionGate>
+                ) : (
+                  <div key={child.id}>{link}</div>
+                )
+              })}
             </div>
           </PopoverContent>
         </Popover>
@@ -641,34 +667,44 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
           <div className="ml-3 space-y-0.5 border-l border-[var(--apple-separator)] pl-2">
             {item.children.map((child: any) => {
               const isChildActive = pathname === child.path
-              return (
-                <PermissionGate key={child.id} permission={child.permission}>
-                  <Button
-                    variant="ghost"
-                    className={cn(
-                      'w-full justify-start text-[14px] h-7 rounded-[10px] apple-transition px-2',
-                      isChildActive
-                        ? 'font-medium'
-                        : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
-                    )}
-                    style={isChildActive ? { color: 'var(--apple-card-gradient)', backgroundColor: 'color-mix(in srgb, var(--apple-card-gradient) 12%, transparent)' } : undefined}
-                    asChild
+              const link = (
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    'w-full justify-start text-[14px] h-7 rounded-[10px] apple-transition px-2',
+                    isChildActive
+                      ? 'font-medium'
+                      : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
+                  )}
+                  style={isChildActive ? { color: 'var(--apple-card-gradient)', backgroundColor: 'color-mix(in srgb, var(--apple-card-gradient) 12%, transparent)' } : undefined}
+                  asChild
+                >
+                  <Link
+                    href={child.path}
+                    prefetch
+                    onMouseEnter={() => router.prefetch(child.path)}
+                    onClick={() => {
+                      if (!expandedItems.includes(item.id)) {
+                        setExpandedItems(prev => [...prev, item.id])
+                      }
+                    }}
                   >
-                    <Link
-                      href={child.path}
-                      prefetch
-                      onMouseEnter={() => router.prefetch(child.path)}
-                      onClick={() => {
-                        if (!expandedItems.includes(item.id)) {
-                          setExpandedItems(prev => [...prev, item.id])
-                        }
-                      }}
-                    >
-                      <child.icon className="mr-2 h-3.5 w-3.5" />
-                      {child.label}
-                    </Link>
-                  </Button>
+                    <child.icon className="mr-2 h-3.5 w-3.5" />
+                    {child.label}
+                  </Link>
+                </Button>
+              )
+              // Only wrap in a gate when the child actually declares a
+              // permission — PermissionGate's `hasPermission(undefined)`
+              // resolves to false, not "unrestricted", so wrapping
+              // unconditionally hid every child with no `permission` set
+              // (e.g. My Stand-up) from every role, not just ungranted ones.
+              return child.permission ? (
+                <PermissionGate key={child.id} permission={child.permission}>
+                  {link}
                 </PermissionGate>
+              ) : (
+                <div key={child.id}>{link}</div>
               )
             })}
           </div>

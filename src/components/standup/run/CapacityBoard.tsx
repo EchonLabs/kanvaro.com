@@ -218,6 +218,17 @@ function MemberCard({
         </button>
       </div>
 
+      {capacity.overrunPolicy === 'reduce' && capacity.outstandingDebtMinutes > 0 && capacity.adjustedMinutes !== capacity.effectiveMinutes ? (
+        <p className="mt-1 text-xs text-[var(--apple-secondary-label)]">
+          {standupStrings.variance.capacityReduced({
+            nominal: capacity.adjustedMinutes,
+            effective: capacity.effectiveMinutes,
+            debt: capacity.outstandingDebtMinutes,
+            locale
+          })}
+        </p>
+      ) : null}
+
       <CapacityMeter
         name={member.name}
         effectiveMinutes={capacity.effectiveMinutes}
