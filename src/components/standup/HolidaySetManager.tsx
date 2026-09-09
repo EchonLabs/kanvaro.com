@@ -169,6 +169,13 @@ export function HolidaySetManager() {
     )
     if (reason === null) return
 
+    if (reason.trim().length < REVOKE_REASON_MIN_LENGTH) {
+      notifyError({
+        title: `That reason is too short — give at least ${REVOKE_REASON_MIN_LENGTH} characters so whoever reads the calendar next knows why.`
+      })
+      return
+    }
+
     setBusy(true)
     try {
       const response = await fetch(
