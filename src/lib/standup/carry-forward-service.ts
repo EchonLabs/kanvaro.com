@@ -302,6 +302,174 @@ export async function buildCarryForwardSet(input: {
   return { standupId: String(standup._id), created, aged, autoClosed, totalOpen }
 }
 
+export interface ConvertOpenAllocationsToCarryForwardInput {
+  projectId: string
+  memberId: string
+}
+
+export interface ConvertOpenAllocationsToCarryForwardResult {
+  detached: number
+  created: number
+}
+
+/**
+ * E60. Removing a member from a project must not silently orphan their
+ * still-open work: rows on a stand-up that has not yet completed simply sat
+ * there, pointing at someone no longer on the project, with no register entry
+ * ever created.
+ *
+ * The situation is identical to `attendance-service.ts`'s `detachAllocations`
+ * — a member's open allocations need converting into `owner_absent` register
+ * items — so this detaches them the exact same way (`detachedReason:
+ * 'owner_absent'`, `excludedFromCapacity: true`). The one real difference:
+ * `detachAllocations` can rely on `buildCarryForwardSet`'s completion-time
+ * sweep to pick the tag up later, because a same-day absence has a normal next
+ * event — that stand-up completing — to trigger it. A removal cannot lean on
+ * the same passive sweep for two reasons. First, `buildCarryForwardSet` does
+ * not check who is still on the team; if the stand-up is later completed by
+ * someone else it will still create *an* item, but the wrong one — an
+ * un-detached row reads as `unfinished_task`, not `owner_absent`, and never
+ * gets `detachedReason`/`excludedFromCapacity` set, so the sweep's fallback is
+ * not equivalent to what this function produces. Second, and more simply,
+ * there is no guarantee that stand-up is ever completed at all — it may sit
+ * `Scheduled` or `Ready` indefinitely — so waiting on the sweep is not a
+ * question of *when* the register catches up but *whether* it ever does. This
+ * opens the `owner_absent` item immediately instead, using the exact same
+ * shape `buildCarryForwardSet`'s own discovery pass uses for the tag
+ * (`upsertOpenItem`, `type: 'owner_absent'`, `tags: ['owner_absent']`),
+ * placed onto the allocation's own (still-open) stand-up rather than a "next"
+ * one that may not exist yet.
+ *
+ * Only allocations on a non-`Completed` stand-up are touched — a completed
+ * stand-up's allocations are frozen history, already swept by
+ * `buildCarryForwardSet` if they qualified, and must not be rewritten.
+ */
+export async function convertOpenAllocationsToCarryForward(
+  input: ConvertOpenAllocationsToCarryForwardInput
+): Promise<ConvertOpenAllocationsToCarryForwardResult> {
+  const rows = (await Allocation.find({
+    project: input.projectId,
+    member: input.memberId,
+    detachedReason: { $exists: false }
+  }).lean()) as any[]
+
+  if (rows.length === 0) return { detached: 0, created: 0 }
+
+  const standupIds = Array.from(new Set(rows.map((row) => String(row.standup))))
+  const openStandups = (await Standup.find({
+    _id: { $in: standupIds },
+    status: { $ne: 'Completed' }
+  }).lean()) as any[]
+  const standupById = new Map(openStandups.map((standup) => [String(standup._id), standup]))
+
+  const openRows = rows.filter((row) => standupById.has(String(row.standup)))
+  if (openRows.length === 0) return { detached: 0, created: 0 }
+
+  await Allocation.updateMany(
+    { _id: { $in: openRows.map((row) => row._id) } },
+    { $set: { detachedReason: 'owner_absent', excludedFromCapacity: true } }
+  )
+
+  let created = 0
+  for (const row of openRows) {
+    const standup = standupById.get(String(row.standup))
+    // No "next" stand-up target the way the completion sweep has one — the
+    // item opens directly onto the stand-up the work was orphaned from.
+    created += await upsertOpenItem(
+      standup,
+      {
+        type: 'owner_absent',
+        taskId: String(row.task),
+        memberId: String(row.member),
+        tags: ['owner_absent']
+      },
+      null
+    )
+  }
+
+  return { detached: openRows.length, created }
+}
+
+export interface CloseCarryForwardItemsForDeletedTaskInput {
+  taskId: string
+  /** The user who performed the delete (SEC-3 needs a real actor, not a system placeholder). */
+  deletedBy: string
+  /** Captured by the caller before the delete — the task record is gone by the time this runs otherwise. */
+  taskLabel?: string
+}
+
+/**
+ * E64. A hard task delete (`DELETE /api/tasks/:id`'s `Task.findOneAndDelete`)
+ * is a different event from the soft `descopedAt` path `autoCloseResolution`
+ * already handles inside `buildCarryForwardSet`. That sweep only ever looks at
+ * items currently showing on *one* stand-up's board, at the moment that
+ * stand-up completes, and it reads `task.descopedAt` off a task document that
+ * is assumed to still exist. A hard delete can happen at any point in a
+ * task's life — independent of any stand-up's lifecycle, and often with no
+ * stand-up ever completing again to trigger that sweep — and once it runs the
+ * task document is gone, so there is nothing left for `autoCloseResolution`'s
+ * `taskById.get()` to find. Left alone, any carry-forward item still pointing
+ * at the task (on whichever stand-up it currently shows on) stays open
+ * forever, referencing a task that no longer exists.
+ *
+ * This is a standalone sibling rather than a branch inside
+ * `autoCloseResolution` for that reason: the two run on different triggers,
+ * over different item sets (one stand-up's board vs. every item across every
+ * stand-up), and one has a live task document to read while the other must
+ * not depend on one. It reuses the same `closed_descoped` shape and the same
+ * `OPEN_CARRY_FORWARD_STATUSES` gate so the register still only ever has one
+ * meaning for "descoped," whichever path produced it.
+ */
+export async function closeCarryForwardItemsForDeletedTask(
+  input: CloseCarryForwardItemsForDeletedTaskInput
+): Promise<number> {
+  const openItems = (await CarryForwardItem.find({
+    task: input.taskId,
+    status: { $in: OPEN_CARRY_FORWARD_STATUSES }
+  })
+    .select('_id organization project')
+    .lean()) as any[]
+
+  if (openItems.length === 0) return 0
+
+  const now = new Date()
+  const label = input.taskLabel ? `${input.taskLabel} ` : ''
+  const comment = `Auto-closed: the task ${label}was deleted by ${input.deletedBy} on ${now.toISOString()}.`
+
+  await CarryForwardItem.updateMany(
+    { _id: { $in: openItems.map((item) => item._id) } },
+    {
+      $set: {
+        status: 'closed_descoped',
+        resolution: {
+          resolvedAt: now,
+          resolvedBy: input.deletedBy,
+          resolutionType: 'descoped',
+          comment
+        }
+      }
+    }
+  )
+
+  await Promise.all(
+    openItems.map((item) =>
+      recordAudit({
+        actor: { type: 'user', userId: input.deletedBy },
+        organizationId: String(item.organization),
+        projectId: String(item.project),
+        action: 'carry_forward_resolved',
+        entityType: 'carry_forward_item',
+        entityId: String(item._id),
+        before: { status: 'open' },
+        after: { status: 'closed_descoped', resolutionType: 'descoped' },
+        context: { reason: 'task_deleted', taskId: input.taskId }
+      })
+    )
+  )
+
+  return openItems.length
+}
+
 /**
  * The three automatic "closes when" conditions we can check without a human
  * (§13.2). Everything else — `owner_absent`, `open_blocker`,
