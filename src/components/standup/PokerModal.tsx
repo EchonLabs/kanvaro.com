@@ -125,6 +125,23 @@ export function PokerModal({
         )
         setServerCurrentTask(session.currentTask ?? null)
         setSessionClosed(session.status !== 'open')
+
+        // A non-facilitator's local `reveal` state never gets set by the
+        // reveal POST (that response only reaches the facilitator's own
+        // request) — poll the read-only reveal-state endpoint for whichever
+        // task is currently visible so every voter sees the same spread.
+        const visibleTaskId = session.currentTask ?? currentTaskId
+        if (visibleTaskId) {
+          const revealResponse = await fetch(
+            `/api/poker-sessions/${sessionId}/tasks/${visibleTaskId}/reveal-state`
+          )
+          if (revealResponse.ok) {
+            const revealPayload = await revealResponse.json()
+            if (revealPayload?.data?.revealed) {
+              setReveal((current) => current ?? revealPayload.data)
+            }
+          }
+        }
       } catch {
         /* A dropped poll is not worth a toast; the next one recovers. */
       }
