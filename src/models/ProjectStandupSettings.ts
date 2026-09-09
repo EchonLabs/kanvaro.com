@@ -104,7 +104,7 @@ export interface IProjectStandupSettings extends Document {
   /** Story-point conversion factor (PLN-13). */
   pointsToHours: number
 
-  /** Per-project notification switches keyed N1..N12; user prefs take precedence. */
+  /** Per-project notification switches keyed N1..N13; user prefs take precedence. */
   notificationSwitches: Record<string, boolean>
 
   createdAt: Date
@@ -112,7 +112,13 @@ export interface IProjectStandupSettings extends Document {
   updatedBy?: mongoose.Types.ObjectId
 }
 
-/** All twelve notification types default on except N3 (stand-up started). */
+/**
+ * All thirteen notification types default on except N3 (stand-up started).
+ * N13 (Task 14/E31: a self-select landed after completion) is listed
+ * explicitly here for the same reason the other twelve are — an unconfigured
+ * project's toggle screen should show it as on, not merely fall through
+ * `isNotificationEnabled`'s absent-key default.
+ */
 const defaultNotificationSwitches = (): Record<string, boolean> => ({
   N1: true,
   N2: true,
@@ -125,7 +131,8 @@ const defaultNotificationSwitches = (): Record<string, boolean> => ({
   N9: true,
   N10: true,
   N11: true,
-  N12: true
+  N12: true,
+  N13: true
 })
 
 const ProjectStandupSettingsSchema = new Schema<IProjectStandupSettings>(

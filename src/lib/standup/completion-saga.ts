@@ -318,10 +318,23 @@ export async function runCompletionSaga(ctx: CompletionContext): Promise<Complet
         // `IStandup` has no `completedBy` field (only `completedAt`) — who
         // completed it is already on the `standup_completed` audit entry the
         // previous step wrote, per SEC-3.
+        const completedAt = new Date()
+        const fields: Record<string, unknown> = { status: 'Completed', completedAt }
+
+        // E57: an advisory discipline metric only — never blocking. Only
+        // computed when the stand-up actually has a `startedAt` to measure
+        // from; one completed via some path that never started (if that's
+        // even reachable) should not get a nonsensical negative/huge value.
+        if (standup.startedAt) {
+          fields.actualDurationMinutes = Math.round(
+            (completedAt.getTime() - standup.startedAt.getTime()) / 60_000
+          )
+        }
+
         await Standup.updateOne(
           { _id: ctx.standupId },
           {
-            $set: { status: 'Completed', completedAt: new Date() },
+            $set: fields,
             $inc: { version: 1 }
           }
         )

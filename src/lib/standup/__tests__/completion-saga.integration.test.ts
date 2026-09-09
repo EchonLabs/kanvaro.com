@@ -260,6 +260,55 @@ describe('runCompletionSaga', () => {
     expect(allocations.every((row) => row.frozenAt)).toBe(true)
   })
 
+  // --- E57: actualDurationMinutes stamped at completion ---------------------
+
+  it('E57: stamps actualDurationMinutes from startedAt to completedAt when the stand-up was started', async () => {
+    const day1 = await seedStandup('2026-08-17', 1)
+    const day2 = await seedStandup('2026-08-18', 2, {
+      startedAt: new Date('2026-08-18T03:35:00.000Z')
+    })
+    const task = await seedTask()
+    await seedAllocation(day1._id, task._id)
+    await seedAllocation(day2._id, task._id)
+
+    const ctx: CompletionContext = {
+      ...baseContext(),
+      standupId: String(day2._id),
+      expectedVersion: 0
+    }
+
+    const before = Date.now()
+    await runCompletionSaga(ctx)
+    const after = Date.now()
+
+    const standup = await Standup.findById(day2._id).lean()
+    expect(standup!.actualDurationMinutes).toBeDefined()
+
+    const expectedMin = Math.round((before - standup!.startedAt!.getTime()) / 60_000)
+    const expectedMax = Math.round((after - standup!.startedAt!.getTime()) / 60_000)
+    expect(standup!.actualDurationMinutes).toBeGreaterThanOrEqual(expectedMin)
+    expect(standup!.actualDurationMinutes).toBeLessThanOrEqual(expectedMax)
+  })
+
+  it('E57: leaves actualDurationMinutes unset when the stand-up has no startedAt', async () => {
+    const day1 = await seedStandup('2026-08-17', 1)
+    const day2 = await seedStandup('2026-08-18', 2)
+    const task = await seedTask()
+    await seedAllocation(day1._id, task._id)
+    await seedAllocation(day2._id, task._id)
+
+    const ctx: CompletionContext = {
+      ...baseContext(),
+      standupId: String(day2._id),
+      expectedVersion: 0
+    }
+
+    await runCompletionSaga(ctx)
+
+    const standup = await Standup.findById(day2._id).lean()
+    expect(standup!.actualDurationMinutes).toBeUndefined()
+  })
+
   // --- RUN-22 / double submission -------------------------------------------
 
   it('RUN-22: a second completion attempt on an already-completed stand-up rejects and changes nothing', async () => {

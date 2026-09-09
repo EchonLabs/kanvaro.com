@@ -21,6 +21,7 @@ import { PermissionService } from '@/lib/permissions/permission-service'
 import { createAllocation, loadAllocationBoard } from '@/lib/standup/allocation-service'
 import { minutes } from '@/lib/standup/minutes'
 import { StandupError } from '@/lib/standup/errors'
+import { notifySelfSelectedAfterCompletion } from '@/lib/standup/notifications'
 import {
   ok,
   readJson,
@@ -70,7 +71,7 @@ interface CreateBody {
  */
 export const POST = withStandupIdPermission(
   { permission: Permission.STANDUP_ALLOCATE_OWN },
-  async (request, { standupId, userId, projectId, standup }) => {
+  async (request, { standupId, userId, organizationId, projectId, standup }) => {
     const body = await readJson<CreateBody>(request)
     const expectedVersion = requireStandupVersion(request)
 
@@ -92,7 +93,21 @@ export const POST = withStandupIdPermission(
           { memberId: body.memberId }
         )
       }
-      if (standup.status !== 'Ready') {
+      // RUN-26's Ready-only lock, widened by exactly one status for E31.
+      // `Completed` is the *only* other status this caller may write through:
+      // every other non-Ready status (In_Progress included — the PM keeps
+      // writing there, a member does not) still refuses below, unchanged.
+      //
+      // No client-supplied flag is needed to tell a Completed-standup
+      // self-select apart from some other own-row write: a caller who lacks
+      // STANDUP_ALLOCATE reaching this branch is *always* self-selecting —
+      // `isSelfSelect` two lines down is unconditionally `true` for this
+      // caller class — so "own row + Completed" already is the self-select
+      // signal. `createAllocation`'s own ALO-23 guard (the project's
+      // `allowSelfSelect` setting) still runs and still refuses this write
+      // when that setting is off; this gate only decides whether the request
+      // is shaped like one this caller is ever allowed to make.
+      if (standup.status !== 'Ready' && standup.status !== 'Completed') {
         throw new StandupError(
           'VALIDATION_FAILED',
           'Your own row can only be edited while the stand-up is Ready.',
@@ -118,6 +133,24 @@ export const POST = withStandupIdPermission(
       expectedVersion,
       actor: { userId }
     })
+
+    // N13/E31. Fired from the route, not `createAllocation`, matching N11's
+    // precedent (`yesterday/route.ts`) of keeping notification dispatch out of
+    // the one writer of `Allocation` — the service stays a pure write path,
+    // and a downed mail transport must never fail an allocation that already
+    // succeeded, hence the swallowed `.catch`.
+    if (
+      result.allocation.source === 'self_selected' &&
+      (result.allocation as any).addedAfterCompletion
+    ) {
+      await notifySelfSelectedAfterCompletion({
+        standupId,
+        projectId: String(projectId),
+        organizationId,
+        facilitatorId: String(standup.facilitator),
+        allocationId: String(result.allocation._id)
+      }).catch(() => undefined)
+    }
 
     return ok(result, { status: 201 })
   }

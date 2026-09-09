@@ -40,6 +40,7 @@ const helpersSource = sourceOf('src/lib/standup/route-helpers.ts')
 // against the mocked dependencies below, not the real database or auth stack.
 const raiseBlockerMock = jest.fn()
 const updateBlockerMock = jest.fn()
+const loadBlockerPanelMock = jest.fn()
 const hasPermission = jest.fn()
 const requireProjectAccess = jest.fn()
 const standupFindById = jest.fn()
@@ -77,8 +78,35 @@ jest.mock('@/models/StandupBlocker', () => ({
 
 jest.mock('@/lib/standup/blocker-service', () => ({
   raiseBlocker: (...args: unknown[]) => raiseBlockerMock(...args),
-  updateBlocker: (...args: unknown[]) => updateBlockerMock(...args)
+  updateBlocker: (...args: unknown[]) => updateBlockerMock(...args),
+  loadBlockerPanel: (...args: unknown[]) => loadBlockerPanelMock(...args)
 }))
+
+describe('GET /api/standups/:id/blockers', () => {
+  it('exposes the handler', () => {
+    expect(typeof blockersRoute.GET).toBe('function')
+  })
+
+  it('opts out of static rendering', () => {
+    expect(blockersRoute.dynamic).toBe('force-dynamic')
+  })
+
+  it('gates through the shared stand-up-id wrapper, never ad hoc', () => {
+    expect(raiseSource).toContain('withStandupIdPermission')
+  })
+
+  it('requires standup:view — a read, not the raise permission', () => {
+    expect(raiseSource).toMatch(/export const GET[\s\S]*?Permission\.STANDUP_VIEW/)
+  })
+
+  it('calls loadBlockerPanel, the seam that assembles Panel 6', () => {
+    expect(raiseSource).toContain('loadBlockerPanel')
+  })
+
+  it('maps a thrown StandupError to the §17.1 envelope via toErrorResponse', () => {
+    expect(raiseSource).toMatch(/export const GET[\s\S]*?toErrorResponse/)
+  })
+})
 
 describe('POST /api/standups/:id/blockers', () => {
   it('exposes the handler', () => {
@@ -149,6 +177,65 @@ describe('withBlockerPermission (route-helpers.ts)', () => {
     expect(helpersSource).toContain('export function withBlockerPermission')
     expect(helpersSource).toContain("import('@/models/StandupBlocker')")
     expect(helpersSource).toContain('StandupBlocker.findById')
+  })
+})
+
+describe('invoking GET for real, with the wrapper wired to mocked auth/db/service', () => {
+  const buildRequest = () => new NextRequest('http://localhost/api/standups/standup-1/blockers')
+
+  beforeEach(() => {
+    loadBlockerPanelMock.mockReset()
+    hasPermission.mockReset().mockResolvedValue(true)
+    requireProjectAccess.mockReset().mockResolvedValue(undefined)
+    standupFindById.mockReset().mockReturnValue({
+      lean: () =>
+        Promise.resolve({
+          _id: 'standup-1',
+          organization: 'org-1',
+          project: 'project-1',
+          sprint: 'sprint-1'
+        })
+    })
+  })
+
+  it('returns 200 with the panel rows from loadBlockerPanel', async () => {
+    const rows = [{ blockerId: 'blocker-1', status: 'open' }]
+    loadBlockerPanelMock.mockResolvedValue(rows)
+
+    const response = await blockersRoute.GET(buildRequest(), { params: { id: 'standup-1' } })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ success: true, data: rows })
+    expect(loadBlockerPanelMock).toHaveBeenCalledWith('standup-1')
+  })
+
+  it('checks the permission against the project the stand-up carries, using standup:view not blocker_raise', async () => {
+    loadBlockerPanelMock.mockResolvedValue([])
+
+    await blockersRoute.GET(buildRequest(), { params: { id: 'standup-1' } })
+
+    expect(hasPermission).toHaveBeenCalledWith('user-1', Permission.STANDUP_VIEW, 'project-1')
+  })
+
+  it('refuses with a plain 403 when the caller lacks standup:view, without ever calling loadBlockerPanel', async () => {
+    hasPermission.mockResolvedValue(false)
+
+    const response = await blockersRoute.GET(buildRequest(), { params: { id: 'standup-1' } })
+
+    expect(response.status).toBe(403)
+    expect(loadBlockerPanelMock).not.toHaveBeenCalled()
+  })
+
+  it('maps a thrown NOT_FOUND StandupError to a 404 carrying that code', async () => {
+    loadBlockerPanelMock.mockRejectedValue(
+      new StandupError('NOT_FOUND', 'That stand-up no longer exists.')
+    )
+
+    const response = await blockersRoute.GET(buildRequest(), { params: { id: 'standup-1' } })
+
+    expect(response.status).toBe(404)
+    const body = await response.json()
+    expect(body.error.code).toBe('NOT_FOUND')
   })
 })
 

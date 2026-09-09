@@ -56,23 +56,31 @@ async function seedPlannableSprint(overrides: Record<string, unknown> = {}) {
     ...overrides
   })
 
-  await Task.create({
-    title: 'Wire the export endpoint',
-    description:
-      'Done when POST /exports returns a job id and the pilot customer can download the CSV.',
-    type: 'task',
-    organization,
-    project,
-    sprint: sprint._id,
-    createdBy: user,
-    status: 'todo',
-    priority: 'medium',
-    taskNumber: 1,
-    displayId: 'KAN-1',
-    originalEstimateMinutes: 240,
-    estimateMethod: 'manual',
-    assignedTo: [{ user: member, assignedAt: new Date() }]
-  })
+  // 5 working days x 2 members x 480min = 4800min capacity. Eight 480min tasks
+  // (3840min, split evenly across both members) comfortably clear the PA-2
+  // under-scope threshold and stay under each member's own capacity, so every
+  // advisory (PA-1..6) passes and this fixture stays a clean "ready to
+  // complete" sprint now that completePlanning also gates on advisories (E19).
+  const assignees = [member, member, member, member, otherMember, otherMember, otherMember, otherMember]
+  for (let i = 0; i < assignees.length; i += 1) {
+    await Task.create({
+      title: `Wire the export endpoint ${i + 1}`,
+      description:
+        'Done when POST /exports returns a job id and the pilot customer can download the CSV.',
+      type: 'task',
+      organization,
+      project,
+      sprint: sprint._id,
+      createdBy: user,
+      status: 'todo',
+      priority: 'medium',
+      taskNumber: i + 1,
+      displayId: `KAN-${i + 1}`,
+      originalEstimateMinutes: 480,
+      estimateMethod: 'poker',
+      assignedTo: [{ user: assignees[i], assignedAt: new Date() }]
+    })
+  }
 
   const session = await SprintPlanningSession.create({
     sprint: sprint._id,

@@ -9,6 +9,7 @@ import { normalizeUploadUrl } from '@/lib/file-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Role } from '@/lib/permissions/permission-definitions'
+import { convertOpenAllocationsToCarryForward } from '@/lib/standup/carry-forward-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -302,6 +303,26 @@ export async function DELETE(request: NextRequest) {
           { status: 403 }
         )
       }
+    }
+
+    // E60: before detaching the member from any project, convert their still
+    // open allocations (rows on a stand-up that has not yet completed) into
+    // owner_absent carry-forward register items — the same conversion an
+    // absence mark gets via attendance-service.ts, just triggered by removal
+    // instead of a daily mark, and done eagerly since a removed member may
+    // never attend another stand-up to trigger the completion-time sweep.
+    const affectedProjects = (await Project.find({
+      organization: organizationId,
+      'teamMembers.memberId': memberId
+    })
+      .select('_id')
+      .lean()) as any[]
+
+    for (const affectedProject of affectedProjects) {
+      await convertOpenAllocationsToCarryForward({
+        projectId: String(affectedProject._id),
+        memberId
+      })
     }
 
     // Remove member from any project team member lists

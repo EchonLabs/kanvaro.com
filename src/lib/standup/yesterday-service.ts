@@ -41,6 +41,16 @@ export interface YesterdayPanelData {
   previousStandupDate?: string
   /** RUN-9's four buckets, in order, always all four. */
   buckets: BucketedRows[]
+  /**
+   * Task 14/E31/ALO-22. Rows written after the previous stand-up had already
+   * completed — a member's self-select or a PM's top-up, both stamped
+   * `addedAfterCompletion` by `allocation-service.ts`. Surfaced as its own
+   * group, distinct from (and in addition to) RUN-9's four buckets: the PM
+   * was not in the room when these were added, so they need calling out
+   * rather than blending into whichever bucket their task status happens to
+   * land in.
+   */
+  addedAfterCompletion: YesterdayRow[]
   computedAt: string
 }
 
@@ -60,6 +70,7 @@ export async function loadYesterdayPanel(standupId: string): Promise<YesterdayPa
     return {
       standupId,
       buckets: partitionYesterday({ rows: [], statusSets }),
+      addedAfterCompletion: [],
       computedAt: new Date().toISOString()
     }
   }
@@ -140,7 +151,8 @@ export async function loadYesterdayPanel(standupId: string): Promise<YesterdayPa
       dayVarianceMinutes: subtractMinutes(loggedMinutes, plannedMinutes),
       remainingEstimateMinutes: minutes(task?.remainingEstimateMinutes ?? 0),
       ageInStandups: ageOf(task, row),
-      unplanned: false
+      unplanned: false,
+      addedAfterCompletion: row.addedAfterCompletion === true
     }
   })
 
@@ -173,6 +185,12 @@ export async function loadYesterdayPanel(standupId: string): Promise<YesterdayPa
     previousStandupId: String(previous._id),
     previousStandupDate: previous.standupDate,
     buckets: partitionYesterday({ rows, statusSets }),
+    // Task 14/E31: the same rows already classified into RUN-9's buckets
+    // above, filtered rather than re-queried — every allocation on the
+    // previous stand-up was already loaded once, and building this from the
+    // enriched `rows` keeps the two views (bucketed, and this one) from ever
+    // disagreeing about a row's task title, logged minutes or age.
+    addedAfterCompletion: rows.filter((row) => row.addedAfterCompletion === true),
     computedAt: new Date().toISOString()
   }
 }

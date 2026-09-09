@@ -547,6 +547,89 @@ describe('POST /api/standups/:id/allocations — a member cannot escape their ow
 })
 
 /**
+ * Task 14 — E31. A member holding only `standup:allocate_own` reaches this
+ * handler always self-selecting (the outer branch above sets
+ * `isSelfSelect = true` unconditionally for this caller class), so "own row +
+ * Completed status" is the whole signal — no client-supplied flag is needed
+ * to tell this apart from a general edit. `Completed` joins `Ready` as the
+ * only two statuses this caller may write through; every other status (the
+ * RUN-26 lockout test above, using `In_Progress`) must keep refusing exactly
+ * as before.
+ */
+describe('POST /api/standups/:id/allocations — E31 self-select after completion', () => {
+  useMongo()
+
+  beforeAll(() => {
+    mockMemberId2 = mem2
+    mockOrgId2 = org2
+  })
+
+  beforeEach(() => {
+    hasPermission2
+      .mockReset()
+      .mockImplementation(
+        async (_userId: string, permission: string) => permission !== Permission.STANDUP_ALLOCATE
+      )
+  })
+
+  it('lets a plain member self-select onto their own row after completion when allowSelfSelect is on', async () => {
+    const { standup, task } = await seedSelfSelectFixture({ status: 'Completed', version: 1 })
+
+    const response = await boardRouteLive.POST(
+      buildPost(
+        `/api/standups/${standup._id}/allocations`,
+        { memberId: String(mem2), taskId: String(task._id) },
+        1
+      ),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(payload.data.allocation.source).toBe('self_selected')
+    expect(payload.data.allocation.addedAfterCompletion).toBe(true)
+  })
+
+  it('still refuses once completed when allowSelfSelect is off', async () => {
+    const { standup, task } = await seedSelfSelectFixture(
+      { status: 'Completed', version: 1 },
+      { allowSelfSelect: false }
+    )
+
+    const response = await boardRouteLive.POST(
+      buildPost(
+        `/api/standups/${standup._id}/allocations`,
+        { memberId: String(mem2), taskId: String(task._id) },
+        1
+      ),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(payload.error.message).toMatch(/self-select is turned off/i)
+    expect(await Allocation.countDocuments({ standup: standup._id })).toBe(0)
+  })
+
+  it('still refuses on a non-Ready, non-Completed status (RUN-26 keeps its lockout)', async () => {
+    const { standup, task } = await seedSelfSelectFixture({ status: 'In_Progress' })
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(mem2),
+        taskId: String(task._id)
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(payload.error.message).toMatch(/only be edited while the stand-up is Ready/i)
+    expect(await Allocation.countDocuments({ standup: standup._id })).toBe(0)
+  })
+})
+
+/**
  * RUN-25's "member pre-edit while `Ready`" — the hours input on
  * `/my/standup` — plus the same RUN-26 lock as above. Before this fix the
  * PATCH route demanded the full `standup:allocate`, so every member edit 403'd.

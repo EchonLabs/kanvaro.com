@@ -107,6 +107,13 @@ export interface IStandup extends Document {
   /** RUN-3: starting late is recorded, never blocked. */
   startedLateByMinutes?: number
   completedAt?: Date
+  /**
+   * E57: `completedAt - startedAt` in whole minutes, stamped by the
+   * completion saga's finalize step. Advisory discipline metric only — never
+   * gates anything. Absent when the stand-up never had a `startedAt` to
+   * measure from.
+   */
+  actualDurationMinutes?: number
   wasBackfilled: boolean
   backfilledAt?: Date
   missedAt?: Date
@@ -202,6 +209,7 @@ const StandupSchema = new Schema<IStandup>(
     startedAt: { type: Date },
     startedLateByMinutes: { type: Number, min: 0 },
     completedAt: { type: Date },
+    actualDurationMinutes: { type: Number, min: 0 },
     wasBackfilled: { type: Boolean, default: false },
     backfilledAt: { type: Date },
     missedAt: { type: Date },

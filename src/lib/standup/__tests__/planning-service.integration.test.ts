@@ -150,10 +150,42 @@ describe('completePlanning', () => {
 
   async function readySprint() {
     await seedCalendar()
-    const sprint = await seedSprint()
+    // A single working day keeps capacity (2 members x 1 day x 480min = 960min)
+    // exactly matched to the two 480min tasks below, so every advisory (PA-1..6)
+    // passes too — this fixture is meant to be unconditionally "ready", not just
+    // mandatory-clean, now that completePlanning also gates on advisories (E19).
+    const sprint = await seedSprint({
+      startDate: new Date('2026-08-24'),
+      endDate: new Date('2026-08-24')
+    })
     await seedTask(sprint, { assignedTo: [{ user }] })
     await seedTask(sprint, { assignedTo: [{ user: member }] })
     return sprint
+  }
+
+  // E19 — scope well past capacity (PA-1) while every task stays individually
+  // estimated (PC-3 passes) and no member goes idle or overloaded (PA-5/PA-6
+  // stay green), so only PA-1 is the advisory under test.
+  async function seedOverCapacitySprint() {
+    await seedCalendar()
+    // 3 working days x 2 members x 480min = 2880min capacity.
+    const sprint = await seedSprint({
+      startDate: new Date('2026-08-24'),
+      endDate: new Date('2026-08-26')
+    })
+    await seedTask(sprint, { assignedTo: [{ user }] })
+    await seedTask(sprint, { assignedTo: [{ user: member }] })
+    // Five more 480min tasks, left unassigned so PA-5/PA-6 stay unaffected,
+    // push total estimate to 3360min — well past the 2880min capacity.
+    for (let i = 0; i < 5; i += 1) {
+      await seedTask(sprint, { assignedTo: [] })
+    }
+    const planning = await session(sprint)
+    return {
+      sprintId: sprint._id.toString(),
+      sessionId: planning._id.toString(),
+      userId: user.toString()
+    }
   }
 
   it('moves the sprint to planned', async () => {
@@ -325,5 +357,30 @@ describe('completePlanning', () => {
     const all = await SprintPlanningSession.find({ sprint: sprint._id }).lean()
     expect(all).toHaveLength(2)
     expect((all as any[]).every((item) => item.status === 'completed')).toBe(true)
+  })
+
+  it('E19 — refuses to complete planning while a failing advisory is unacknowledged', async () => {
+    const { sprintId, sessionId, userId } = await seedOverCapacitySprint()
+
+    await expect(
+      completePlanning({ sprintId, sessionId, userId })
+    ).rejects.toMatchObject({ code: 'COMPLETION_CHECKS_FAILED' })
+
+    // Nothing moved — same guarantee as the mandatory-check refusal above.
+    const after = await Sprint.findById(sprintId).lean()
+    expect((after as any).status).toBe('planning')
+  })
+
+  it('E19 — completes planning once the over-capacity advisory is acknowledged', async () => {
+    const { sprintId, sessionId, userId } = await seedOverCapacitySprint()
+
+    const result = await completePlanning({
+      sprintId,
+      sessionId,
+      userId,
+      acknowledgedCheckIds: ['PA-1']
+    })
+
+    expect(result.sprint.status).toBe('planned')
   })
 })

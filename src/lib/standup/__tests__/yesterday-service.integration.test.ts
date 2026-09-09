@@ -147,4 +147,39 @@ describe('loadYesterdayPanel', () => {
     await Task.updateOne({ _id: example.kan214 }, { $set: { standupSpillCount: 5 } })
     expect(rowFor(await loadYesterdayPanel(example.day4), 'KAN-214').ageInStandups).toBe(5)
   })
+
+  /**
+   * Task 14 — E31/ALO-22. A row written after the previous stand-up already
+   * completed (a member's self-select or a PM's top-up — both share the same
+   * `addedAfterCompletion` stamp) is real, planned work the next day's review
+   * must not silently fold into the ordinary buckets: the PM was not in the
+   * room when it happened, so it needs its own, clearly-labeled group.
+   */
+  it('surfaces a row added after the previous stand-up completed as its own group', async () => {
+    const example = await seedWorkedExample()
+    await Allocation.updateOne(
+      { _id: example.allocations['KAN-231'] },
+      {
+        $set: {
+          addedAfterCompletion: true,
+          addedAfterCompletionAt: new Date(`${FIXTURE_DAY_3}T20:00:00+05:30`),
+          addedAfterCompletionReason: 'Self-selected after the stand-up completed'
+        }
+      }
+    )
+
+    const panel = await loadYesterdayPanel(example.day4)
+
+    expect(panel.addedAfterCompletion).toHaveLength(1)
+    expect(panel.addedAfterCompletion[0].taskKey).toBe('KAN-231')
+
+    // Still classified into its ordinary bucket too — the new group is an
+    // addition to the response, not a rerouting of RUN-9's four buckets.
+    expect(allRows(panel).some((row) => row.taskKey === 'KAN-231')).toBe(true)
+  })
+
+  it('returns an empty addedAfterCompletion group when nothing was added late', async () => {
+    const { day4 } = await seedWorkedExample()
+    expect((await loadYesterdayPanel(day4)).addedAfterCompletion).toEqual([])
+  })
 })

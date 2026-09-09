@@ -18,10 +18,19 @@ import type { CalendarImpactItem } from './calendar-impact'
 import { sendStandupNotificationOnce } from './jobs/notify'
 import { standupStrings } from './strings'
 
-/** The §9.5 notification ids. Used as keys into `notificationSwitches`. */
+/**
+ * The §9.5 notification ids. Used as keys into `notificationSwitches`.
+ *
+ * `N13` is Task 14/E31's addition — the spec's own §9.5 table has no entry for
+ * "a member self-selected onto their own day after the stand-up completed",
+ * because that path did not exist until this task closed it. It keeps the
+ * table's numbering rather than inventing an unrelated scheme, so a future
+ * reader scanning `notificationSwitches` for "every id this project can
+ * silence" finds it exactly where N1-N12 taught them to look.
+ */
 export type StandupNotificationId =
   | 'N1' | 'N2' | 'N3' | 'N4' | 'N5' | 'N6'
-  | 'N7' | 'N8' | 'N9' | 'N10' | 'N11' | 'N12'
+  | 'N7' | 'N8' | 'N9' | 'N10' | 'N11' | 'N12' | 'N13'
 
 /**
  * Whether a project has this notification switched on (SCH-16).
@@ -287,6 +296,34 @@ export async function notifyStatusChangedOnBehalf(input: {
       taskKey: input.taskKey ?? ''
     }),
     url: `/tasks/${input.taskId}`
+  })
+}
+
+/**
+ * N13 — Task 14/E31: a member self-selected a task onto their own day after
+ * the stand-up had already completed. Tells the facilitator, following N7's
+ * pattern exactly: keyed per-allocation (`N13:<allocationId>`) rather than
+ * once per stand-up, because a stand-up can gather more than one such
+ * addition across the day and each is its own piece of news — the same
+ * reasoning N7's per-`overrideId` key documents for overrides.
+ */
+export async function notifySelfSelectedAfterCompletion(input: {
+  standupId: string
+  projectId: string
+  organizationId: string
+  facilitatorId: string
+  allocationId: string
+}): Promise<number> {
+  return sendStandupNotificationOnce({
+    standupId: input.standupId,
+    projectId: input.projectId,
+    organizationId: input.organizationId,
+    notificationId: 'N13',
+    variantKey: `N13:${input.allocationId}`,
+    recipientIds: [input.facilitatorId],
+    perRecipient: true,
+    title: standupStrings.notifications.selfSelectedAfterCompletionTitle(),
+    message: standupStrings.notifications.selfSelectedAfterCompletionMessage()
   })
 }
 

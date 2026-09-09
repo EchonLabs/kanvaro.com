@@ -2,10 +2,12 @@ import { Holiday } from '@/models/Holiday'
 import { HolidaySet } from '@/models/HolidaySet'
 import { JobHeartbeat } from '@/models/JobHeartbeat'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
+import { TimeEntry } from '@/models/TimeEntry'
 import { SCHEDULER_HEARTBEAT_JOB } from '@/lib/standup/jobs/heartbeat'
 import { getActiveDegradations } from '@/lib/standup/degradation'
 
 import { ids, syncIndexes, useMongo } from './helpers/mongo'
+import mongoose from 'mongoose'
 
 describe('getActiveDegradations', () => {
   useMongo()
@@ -168,5 +170,98 @@ describe('HOLIDAY_COVERAGE_GAP (DO-4)', () => {
     })
 
     expect(found.map((d) => d.code)).not.toContain('HOLIDAY_COVERAGE_GAP')
+  })
+})
+
+describe('CROSS_PROJECT_LOAD_UNAVAILABLE (E23)', () => {
+  useMongo()
+
+  beforeEach(async () => {
+    await syncIndexes(JobHeartbeat)
+    process.env.CRON_SECRET = 'set-so-it-is-quiet'
+    await JobHeartbeat.create({
+      job: SCHEDULER_HEARTBEAT_JOB,
+      ranAt: new Date(),
+      durationMs: 1,
+      ok: true
+    })
+  })
+
+  afterEach(() => {
+    delete process.env.CRON_SECRET
+  })
+
+  it('always surfaces CROSS_PROJECT_LOAD_UNAVAILABLE when a project scope is given (E23)', async () => {
+    const degradations = await getActiveDegradations({
+      organizationId: ids.organization.toString(),
+      projectId: ids.project.toString()
+    })
+
+    expect(degradations.some((d) => d.code === 'CROSS_PROJECT_LOAD_UNAVAILABLE')).toBe(true)
+  })
+
+  it('never surfaces it for an organization-only scope with no project', async () => {
+    const degradations = await getActiveDegradations({ organizationId: ids.organization.toString() })
+
+    expect(degradations.some((d) => d.code === 'CROSS_PROJECT_LOAD_UNAVAILABLE')).toBe(false)
+  })
+})
+
+describe('LEAVE_DATA_MANUAL and TIME_LOGGING_MANUAL (E74/E75)', () => {
+  useMongo()
+
+  beforeEach(async () => {
+    await syncIndexes(JobHeartbeat, TimeEntry)
+    process.env.CRON_SECRET = 'set-so-it-is-quiet'
+    await JobHeartbeat.create({
+      job: SCHEDULER_HEARTBEAT_JOB,
+      ranAt: new Date(),
+      durationMs: 1,
+      ok: true
+    })
+  })
+
+  afterEach(() => {
+    delete process.env.CRON_SECRET
+  })
+
+  it('surfaces LEAVE_DATA_MANUAL whenever a project scope is given (E75)', async () => {
+    const degradations = await getActiveDegradations({
+      organizationId: ids.organization.toString(),
+      projectId: ids.project.toString()
+    })
+
+    expect(degradations.some((d) => d.code === 'LEAVE_DATA_MANUAL')).toBe(true)
+  })
+
+  it('surfaces TIME_LOGGING_MANUAL when the project has no real time entries (E74)', async () => {
+    const degradations = await getActiveDegradations({
+      organizationId: ids.organization.toString(),
+      projectId: ids.project.toString()
+    })
+
+    expect(degradations.some((d) => d.code === 'TIME_LOGGING_MANUAL')).toBe(true)
+  })
+
+  it('does not surface TIME_LOGGING_MANUAL once the project has real logged time', async () => {
+    await TimeEntry.create({
+      user: new mongoose.Types.ObjectId(),
+      organization: ids.organization,
+      project: ids.project,
+      description: 'Real work',
+      startTime: new Date(),
+      duration: 60,
+      status: 'completed',
+      category: 'general', // not 'standup_manual'
+      isBillable: true,
+      tags: []
+    })
+
+    const degradations = await getActiveDegradations({
+      organizationId: ids.organization.toString(),
+      projectId: ids.project.toString()
+    })
+
+    expect(degradations.some((d) => d.code === 'TIME_LOGGING_MANUAL')).toBe(false)
   })
 })

@@ -98,9 +98,22 @@ export async function createAllocation(
 ): Promise<AllocationWriteResult> {
   const topUpReason = input.topUp ? assertTopUpReason(input.topUp.reason) : undefined
 
+  // `allowCompleted` also opens for a `selfSelect` write, not only a `topUp`
+  // one — Task 14/E31. This only ever matters when the stand-up is *actually*
+  // Completed, so it cannot loosen anything for the ordinary pre-completion
+  // self-select path (status `Ready`, where this flag is irrelevant); it only
+  // lets a genuinely Completed-standup self-select reach the ALO-23 checks
+  // below instead of being refused here before they run.
   const context = await loadMutableContext(input.standupId, input.expectedVersion, {
-    allowCompleted: Boolean(input.topUp)
+    allowCompleted: Boolean(input.topUp) || Boolean(input.selfSelect)
   })
+
+  // Task 14/E31: a self-select that actually landed against a Completed
+  // stand-up. Computed once, right after the status is known, and reused both
+  // to decide the `addedAfterCompletion` stamp below and — implicitly, via
+  // that stamp — to drive the route's post-write notification.
+  const isSelfSelectAfterCompletion =
+    Boolean(input.selfSelect) && context.standup.status === 'Completed'
 
   // ALO-23. Two independent conditions, and both are refusals rather than
   // silent downgrades to an ordinary allocation: a member who thinks they
@@ -187,7 +200,19 @@ export async function createAllocation(
             addedAfterCompletionAt: new Date(),
             addedAfterCompletionReason: topUpReason
           }
-        : {}),
+        : isSelfSelectAfterCompletion
+          ? {
+              // No PM-supplied reason exists for a member's own self-select the
+              // way a top-up carries one — `addedAfterCompletionReason` is
+              // optional on the schema, but a blank field on an already
+              // history-altering row is exactly the kind of unexplained edit
+              // ALO-22's own reasoning warns against, so a fixed, honest
+              // default fills it instead of leaving it empty.
+              addedAfterCompletion: true,
+              addedAfterCompletionAt: new Date(),
+              addedAfterCompletionReason: 'Self-selected after the stand-up completed'
+            }
+          : {}),
       createdBy: input.actor.userId
     })
   } catch (error) {
@@ -414,6 +439,9 @@ export interface AllocationBoard {
   facilitatorName: string
   meetingUrl?: string
   standupVersion: number
+  /** E57/§15.8.2. Feeds the run screen's advisory elapsed-time indicator. */
+  startedAt?: Date
+  durationMinutes?: number
   /** DN-6 / OB-10: false means the board must say ceremonies were not deducted. */
   ceremoniesConsumeCapacity: boolean
   members: BoardMember[]
@@ -515,6 +543,11 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
     facilitatorName: nameById.get(String(context.standup.facilitator)) ?? '',
     ...(context.standup.meetingUrl ? { meetingUrl: context.standup.meetingUrl } : {}),
     standupVersion: context.standup.version ?? 0,
+    ...(context.standup.startedAt ? { startedAt: context.standup.startedAt } : {}),
+    // `durationMinutes` is `required` on the schema, so this is always present
+    // in practice — kept a plain assignment (not a conditional spread like
+    // `startedAt`/`meetingUrl` above) to match that non-optional reality.
+    durationMinutes: context.standup.durationMinutes,
     ceremoniesConsumeCapacity: context.ceremoniesConsumeCapacity,
     members,
     pool: partitionPool(

@@ -14,6 +14,7 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { logTaskFieldChanges } from '@/lib/task-activity-logger'
 import { logActivity } from '@/lib/activity-logger'
 import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
+import { closeCarryForwardItemsForDeletedTask } from '@/lib/standup/carry-forward-service'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
@@ -1109,6 +1110,30 @@ export async function DELETE(
       )
     }
 
+    // E64: close any carry-forward register items still pointing at this
+    // task before they're left dangling forever, referencing a task that no
+    // longer exists. findOneAndDelete already returned the task's identity
+    // (title/displayId) atomically, so this reads it from the returned
+    // document rather than needing a lookup before the delete. Awaited
+    // (unlike the cache invalidation below) because this is the correctness
+    // fix itself, not a best-effort side effect. The task is already
+    // irreversibly deleted by this point, so a failure here must not fail
+    // the request or change its status — but it must not be silently
+    // swallowed either, since it leaves the carry-forward register
+    // inconsistent (the exact bug E64 exists to prevent). Surfaced as a
+    // non-fatal warning on the success response instead.
+    const warnings: string[] = []
+    try {
+      await closeCarryForwardItemsForDeletedTask({
+        taskId,
+        deletedBy: userId,
+        taskLabel: (task as any).displayId || (task as any).title
+      })
+    } catch (error) {
+      console.error('Failed to auto-close carry-forward items for deleted task:', error)
+      warnings.push('Failed to auto-close related carry-forward items')
+    }
+
     // Invalidate tasks cache for this organization (non-blocking)
     // Don't await to avoid blocking the response
     invalidateCache(`tasks:*:org:${organizationId}:*`).catch(error => {
@@ -1118,7 +1143,8 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'Task deleted successfully'
+      message: 'Task deleted successfully',
+      ...(warnings.length > 0 ? { warnings } : {})
     })
 
   } catch (error) {

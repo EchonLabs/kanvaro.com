@@ -1,4 +1,4 @@
-import { isOwnRowReadOnly } from '../own-row'
+import { isOwnRowReadOnly, isSelfSelectDisabled } from '../own-row'
 
 /**
  * RUN-26, extracted from the two screens that used to state it separately.
@@ -33,5 +33,53 @@ describe('isOwnRowReadOnly', () => {
     it('locks a member viewing the run screen once it has started', () => {
       expect(isOwnRowReadOnly({ status: 'In_Progress', canAllocateOthers: false })).toBe(true)
     })
+  })
+})
+
+/**
+ * Task 14/E31. Narrower and deliberately different from `isOwnRowReadOnly`
+ * above: adding a brand-new self-selected task is meant to stay possible on
+ * `Completed`, while editing an *existing* row's hours (what
+ * `isOwnRowReadOnly` governs) must not be.
+ */
+describe('isSelfSelectDisabled', () => {
+  it('stays enabled on Ready when self-select is allowed', () => {
+    expect(
+      isSelfSelectDisabled({ status: 'Ready', canAllocateOthers: false, allowSelfSelect: true })
+    ).toBe(false)
+  })
+
+  it('is enabled on Completed when self-select is allowed — the whole point of E31', () => {
+    expect(
+      isSelfSelectDisabled({
+        status: 'Completed',
+        canAllocateOthers: false,
+        allowSelfSelect: true
+      })
+    ).toBe(false)
+  })
+
+  it('stays disabled on every other status, In_Progress included', () => {
+    for (const status of ['Scheduled', 'In_Progress', 'Reopened', 'Missed', 'Cancelled']) {
+      expect(
+        isSelfSelectDisabled({ status, canAllocateOthers: false, allowSelfSelect: true })
+      ).toBe(true)
+    }
+  })
+
+  it('stays disabled whatever the status when the project has self-select turned off', () => {
+    for (const status of ['Ready', 'Completed', 'In_Progress']) {
+      expect(
+        isSelfSelectDisabled({ status, canAllocateOthers: false, allowSelfSelect: false })
+      ).toBe(true)
+    }
+  })
+
+  it('never disables a PM, whatever the status or the project setting', () => {
+    for (const status of ['Ready', 'Completed', 'In_Progress']) {
+      expect(
+        isSelfSelectDisabled({ status, canAllocateOthers: true, allowSelfSelect: false })
+      ).toBe(false)
+    }
   })
 })

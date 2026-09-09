@@ -1,14 +1,23 @@
 /**
- * Raising a blocker (spec RUN-14..17, phase 10).
+ * Blocker panel read, and raising a blocker (spec RUN-14..18, phase 10).
  *
+ *   GET  /api/standups/:id/blockers
  *   POST /api/standups/:id/blockers
  *
- * Gated on `standup:blocker_raise` — `raiseBlocker` does the actual work: it
- * validates the description, excludes the linked allocation from capacity
- * unless the caller explicitly kept it allocated (RUN-16), opens the linked
- * `open_blocker` carry-forward register row (RUN-17), and audits it (SEC-3).
+ * `GET` is read-only, gated on `standup:view` like the other board panels
+ * (`carry-forward/route.ts`'s `GET` is the direct template) — Panel 6 is part
+ * of the board, not a mutation surface. `loadBlockerPanel` does the assembly:
+ * every blocker on this stand-up, RUN-18's overdue flag, and RUN-15's freed-
+ * capacity figure, batched the same way Panel 4's read model batches its task
+ * and member lookups.
  *
- * Deliberately carries no stand-up version guard. RUN-23's optimistic-
+ * `POST` is gated on `standup:blocker_raise` — `raiseBlocker` does the actual
+ * write: it validates the description, excludes the linked allocation from
+ * capacity unless the caller explicitly kept it allocated (RUN-16), opens the
+ * linked `open_blocker` carry-forward register row (RUN-17), and audits it
+ * (SEC-3).
+ *
+ * `POST` deliberately carries no stand-up version guard. RUN-23's optimistic-
  * concurrency check exists for writes to the `Standup` document's own guarded
  * fields; raising a blocker creates a sibling `StandupBlocker` record and
  * never touches the stand-up itself. Task 6's override route and Phase 9's
@@ -18,11 +27,23 @@
 import { NextResponse } from 'next/server'
 
 import { Permission } from '@/lib/permissions/permission-definitions'
-import { raiseBlocker } from '@/lib/standup/blocker-service'
+import { loadBlockerPanel, raiseBlocker } from '@/lib/standup/blocker-service'
 import { toErrorResponse } from '@/lib/standup/errors'
-import { withStandupIdPermission } from '@/lib/standup/route-helpers'
+import { ok, withStandupIdPermission } from '@/lib/standup/route-helpers'
 
 export const dynamic = 'force-dynamic'
+
+export const GET = withStandupIdPermission(
+  { permission: Permission.STANDUP_VIEW },
+  async (_request, { standupId }) => {
+    try {
+      return ok(await loadBlockerPanel(standupId))
+    } catch (error) {
+      const { status, body: errorBody } = toErrorResponse(error)
+      return NextResponse.json(errorBody, { status })
+    }
+  }
+)
 
 interface RaiseBlockerBody {
   taskId?: string

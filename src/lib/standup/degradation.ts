@@ -10,6 +10,7 @@
  * detection lands in a later phase, so no later phase has to widen this type.
  */
 import { JobHeartbeat } from '@/models/JobHeartbeat'
+import { TimeEntry } from '@/models/TimeEntry'
 
 import { checkHolidayCoverage } from './calendar-service'
 import { cronSecretIsConfigured } from './jobs/auth'
@@ -125,6 +126,40 @@ export async function getActiveDegradations(
             })
           : standupStrings.degradation.holidayCoverageNone({ setName: gap.setName }),
         action: { label: standupStrings.degradation.holidayCoverageAction, href: HOLIDAY_ADMIN },
+        detectedAt: now
+      })
+    }
+  }
+
+  // SCH-18/19/20 (register row 10): single-project capacity only in release one.
+  // Info-level, always present once a project scope exists — this is a
+  // permanent limitation of this release, not a transient failure.
+  if (scope.projectId) {
+    found.push({
+      code: 'CROSS_PROJECT_LOAD_UNAVAILABLE',
+      severity: 'info',
+      message: standupStrings.degradation.crossProjectLoadUnavailable,
+      detectedAt: now
+    })
+
+    // §6.4 OB-14 / register row 7: leave has no module integration in this
+    // release at all, for any project — a permanent fact, not a detected one.
+    found.push({
+      code: 'LEAVE_DATA_MANUAL',
+      severity: 'info',
+      message: standupStrings.degradation.leaveDataManual,
+      detectedAt: now
+    })
+
+    const hasRealTimeEntry = await TimeEntry.exists({
+      project: scope.projectId,
+      category: { $ne: 'standup_manual' }
+    })
+    if (!hasRealTimeEntry) {
+      found.push({
+        code: 'TIME_LOGGING_MANUAL',
+        severity: 'info',
+        message: standupStrings.degradation.timeLoggingManual,
         detectedAt: now
       })
     }

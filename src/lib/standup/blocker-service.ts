@@ -9,10 +9,15 @@
  */
 import { StandupBlocker, type IStandupBlocker } from '@/models/StandupBlocker'
 import { Allocation } from '@/models/Allocation'
-import { validateBlockerFields } from './blocker'
+import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
+import { Standup } from '@/models/Standup'
+import { Task } from '@/models/Task'
+import { User } from '@/models/User'
+import { isOverdue, validateBlockerFields } from './blocker'
 import { StandupError } from './errors'
 import { recordAudit } from './audit'
 import { createOpenBlockerItem, resolveLinkedOpenBlockerItem } from './carry-forward-service'
+import { isoOfStoredDate } from './calendar-dates'
 
 export interface RaiseBlockerInput {
   standupId: string
@@ -61,13 +66,21 @@ export async function raiseBlocker(input: RaiseBlockerInput): Promise<IStandupBl
   })
 
   if (input.linkedAllocationId) {
+    // AC-25/RUN-15: a blocked allocation is excluded from capacity unless the
+    // PM explicitly kept it allocated (RUN-16), *or* the project has opted
+    // blocked tasks into still consuming capacity via
+    // `ProjectStandupSettings.blockedTasksConsumeCapacity`.
+    const settings = await ProjectStandupSettings.findOne({ project: input.projectId })
+      .select('blockedTasksConsumeCapacity')
+      .lean<{ blockedTasksConsumeCapacity?: boolean } | null>()
+
     await Allocation.updateOne(
       { _id: input.linkedAllocationId },
       {
         $set: {
           isBlocked: true,
           allocatedDespiteBlocked: Boolean(input.allocatedDespiteBlocked),
-          excludedFromCapacity: !input.allocatedDespiteBlocked,
+          excludedFromCapacity: !input.allocatedDespiteBlocked && !settings?.blockedTasksConsumeCapacity,
           blockedNote: input.blockedNote
         }
       }
@@ -160,4 +173,98 @@ export async function updateBlocker(input: UpdateBlockerInput): Promise<IStandup
   })
 
   return blocker
+}
+
+// --- Panel 6 read model (RUN-14..18) ---------------------------------------
+
+export interface BlockerPanelRow {
+  blockerId: string
+  taskKey?: string
+  description: string
+  blockerType: string
+  severity: string
+  status: string
+  owner?: string
+  targetResolutionDate?: string
+  overdue: boolean
+  freedMinutes?: number
+  blockerLabel: string
+}
+
+/**
+ * Panel 6's read (RUN-14..18). Every blocker raised on this stand-up,
+ * assembled the same way `loadCarryForwardPanel` assembles Panel 4: load the
+ * stand-up for its `standupDate` (this module's "today" for RUN-18's overdue
+ * check, the same reference date every other panel-assembly function in this
+ * file uses), batch-load the related tasks/owners/allocations rather than
+ * one query per blocker, then map.
+ *
+ * Two fields are purely computed, never stored:
+ * - `overdue` reuses `isOverdue` from `blocker.ts` (RUN-18) — the same pure
+ *   function `blocker.test.ts` already exercises — comparing the blocker's
+ *   `targetResolutionDate` against the stand-up's own calendar date.
+ * - `blockerLabel` is `'BLK-' + ` the blocker's own `_id`'s last 6 hex
+ *   characters, uppercased. No counter, no extra storage — every read derives
+ *   the same label from the id that already uniquely identifies the row.
+ */
+export async function loadBlockerPanel(standupId: string): Promise<BlockerPanelRow[]> {
+  const standup = (await Standup.findById(standupId).select('standupDate').lean()) as any
+  if (!standup) {
+    throw new StandupError('NOT_FOUND', 'That stand-up no longer exists.', { standupId })
+  }
+
+  const blockers = (await StandupBlocker.find({ standup: standup._id }).lean()) as any[]
+
+  const taskIds = Array.from(new Set(blockers.filter((b) => b.task).map((b) => String(b.task))))
+  const ownerIds = Array.from(new Set(blockers.filter((b) => b.owner).map((b) => String(b.owner))))
+  const allocationIds = Array.from(
+    new Set(blockers.filter((b) => b.linkedAllocation).map((b) => String(b.linkedAllocation)))
+  )
+
+  const [tasks, owners, allocations] = await Promise.all([
+    taskIds.length
+      ? (Task.find({ _id: { $in: taskIds } }).select('displayId').lean() as Promise<any[]>)
+      : Promise.resolve([]),
+    ownerIds.length
+      ? (User.find({ _id: { $in: ownerIds } }).select('firstName lastName email').lean() as Promise<any[]>)
+      : Promise.resolve([]),
+    allocationIds.length
+      ? (Allocation.find({ _id: { $in: allocationIds } })
+          .select('plannedMinutes excludedFromCapacity')
+          .lean() as Promise<any[]>)
+      : Promise.resolve([])
+  ])
+
+  const taskById = new Map(tasks.map((task) => [String(task._id), task]))
+  const ownerNameById = new Map(
+    owners.map((owner) => [
+      String(owner._id),
+      [owner.firstName, owner.lastName].filter(Boolean).join(' ') || owner.email
+    ])
+  )
+  const allocationById = new Map(allocations.map((allocation) => [String(allocation._id), allocation]))
+
+  return blockers.map((blocker): BlockerPanelRow => {
+    const task = blocker.task ? taskById.get(String(blocker.task)) : undefined
+    const allocation = blocker.linkedAllocation
+      ? allocationById.get(String(blocker.linkedAllocation))
+      : undefined
+    const targetResolutionDate = blocker.targetResolutionDate
+      ? isoOfStoredDate(blocker.targetResolutionDate)
+      : undefined
+
+    return {
+      blockerId: String(blocker._id),
+      ...(task?.displayId ? { taskKey: task.displayId } : {}),
+      description: blocker.description,
+      blockerType: blocker.blockerType,
+      severity: blocker.severity,
+      status: blocker.status,
+      ...(blocker.owner ? { owner: ownerNameById.get(String(blocker.owner)) } : {}),
+      ...(targetResolutionDate ? { targetResolutionDate } : {}),
+      overdue: isOverdue(targetResolutionDate, standup.standupDate),
+      ...(allocation?.excludedFromCapacity ? { freedMinutes: allocation.plannedMinutes } : {}),
+      blockerLabel: `BLK-${String(blocker._id).slice(-6).toUpperCase()}`
+    }
+  })
 }

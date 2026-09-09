@@ -394,6 +394,22 @@ export const standupStrings = {
     joinCall: () => 'Join call',
     refresh: () => 'Refresh',
     complete: () => 'Complete stand-up',
+    viewSummary: () => 'View summary',
+
+    /** RUN-2/3, AC-5 (Task 1). The button that starts a `Ready` stand-up. */
+    start: () => 'Start stand-up',
+    startSuccess: () => 'Stand-up started.',
+    startPlanningGateFailed: () =>
+      'This sprint has not completed planning, so this stand-up cannot start.',
+    startFailed: () => 'That could not be started.',
+
+    /**
+     * E57/§15.8.2. Advisory-only elapsed-time indicator — never disables or
+     * gates anything, just tells the room how it's tracking against the
+     * configured duration.
+     */
+    elapsedTime: ({ elapsed, duration }: { elapsed: string; duration: number }) =>
+      `Elapsed ${elapsed} of ${duration}:00`,
 
     /** The §15.8.1 jump bar. One entry per panel, all seven, always. */
     panel1: () => 'Attendance',
@@ -515,6 +531,15 @@ export const standupStrings = {
   my: {
     title: () => 'My Stand-up',
     noStandup: () => 'You have no stand-up open right now.',
+    /**
+     * Shown under `noStandup`. A blank screen with one sentence gave no way
+     * to tell "nothing scheduled today" apart from "something is broken" —
+     * this names the most common cause (the sprint covering today has not
+     * finished planning, so generation never ran) and gives a next step.
+     */
+    noStandupHint: () =>
+      'Your current sprint may still be in planning — stand-ups are only scheduled once planning is complete. Check with your PM, or view your projects.',
+    noStandupProjectsLink: () => 'View your projects',
     readOnlyBanner: () => 'The stand-up has started. Your day is now read-only.',
     hoursFor: ({ title }: { title: string }) => `Hours for ${title}`,
     addTask: ({ key }: { key: string }) => `Add ${key}`,
@@ -828,6 +853,8 @@ export const standupStrings = {
     unplannedHint: () =>
       'Time was logged against this task yesterday, but it was not on the plan.',
     markAllConfirmed: () => 'Mark all confirmed',
+    /** I1 — tasks added to yesterday's plan after that stand-up already completed. */
+    addedAfterCompletion: () => "Added after yesterday's stand-up completed",
     ageBadge: ({ standups }: { standups: number }) =>
       `Open across ${standups} ${plural(standups, 'stand-up', 'stand-ups')}`,
     previousStatus: () => 'Was',
@@ -884,6 +911,7 @@ export const standupStrings = {
     empty: () =>
       'No stand-ups have been generated for this sprint yet. They are created when the planning session completes.',
     today: () => 'Today',
+    sprintDays: () => 'This sprint',
     dayLabel: ({ number, total }: { number: number; total: number }) =>
       `Day ${number} of ${total}`,
     dayOne: () => 'Day one — assignment',
@@ -971,7 +999,12 @@ export const standupStrings = {
     statusChangedOnBehalfMessage: ({ taskKey }: { taskKey: string }) =>
       taskKey
         ? `${taskKey} was updated on your behalf during today's stand-up.`
-        : 'One of your tasks was updated on your behalf during today’s stand-up.'
+        : 'One of your tasks was updated on your behalf during today’s stand-up.',
+
+    /** N13 — Task 14/E31: a member self-selected work after completion. */
+    selfSelectedAfterCompletionTitle: () => 'Extra work was self-selected after completion',
+    selfSelectedAfterCompletionMessage: () =>
+      'A team member added a task to their own day after the stand-up was already completed. It will appear on tomorrow’s review.'
   },
 
   /**
@@ -1023,7 +1056,13 @@ export const standupStrings = {
       'that date may fall on public holidays.',
     holidayCoverageNone: ({ setName }: { setName: string }) =>
       `${setName} has no holidays loaded at all. Every date is being treated as a working day.`,
-    holidayCoverageAction: 'Import holidays'
+    holidayCoverageAction: 'Import holidays',
+    crossProjectLoadUnavailable:
+      'Capacity shown here does not account for what this person is allocated on other projects today.',
+    leaveDataManual:
+      'This project has no connected leave calendar — capacity assumes nobody is on leave unless a PM enters it manually.',
+    timeLoggingManual:
+      'This project has no logged time yet — variance is being tracked from hours the PM enters manually.'
   },
 
   /**

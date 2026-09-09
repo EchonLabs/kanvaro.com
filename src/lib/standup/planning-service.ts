@@ -17,6 +17,7 @@ import { StandupError } from './errors'
 import { generateStandupsForSprint, type GenerateResult } from './generation'
 import {
   evaluatePlanningChecklist,
+  unacknowledgedAdvisories,
   type ChecklistInput,
   type ChecklistMemberInput,
   type ChecklistResult,
@@ -193,6 +194,24 @@ export async function completePlanning(
         entities: (item.offendingIds ?? []).map((id) => ({ id }))
       }))
     })
+  }
+
+  // PLN-7/E19 — advisory items never block on their own, but a failing one
+  // needs an explicit acknowledgement before completion can proceed.
+  const outstandingAdvisories = unacknowledgedAdvisories(checklist, input.acknowledgedCheckIds ?? [])
+  if (outstandingAdvisories.length > 0) {
+    throw new StandupError(
+      'COMPLETION_CHECKS_FAILED',
+      `${outstandingAdvisories.length} advisory warning(s) need acknowledgement before planning can complete`,
+      {
+        failures: outstandingAdvisories.map((item) => ({
+          checkId: item.checkId,
+          overridable: false,
+          message: item.message,
+          entities: (item.offendingIds ?? []).map((id) => ({ id }))
+        }))
+      }
+    )
   }
 
   assertTransition((sprint as any).status as SprintState, 'planned')

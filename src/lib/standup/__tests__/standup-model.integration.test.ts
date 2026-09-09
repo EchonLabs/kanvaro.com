@@ -114,6 +114,27 @@ describe('Standup model', () => {
     expect(created.attendance[1].state).toBe('absent_planned')
   })
 
+  it('stores actualDurationMinutes as an optional non-negative field (E57)', async () => {
+    const created = await Standup.create(baseStandup({ actualDurationMinutes: 18 }))
+
+    expect(created.actualDurationMinutes).toBe(18)
+
+    const reloaded = await Standup.findById(created._id)
+    expect(reloaded?.actualDurationMinutes).toBe(18)
+  })
+
+  it('leaves actualDurationMinutes undefined when never stamped', async () => {
+    const created = await Standup.create(baseStandup())
+
+    expect(created.actualDurationMinutes).toBeUndefined()
+  })
+
+  it('rejects a negative actualDurationMinutes', async () => {
+    await expect(
+      Standup.create(baseStandup({ actualDurationMinutes: -1 }))
+    ).rejects.toThrow(/actualDurationMinutes/i)
+  })
+
   it('keeps a notification ledger so a re-run cannot send twice (SCH-17)', async () => {
     const created = await Standup.create(baseStandup())
 

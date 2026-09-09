@@ -17,6 +17,7 @@ import {
   notifyNotAllocated,
   notifyOverrideIssued,
   notifyPersonalCommitment,
+  notifySelfSelectedAfterCompletion,
   notifyStandupCompleted,
   notifyStatusChangedOnBehalf,
   type StandupNotificationId
@@ -216,6 +217,60 @@ describe('N7 notifyOverrideIssued', () => {
 
     await notifyOverrideIssued({ ...base, overrideId: 'override-1' })
     const sent = await notifyOverrideIssued({ ...base, overrideId: 'override-2' })
+
+    expect(sent).toBe(1)
+    expect(createNotification).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('N13 notifySelfSelectedAfterCompletion (E31)', () => {
+  useMongo()
+
+  it('sends once, tagged N13, to the facilitator', async () => {
+    const standupId = await seedStandup()
+
+    const sent = await notifySelfSelectedAfterCompletion({
+      standupId,
+      projectId: project.toString(),
+      organizationId: organization.toString(),
+      facilitatorId: user.toString(),
+      allocationId: 'allocation-1'
+    })
+
+    expect(sent).toBe(1)
+    const [recipientId, , payload] = createNotification.mock.calls[0]
+    expect(String(recipientId)).toBe(user.toString())
+    expect(payload.data.metadata.notificationId).toBe('N13:allocation-1')
+  })
+
+  it('does not resend for the same allocation', async () => {
+    const standupId = await seedStandup()
+    const input = {
+      standupId,
+      projectId: project.toString(),
+      organizationId: organization.toString(),
+      facilitatorId: user.toString(),
+      allocationId: 'allocation-1'
+    }
+
+    await notifySelfSelectedAfterCompletion(input)
+    const second = await notifySelfSelectedAfterCompletion(input)
+
+    expect(second).toBe(0)
+    expect(createNotification).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends a fresh notification for a distinct allocation on the same stand-up', async () => {
+    const standupId = await seedStandup()
+    const base = {
+      standupId,
+      projectId: project.toString(),
+      organizationId: organization.toString(),
+      facilitatorId: user.toString()
+    }
+
+    await notifySelfSelectedAfterCompletion({ ...base, allocationId: 'allocation-1' })
+    const sent = await notifySelfSelectedAfterCompletion({ ...base, allocationId: 'allocation-2' })
 
     expect(sent).toBe(1)
     expect(createNotification).toHaveBeenCalledTimes(2)

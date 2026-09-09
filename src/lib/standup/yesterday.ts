@@ -47,6 +47,13 @@ export interface YesterdayRow {
   ageInStandups: number
   /** E39 — time logged against a task nobody planned for this member. */
   unplanned: boolean
+  /**
+   * Task 14/E31/ALO-22. True when this allocation was written after its
+   * stand-up had already completed (a member's self-select or a PM's
+   * top-up). Absent on an unplanned row (E39), which carries no allocation to
+   * read the stamp from.
+   */
+  addedAfterCompletion?: boolean
 }
 
 export interface BucketedRows {

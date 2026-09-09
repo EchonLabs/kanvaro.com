@@ -564,6 +564,28 @@ describe('loadAllocationBoard', () => {
     const boardMember = board.members.find((m) => m.memberId === String(member))
     expect(boardMember?.attendance).toBeUndefined()
   })
+
+  it('carries durationMinutes so the run screen can drive E57’s elapsed-time indicator', async () => {
+    const board = await loadAllocationBoard(standupId)
+    expect(board.durationMinutes).toBe(15)
+  })
+
+  it('carries startedAt once the stand-up has started, for the same E57 indicator', async () => {
+    const startedAt = new Date('2026-08-17T03:31:00.000Z')
+    await Standup.updateOne({ _id: standupId }, { $set: { startedAt } })
+
+    const board = await loadAllocationBoard(standupId)
+
+    expect(board.startedAt).toBeDefined()
+    expect(new Date(board.startedAt as unknown as string).toISOString()).toBe(
+      startedAt.toISOString()
+    )
+  })
+
+  it('leaves startedAt undefined before the stand-up has started', async () => {
+    const board = await loadAllocationBoard(standupId)
+    expect(board.startedAt).toBeUndefined()
+  })
 })
 
 /**
@@ -759,5 +781,104 @@ describe('ALO-23 — self-select', () => {
     })
 
     expect(await Allocation.countDocuments({ standup: standupId })).toBe(2)
+  })
+})
+
+/**
+ * Task 14 — E31. A member self-selecting onto their own day *after* the
+ * stand-up has completed is a third, narrower case than ALO-22's PM top-up:
+ * same "history may only grow" invariant, but member-initiated and with no
+ * PM-supplied reason. `loadMutableContext`'s `allowCompleted` gate has to
+ * open for this case too, and the row has to carry the same
+ * `addedAfterCompletion` stamp ALO-22 uses, so Phase 8's variance engine and
+ * the yesterday review treat it identically to a top-up.
+ */
+describe('E31 — self-select after the stand-up has completed', () => {
+  useMongo()
+
+  beforeEach(async () => {
+    await syncIndexes(Allocation)
+    await seed()
+  })
+
+  const allowSelfSelect = async (allowed: boolean) => {
+    await ProjectStandupSettings.updateOne(
+      { project },
+      { $set: { allowSelfSelect: allowed } }
+    )
+  }
+
+  const complete = async () => {
+    await Standup.updateOne({ _id: standupId }, { $set: { status: 'Completed' } })
+  }
+
+  it('accepts the self-select and stamps addedAfterCompletion', async () => {
+    await allowSelfSelect(true)
+    await complete()
+
+    const result = await createAllocation({
+      standupId,
+      memberId: String(member),
+      taskId,
+      plannedMinutes: minutes(60),
+      expectedVersion: 3,
+      actor: { userId: String(member) },
+      selfSelect: true
+    })
+
+    expect(result.allocation.source).toBe('self_selected')
+    expect(result.allocation.addedAfterCompletion).toBe(true)
+    expect(result.allocation.addedAfterCompletionAt).toBeInstanceOf(Date)
+    // No PM-supplied reason exists for this path, unlike a top-up — a sensible
+    // default fills the (optional) field rather than leaving it blank.
+    expect(result.allocation.addedAfterCompletionReason).toBeTruthy()
+  })
+
+  it('still refuses when the project has self-select turned off', async () => {
+    await allowSelfSelect(false)
+    await complete()
+
+    await expect(
+      createAllocation({
+        standupId,
+        memberId: String(member),
+        taskId,
+        plannedMinutes: minutes(60),
+        expectedVersion: 3,
+        actor: { userId: String(member) },
+        selfSelect: true
+      })
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+    expect(await Allocation.countDocuments({ standup: standupId })).toBe(0)
+  })
+
+  it('still refuses self-selecting onto somebody else’s day even once completed', async () => {
+    await allowSelfSelect(true)
+    await complete()
+
+    await expect(
+      createAllocation({
+        standupId,
+        memberId: String(otherMember),
+        taskId,
+        plannedMinutes: minutes(60),
+        expectedVersion: 3,
+        actor: { userId: String(member) },
+        selfSelect: true
+      })
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+  })
+
+  it('does not widen the completed-standup gate for a plain create with no self-select intent', async () => {
+    // The regression this task must not introduce: `allowCompleted` widening
+    // only matters when `selfSelect` is actually true. An ordinary create
+    // against a Completed stand-up must still be refused exactly as ALO-22's
+    // own suite already proves for the no-topUp case.
+    await allowSelfSelect(true)
+    await complete()
+
+    await expect(create({ plannedMinutes: minutes(60) })).rejects.toMatchObject({
+      code: 'IMMUTABLE_COMPLETED_STANDUP'
+    })
   })
 })
