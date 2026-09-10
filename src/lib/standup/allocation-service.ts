@@ -459,6 +459,18 @@ export interface AllocationBoard {
    * "completion was interrupted" banner *before* clicking Complete again.
    */
   completionState: { runId: string; lastCompletedStep: string | null } | null
+  /**
+   * ALO-20/21. Present only on a day-one stand-up — the spec's own "sprint
+   * assignment progress meter… above the pool" (§15.8.10). Computed from the
+   * same `members`/`pool` this function already builds, not a second query.
+   */
+  dayOne?: {
+    assignedTasks: number
+    totalTasks: number
+    placedMinutes: Minutes
+    sprintCapacityMinutes: Minutes
+    stillUnassigned?: number
+  }
 }
 
 /** The whole of Panel 5, in one read. */
@@ -533,6 +545,36 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
 
   const doneStatuses = context.settings?.doneStatuses ?? ['done', 'cancelled', 'released']
 
+  const pool = partitionPool(
+    tasks.map(toPoolTask),
+    allocations.map((row) => ({
+      taskId: String(row.task),
+      memberId: String(row.member),
+      excludedFromCapacity: row.excludedFromCapacity,
+      detachedReason: row.detachedReason
+    })),
+    doneStatuses
+  )
+
+  // The same done-status filter `partitionPool` applies internally, applied
+  // once here too, so the pool and the meter can never silently disagree
+  // about which tasks are still live.
+  const doneStatusSet = new Set(doneStatuses.map((status: string) => status.toLowerCase()))
+  const nonDoneTaskCount = tasks.filter(
+    (task) => !doneStatusSet.has(String(task.status).toLowerCase())
+  ).length
+
+  const dayOne =
+    context.standup.shape === 'day_one'
+      ? {
+          assignedTasks: nonDoneTaskCount - pool.unassigned.length,
+          totalTasks: nonDoneTaskCount,
+          placedMinutes: sumMinutes(members, (member) => member.capacity.allocatedMinutes),
+          sprintCapacityMinutes: sumMinutes(members, (member) => member.capacity.effectiveMinutes),
+          ...(pool.unassigned.length > 0 ? { stillUnassigned: pool.unassigned.length } : {})
+        }
+      : undefined
+
   return {
     standupId: context.standupId,
     date: context.date,
@@ -550,23 +592,15 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
     durationMinutes: context.standup.durationMinutes,
     ceremoniesConsumeCapacity: context.ceremoniesConsumeCapacity,
     members,
-    pool: partitionPool(
-      tasks.map(toPoolTask),
-      allocations.map((row) => ({
-        taskId: String(row.task),
-        memberId: String(row.member),
-        excludedFromCapacity: row.excludedFromCapacity,
-        detachedReason: row.detachedReason
-      })),
-      doneStatuses
-    ),
+    pool,
     computedAt: new Date().toISOString(),
     completionState: context.standup.completionState
       ? {
           runId: context.standup.completionState.runId,
           lastCompletedStep: context.standup.completionState.lastCompletedStep ?? null
         }
-      : null
+      : null,
+    ...(dayOne ? { dayOne } : {})
   }
 }
 

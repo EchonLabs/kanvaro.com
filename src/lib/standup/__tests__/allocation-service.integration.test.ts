@@ -586,6 +586,32 @@ describe('loadAllocationBoard', () => {
     const board = await loadAllocationBoard(standupId)
     expect(board.startedAt).toBeUndefined()
   })
+
+  it('computes the day-one progress meter from real allocations and capacity (ALO-20/21)', async () => {
+    await anotherTask() // KAN-231, stays unassigned
+    await create({ plannedMinutes: minutes(180) }) // KAN-214 allocated to `member`
+
+    const board = await loadAllocationBoard(standupId)
+
+    // Both members default to 480 daily minutes, less the stand-up's own 15
+    // minutes (DN-1/DN-3's ceremony deduction) — the same EFFECTIVE this file
+    // already defines for its other exact-minute assertions.
+    expect(board.dayOne).toEqual({
+      assignedTasks: 1,
+      totalTasks: 2,
+      placedMinutes: 180,
+      sprintCapacityMinutes: EFFECTIVE * 2,
+      stillUnassigned: 1
+    })
+  })
+
+  it('omits dayOne entirely on a mid-sprint stand-up', async () => {
+    await Standup.updateOne({ _id: standupId }, { $set: { shape: 'mid_sprint' } })
+
+    const board = await loadAllocationBoard(standupId)
+
+    expect(board.dayOne).toBeUndefined()
+  })
 })
 
 /**

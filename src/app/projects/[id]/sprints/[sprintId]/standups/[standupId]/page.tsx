@@ -622,6 +622,7 @@ function toRunScreenData(
     ...(carryForward ? { carryForward: toCarryForwardView(carryForward) } : {}),
     ...(sprintClose ? { sprintClose: toSprintCloseView(sprintClose) } : {}),
     ...(blockers ? { blockers: toBlockerRows(blockers) } : {}),
+    ...(board.dayOne ? { dayOne: board.dayOne } : {}),
     completionState: board.completionState ?? null
   }
 }
