@@ -19,7 +19,7 @@ import type { ScheduleDay, SprintSchedule } from '@/lib/standup/schedule'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
-const { schedule: strings } = standupStrings
+const { schedule: strings, run: runStrings } = standupStrings
 
 /** Days that cannot be opened: there is no meeting behind them. */
 const UNOPENABLE = ['Skipped_Holiday', 'Cancelled']
@@ -69,6 +69,14 @@ function formatTime(instant: string, timezone: string): string {
 function shapeLabel(day: ScheduleDay): string | null {
   if (day.shape === 'day_one') return strings.dayOne()
   if (day.shape === 'final_day') return strings.finalDay()
+  return null
+}
+
+/** UI-8: the verb for today's row, matching what the run screen itself would show. */
+function todayActionLabel(status: ScheduleDay['status']): string | null {
+  if (status === 'Ready' || status === 'Scheduled') return runStrings.start()
+  if (status === 'In_Progress' || status === 'Reopened') return strings.resume()
+  if (status === 'Completed') return runStrings.viewSummary()
   return null
 }
 
@@ -126,6 +134,12 @@ function DayRow({
               total: day.totalSprintDays
             })}
           </span>
+
+          {isToday && todayActionLabel(day.status) ? (
+            <span className="ml-auto apple-transition rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] px-3 h-7 inline-flex items-center text-[13px] font-semibold text-white">
+              {todayActionLabel(day.status)}
+            </span>
+          ) : null}
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">

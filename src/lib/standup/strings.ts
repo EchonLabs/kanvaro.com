@@ -923,6 +923,7 @@ export const standupStrings = {
     loading: () => 'Loading the schedule…',
     sprintsLoadFailed: () => "Could not load this project's sprints.",
     scheduleLoadFailed: () => 'Could not load the stand-up schedule.',
+    resume: () => 'Resume',
     status: {
       Scheduled: 'Scheduled',
       Ready: 'Ready to start',

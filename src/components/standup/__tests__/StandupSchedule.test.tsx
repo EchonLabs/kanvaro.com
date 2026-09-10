@@ -161,4 +161,63 @@ describe('StandupSchedule', () => {
       '/projects/project-1/sprints/sprint-1/standups/standup-1'
     )
   })
+
+  it('UI-8: shows "Start stand-up" on today’s row when Ready', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [day({ date: '2026-08-11', status: 'Ready' })]
+        })}
+      />
+    )
+
+    const today = screen.getByTestId('schedule-today')
+    expect(within(today).getByText('Start stand-up')).toBeInTheDocument()
+  })
+
+  it('UI-8: shows "Resume" on today’s row when in progress', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [day({ date: '2026-08-11', status: 'In_Progress' })]
+        })}
+      />
+    )
+
+    const today = screen.getByTestId('schedule-today')
+    expect(within(today).getByText('Resume')).toBeInTheDocument()
+  })
+
+  it('UI-8: shows "View summary" on today’s row when completed', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [day({ date: '2026-08-11', status: 'Completed' })]
+        })}
+      />
+    )
+
+    const today = screen.getByTestId('schedule-today')
+    expect(within(today).getByText('View summary')).toBeInTheDocument()
+  })
+
+  it('shows no action label on a non-today row', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [
+            day({ date: '2026-08-11', status: 'Ready' }),
+            day({ date: '2026-08-12', status: 'Ready' })
+          ]
+        })}
+      />
+    )
+
+    const notToday = screen.getByTestId('schedule-day')
+    expect(within(notToday).queryByText('Start stand-up')).not.toBeInTheDocument()
+  })
 })
