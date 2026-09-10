@@ -409,6 +409,36 @@ describe('the jump bar and the shapes (§15.8.10)', () => {
     expect(screen.queryByText(standupStrings.run.panel4())).not.toBeInTheDocument()
   })
 
+  it('lists the jump nav links in Panel 5 -> 1 -> 6 -> 7 order on day one, matching the DOM', () => {
+    renderScreen({ shape: 'day_one' })
+
+    const bar = screen.getByRole('navigation', { name: /panels/i })
+    const hrefs = within(bar)
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'))
+
+    expect(hrefs).toEqual(['#panel-5', '#panel-1', '#panel-6', '#panel-7'])
+  })
+
+  it('keeps the jump nav links in 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 order mid-sprint', () => {
+    renderScreen()
+
+    const bar = screen.getByRole('navigation', { name: /panels/i })
+    const hrefs = within(bar)
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'))
+
+    expect(hrefs).toEqual([
+      '#panel-1',
+      '#panel-2',
+      '#panel-3',
+      '#panel-4',
+      '#panel-5',
+      '#panel-6',
+      '#panel-7'
+    ])
+  })
+
   it('shows the ALO-20 progress meter on day one', () => {
     renderScreen({
       shape: 'day_one',

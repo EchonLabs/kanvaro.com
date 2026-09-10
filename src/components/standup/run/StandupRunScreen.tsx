@@ -1237,15 +1237,16 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         aria-label="Stand-up panels"
         className="flex flex-wrap gap-1.5 text-xs text-[var(--apple-secondary-label)]"
       >
+        {isDayOne && <JumpLink id={5} label={standupStrings.run.panel5()} />}
         <JumpLink id={1} label={standupStrings.run.panel1()} />
         {!isDayOne && (
           <>
             <JumpLink id={2} label={standupStrings.run.panel2()} />
             <JumpLink id={3} label={standupStrings.run.panel3()} />
             <JumpLink id={4} label={standupStrings.run.panel4()} />
+            <JumpLink id={5} label={standupStrings.run.panel5()} />
           </>
         )}
-        <JumpLink id={5} label={standupStrings.run.panel5()} />
         <JumpLink id={6} label={standupStrings.run.panel6()} />
         <JumpLink id={7} label={standupStrings.run.panel7()} />
       </nav>
