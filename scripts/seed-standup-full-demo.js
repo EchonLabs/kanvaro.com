@@ -18,6 +18,7 @@ const path = require('path')
 const ORG_ID = new ObjectId('6a891b3fc7fac0179d60ece7')
 const PROJECT_ID = new ObjectId('6a8af360917b98ed065e606e')
 const SPRINT1_ID = new ObjectId('6a8af448917b98ed065f0deb')
+const SPRINT2_ID = new ObjectId('6a8d09a0c9f4a666d779e0db')
 
 const ADMIN = new ObjectId('6a891b3fc7fac0179d60ece8')
 const PM = new ObjectId('6a8aeeaf917b98ed065e6009')
@@ -31,6 +32,13 @@ const DAY4 = new ObjectId('6a8c20fe4ae51abb26bd438d')
 const DAY8 = new ObjectId('6a8c20fe4ae51abb26bd4391')
 
 const MARKER = 'standup-full-demo-2026-09-10'
+
+const isoDate = (d) => d.toISOString().slice(0, 10)
+const addDays = (d, n) => {
+  const copy = new Date(d)
+  copy.setUTCDate(copy.getUTCDate() + n)
+  return copy
+}
 
 async function fixProjectTeam(db) {
   // Admin: team member, no project role — org admin scope covers the rest.
@@ -207,6 +215,170 @@ async function backfillSprint1Summaries(db) {
   console.log('Task 2: Sprint 1 StandupSummary documents backfilled')
 }
 
+async function createSprint2(db) {
+  const sprint = await db.collection('sprints').findOne({ _id: SPRINT2_ID })
+
+  if (sprint && sprint.status === 'active' && sprint.tasks && sprint.tasks.length > 0) {
+    return SPRINT2_ID
+  }
+
+  const now = new Date()
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  const startDate = today
+  const endDate = addDays(today, 13)
+
+  const lastTask = await db.collection('tasks')
+    .find({ project: PROJECT_ID })
+    .sort({ taskNumber: -1 })
+    .limit(1)
+    .toArray()
+  const nextTaskNumber = (lastTask[0]?.taskNumber ?? 4) + 1
+
+  const taskDefs = [
+    { title: 'Export invoice as CSV', type: 'feature', priority: 'high', estimateMinutes: 300, owner: QA },
+    { title: 'Audit log for invoice edits', type: 'feature', priority: 'medium', estimateMinutes: 480, owner: ANESSA },
+    { title: 'Fix rounding error in tax rules engine', type: 'bug', priority: 'critical', estimateMinutes: 180, owner: QA },
+    { title: 'Regression pass on PDF render pipeline', type: 'task', priority: 'medium', estimateMinutes: 240, owner: QA },
+    { title: 'Reconcile invoice totals against ledger', type: 'feature', priority: 'medium', estimateMinutes: 360, owner: ANESSA }
+  ]
+
+  const existingSprintTaskCount = await db.collection('tasks').countDocuments({ sprint: SPRINT2_ID })
+  let taskIds = []
+  if (existingSprintTaskCount === 0) {
+    const taskDocs = taskDefs.map((def, index) => {
+      const taskNumber = nextTaskNumber + index
+      return {
+        _id: new ObjectId(),
+        title: def.title,
+        description: `${def.title}. Acceptance: verified against the Sprint 2 goal in the invoicing module.`,
+        status: 'todo',
+        priority: def.priority,
+        isBillable: true,
+        type: def.type,
+        organization: ORG_ID,
+        project: PROJECT_ID,
+        taskNumber,
+        displayId: `1.${taskNumber}`,
+        assignedTo: [{ user: def.owner }],
+        standupOwner: def.owner,
+        createdBy: PM,
+        assignedBy: PM,
+        estimatedHours: def.estimateMinutes / 60,
+        originalEstimateMinutes: def.estimateMinutes,
+        remainingEstimateMinutes: def.estimateMinutes,
+        estimateUnit: 'hours',
+        estimateValue: def.estimateMinutes / 60,
+        estimateMethod: 'manual',
+        consensusReached: false,
+        estimatedAt: now,
+        estimatedBy: PM,
+        estimateLockedAt: now,
+        sprint: SPRINT2_ID,
+        labels: [],
+        dependencies: [],
+        attachments: [],
+        subtasks: [],
+        archived: false,
+        position: index,
+        totalLoggedMinutes: 0,
+        standupSpillCount: 0,
+        actualHours: 0,
+        createdAt: now,
+        updatedAt: now
+      }
+    })
+    await db.collection('tasks').insertMany(taskDocs)
+    taskIds = taskDocs.map((t) => t._id)
+  } else {
+    taskIds = (await db.collection('tasks').find({ sprint: SPRINT2_ID }).toArray()).map((t) => t._id)
+  }
+
+  await db.collection('sprints').updateOne(
+    { _id: SPRINT2_ID },
+    {
+      $set: {
+        description: 'Invoicing module hardening: exports, audit trail, tax-rule fixes.',
+        status: 'active',
+        startDate,
+        endDate,
+        actualStartDate: startDate,
+        goal: 'Ship CSV export, the invoice audit log, and clear the tax-rounding bug before the pilot review.',
+        capacity: 240,
+        tasks: taskIds,
+        plannedAt: now
+      },
+      $pull: { teamMembers: HR }
+    }
+  )
+
+  const existingPlanningSession = await db.collection('sprintplanningsessions').findOne({ sprint: SPRINT2_ID, status: 'completed' })
+  if (!existingPlanningSession) {
+    const PLANNING_SESSION_ID = new ObjectId()
+    const totalEstimatedMinutes = taskDefs.reduce((sum, def) => sum + def.estimateMinutes, 0)
+    const countByType = taskDefs.reduce((acc, def) => {
+      acc[def.type] = (acc[def.type] ?? 0) + 1
+      return acc
+    }, {})
+
+    await db.collection('sprintplanningsessions').insertOne({
+      _id: PLANNING_SESSION_ID,
+      organization: ORG_ID,
+      project: PROJECT_ID,
+      sprint: SPRINT2_ID,
+      status: 'completed',
+      sprintGoal: 'Ship CSV export, the invoice audit log, and clear the tax-rounding bug before the pilot review.',
+      participants: [PM, QA, ANESSA],
+      facilitator: PM,
+      startedAt: now,
+      completedAt: now,
+      capacitySnapshot: {
+        workingDayCount: 10,
+        totalCapacityMinutes: 240 * 60,
+        leaveMinutes: 0,
+        netCapacityMinutes: 240 * 60,
+        perMember: [
+          { member: QA, dailyCapacityMinutes: 480, sprintCapacityMinutes: 4800 },
+          { member: ANESSA, dailyCapacityMinutes: 480, sprintCapacityMinutes: 4800 }
+        ]
+      },
+      scopeSnapshot: {
+        taskCount: 5,
+        estimatedTaskCount: 5,
+        totalEstimatedMinutes,
+        countByType
+      },
+      checklistResults: [
+        { checkId: 'PC-1', kind: 'mandatory', passed: true },
+        { checkId: 'PC-2', kind: 'mandatory', passed: true },
+        { checkId: 'PC-3', kind: 'mandatory', passed: true },
+        { checkId: 'PC-4', kind: 'mandatory', passed: true },
+        { checkId: 'PC-5', kind: 'mandatory', passed: true },
+        { checkId: 'PC-6', kind: 'mandatory', passed: true },
+        { checkId: 'PC-7', kind: 'mandatory', passed: true },
+        { checkId: 'PA-1', kind: 'advisory', passed: true },
+        { checkId: 'PA-2', kind: 'advisory', passed: true },
+        { checkId: 'PA-3', kind: 'advisory', passed: true },
+        { checkId: 'PA-4', kind: 'advisory', passed: true },
+        { checkId: 'PA-5', kind: 'advisory', passed: true },
+        { checkId: 'PA-6', kind: 'advisory', passed: true }
+      ],
+      createdBy: PM,
+      completedBy: PM,
+      createdAt: now,
+      updatedAt: now
+    })
+
+    await db.collection('sprints').updateOne(
+      { _id: SPRINT2_ID },
+      { $set: { activePlanningSession: PLANNING_SESSION_ID } }
+    )
+  }
+
+  console.log('Task 3: Sprint 2 (pre-existing placeholder) populated — real goal, 5 tasks, completed planning session, HR removed from team, dates repointed to today')
+  return SPRINT2_ID
+}
+
 async function removeAll(db) {
   // Undo all changes from fixProjectTeam()
   // Remove team members added for Admin/PM/QA/Anessa
@@ -234,7 +406,28 @@ async function removeAll(db) {
   await db.collection('standupsummaries').deleteMany({ standup: { $in: [DAY1, DAY2, DAY4, DAY8] } })
   await db.collection('sprints').updateOne({ _id: SPRINT1_ID }, { $set: { status: 'planning' } })
 
-  console.log('Removed full-demo changes (Task 1 only implemented so far)')
+  // Undo all changes from createSprint2(): restore the pre-existing placeholder
+  // sprint document to its original state rather than deleting it.
+  await db.collection('tasks').deleteMany({ sprint: SPRINT2_ID })
+  await db.collection('sprintplanningsessions').deleteMany({ sprint: SPRINT2_ID })
+  await db.collection('sprints').updateOne(
+    { _id: SPRINT2_ID },
+    {
+      $set: {
+        description: 'new sprint',
+        status: 'planning',
+        startDate: new Date('2026-09-07T00:00:00.000Z'),
+        endDate: new Date('2026-09-21T00:00:00.000Z'),
+        goal: '',
+        capacity: 0,
+        tasks: []
+      },
+      $unset: { activePlanningSession: '', actualStartDate: '', plannedAt: '' },
+      $addToSet: { teamMembers: HR }
+    }
+  )
+
+  console.log('Removed full-demo changes (Tasks 1-3)')
 }
 
 async function main() {
@@ -250,8 +443,9 @@ async function main() {
 
   await fixProjectTeam(db)
   await backfillSprint1Summaries(db)
+  const sprint2Id = await createSprint2(db)
 
-  console.log('\nDone (Task 1 of the full demo seed).')
+  console.log(`\nDone (Tasks 1-3 of the full demo seed). Sprint 2: ${sprint2Id}`)
   await client.close()
 }
 
