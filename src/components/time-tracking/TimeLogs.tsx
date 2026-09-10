@@ -2615,11 +2615,13 @@ export function TimeLogs({
               >
                 {/* ── Mobile / Tablet card (hidden on md+) ────────────── */}
                 <div className="md:hidden px-4 py-3 space-y-2.5">
-                  {/* Row 1: Task name + Project name */}
+                  {/* Row 1: Memo + Project name */}
                   <div className="grid grid-cols-[1fr_auto] gap-x-2 items-start">
                     <div className="min-w-0">
                       <p className="text-[15px] font-semibold text-[var(--apple-label)] truncate">
-                        {entry.task?.title || <span className="italic text-[var(--apple-tertiary-label)]">No task</span>}
+                        {entry.description
+                          ? <span className="truncate">{entry.description}</span>
+                          : <span className="italic text-[var(--apple-tertiary-label)]">No memo</span>}
                       </p>
                       <p className="text-[13px] text-[var(--apple-secondary-label)] truncate mt-0.5">
                         {entry.project?.name || <span className="italic text-[var(--apple-tertiary-label)]">No project</span>}
@@ -2760,10 +2762,12 @@ export function TimeLogs({
                       className="h-4 w-4"
                     />
                   )}
-                  {/* Col 1: Task name + Project name */}
+                  {/* Col 1: Memo (description) + Project name */}
                   <div className="min-w-0">
                     <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">
-                      {entry.task?.title || <span className="italic text-[var(--apple-tertiary-label)]">No task</span>}
+                      {entry.description
+                        ? <span className="truncate">{entry.description}</span>
+                        : <span className="italic text-[var(--apple-tertiary-label)]">No memo</span>}
                     </p>
                     <p className="text-[12px] text-[var(--apple-secondary-label)] truncate mt-0.5">
                       {entry.project?.name || <span className="italic text-[var(--apple-tertiary-label)]">No project</span>}
