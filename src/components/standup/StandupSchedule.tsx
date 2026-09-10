@@ -133,6 +133,10 @@ function DayRow({
             {strings.status[day.status] ?? day.status}
           </span>
 
+          <span className="text-xs text-[var(--apple-secondary-label)]">
+            {day.facilitatorName}
+          </span>
+
           {openable ? (
             <span className="font-apple-mono text-xs text-[var(--apple-tertiary-label)]">
               {formatTime(day.scheduledStartAt, timezone)}

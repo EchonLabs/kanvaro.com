@@ -27,6 +27,7 @@ const day = (over: Partial<ScheduleDay> = {}): ScheduleDay => ({
   scheduledStartAt: '2026-08-10T03:30:00.000Z',
   durationMinutes: 15,
   facilitatorId: 'user-1',
+  facilitatorName: 'Priya Fernando',
   expectedAttendeeIds: ['member-1'],
   wasBackfilled: false,
   hasCalendarAnomaly: false,
@@ -118,6 +119,12 @@ describe('StandupSchedule', () => {
     render(<StandupSchedule schedule={schedule({ days: [], totalSprintDays: 0 })} />)
 
     expect(screen.getByText(/no stand-ups have been generated/i)).toBeInTheDocument()
+  })
+
+  it('shows the facilitator’s name, not their id', () => {
+    render(<StandupSchedule schedule={schedule()} />)
+
+    expect(screen.getAllByText('Priya Fernando').length).toBeGreaterThan(0)
   })
 
   it('links each openable day to the real nested run-screen route, not a bare /standups/:id', () => {

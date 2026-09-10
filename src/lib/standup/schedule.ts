@@ -13,6 +13,7 @@
  */
 import { Sprint } from '@/models/Sprint'
 import { Standup, type StandupShape, type StandupStatus } from '@/models/Standup'
+import { User } from '@/models/User'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
 
 import { isoOfStoredDate, todayInTimezone, type IsoDate } from './calendar-dates'
@@ -29,6 +30,7 @@ export interface ScheduleDay {
   scheduledStartAt: string
   durationMinutes: number
   facilitatorId: string
+  facilitatorName: string
   expectedAttendeeIds: string[]
   /** UI-9: why this day does not run. */
   skippedReason?: string
@@ -53,6 +55,12 @@ export interface ScheduleOptions {
   now?: Date
 }
 
+/** Falls back to the email, then the id — a blank name row is unusable. */
+function displayName(person: any): string {
+  const full = [person.firstName, person.lastName].filter(Boolean).join(' ').trim()
+  return full || person.email || String(person._id)
+}
+
 export async function getSprintSchedule(
   sprintId: string,
   options: ScheduleOptions = {}
@@ -73,6 +81,12 @@ export async function getSprintSchedule(
 
   const timezone = calendar?.timezone ?? 'UTC'
 
+  const facilitatorIds = [...new Set(standups.map((standup) => String(standup.facilitator)))]
+  const facilitators = await User.find({ _id: { $in: facilitatorIds } })
+    .select('firstName lastName email')
+    .lean() as any[]
+  const facilitatorNameById = new Map(facilitators.map((person) => [String(person._id), displayName(person)]))
+
   const days: ScheduleDay[] = standups.map((standup) => ({
     standupId: String(standup._id),
     date: standup.standupDate,
@@ -84,6 +98,7 @@ export async function getSprintSchedule(
     scheduledStartAt: standup.scheduledStartAt.toISOString(),
     durationMinutes: standup.durationMinutes,
     facilitatorId: String(standup.facilitator),
+    facilitatorName: facilitatorNameById.get(String(standup.facilitator)) ?? String(standup.facilitator),
     expectedAttendeeIds: (standup.expectedAttendees ?? []).map(String),
     skippedReason: standup.skippedReason,
     cancelledReason: standup.cancelledReason,

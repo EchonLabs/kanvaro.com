@@ -14,6 +14,7 @@ import mongoose from 'mongoose'
 import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
+import { User } from '@/models/User'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
 
 import { generateStandupsForSprint } from '../generation'
@@ -150,6 +151,33 @@ describe('getSprintSchedule', () => {
     await expect(
       getSprintSchedule(String(new mongoose.Types.ObjectId()))
     ).rejects.toMatchObject({ code: 'NOT_FOUND' })
+  })
+
+  it('resolves the facilitator id to a real name', async () => {
+    await User.create({
+      _id: user,
+      firstName: 'Priya',
+      lastName: 'Fernando',
+      email: 'priya@example.com',
+      organization,
+      role: 'project_manager',
+      password: 'hashed'
+    })
+    await seedProject()
+    const sprint = await seedSprint()
+
+    const schedule = await getSprintSchedule(String(sprint._id))
+
+    expect(schedule.days[0].facilitatorName).toBe('Priya Fernando')
+  })
+
+  it('falls back to the raw id when the facilitator has no User document', async () => {
+    await seedProject()
+    const sprint = await seedSprint()
+
+    const schedule = await getSprintSchedule(String(sprint._id))
+
+    expect(schedule.days[0].facilitatorName).toBe(String(user))
   })
 })
 
