@@ -13,6 +13,7 @@
  * note before anything else: "Note that number. It is your ceiling."
  */
 import { useCallback, useEffect, useState } from 'react'
+import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core'
 import {
   AlertTriangle,
   Check,
@@ -393,6 +394,16 @@ export function PlanningWorkspace({
     }
   }
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const overId = event.over?.id
+    const activeId = event.active.id
+    if (!overId || typeof activeId !== 'string' || typeof overId !== 'string') return
+
+    const action = resolveDrop(overId, activeId, backlog, scope)
+    if (action === 'add') moveTask(activeId, true)
+    if (action === 'remove') moveTask(activeId, false)
+  }
+
   if (loading) return <PlanningSkeleton />
 
   // UI-7 — the post-completion confirmation.
@@ -572,24 +583,28 @@ export function PlanningWorkspace({
           <h3 className="apple-section-label text-[var(--apple-secondary-label)]">
             Sprint scope
           </h3>
-          <div className="grid gap-4 md:grid-cols-2">
-            <TaskPane
-              title="Backlog"
-              emptyMessage="Nothing unassigned in the backlog for this project."
-              tasks={backlog}
-              actionLabel="Add"
-              onAction={(taskId) => moveTask(taskId, true)}
-              busy={busy}
-            />
-            <TaskPane
-              title={`In this sprint (${scope.length})`}
-              emptyMessage="Nothing is in scope yet. Add tasks from the backlog."
-              tasks={scope}
-              actionLabel="Remove"
-              onAction={(taskId) => moveTask(taskId, false)}
-              busy={busy}
-            />
-          </div>
+          <DndContext onDragEnd={handleDragEnd}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <TaskPane
+                id="backlog-pool"
+                title="Backlog"
+                emptyMessage="Nothing unassigned in the backlog for this project."
+                tasks={backlog}
+                actionLabel="Add"
+                onAction={(taskId) => moveTask(taskId, true)}
+                busy={busy}
+              />
+              <TaskPane
+                id="sprint-scope"
+                title={`In this sprint (${scope.length})`}
+                emptyMessage="Nothing is in scope yet. Add tasks from the backlog, or drag one in."
+                tasks={scope}
+                actionLabel="Remove"
+                onAction={(taskId) => moveTask(taskId, false)}
+                busy={busy}
+              />
+            </div>
+          </DndContext>
         </section>
       )}
 
@@ -697,6 +712,26 @@ function blockerTooltip(blockers: ChecklistItemView[], session: unknown): string
   return first ? `${first.checkId}: ${first.message ?? 'This check must pass first.'}` : ''
 }
 
+/**
+ * Pure drag-resolution: given what was dropped where, decide whether that's
+ * an add, a remove, or nothing — no DOM, no network, so it's testable
+ * without simulating a real pointer drag (dnd-kit's own drag mechanics are
+ * out of scope for jsdom; this function is the part worth unit testing).
+ */
+export function resolveDrop(
+  overId: string,
+  activeTaskId: string,
+  backlog: BacklogTask[],
+  scope: BacklogTask[]
+): 'add' | 'remove' | null {
+  const inBacklog = backlog.some((task) => task._id === activeTaskId)
+  const inScope = scope.some((task) => task._id === activeTaskId)
+
+  if (overId === 'sprint-scope' && inBacklog) return 'add'
+  if (overId === 'backlog-pool' && inScope) return 'remove'
+  return null
+}
+
 function Stat({
   label,
   value,
@@ -727,6 +762,7 @@ function Stat({
 }
 
 function TaskPane({
+  id,
   title,
   emptyMessage,
   tasks,
@@ -734,6 +770,7 @@ function TaskPane({
   onAction,
   busy
 }: {
+  id: string
   title: string
   emptyMessage: string
   tasks: BacklogTask[]
@@ -741,34 +778,77 @@ function TaskPane({
   onAction: (taskId: string) => void
   busy: boolean
 }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+
   return (
     <div className="space-y-2">
       <p className="text-[13px] font-medium text-[var(--apple-label)]">{title}</p>
-      <div className="max-h-[320px] space-y-1 overflow-y-auto rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] p-2">
+      <div
+        ref={setNodeRef}
+        className={cn(
+          'max-h-[320px] space-y-1 overflow-y-auto rounded-[var(--apple-radius-md)] border p-2 apple-transition',
+          isOver ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/5' : 'border-[var(--apple-separator)]'
+        )}
+      >
         {tasks.length === 0 ? (
           <p className="px-2 py-3 text-[13px] text-[var(--apple-tertiary-label)]">{emptyMessage}</p>
         ) : (
           tasks.map((task) => (
-            <div
-              key={task._id}
-              className="flex items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-fill-quaternary)]"
-            >
-              <span className="font-apple-mono text-[12px] text-[var(--apple-system-blue)]">
-                {task.displayId}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--apple-label)]">
-                {task.title}
-              </span>
-              <span className="font-apple-mono text-[12px] tabular-nums text-[var(--apple-tertiary-label)]">
-                {task.originalEstimateMinutes ? `${hours(task.originalEstimateMinutes)}h` : '—'}
-              </span>
-              <Button size="sm" variant="outline" disabled={busy} onClick={() => onAction(task._id)}>
-                {actionLabel}
-              </Button>
-            </div>
+            <DraggableTaskRow key={task._id} task={task} actionLabel={actionLabel} onAction={onAction} busy={busy} />
           ))
         )}
       </div>
+    </div>
+  )
+}
+
+function DraggableTaskRow({
+  task,
+  actionLabel,
+  onAction,
+  busy
+}: {
+  task: BacklogTask
+  actionLabel: string
+  onAction: (taskId: string) => void
+  busy: boolean
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task._id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={
+        transform
+          ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 10 : undefined }
+          : undefined
+      }
+      className={cn(
+        'flex cursor-grab items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-fill-quaternary)] apple-transition',
+        isDragging && 'opacity-50'
+      )}
+    >
+      <span className="font-apple-mono text-[12px] text-[var(--apple-system-blue)]">{task.displayId}</span>
+      <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--apple-label)]">{task.title}</span>
+      <span className="font-apple-mono text-[12px] tabular-nums text-[var(--apple-tertiary-label)]">
+        {task.originalEstimateMinutes ? `${hours(task.originalEstimateMinutes)}h` : '—'}
+      </span>
+      {/* NFR-A2 — every drag interaction needs a keyboard/click equivalent.
+          This button is that equivalent, not a leftover — it must keep
+          working exactly as it did before drag-and-drop existed. */}
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={(event) => {
+          event.stopPropagation()
+          onAction(task._id)
+        }}
+      >
+        {actionLabel}
+      </Button>
     </div>
   )
 }

@@ -3,7 +3,7 @@
  */
 import { render, screen, waitFor } from '@testing-library/react'
 
-import { PlanningWorkspace } from '../PlanningWorkspace'
+import { PlanningWorkspace, resolveDrop } from '../PlanningWorkspace'
 
 jest.mock('@/lib/permissions/permission-context', () => ({
   usePermissions: () => ({
@@ -121,7 +121,11 @@ describe('PlanningWorkspace — persistent scope/backlog panes', () => {
       />
     )
 
-    const removeButton = await screen.findByRole('button', { name: /remove/i })
+    // Exact name, not a substring match: the draggable row wrapping this
+    // button is itself an accessible "button" role (dnd-kit's keyboard drag
+    // affordance) whose computed name includes the row's full text, so a
+    // loose /remove/i match is ambiguous between the row and the real button.
+    const removeButton = await screen.findByRole('button', { name: 'Remove' })
     removeButton.click()
 
     await waitFor(() =>
@@ -133,5 +137,27 @@ describe('PlanningWorkspace — persistent scope/backlog panes', () => {
         })
       )
     )
+  })
+})
+
+describe('resolveDrop — pure drag-resolution logic', () => {
+  const backlogTasks = [{ _id: 'b1', displayId: '1.1', title: 'Backlog task' }]
+  const scopeTasks = [{ _id: 's1', displayId: '1.2', title: 'Scoped task' }]
+
+  it('dropping a backlog task onto the scope pane resolves to add', () => {
+    expect(resolveDrop('sprint-scope', 'b1', backlogTasks, scopeTasks)).toBe('add')
+  })
+
+  it('dropping a scoped task onto the backlog pane resolves to remove', () => {
+    expect(resolveDrop('backlog-pool', 's1', backlogTasks, scopeTasks)).toBe('remove')
+  })
+
+  it('dropping a task back onto the pane it already belongs to is a no-op', () => {
+    expect(resolveDrop('backlog-pool', 'b1', backlogTasks, scopeTasks)).toBe(null)
+    expect(resolveDrop('sprint-scope', 's1', backlogTasks, scopeTasks)).toBe(null)
+  })
+
+  it('an unrecognized drop target is a no-op', () => {
+    expect(resolveDrop('some-other-id', 'b1', backlogTasks, scopeTasks)).toBe(null)
   })
 })
