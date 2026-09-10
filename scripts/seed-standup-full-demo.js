@@ -381,6 +381,101 @@ async function createSprint2(db) {
   return SPRINT2_ID
 }
 
+async function createSprint2DayOne(db, sprint2Id) {
+  const tasks = await db.collection('tasks').find({ sprint: sprint2Id }).sort({ taskNumber: 1 }).toArray()
+  const now = new Date()
+
+  // The real app generates Sprint 2's full standup calendar once planning
+  // completes (src/lib/standup/generation.ts — normally fired from
+  // completePlanning, also reachable via POST /api/sprints/:id/standups/generate,
+  // and evidently already exercised against this environment: a real
+  // day_one standup for today, status Ready, already exists with a built
+  // `snapshot`/`notificationsSent`/`completionState` this script has no
+  // business fabricating or duplicating). So: attach allocations to that
+  // real standup when it exists, rather than inserting a shadow duplicate.
+  // Only synthesize a standup document as a fallback, for a fresh database
+  // where generation hasn't run yet.
+  let standup = await db.collection('standups').findOne({ sprint: sprint2Id, shape: 'day_one' })
+  let standupId
+
+  if (standup) {
+    standupId = standup._id
+  } else {
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+    const standupDate = isoDate(today)
+    const scheduledStartAt = new Date(`${standupDate}T03:45:00.000Z`) // 09:15 Asia/Colombo
+
+    standupId = new ObjectId()
+    await db.collection('standups').insertOne({
+      _id: standupId,
+      project: PROJECT_ID,
+      sprint: sprint2Id,
+      organization: ORG_ID,
+      seedMarker: MARKER,
+      standupDate,
+      scheduledStartAt,
+      durationMinutes: 15,
+      sprintDayNumber: 1,
+      totalSprintDays: 10,
+      shape: 'day_one',
+      status: 'Ready',
+      facilitator: PM,
+      expectedAttendees: [PM, QA, ANESSA],
+      attendance: [
+        { user: PM, state: 'present' },
+        { user: QA, state: 'present' },
+        { user: ANESSA, state: 'present' }
+      ],
+      version: 0,
+      wasBackfilled: false,
+      calendarAnomalies: [],
+      snapshotBuiltAt: now,
+      notificationsSent: {},
+      createdAt: now,
+      updatedAt: now
+    })
+    console.log(`Task 4: Sprint 2 day-one stand-up created for ${standupDate} (Ready)`)
+  }
+
+  const existingAllocations = await db.collection('allocations').findOne({ standup: standupId, seedMarker: MARKER })
+  if (existingAllocations) return
+
+  // Pre-assign 3 of the 5 tasks: QA gets a full day (5h + 3h = 8h) across 2
+  // tasks, Anessa gets a partial day (6h planned of an 8h-estimated task) —
+  // a deliberate capacity gap so the redesigned capacity board isn't
+  // trivially all-green. 2 tasks stay unassigned in the pool.
+  const [t1, t2, t3] = tasks
+  await db.collection('allocations').insertMany([
+    {
+      standup: standupId, sprint: sprint2Id, project: PROJECT_ID, organization: ORG_ID,
+      seedMarker: MARKER,
+      member: QA, task: t1._id, plannedMinutes: t1.originalEstimateMinutes, source: 'pre_assigned',
+      isBlocked: false, allocatedDespiteBlocked: false, excludedFromCapacity: false,
+      pairedDeliberately: false, addedAfterCompletion: false,
+      taskStatusAtAllocation: 'todo', createdBy: PM, createdAt: now, updatedAt: now
+    },
+    {
+      standup: standupId, sprint: sprint2Id, project: PROJECT_ID, organization: ORG_ID,
+      seedMarker: MARKER,
+      member: QA, task: t3._id, plannedMinutes: t3.originalEstimateMinutes, source: 'pre_assigned',
+      isBlocked: false, allocatedDespiteBlocked: false, excludedFromCapacity: false,
+      pairedDeliberately: false, addedAfterCompletion: false,
+      taskStatusAtAllocation: 'todo', createdBy: PM, createdAt: now, updatedAt: now
+    },
+    {
+      standup: standupId, sprint: sprint2Id, project: PROJECT_ID, organization: ORG_ID,
+      seedMarker: MARKER,
+      member: ANESSA, task: t2._id, plannedMinutes: 360, source: 'pre_assigned',
+      isBlocked: false, allocatedDespiteBlocked: false, excludedFromCapacity: false,
+      pairedDeliberately: false, addedAfterCompletion: false,
+      taskStatusAtAllocation: 'todo', createdBy: PM, createdAt: now, updatedAt: now
+    }
+  ])
+
+  console.log('Task 4: 3 allocations seeded against Sprint 2\'s day-one stand-up (QA full day, Anessa 6h of 8h), 2 tasks left in the pool')
+}
+
 async function removeAll(db) {
   // Undo all changes from fixProjectTeam()
   // Remove team members added for Admin/PM/QA/Anessa
@@ -412,6 +507,11 @@ async function removeAll(db) {
   // sprint document to its original state rather than deleting it.
   await db.collection('tasks').deleteMany({ sprint: SPRINT2_ID, seedMarker: MARKER })
   await db.collection('sprintplanningsessions').deleteMany({ sprint: SPRINT2_ID, seedMarker: MARKER })
+
+  // Undo all changes from createSprint2DayOne()
+  await db.collection('allocations').deleteMany({ sprint: SPRINT2_ID, seedMarker: MARKER })
+  await db.collection('standups').deleteMany({ sprint: SPRINT2_ID, seedMarker: MARKER })
+
   await db.collection('sprints').updateOne(
     { _id: SPRINT2_ID },
     {
@@ -429,7 +529,7 @@ async function removeAll(db) {
     }
   )
 
-  console.log('Removed full-demo changes (Tasks 1-3)')
+  console.log('Removed full-demo changes (Tasks 1-4)')
 }
 
 async function main() {
@@ -446,8 +546,9 @@ async function main() {
   await fixProjectTeam(db)
   await backfillSprint1Summaries(db)
   const sprint2Id = await createSprint2(db)
+  await createSprint2DayOne(db, sprint2Id)
 
-  console.log(`\nDone (Tasks 1-3 of the full demo seed). Sprint 2: ${sprint2Id}`)
+  console.log(`\nDone (Tasks 1-4 of the full demo seed). Sprint 2: ${sprint2Id}`)
   await client.close()
 }
 
