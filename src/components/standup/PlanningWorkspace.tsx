@@ -16,7 +16,6 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle,
   Check,
-  ListPlus,
   Loader2,
   PlayCircle,
   ShieldAlert,
@@ -115,7 +114,7 @@ export function PlanningWorkspace({
   const [completed, setCompleted] = useState<{ message: string } | null>(null)
   const [poker, setPoker] = useState<any>(null)
   const [backlog, setBacklog] = useState<BacklogTask[]>([])
-  const [showBacklog, setShowBacklog] = useState(false)
+  const [scope, setScope] = useState<BacklogTask[]>([])
   // PLN-10 `participantIds`. Only the sprint team could vote before, which shut
   // out QA and specialists who estimate work they are not assigned.
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([])
@@ -183,6 +182,21 @@ export function PlanningWorkspace({
     }
   }, [projectId])
 
+  // The sprint scope pane: what a PM has already committed. Without this a
+  // PM could add tasks but never see or remove what's already in the sprint
+  // without leaving the page.
+  const loadScope = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `/api/tasks?sprint=${encodeURIComponent(sprintId)}&limit=100`
+      )
+      const payload = await response.json()
+      if (response.ok) setScope(payload.data ?? payload.tasks ?? [])
+    } catch {
+      /* Same reasoning as loadBacklog: additive, must not blank the gate. */
+    }
+  }, [sprintId])
+
   const loadMembers = useCallback(async () => {
     try {
       const response = await fetch(`/api/projects/${projectId}/member-capacity`)
@@ -203,7 +217,7 @@ export function PlanningWorkspace({
         body: JSON.stringify({ sprint: intoSprint ? sprintId : null })
       })
       if (!response.ok) throw new Error('Could not move the task')
-      await Promise.all([refresh(), loadBacklog()])
+      await Promise.all([refresh(), loadBacklog(), loadScope()])
     } catch (error) {
       notify.error({
         title: intoSprint ? 'Could not add the task' : 'Could not remove the task',
@@ -217,6 +231,13 @@ export function PlanningWorkspace({
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  useEffect(() => {
+    if (session) {
+      loadBacklog()
+      loadScope()
+    }
+  }, [session, loadBacklog, loadScope])
 
   const openSession = async () => {
     setBusy(true)
@@ -548,59 +569,27 @@ export function PlanningWorkspace({
 
       {session && (
         <section className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="apple-section-label text-[var(--apple-secondary-label)]">
-              Sprint scope
-            </h3>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setShowBacklog((current) => !current)
-                if (!showBacklog && backlog.length === 0) loadBacklog()
-              }}
-            >
-              <ListPlus className="mr-1.5 h-3.5 w-3.5" />
-              {showBacklog ? 'Hide backlog' : 'Add from backlog'}
-            </Button>
+          <h3 className="apple-section-label text-[var(--apple-secondary-label)]">
+            Sprint scope
+          </h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <TaskPane
+              title="Backlog"
+              emptyMessage="Nothing unassigned in the backlog for this project."
+              tasks={backlog}
+              actionLabel="Add"
+              onAction={(taskId) => moveTask(taskId, true)}
+              busy={busy}
+            />
+            <TaskPane
+              title={`In this sprint (${scope.length})`}
+              emptyMessage="Nothing is in scope yet. Add tasks from the backlog."
+              tasks={scope}
+              actionLabel="Remove"
+              onAction={(taskId) => moveTask(taskId, false)}
+              busy={busy}
+            />
           </div>
-
-          {showBacklog && (
-            <div className="max-h-[240px] space-y-1 overflow-y-auto rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] p-2">
-              {backlog.length === 0 ? (
-                <p className="px-2 py-3 text-[13px] text-[var(--apple-tertiary-label)]">
-                  Nothing unassigned in the backlog for this project.
-                </p>
-              ) : (
-                backlog.map((task) => (
-                  <div
-                    key={task._id}
-                    className="flex items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-fill-quaternary)]"
-                  >
-                    <span className="font-apple-mono text-[12px] text-[var(--apple-system-blue)]">
-                      {task.displayId}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--apple-label)]">
-                      {task.title}
-                    </span>
-                    <span className="font-apple-mono text-[12px] tabular-nums text-[var(--apple-tertiary-label)]">
-                      {task.originalEstimateMinutes
-                        ? `${hours(task.originalEstimateMinutes)}h`
-                        : '—'}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => moveTask(task._id, true)}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
         </section>
       )}
 
@@ -733,6 +722,53 @@ function Stat({
           <AlertTriangle className="ml-1.5 inline h-4 w-4 text-[var(--apple-system-orange)]" />
         )}
       </p>
+    </div>
+  )
+}
+
+function TaskPane({
+  title,
+  emptyMessage,
+  tasks,
+  actionLabel,
+  onAction,
+  busy
+}: {
+  title: string
+  emptyMessage: string
+  tasks: BacklogTask[]
+  actionLabel: string
+  onAction: (taskId: string) => void
+  busy: boolean
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[13px] font-medium text-[var(--apple-label)]">{title}</p>
+      <div className="max-h-[320px] space-y-1 overflow-y-auto rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] p-2">
+        {tasks.length === 0 ? (
+          <p className="px-2 py-3 text-[13px] text-[var(--apple-tertiary-label)]">{emptyMessage}</p>
+        ) : (
+          tasks.map((task) => (
+            <div
+              key={task._id}
+              className="flex items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-fill-quaternary)]"
+            >
+              <span className="font-apple-mono text-[12px] text-[var(--apple-system-blue)]">
+                {task.displayId}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--apple-label)]">
+                {task.title}
+              </span>
+              <span className="font-apple-mono text-[12px] tabular-nums text-[var(--apple-tertiary-label)]">
+                {task.originalEstimateMinutes ? `${hours(task.originalEstimateMinutes)}h` : '—'}
+              </span>
+              <Button size="sm" variant="outline" disabled={busy} onClick={() => onAction(task._id)}>
+                {actionLabel}
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   )
 }
