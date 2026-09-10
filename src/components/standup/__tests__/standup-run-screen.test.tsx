@@ -22,6 +22,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 
 import { StandupRunScreen } from '@/components/standup/run/StandupRunScreen'
 import type { RunScreenData } from '@/components/standup/run/StandupRunScreen'
+import type { BlockerRow } from '@/components/standup/run/BlockerPanel'
 import type { CapacityBreakdown } from '@/lib/standup/capacity'
 import { evaluateCompletionChecks } from '@/lib/standup/completion-checks'
 import { minutes } from '@/lib/standup/minutes'
@@ -941,5 +942,159 @@ describe('final-day sprint close', () => {
       }
     })
     expect(screen.getByText(/complete stand-up/i)).not.toBeDisabled()
+  })
+})
+
+describe('Panel 6 — blockers, the resolve fix (Task 5)', () => {
+  const openBlocker = (overrides: Partial<BlockerRow> = {}): BlockerRow => ({
+    blockerId: 'blk-1',
+    taskKey: 'KAN-1',
+    description: 'Vendor sandbox is down',
+    blockerType: 'external_party',
+    severity: 'high',
+    status: 'open',
+    overdue: false,
+    blockerLabel: 'BLK-1',
+    ...overrides
+  })
+
+  it('shows an open blocker row', () => {
+    renderScreen({ blockers: [openBlocker()] })
+    expect(screen.getByTestId('blocker-row')).toBeInTheDocument()
+  })
+
+  // The bug the reviewer caught: `BlockerPanel`'s own status check (line 89
+  // there) only hides the row's Resolve *button*, not the row itself — so
+  // without this screen filtering `board.blockers` before handing them to
+  // the panel, a resolved blocker would sit in Panel 6 forever, sans button.
+  it('does not render a blocker that is already resolved on the board', () => {
+    renderScreen({ blockers: [openBlocker({ status: 'resolved' })] })
+    expect(screen.queryByTestId('blocker-row')).not.toBeInTheDocument()
+  })
+
+  it('does not render a blocker marked wont_resolve either', () => {
+    renderScreen({ blockers: [openBlocker({ status: 'wont_resolve' })] })
+    expect(screen.queryByTestId('blocker-row')).not.toBeInTheDocument()
+  })
+
+  it('removes the row once the PM resolves it and the board reloads', async () => {
+    const api = { ...okApi(), resolveBlocker: jest.fn().mockResolvedValue(undefined) }
+    // The server's own state after the PATCH: the blocker is now resolved.
+    // `onSubmitResolveBlocker` has to call `reload()` (i.e. `api.refresh`)
+    // for this to reach the screen at all — `board` is this component's own
+    // state and is never re-synced from the `data` prop after mount.
+    api.refresh.mockResolvedValue(data({ blockers: [openBlocker({ status: 'resolved' })] }))
+    renderScreen({ blockers: [openBlocker()] }, api)
+
+    expect(screen.getByTestId('blocker-row')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.blocker.resolve() }))
+    const dialog = screen.getByRole('dialog')
+
+    fireEvent.change(within(dialog).getByLabelText(/resolution note/i), {
+      target: { value: 'Vendor sandbox came back up.' }
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: /resolve/i }))
+
+    await waitFor(() =>
+      expect(api.resolveBlocker).toHaveBeenCalledWith({
+        blockerId: 'blk-1',
+        status: 'resolved',
+        resolutionNote: 'Vendor sandbox came back up.'
+      })
+    )
+    await waitFor(() => expect(api.refresh).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByTestId('blocker-row')).not.toBeInTheDocument())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows an error notice and keeps the dialog open when the server refuses', async () => {
+    const api = {
+      ...okApi(),
+      resolveBlocker: jest.fn().mockRejectedValue(new Error('nope'))
+    }
+    renderScreen({ blockers: [openBlocker()] }, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.blocker.resolve() }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText(/resolution note/i), {
+      target: { value: 'Vendor sandbox came back up.' }
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: /resolve/i }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      standupStrings.blocker.resolveFailed()
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+})
+
+describe('Panel 6 — blockers, the raise fix (Task 4 fix)', () => {
+  it('appears in the panel once the PM raises it and the board reloads', async () => {
+    const api = { ...okApi(), raiseBlocker: jest.fn().mockResolvedValue(undefined) }
+    const raised: BlockerRow = {
+      blockerId: 'blk-new',
+      description: 'Waiting on the vendor sandbox',
+      blockerType: 'external_party',
+      severity: 'medium',
+      status: 'open',
+      overdue: false,
+      blockerLabel: 'BLK-2'
+    }
+    // The server's own state after the POST: the new blocker now exists.
+    // `onSubmitRaiseBlocker` has to call `reload()` (i.e. `api.refresh`) for
+    // this to reach the screen at all — same reason as the resolve-path fix
+    // above: `board` is this component's own state and is never re-synced
+    // from the `data` prop after mount.
+    api.refresh.mockResolvedValue(data({ blockers: [raised] }))
+    renderScreen({ blockers: [] }, api)
+
+    expect(screen.queryByTestId('blocker-row')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.blocker.raise() }))
+    const dialog = screen.getByRole('dialog')
+
+    fireEvent.change(within(dialog).getByLabelText(/description/i), {
+      target: { value: 'Waiting on the vendor sandbox' }
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: /raise a blocker/i }))
+
+    await waitFor(() =>
+      expect(api.raiseBlocker).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Waiting on the vendor sandbox' })
+      )
+    )
+    await waitFor(() => expect(api.refresh).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByTestId('blocker-row')).toBeInTheDocument())
+    expect(screen.getByTestId('blocker-row')).toHaveTextContent('Waiting on the vendor sandbox')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('offers actively-allocated tasks (not the pool) so a real allocationId reaches the payload (Important 5)', async () => {
+    // The default fixture's `pool` is empty — every task on this board is an
+    // active allocation (Kasun's `KAN-214`). Before the fix, `RaiseBlockerModal`
+    // was fed `poolTasks` (`board.pool.unassigned + assignedNotPlanned`), which
+    // structurally excludes tasks with a live allocation — so this option could
+    // never have appeared, and `linkedAllocationId` could never populate.
+    const api = { ...okApi(), raiseBlocker: jest.fn().mockResolvedValue(undefined) }
+    renderScreen({}, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.blocker.raise() }))
+    const dialog = screen.getByRole('dialog')
+
+    const taskSelect = within(dialog).getByLabelText(/linked task/i)
+    expect(within(taskSelect).getByRole('option', { name: /KAN-214/ })).toBeInTheDocument()
+
+    fireEvent.change(taskSelect, { target: { value: 't1' } })
+    fireEvent.change(within(dialog).getByLabelText(/description/i), {
+      target: { value: 'Blocked on the invoice model migration' }
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: /raise a blocker/i }))
+
+    await waitFor(() =>
+      expect(api.raiseBlocker).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: 't1', linkedAllocationId: 'a1' })
+      )
+    )
   })
 })

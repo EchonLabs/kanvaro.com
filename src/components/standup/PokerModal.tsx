@@ -39,6 +39,7 @@ interface RevealedVote {
 }
 
 interface RevealState {
+  round?: number
   spread: number | null
   min: number | null
   max: number | null
@@ -129,16 +130,30 @@ export function PokerModal({
         // A non-facilitator's local `reveal` state never gets set by the
         // reveal POST (that response only reaches the facilitator's own
         // request) — poll the read-only reveal-state endpoint for whichever
-        // task is currently visible so every voter sees the same spread.
-        const visibleTaskId = session.currentTask ?? currentTaskId
-        if (visibleTaskId) {
+        // task is actually on screen (the local `taskId`, resolved through
+        // `resolveVisibleTask`'s own fallback logic) so every voter sees the
+        // same spread. Fetching for a separately-computed id (the old
+        // `session.currentTask ?? currentTaskId`) could disagree with what
+        // `resolveVisibleTask`'s fallback branch put on screen when
+        // `currentTask` is null or not in the client's queue (Important 3).
+        if (taskId) {
           const revealResponse = await fetch(
-            `/api/poker-sessions/${sessionId}/tasks/${visibleTaskId}/reveal-state`
+            `/api/poker-sessions/${sessionId}/tasks/${taskId}/reveal-state`
           )
           if (revealResponse.ok) {
             const revealPayload = await revealResponse.json()
+            // Replace, never merely set-if-null: a re-vote (`finalize({
+            // revote: true })`) puts the same task back into `voting` without
+            // changing `taskId`, so `revealed: false` (or a new `round`) must
+            // clear/replace a stale spread — otherwise a non-facilitator voter
+            // is stuck looking at round 1's reveal forever, with the card grid
+            // (rendered under `!reveal`) never coming back (Critical 2).
             if (revealPayload?.data?.revealed) {
-              setReveal((current) => current ?? revealPayload.data)
+              setReveal((current) =>
+                current && current.round === revealPayload.data.round ? current : revealPayload.data
+              )
+            } else {
+              setReveal((current) => (current === null ? current : null))
             }
           }
         }
@@ -153,7 +168,11 @@ export function PokerModal({
       cancelled = true
       clearInterval(interval)
     }
-  }, [open, sessionId])
+    // `taskId` is included (Important 3) so the reveal-state fetch always
+    // targets the task actually on screen, including after
+    // `resolveVisibleTask`'s fallback branch changes it out from under a
+    // stale `currentTaskId` prop.
+  }, [open, sessionId, taskId])
 
   // One rule decides what is on screen, for the facilitator and voters alike.
   useEffect(() => {
