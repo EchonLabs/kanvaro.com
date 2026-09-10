@@ -86,6 +86,23 @@ async function backfillSprint1Summaries(db) {
 
   const sprint = await db.collection('sprints').findOne({ _id: SPRINT1_ID })
 
+  // §13.3's per-project age thresholds (`ageBandFor` in carry-forward.ts):
+  // note/escalation bands come from settings, the chronic band is a fixed
+  // constant not stored anywhere.
+  const CHRONIC_AGE_THRESHOLD = 8
+  const standupSettings = await db.collection('projectstandupsettings').findOne({ project: PROJECT_ID })
+  const ageThresholds = {
+    noteThreshold: standupSettings?.carryForwardNoteThreshold ?? 3,
+    escalationThreshold: standupSettings?.carryForwardEscalationThreshold ?? 5
+  }
+  const ageBandFor = (ageInStandups) => {
+    const age = ageInStandups ?? 0
+    if (age >= CHRONIC_AGE_THRESHOLD) return 'chronic'
+    if (age >= ageThresholds.escalationThreshold) return 'escalated'
+    if (age >= ageThresholds.noteThreshold) return 'note_required'
+    return 'normal'
+  }
+
   for (const standupId of [DAY1, DAY2, DAY4, DAY8]) {
     const exists = await db.collection('standupsummaries').findOne({ standup: standupId })
     if (exists) continue
@@ -97,7 +114,13 @@ async function backfillSprint1Summaries(db) {
     const carryForward = await db.collection('carryforwarditems').find({ originStandup: standupId }).toArray()
     const overrides = await db.collection('standupoverrides').find({ standup: standupId }).toArray()
 
-    const taskIds = [...new Set(allocations.map((a) => a.task.toString()))]
+    // Carry-forward items can reference a task that wasn't re-allocated on
+    // this particular day, so the id set must cover both sources or
+    // taskKeyById/taskTitleById silently come back undefined for those rows.
+    const taskIds = [...new Set([
+      ...allocations.map((a) => a.task.toString()),
+      ...carryForward.map((item) => item.task).filter(Boolean).map((id) => id.toString())
+    ])]
     const tasks = await db.collection('tasks').find({ _id: { $in: taskIds.map((id) => new ObjectId(id)) } }).toArray()
     const taskKeyById = new Map(tasks.map((t) => [t._id.toString(), t.displayId]))
     const taskTitleById = new Map(tasks.map((t) => [t._id.toString(), t.title]))
@@ -153,12 +176,12 @@ async function backfillSprint1Summaries(db) {
         status: b.status
       })),
       blockersResolved: blockers
-        .filter((b) => b.status === 'resolved')
+        .filter((b) => b.status === 'resolved' || b.status === 'wont_resolve')
         .map((b) => ({ blockerId: String(b._id), resolutionNote: b.resolutionNote })),
       carryForwardState: carryForward.map((item) => ({
         itemId: String(item._id),
         taskKey: item.task ? taskKeyById.get(item.task.toString()) : undefined,
-        ageBand: item.ageInStandups >= 3 ? '3+' : String(item.ageInStandups ?? 0),
+        ageBand: ageBandFor(item.ageInStandups),
         status: item.status
       })),
       overridesIssued: overrides.map((o) => ({
