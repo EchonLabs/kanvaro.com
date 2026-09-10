@@ -341,7 +341,8 @@ describe('invoking PATCH for real, with withBlockerPermission wired to mocked au
         Promise.resolve({
           _id: 'blocker-1',
           organization: 'org-1',
-          project: 'project-1'
+          project: 'project-1',
+          standup: 'standup-1'
         })
     })
   })
@@ -361,6 +362,11 @@ describe('invoking PATCH for real, with withBlockerPermission wired to mocked au
     expect(updateBlockerMock).toHaveBeenCalledWith(
       expect.objectContaining({
         blockerId: 'blocker-1',
+        // Critical 1's fix threads a `standupId` through every caller of
+        // `updateBlocker`, this route included — here it comes from the
+        // blocker `withBlockerPermission` already loaded and org-scoped by
+        // its own id, not from the URL (this route has no stand-up segment).
+        standupId: 'standup-1',
         updatedBy: 'user-1',
         organizationId: 'org-1',
         projectId: 'project-1',

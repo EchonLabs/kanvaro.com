@@ -1251,7 +1251,9 @@ export const standupStrings = {
     raise: () => 'Raise a blocker',
     resolve: () => 'Resolve',
     empty: () => 'No blockers right now.',
-    general: () => 'General'
+    general: () => 'General',
+    raiseFailed: () => 'That blocker could not be raised.',
+    resolveFailed: () => 'That blocker could not be resolved.'
   },
 
   /**

@@ -112,6 +112,16 @@ export async function raiseBlocker(input: RaiseBlockerInput): Promise<IStandupBl
 
 export interface UpdateBlockerInput {
   blockerId: string
+  /**
+   * The stand-up id from the route's own `:id` param (Critical 1 of the
+   * final-review fix wave). `withStandupIdPermission` only org-isolates the
+   * stand-up named in the URL — it says nothing about whether `:blockerId` is
+   * actually a child of that stand-up. Without this, any caller with
+   * `STANDUP_BLOCKER_RAISE` on *some* stand-up in their own org could PATCH
+   * any `StandupBlocker` document in the entire database by guessing/probing
+   * ids. Scoping the lookup by both `_id` and `standup` closes that.
+   */
+  standupId: string
   updatedBy: string
   organizationId: string
   projectId: string
@@ -128,7 +138,11 @@ export interface UpdateBlockerInput {
  * — "no Blocker entity to check against" — this closes it).
  */
 export async function updateBlocker(input: UpdateBlockerInput): Promise<IStandupBlocker> {
-  const blocker = await StandupBlocker.findById(input.blockerId)
+  const blocker = await StandupBlocker.findOne({
+    _id: input.blockerId,
+    standup: input.standupId,
+    organization: input.organizationId
+  })
   if (!blocker) throw new StandupError('NOT_FOUND', 'Blocker not found.')
 
   const closing = input.status === 'resolved' || input.status === 'wont_resolve'
