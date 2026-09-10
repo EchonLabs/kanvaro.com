@@ -33,14 +33,15 @@ interface UpdateBlockerBody {
 
 export const PATCH = withStandupIdPermission(
   { permission: Permission.STANDUP_BLOCKER_RAISE },
-  async (request, { userId, organizationId, projectId, params }) => {
+  async (request, { userId, organizationId, projectId, standupId, standup, params }) => {
     try {
       const body = (await request.json()) as UpdateBlockerBody
       const blocker = await updateBlocker({
         blockerId: params.blockerId,
+        standupId,
         updatedBy: userId,
         organizationId,
-        projectId: projectId ?? '',
+        projectId: projectId ?? String((standup as any).project),
         owner: body.owner,
         targetResolutionDate: body.targetResolutionDate,
         severity: body.severity,

@@ -35,15 +35,21 @@ interface UpdateBlockerBody {
 
 export const PATCH = withBlockerPermission(
   { permission: Permission.STANDUP_BLOCKER_RAISE },
-  async (request, { userId, organizationId, projectId, blockerId }) => {
+  async (request, { userId, organizationId, projectId, blockerId, blocker: loadedBlocker }) => {
     try {
       const body = (await request.json()) as UpdateBlockerBody
 
       const blocker = await updateBlocker({
         blockerId,
+        // `withBlockerPermission` already loaded and org-scoped this blocker
+        // by its own id (unlike `/api/standups/:id/blockers/:blockerId`,
+        // which is keyed by a URL stand-up id and needed Critical 1's fix),
+        // so its own `standup` field is the correct, already-verified scope
+        // to thread through to `updateBlocker`'s new required field.
+        standupId: String((loadedBlocker as any).standup),
         updatedBy: userId,
         organizationId,
-        projectId: projectId ?? '',
+        projectId: projectId ?? String((loadedBlocker as any).project),
         owner: body.owner,
         targetResolutionDate: body.targetResolutionDate,
         severity: body.severity,

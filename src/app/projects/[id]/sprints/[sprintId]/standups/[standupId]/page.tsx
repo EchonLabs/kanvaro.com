@@ -31,6 +31,7 @@ import {
   ReviseEstimateModal,
   type ReviseEstimateTarget
 } from '@/components/standup/run/ReviseEstimateModal'
+import { ModalOverlay } from '@/components/standup/primitives/ModalOverlay'
 import type { VariancePanelMember, VariancePanelRow } from '@/components/standup/run/VariancePanel'
 import type { CarryForwardItemRow } from '@/components/standup/run/CarryForwardPanel'
 import type { BlockerRow } from '@/components/standup/run/BlockerPanel'
@@ -321,6 +322,50 @@ export default function StandupRunPage({
         body: JSON.stringify(input)
       })
       return unwrap(response)
+    },
+
+    // --- Task 4 (Panel 6's raise-blocker action) ---------------------------
+    /**
+     * `POST /api/standups/:id/blockers` returns the created blocker directly
+     * (`NextResponse.json(blocker, { status: 201 })`), not the `{ success,
+     * data }` envelope its sibling `GET`/`PATCH` use — `unwrap`'s
+     * `payload.data ?? payload` fallback already covers that shape, so no
+     * special-casing is needed here.
+     */
+    // No `setData(await load())` here, on purpose — same convention `start()`
+    // above documents: `StandupRunScreen`'s own `onSubmitRaiseBlocker` already
+    // calls `reload()` (== `api.refresh` == this page's `load`) right after
+    // this resolves, so refetching here too would fire the six-endpoint
+    // `load()` fan-out twice for one mutation, racing itself.
+    async raiseBlocker(input) {
+      const response = await fetch(`/api/standups/${standupId}/blockers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input)
+      })
+      await unwrap(response)
+    },
+
+    /**
+     * Task 5 (RUN-14..18's resolve path). `PATCH
+     * /api/standups/:id/blockers/:blockerId` — unlike its sibling `POST`
+     * above, this route DOES wrap its response in the standard `{ success,
+     * data }` envelope (`return ok(blocker)`,
+     * `blockers/[blockerId]/route.ts:50`). The return value is unused here —
+     * `StandupRunScreen`'s own `onSubmitResolveBlocker` calls `reload()` right
+     * after this resolves (same convention as `raiseBlocker` above, and
+     * `start()`'s docblock), so this function does not duplicate that fetch.
+     */
+    async resolveBlocker(input) {
+      const response = await fetch(
+        `/api/standups/${standupId}/blockers/${input.blockerId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: input.status, resolutionNote: input.resolutionNote })
+        }
+      )
+      if (!response.ok) throw await asError(response)
     }
   }
 
@@ -417,61 +462,62 @@ export default function StandupRunPage({
         )}
 
         {revising && (
-          <ReviseEstimateModal
-            target={revising}
-            onSave={saveRevision}
-            onCancel={() => setRevising(null)}
-          />
+          <ModalOverlay open onClose={() => setRevising(null)} labelledBy="revise-title">
+            <ReviseEstimateModal
+              target={revising}
+              onSave={saveRevision}
+              onCancel={() => setRevising(null)}
+            />
+          </ModalOverlay>
         )}
 
         {givingReason && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reason-title"
-            className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4"
-          >
-            <h3 id="reason-title" className="text-sm font-semibold">
-              {standupStrings.run.panel3()} — {givingReason.taskKey ?? givingReason.title}
-            </h3>
-            <label className="flex flex-col gap-1 text-sm" htmlFor="not-started-reason">
-              Why didn’t this happen?
-              <textarea
-                id="not-started-reason"
-                value={reasonText}
-                onChange={(event) => setReasonText(event.target.value)}
-                className="min-h-16 rounded-md border border-border bg-background px-2 py-1 text-sm"
-              />
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setGivingReason(null)}
-                className="rounded-md border border-border px-3 py-1 text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!reasonText.trim()}
-                onClick={saveReason}
-                className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground disabled:opacity-50"
-              >
-                Save
-              </button>
+          <ModalOverlay open onClose={() => setGivingReason(null)} labelledBy="reason-title">
+            <div className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
+              <h3 id="reason-title" className="text-sm font-semibold">
+                {standupStrings.run.panel3()} — {givingReason.taskKey ?? givingReason.title}
+              </h3>
+              <label className="flex flex-col gap-1 text-sm" htmlFor="not-started-reason">
+                Why didn’t this happen?
+                <textarea
+                  id="not-started-reason"
+                  value={reasonText}
+                  onChange={(event) => setReasonText(event.target.value)}
+                  className="min-h-16 rounded-md border border-border bg-background px-2 py-1 text-sm"
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGivingReason(null)}
+                  className="rounded-md border border-border px-3 py-1 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!reasonText.trim()}
+                  onClick={saveReason}
+                  className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
             </div>
-          </div>
+          </ModalOverlay>
         )}
 
         {ledger && (
-          <DebtLedgerDrawer
-            memberName={ledger.memberName}
-            position={ledger.position}
-            entries={ledger.entries}
-            canWriteOff={ledger.canWriteOff}
-            onWriteOff={saveWriteOff}
-            onClose={() => setLedger(null)}
-          />
+          <ModalOverlay open onClose={() => setLedger(null)} labelledBy="debt-ledger-title">
+            <DebtLedgerDrawer
+              memberName={ledger.memberName}
+              position={ledger.position}
+              entries={ledger.entries}
+              canWriteOff={ledger.canWriteOff}
+              onWriteOff={saveWriteOff}
+              onClose={() => setLedger(null)}
+            />
+          </ModalOverlay>
         )}
       </div>
     </MainLayout>
