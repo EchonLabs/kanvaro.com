@@ -140,6 +140,7 @@ describe('updateBlocker', () => {
     await expect(
       updateBlocker({
         blockerId: String(blocker._id),
+        standupId: String(ids.user),
         updatedBy: String(ids.user),
         organizationId: String(ids.organization),
         projectId: String(ids.project),
@@ -156,6 +157,7 @@ describe('updateBlocker', () => {
 
     const updated = await updateBlocker({
       blockerId: String(blocker._id),
+      standupId: String(ids.user),
       updatedBy: String(ids.user),
       organizationId: String(ids.organization),
       projectId: String(ids.project),
@@ -173,6 +175,51 @@ describe('updateBlocker', () => {
     expect(item?.status).toBe('resolved')
     expect(item?.resolution?.resolutionType).toBe('done')
     expect(item?.resolution?.comment).toBe('Vendor restored the sandbox environment this morning.')
+  })
+
+  it('rejects a blocker id that does not belong to the given stand-up (Critical 1, cross-tenant/cross-standup write)', async () => {
+    const allocation = await seedAllocation()
+    const blocker = await raiseBlocker(
+      raiseInput({ linkedAllocationId: String(allocation._id), taskId: String(allocation.task) })
+    )
+
+    await expect(
+      updateBlocker({
+        blockerId: String(blocker._id),
+        // A different stand-up id than the one the blocker was actually
+        // raised on (`raiseInput`'s default `standupId` is `ids.user`).
+        standupId: String(anyId()),
+        updatedBy: String(ids.user),
+        organizationId: String(ids.organization),
+        projectId: String(ids.project),
+        status: 'resolved',
+        resolutionNote: 'Attempting to resolve someone else\'s blocker.'
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' })
+
+    // Proves the mismatch actually short-circuited the write — not just that
+    // the promise rejected for some other reason.
+    const untouched = await StandupBlocker.findById(blocker._id).lean()
+    expect(untouched?.status).toBe('open')
+  })
+
+  it('rejects an org mismatch even when standup and blocker ids otherwise line up', async () => {
+    const allocation = await seedAllocation()
+    const blocker = await raiseBlocker(
+      raiseInput({ linkedAllocationId: String(allocation._id), taskId: String(allocation.task) })
+    )
+
+    await expect(
+      updateBlocker({
+        blockerId: String(blocker._id),
+        standupId: String(ids.user),
+        updatedBy: String(ids.user),
+        organizationId: String(anyId()),
+        projectId: String(ids.project),
+        status: 'resolved',
+        resolutionNote: 'Attempting a cross-organization resolve.'
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 })
 

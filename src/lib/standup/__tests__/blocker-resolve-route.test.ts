@@ -14,6 +14,7 @@ jest.mock('@/lib/standup/route-helpers', () => {
         organizationId: 'org-1',
         projectId: 'project-1',
         standupId: 'standup-1',
+        standup: { project: 'project-1' },
         params: context.params
       })
   }
@@ -34,9 +35,41 @@ describe('PATCH /api/standups/:id/blockers/:blockerId', () => {
 
     expect(response.status).toBe(200)
     expect(updateBlocker).toHaveBeenCalledWith(
-      expect.objectContaining({ blockerId: 'blocker-1', status: 'resolved' })
+      expect.objectContaining({ blockerId: 'blocker-1', standupId: 'standup-1', status: 'resolved' })
     )
     expect(body.data.status).toBe('resolved')
+  })
+
+  it('threads the URL stand-up id through to updateBlocker (Critical 1) and falls back to standup.project (Important 6)', async () => {
+    ;(updateBlocker as jest.Mock).mockResolvedValue({ _id: 'blocker-1', status: 'resolved' })
+
+    const request = new NextRequest('http://localhost/x', {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'resolved', resolutionNote: 'Fixed the vendor sandbox this morning.' })
+    })
+    await PATCH(request, { params: { id: 'standup-1', blockerId: 'blocker-1' } })
+
+    expect(updateBlocker).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blockerId: 'blocker-1',
+        standupId: 'standup-1',
+        organizationId: 'org-1',
+        projectId: 'project-1'
+      })
+    )
+  })
+
+  it('maps a NOT_FOUND from a mismatched blocker/stand-up pair to a 404 rather than succeeding', async () => {
+    const { StandupError } = jest.requireActual('@/lib/standup/errors')
+    ;(updateBlocker as jest.Mock).mockRejectedValue(new StandupError('NOT_FOUND', 'Blocker not found.'))
+
+    const request = new NextRequest('http://localhost/x', {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'resolved', resolutionNote: 'Trying to resolve a foreign blocker.' })
+    })
+    const response = await PATCH(request, { params: { id: 'standup-1', blockerId: 'blocker-from-elsewhere' } })
+
+    expect(response.status).toBe(404)
   })
 
   it('maps a too-short resolution note to a 4xx', async () => {
