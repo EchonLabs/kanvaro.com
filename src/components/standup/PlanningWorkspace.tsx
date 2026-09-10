@@ -13,7 +13,15 @@
  * note before anything else: "Note that number. It is your ceiling."
  */
 import { useCallback, useEffect, useState } from 'react'
-import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core'
+import {
+  DndContext,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from '@dnd-kit/core'
 import {
   AlertTriangle,
   Check,
@@ -104,6 +112,11 @@ export function PlanningWorkspace({
   // casting a vote only needs SPRINT_VIEW. A team member reaches this screen to
   // vote and must not be shown controls the API would refuse.
   const canFacilitate = hasPermission(Permission.SPRINT_UPDATE, projectId)
+
+  // Matches KanbanBoard's sensor config: without an activation distance, the
+  // draggable row's pointerdown listener can register a drag before a click
+  // on its "Add"/"Remove" button is resolved.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const [data, setData] = useState<ChecklistPayload | null>(null)
   const [openPokerSession, setOpenPokerSession] = useState<any>(null)
@@ -583,7 +596,7 @@ export function PlanningWorkspace({
           <h3 className="apple-section-label text-[var(--apple-secondary-label)]">
             Sprint scope
           </h3>
-          <DndContext onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             <div className="grid gap-4 md:grid-cols-2">
               <TaskPane
                 id="backlog-pool"
