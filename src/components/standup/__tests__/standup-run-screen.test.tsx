@@ -439,6 +439,37 @@ describe('the jump bar and the shapes (§15.8.10)', () => {
     renderScreen()
     expect(screen.queryByTestId('day-one-progress')).not.toBeInTheDocument()
   })
+
+  it('renders Panel 5 as the top panel on day one, per spec §15.8.10', () => {
+    renderScreen({ shape: 'day_one' })
+
+    const panelFive = screen.getByRole('heading', { name: standupStrings.run.panel5() })
+    const attendanceHeading = screen.getByRole('heading', {
+      name: standupStrings.run.attendanceTitle()
+    })
+
+    // compareDocumentPosition returns a bitmask; DOCUMENT_POSITION_FOLLOWING
+    // (4) means the *other* node comes after this one in document order — so
+    // asserting it here proves Panel 5 precedes Attendance in the DOM.
+    expect(
+      panelFive.compareDocumentPosition(attendanceHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+
+  it('keeps Attendance before Panel 5 mid-sprint (unchanged order)', () => {
+    renderScreen()
+
+    const attendanceHeading = screen.getByRole('heading', {
+      name: standupStrings.run.attendanceTitle()
+    })
+    const panelFive = screen.getByRole('heading', { name: standupStrings.run.panel5() })
+
+    expect(
+      attendanceHeading.compareDocumentPosition(panelFive) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
 })
 
 describe('the panel nobody has built yet', () => {

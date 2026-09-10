@@ -1051,6 +1051,91 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     }))
   )
 
+  /**
+   * §15.8.10: on day one the pool takes the primary position and the board
+   * is secondary but always visible.
+   */
+  const panelFive = (
+    <section id="panel-5" aria-labelledby="panel-5-heading" className="flex flex-col gap-3">
+      <h3 id="panel-5-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
+        {standupStrings.run.panel5()}
+      </h3>
+
+      {isDayOne && board.dayOne && (
+        <div className="flex flex-col gap-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-3 text-[13px]">
+          <p data-testid="day-one-progress">
+            {standupStrings.run.dayOneProgress({
+              assigned: board.dayOne.assignedTasks,
+              totalTasks: board.dayOne.totalTasks,
+              placed: formatMinutesAsHours(board.dayOne.placedMinutes, { locale }),
+              capacity: formatMinutesAsHours(board.dayOne.sprintCapacityMinutes, {
+                locale
+              })
+            })}
+          </p>
+          {/* ALO-21 — soft. It never blocks completion. */}
+          {board.dayOne.stillUnassigned ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              {standupStrings.run.dayOneUnassignedWarning({
+                count: board.dayOne.stillUnassigned
+              })}
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      <div
+        className={
+          isDayOne ? 'grid gap-4 lg:grid-cols-[2fr_1fr]' : 'grid gap-4 lg:grid-cols-[1fr_2fr]'
+        }
+      >
+        <UnassignedPool
+          unassigned={board.pool.unassigned}
+          assignedNotPlanned={board.pool.assignedNotPlanned}
+          selectedMember={
+            selectedMember
+              ? {
+                  memberId: selectedMember.memberId,
+                  name: selectedMember.name,
+                  gapMinutes: selectedMember.capacity.gapMinutes
+                }
+              : null
+          }
+          totalCount={board.poolTotal}
+          readOnly={readOnly}
+          locale={locale}
+          onAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
+        />
+
+        <div onFocusCapture={() => setSelectedMemberId(selectedMemberId)}>
+          <CapacityBoard
+            members={board.members}
+            poolTasks={poolTasks}
+            ceremoniesConsumeCapacity={board.ceremoniesConsumeCapacity}
+            readOnly={readOnly}
+            locale={locale}
+            onChangeHours={onChangeHours}
+            onRemove={onRemove}
+            onQuickAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
+            onReassignStranded={(memberId) => {
+              setSelectedMemberId(memberId)
+              setPrompt({
+                memberId,
+                taskCount: board.members
+                  .find((member) => member.memberId === memberId)
+                  ?.allocations.filter((row) => row.detachedReason).length ?? 0,
+                totalMinutes:
+                  board.members.find((member) => member.memberId === memberId)?.capacity
+                    .strandedMinutes ?? (0 as Minutes),
+                tasks: []
+              })
+            }}
+          />
+        </div>
+      </div>
+    </section>
+  )
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-3 border-b border-[var(--apple-separator)] pb-4">
@@ -1205,6 +1290,8 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         </div>
       )}
 
+      {isDayOne && panelFive}
+
       <AttendancePanel
         members={board.members}
         prompt={prompt}
@@ -1256,86 +1343,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         />
       )}
 
-      {/* §15.8.10: on day one the pool takes the primary position and the board
-          is secondary but always visible. */}
-      <section id="panel-5" aria-labelledby="panel-5-heading" className="flex flex-col gap-3">
-        <h3 id="panel-5-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
-          {standupStrings.run.panel5()}
-        </h3>
-
-        {isDayOne && board.dayOne && (
-          <div className="flex flex-col gap-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-3 text-[13px]">
-            <p data-testid="day-one-progress">
-              {standupStrings.run.dayOneProgress({
-                assigned: board.dayOne.assignedTasks,
-                totalTasks: board.dayOne.totalTasks,
-                placed: formatMinutesAsHours(board.dayOne.placedMinutes, { locale }),
-                capacity: formatMinutesAsHours(board.dayOne.sprintCapacityMinutes, {
-                  locale
-                })
-              })}
-            </p>
-            {/* ALO-21 — soft. It never blocks completion. */}
-            {board.dayOne.stillUnassigned ? (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                {standupStrings.run.dayOneUnassignedWarning({
-                  count: board.dayOne.stillUnassigned
-                })}
-              </p>
-            ) : null}
-          </div>
-        )}
-
-        <div
-          className={
-            isDayOne ? 'grid gap-4 lg:grid-cols-[2fr_1fr]' : 'grid gap-4 lg:grid-cols-[1fr_2fr]'
-          }
-        >
-          <UnassignedPool
-            unassigned={board.pool.unassigned}
-            assignedNotPlanned={board.pool.assignedNotPlanned}
-            selectedMember={
-              selectedMember
-                ? {
-                    memberId: selectedMember.memberId,
-                    name: selectedMember.name,
-                    gapMinutes: selectedMember.capacity.gapMinutes
-                  }
-                : null
-            }
-            totalCount={board.poolTotal}
-            readOnly={readOnly}
-            locale={locale}
-            onAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
-          />
-
-          <div onFocusCapture={() => setSelectedMemberId(selectedMemberId)}>
-            <CapacityBoard
-              members={board.members}
-              poolTasks={poolTasks}
-              ceremoniesConsumeCapacity={board.ceremoniesConsumeCapacity}
-              readOnly={readOnly}
-              locale={locale}
-              onChangeHours={onChangeHours}
-              onRemove={onRemove}
-              onQuickAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
-              onReassignStranded={(memberId) => {
-                setSelectedMemberId(memberId)
-                setPrompt({
-                  memberId,
-                  taskCount: board.members
-                    .find((member) => member.memberId === memberId)
-                    ?.allocations.filter((row) => row.detachedReason).length ?? 0,
-                  totalMinutes:
-                    board.members.find((member) => member.memberId === memberId)?.capacity
-                      .strandedMinutes ?? (0 as Minutes),
-                  tasks: []
-                })
-              }}
-            />
-          </div>
-        </div>
-      </section>
+      {!isDayOne && panelFive}
 
       {board.shape === 'final_day' && board.sprintClose && (
         <SprintCloseReadinessPanel
