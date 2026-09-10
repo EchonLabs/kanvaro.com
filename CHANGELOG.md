@@ -1,3 +1,10 @@
+## [1.42.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.2...v1.42.3) (2026-09-10)
+
+
+### Bug Fixes
+
+* showing memo instead of task title in timelogs ([4968b09](https://github.com/EchonLabs/kanvaro.com/commit/4968b0982ac6165d751eae8f4fb025aabee7b3e9))
+
 ## [1.42.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.1...v1.42.2) (2026-09-09)
 
 
