@@ -81,7 +81,7 @@ export async function getSprintSchedule(
 
   const timezone = calendar?.timezone ?? 'UTC'
 
-  const facilitatorIds = [...new Set(standups.map((standup) => String(standup.facilitator)))]
+  const facilitatorIds = Array.from(new Set(standups.map((standup) => String(standup.facilitator))))
   const facilitators = await User.find({ _id: { $in: facilitatorIds } })
     .select('firstName lastName email')
     .lean() as any[]
