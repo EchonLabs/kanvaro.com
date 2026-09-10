@@ -77,6 +77,113 @@ async function fixProjectTeam(db) {
   console.log('Task 1: project team membership and roles fixed (HR removed, QA/PM/Anessa/Admin correct)')
 }
 
+async function backfillSprint1Summaries(db) {
+  const usersById = new Map(
+    (await db.collection('users').find({ _id: { $in: [PM, QA, ANESSA] } }).toArray())
+      .map((u) => [u._id.toString(), `${u.firstName} ${u.lastName}`])
+  )
+  const nameFor = (id) => usersById.get(id.toString()) ?? id.toString()
+
+  const sprint = await db.collection('sprints').findOne({ _id: SPRINT1_ID })
+
+  for (const standupId of [DAY1, DAY2, DAY4, DAY8]) {
+    const exists = await db.collection('standupsummaries').findOne({ standup: standupId })
+    if (exists) continue
+
+    const standup = await db.collection('standups').findOne({ _id: standupId })
+    const allocations = await db.collection('allocations').find({ standup: standupId }).toArray()
+    const variances = await db.collection('allocationvariances').find({ standup: standupId }).toArray()
+    const blockers = await db.collection('standupblockers').find({ standup: standupId }).toArray()
+    const carryForward = await db.collection('carryforwarditems').find({ originStandup: standupId }).toArray()
+    const overrides = await db.collection('standupoverrides').find({ standup: standupId }).toArray()
+
+    const taskIds = [...new Set(allocations.map((a) => a.task.toString()))]
+    const tasks = await db.collection('tasks').find({ _id: { $in: taskIds.map((id) => new ObjectId(id)) } }).toArray()
+    const taskKeyById = new Map(tasks.map((t) => [t._id.toString(), t.displayId]))
+    const taskTitleById = new Map(tasks.map((t) => [t._id.toString(), t.title]))
+
+    const memberIds = [...new Set(allocations.map((a) => a.member.toString()))]
+
+    const summary = {
+      standup: standupId,
+      sprint: SPRINT1_ID,
+      project: PROJECT_ID,
+      organization: ORG_ID,
+      generatedAt: standup.completedAt ?? new Date(),
+      headerFacts: {
+        standupDate: standup.standupDate,
+        dayNumber: standup.displayedDayNumber ?? standup.sprintDayNumber,
+        totalDays: standup.totalSprintDays,
+        facilitatorName: nameFor(standup.facilitator),
+        durationMinutes: standup.durationMinutes
+      },
+      attendance: (standup.attendance ?? []).map((row) => ({
+        memberId: row.user,
+        name: nameFor(row.user),
+        status: row.state
+      })),
+      completedYesterday: variances
+        .filter((v) => v.outcome && v.outcome.startsWith('delivered'))
+        .map((v) => ({ taskId: v.task, taskKey: taskKeyById.get(v.task.toString()), title: taskTitleById.get(v.task.toString()) })),
+      varianceTable: variances.map((v) => ({
+        allocationId: v.allocation,
+        taskKey: taskKeyById.get(v.task.toString()),
+        memberId: v.member,
+        outcome: v.outcome,
+        dayVarianceMinutes: v.dayVarianceMinutes
+      })),
+      debtMovements: memberIds.map((id) => {
+        const memberVariances = variances.filter((v) => v.member.toString() === id)
+        const outstandingDebtMinutes = memberVariances.reduce((sum, v) => sum + Math.max(0, -(v.dayVarianceMinutes ?? 0)), 0)
+        const surplusMinutes = memberVariances.reduce((sum, v) => sum + Math.max(0, v.overrunMinutes ?? 0), 0)
+        return { memberId: new ObjectId(id), outstandingDebtMinutes, surplusMinutes }
+      }),
+      memberCommitments: memberIds.map((id) => ({
+        memberId: new ObjectId(id),
+        name: nameFor(id),
+        allocations: allocations
+          .filter((a) => a.member.toString() === id)
+          .map((a) => ({ taskId: a.task, taskKey: taskKeyById.get(a.task.toString()), plannedMinutes: a.plannedMinutes }))
+      })),
+      blockersRaised: blockers.map((b) => ({
+        blockerId: String(b._id),
+        description: b.description,
+        blockerType: b.blockerType,
+        severity: b.severity,
+        status: b.status
+      })),
+      blockersResolved: blockers
+        .filter((b) => b.status === 'resolved')
+        .map((b) => ({ blockerId: String(b._id), resolutionNote: b.resolutionNote })),
+      carryForwardState: carryForward.map((item) => ({
+        itemId: String(item._id),
+        taskKey: item.task ? taskKeyById.get(item.task.toString()) : undefined,
+        ageBand: item.ageInStandups >= 3 ? '3+' : String(item.ageInStandups ?? 0),
+        status: item.status
+      })),
+      overridesIssued: overrides.map((o) => ({
+        type: o.type,
+        reasonCode: o.reasonCode,
+        justification: o.justification
+      })),
+      createdAt: standup.completedAt ?? new Date(),
+      updatedAt: standup.completedAt ?? new Date()
+    }
+
+    await db.collection('standupsummaries').insertOne(summary)
+    console.log(`  Backfilled StandupSummary for ${standup.standupDate}`)
+  }
+
+  if (sprint.status !== 'completed') {
+    await db.collection('sprints').updateOne(
+      { _id: SPRINT1_ID },
+      { $set: { status: 'completed', actualEndDate: new Date('2026-09-04T09:31:00.000Z') } }
+    )
+    console.log('  Sprint 1 status corrected to completed')
+  }
+  console.log('Task 2: Sprint 1 StandupSummary documents backfilled')
+}
+
 async function removeAll(db) {
   // Undo all changes from fixProjectTeam()
   // Remove team members added for Admin/PM/QA/Anessa
@@ -101,6 +208,9 @@ async function removeAll(db) {
       { $pull: { projectRoles: { project: PROJECT_ID } } }
     )
   }
+  await db.collection('standupsummaries').deleteMany({ standup: { $in: [DAY1, DAY2, DAY4, DAY8] } })
+  await db.collection('sprints').updateOne({ _id: SPRINT1_ID }, { $set: { status: 'planning' } })
+
   console.log('Removed full-demo changes (Task 1 only implemented so far)')
 }
 
@@ -116,6 +226,7 @@ async function main() {
   }
 
   await fixProjectTeam(db)
+  await backfillSprint1Summaries(db)
 
   console.log('\nDone (Task 1 of the full demo seed).')
   await client.close()
