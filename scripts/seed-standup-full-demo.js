@@ -253,6 +253,7 @@ async function createSprint2(db) {
         title: def.title,
         description: `${def.title}. Acceptance: verified against the Sprint 2 goal in the invoicing module.`,
         status: 'todo',
+        seedMarker: MARKER,
         priority: def.priority,
         isBillable: true,
         type: def.type,
@@ -326,6 +327,7 @@ async function createSprint2(db) {
       organization: ORG_ID,
       project: PROJECT_ID,
       sprint: SPRINT2_ID,
+      seedMarker: MARKER,
       status: 'completed',
       sprintGoal: 'Ship CSV export, the invoice audit log, and clear the tax-rounding bug before the pilot review.',
       participants: [PM, QA, ANESSA],
@@ -408,8 +410,8 @@ async function removeAll(db) {
 
   // Undo all changes from createSprint2(): restore the pre-existing placeholder
   // sprint document to its original state rather than deleting it.
-  await db.collection('tasks').deleteMany({ sprint: SPRINT2_ID })
-  await db.collection('sprintplanningsessions').deleteMany({ sprint: SPRINT2_ID })
+  await db.collection('tasks').deleteMany({ sprint: SPRINT2_ID, seedMarker: MARKER })
+  await db.collection('sprintplanningsessions').deleteMany({ sprint: SPRINT2_ID, seedMarker: MARKER })
   await db.collection('sprints').updateOne(
     { _id: SPRINT2_ID },
     {
