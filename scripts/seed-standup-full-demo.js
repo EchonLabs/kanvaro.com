@@ -1,15 +1,38 @@
 /**
  * Full demo dataset for the stand-up module's 5 real accounts:
- *  - Fixes project team membership/roles (this task).
- *  - Backfills StandupSummary documents onto Sprint 1's already-Completed
- *    standups, the confirmed cause of "no summary available" (Task 2).
- *  - Creates a second, currently-active sprint anchored to today so the
- *    Schedule hub / Run screen / My Stand-up have live data (Tasks 3-4).
+ *  - Task 1: Fixes project team membership/roles (Admin/PM/QA/Anessa on the
+ *    team with correct roles, HR removed from the project).
+ *  - Task 2: Backfills StandupSummary documents onto Sprint 1's already-
+ *    Completed standups, the confirmed cause of "no summary available".
+ *  - Task 3: Populates Sprint 2 with a real goal, 5 tasks, and a completed
+ *    planning session, anchored to today so the Schedule hub / Run screen /
+ *    My Stand-up have live data.
+ *  - Task 4: Seeds allocations against Sprint 2's day-one stand-up.
+ *
+ * Two non-obvious quirks:
+ *  1. Sprint 2 is NOT created by this script — it adopts and populates a
+ *     real, pre-existing placeholder sprint document (SPRINT2_ID) that must
+ *     already exist in the target database. This script only ever updates
+ *     that document; it never inserts a sprints row.
+ *  2. `--remove` deliberately does NOT delete the real, app-generated
+ *     stand-up calendar the app itself creates for Sprint 2 once planning
+ *     completes (src/lib/standup/generation.ts) — only documents this
+ *     script tagged with `seedMarker: MARKER` are removed. Because of this,
+ *     after `--remove` some of those real stand-ups can end up dated
+ *     outside Sprint 2's restored placeholder date range; the script prints
+ *     a warning explaining this when it happens.
  *
  * Idempotent: running it twice is a no-op the second time for each section.
+ * Only removes data this script itself created (tagged with `seedMarker`);
+ * pre-existing data (e.g. Admin's original team membership, or QA/Anessa's
+ * pre-existing project roles) is left untouched by `--remove`.
  *
- *   node scripts/seed-standup-full-demo.js          # create
- *   node scripts/seed-standup-full-demo.js --remove # tear down everything it created
+ * This script targets one specific, already-seeded local Kanvaro database —
+ * it is not a general-purpose seeder. It preflight-checks PROJECT_ID/
+ * SPRINT1_ID/SPRINT2_ID exist before writing anything (create mode only).
+ *
+ *   node scripts/seed-standup-full-demo.js          # create / update
+ *   node scripts/seed-standup-full-demo.js --remove # remove only what this script created
  */
 const { MongoClient, ObjectId } = require('mongodb')
 const fs = require('fs')
@@ -52,12 +75,12 @@ async function fixProjectTeam(db) {
   )
   await db.collection('projects').updateOne(
     { _id: PROJECT_ID, 'teamMembers.memberId': { $ne: ADMIN } },
-    { $push: { teamMembers: { memberId: ADMIN } } }
+    { $push: { teamMembers: { memberId: ADMIN, seedMarker: MARKER } } }
   )
   for (const [user, role] of [[PM, 'project_manager'], [QA, 'project_qa_lead'], [ANESSA, 'project_member']]) {
     await db.collection('projects').updateOne(
       { _id: PROJECT_ID, 'teamMembers.memberId': { $ne: user } },
-      { $push: { teamMembers: { memberId: user } } }
+      { $push: { teamMembers: { memberId: user, seedMarker: MARKER } } }
     )
     // Two-step for roles: remove any stale role first, then add the correct one if not present.
     await db.collection('projects').updateOne(
@@ -66,7 +89,7 @@ async function fixProjectTeam(db) {
     )
     await db.collection('projects').updateOne(
       { _id: PROJECT_ID, 'projectRoles.user': { $ne: user } },
-      { $push: { projectRoles: { user, role, assignedBy: PM, assignedAt: new Date() } } }
+      { $push: { projectRoles: { user, role, assignedBy: PM, assignedAt: new Date(), seedMarker: MARKER } } }
     )
   }
   // Mirror onto the User side (User.projectRoles), since both are read in
@@ -79,7 +102,7 @@ async function fixProjectTeam(db) {
     )
     await db.collection('users').updateOne(
       { _id: user, 'projectRoles.project': { $ne: PROJECT_ID } },
-      { $push: { projectRoles: { project: PROJECT_ID, role, assignedBy: PM, assignedAt: new Date() } } }
+      { $push: { projectRoles: { project: PROJECT_ID, role, assignedBy: PM, assignedAt: new Date(), seedMarker: MARKER } } }
     )
   }
   console.log('Task 1: project team membership and roles fixed (HR removed, QA/PM/Anessa/Admin correct)')
@@ -477,16 +500,18 @@ async function createSprint2DayOne(db, sprint2Id) {
 }
 
 async function removeAll(db) {
-  // Undo all changes from fixProjectTeam()
-  // Remove team members added for Admin/PM/QA/Anessa
+  // Undo all changes from fixProjectTeam() — only pull entries this script
+  // itself added (tagged with seedMarker). Pre-existing data (e.g. Admin's
+  // original team membership, or QA/Anessa's pre-existing project roles)
+  // must be left untouched.
   await db.collection('projects').updateOne(
     { _id: PROJECT_ID },
-    { $pull: { teamMembers: { memberId: { $in: [ADMIN, PM, QA, ANESSA] } } } }
+    { $pull: { teamMembers: { memberId: { $in: [ADMIN, PM, QA, ANESSA] }, seedMarker: MARKER } } }
   )
   // Remove project roles added for PM/QA/Anessa
   await db.collection('projects').updateOne(
     { _id: PROJECT_ID },
-    { $pull: { projectRoles: { user: { $in: [PM, QA, ANESSA] } } } }
+    { $pull: { projectRoles: { user: { $in: [PM, QA, ANESSA] }, seedMarker: MARKER } } }
   )
   // Restore HR's team membership
   await db.collection('projects').updateOne(
@@ -497,7 +522,7 @@ async function removeAll(db) {
   for (const user of [PM, QA, ANESSA]) {
     await db.collection('users').updateOne(
       { _id: user },
-      { $pull: { projectRoles: { project: PROJECT_ID } } }
+      { $pull: { projectRoles: { project: PROJECT_ID, seedMarker: MARKER } } }
     )
   }
   await db.collection('standupsummaries').deleteMany({ standup: { $in: [DAY1, DAY2, DAY4, DAY8] } })
@@ -529,6 +554,18 @@ async function removeAll(db) {
     }
   )
 
+  // The real app auto-generates a full stand-up calendar for Sprint 2 once
+  // planning completes (src/lib/standup/generation.ts). Those documents
+  // don't carry seedMarker, so the deleteMany above correctly leaves them
+  // alone — but the sprint's dates/status were just rewound to the
+  // placeholder's original values, so some of those real stand-ups may now
+  // fall outside the sprint's restored date range. Flag it rather than
+  // silently leaving the database in a self-contradictory state.
+  const leftoverStandups = await db.collection('standups').countDocuments({ sprint: SPRINT2_ID })
+  if (leftoverStandups > 0) {
+    console.log(`  WARNING: ${leftoverStandups} real app-generated stand-up(s) still exist for Sprint 2 and were intentionally left alone (not created by this script). The sprint's dates/status were reset to the placeholder's original values, so some of these stand-ups may now fall outside the sprint's restored date range. This is expected — re-run the script without --remove to repopulate Sprint 2 correctly.`)
+  }
+
   console.log('Removed full-demo changes (Tasks 1-4)')
 }
 
@@ -542,6 +579,19 @@ async function main() {
     await removeAll(db)
     return client.close()
   }
+
+  // Preflight: this script targets one specific, already-seeded local
+  // Kanvaro database, not a general-purpose seeder. If the hardcoded ids
+  // don't resolve, fail loudly instead of silently writing orphaned
+  // documents (e.g. tasks pointing at a nonexistent sprint).
+  const [project, sprint1, sprint2] = await Promise.all([
+    db.collection('projects').findOne({ _id: PROJECT_ID }),
+    db.collection('sprints').findOne({ _id: SPRINT1_ID }),
+    db.collection('sprints').findOne({ _id: SPRINT2_ID })
+  ])
+  if (!project) throw new Error(`Project ${PROJECT_ID} not found. This script targets one specific, already-seeded local Kanvaro database — it is not a general-purpose seeder.`)
+  if (!sprint1) throw new Error(`Sprint 1 (${SPRINT1_ID}) not found. This script targets one specific, already-seeded local Kanvaro database.`)
+  if (!sprint2) throw new Error(`Sprint 2 placeholder (${SPRINT2_ID}) not found. This script targets one specific, already-seeded local Kanvaro database.`)
 
   await fixProjectTeam(db)
   await backfillSprint1Summaries(db)
