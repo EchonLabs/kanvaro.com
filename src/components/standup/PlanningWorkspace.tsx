@@ -34,6 +34,7 @@ import {
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
+import { GradientProgress } from '@/components/ui/GradientProgress'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Label } from '@/components/ui/label'
 // Lower-case path: the rest of the app imports it this way, and TypeScript
@@ -558,13 +559,29 @@ export function PlanningWorkspace({
       {totals && (
         <div className="grid gap-3 sm:grid-cols-3">
           <Stat label="Net capacity" value={`${hours(totals.netCapacityMinutes)}h`} />
-          <Stat
-            label="Estimated scope"
-            value={`${hours(totals.totalEstimatedMinutes)}h`}
-            tone={
-              totals.totalEstimatedMinutes > totals.netCapacityMinutes ? 'warning' : 'default'
-            }
-          />
+          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] p-3">
+            <p className="apple-section-label text-[var(--apple-tertiary-label)]">Estimated scope</p>
+            <p className="font-apple-mono text-lg tabular-nums text-[var(--apple-label)]">
+              {hours(totals.totalEstimatedMinutes)}h
+            </p>
+            <GradientProgress
+              value={
+                totals.netCapacityMinutes > 0
+                  ? Math.round((totals.totalEstimatedMinutes / totals.netCapacityMinutes) * 100)
+                  : 0
+              }
+              gradient={
+                totals.totalEstimatedMinutes > totals.netCapacityMinutes
+                  ? 'var(--apple-system-orange)'
+                  : 'var(--apple-chart-gradient)'
+              }
+              glow={
+                totals.totalEstimatedMinutes > totals.netCapacityMinutes
+                  ? 'var(--apple-system-orange)'
+                  : 'var(--apple-chart-glow)'
+              }
+            />
+          </div>
           <Stat
             label="Tasks estimated"
             value={`${totals.estimatedTaskCount} of ${totals.taskCount}`}

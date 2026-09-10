@@ -161,3 +161,25 @@ describe('resolveDrop — pure drag-resolution logic', () => {
     expect(resolveDrop('some-other-id', 'b1', backlogTasks, scopeTasks)).toBe(null)
   })
 })
+
+describe('PlanningWorkspace — capacity gauge', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('renders a percentage-labeled capacity gauge instead of a plain estimated-scope number only', async () => {
+    global.fetch = mockFetch()
+
+    render(
+      <PlanningWorkspace
+        sprintId="s1"
+        sprintName="Sprint 1"
+        sprintStatus="planning"
+        projectId="p1"
+      />
+    )
+
+    // Fixture: totalEstimatedMinutes 360 / netCapacityMinutes 480 = 75%.
+    expect(await screen.findByText('75%')).toBeInTheDocument()
+  })
+})
