@@ -12,6 +12,9 @@ import { YesterdayPanel, type YesterdayPanelApi } from './YesterdayPanel'
 import { CapacityBoard, type BoardAllocationView } from './CapacityBoard'
 import { CompletionPanel } from './CompletionPanel'
 import { OverrideModal, type OverridableType, type OverrideModalAffectedMember, type OverrideModalSubmitInput } from './OverrideModal'
+import { RaiseBlockerModal, type RaiseBlockerSubmitInput } from './RaiseBlockerModal'
+import { ResolveBlockerDialog, type ResolveBlockerSubmitInput } from './ResolveBlockerDialog'
+import { ModalOverlay } from '@/components/standup/primitives/ModalOverlay'
 import { UnassignedPool } from './UnassignedPool'
 import { SprintCloseReadinessPanel } from './SprintCloseReadinessPanel'
 import { useStandupShortcuts } from './useStandupShortcuts'
@@ -376,6 +379,21 @@ export interface RunScreenApi {
 
   // --- Phase 11 --------------------------------------------------------------
   setTaskDisposition?(input: { taskId: string; type: string }): Promise<void>
+
+  /**
+   * RUN-14..18 (Task 4). `POST /api/standups/:id/blockers`. Optional so a
+   * caller that has not wired it yet still compiles — Panel 6's "Raise
+   * blocker" button only opens `RaiseBlockerModal` when this is present.
+   */
+  raiseBlocker?(input: RaiseBlockerSubmitInput): Promise<void>
+
+  /**
+   * RUN-14..18 (Task 5). `PATCH /api/standups/:id/blockers/:blockerId`.
+   * Optional so a caller that has not wired it yet still compiles — Panel
+   * 6's "Resolve" button only opens `ResolveBlockerDialog` when this is
+   * present.
+   */
+  resolveBlocker?(input: ResolveBlockerSubmitInput): Promise<void>
 }
 
 /** Mirrors `StandupSchedule.tsx`'s `STATUS_TONE`/pill convention so a
@@ -759,6 +777,70 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
 
   const onCancelOverride = useCallback(() => setOverridingCheck(null), [])
 
+  /**
+   * Task 4 (RUN-14..18). Mirrors `overridingCheck`'s show/hide pattern above
+   * — a plain boolean is enough since, unlike the override modal, raising a
+   * blocker needs no derived context from the current board.
+   */
+  const [raisingBlocker, setRaisingBlocker] = useState(false)
+
+  const onSubmitRaiseBlocker = useCallback(
+    async (input: RaiseBlockerSubmitInput) => {
+      if (!api.raiseBlocker) return
+      setNotice(null)
+      try {
+        await api.raiseBlocker(input)
+        setRaisingBlocker(false)
+        // Same fix as `onSubmitResolveBlocker` below, same reason: `board` is
+        // this screen's own state, populated once from the `data` prop at
+        // mount and never re-synced from it afterwards, so the newly raised
+        // blocker never actually appears in `board.blockers` unless something
+        // calls `reload()`.
+        await reload()
+      } catch {
+        // Mirrors `onSubmitOverride`'s failure handling: the modal stays open
+        // with the PM's in-progress input intact rather than losing it to a
+        // silently closed form.
+        setNotice(standupStrings.blocker.raiseFailed())
+      }
+    },
+    [api, reload]
+  )
+
+  /**
+   * Task 5 (RUN-14..18). Sibling to `raisingBlocker` above — a blocker id
+   * rather than a plain boolean since `ResolveBlockerDialog` needs to know
+   * which row it is closing.
+   */
+  const [resolvingBlockerId, setResolvingBlockerId] = useState<string | null>(null)
+
+  const onSubmitResolveBlocker = useCallback(
+    async (input: ResolveBlockerSubmitInput) => {
+      if (!api.resolveBlocker) return
+      setNotice(null)
+      try {
+        await api.resolveBlocker(input)
+        setResolvingBlockerId(null)
+        // `board` is this screen's own state, populated at mount from the
+        // `data` prop and never re-synced from it afterwards (see the
+        // `versionRef` docblock above) — every other mutation on this screen
+        // that needs the board to reflect a server-side change calls
+        // `reload()` for exactly that reason (`onSubmitOverride`,
+        // `CarryForwardPanel`'s `resolve`/`addNote` wrappers below). Without
+        // this, the just-resolved blocker's `status` never changes in local
+        // state, so `openBlockers`'s filter below would have nothing to
+        // filter and the row would keep showing until an unrelated reload.
+        await reload()
+      } catch {
+        // Mirrors `onSubmitRaiseBlocker`'s failure handling: the dialog stays
+        // open with the PM's in-progress note intact rather than losing it to
+        // a silently closed form.
+        setNotice(standupStrings.blocker.resolveFailed())
+      }
+    },
+    [api, reload]
+  )
+
   const onSubmitOverride = useCallback(
     async (input: OverrideModalSubmitInput) => {
       if (!overridingCheck || !overrideContext || !api.issueOverride) return
@@ -924,6 +1006,20 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     (member) => member.attendance === 'present' || member.attendance === 'partial'
   ).length
 
+  /**
+   * Task 5 fix. `BlockerPanel` itself renders every row it is given — its own
+   * `status !== 'resolved' && status !== 'wont_resolve'` check (line 89) only
+   * gates whether the row's Resolve button appears, not whether the row
+   * itself is shown. So a just-resolved blocker would otherwise sit in Panel
+   * 6 forever, sans button, once the board reloads. Filtering here (the call
+   * site) rather than inside `BlockerPanel` keeps that component able to
+   * render closed rows for some other future context without this screen's
+   * "open" list needing to change.
+   */
+  const openBlockers = (board.blockers ?? []).filter(
+    (row) => row.status !== 'resolved' && row.status !== 'wont_resolve'
+  )
+
   const poolTasks: QuickAddTask[] = [
     ...board.pool.unassigned,
     ...board.pool.assignedNotPlanned
@@ -933,6 +1029,27 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     title: task.title,
     remainingEstimateMinutes: task.remainingEstimateMinutes
   }))
+
+  /**
+   * Important 5 of the final-review fix wave. `poolTasks` above is `board.pool
+   * .unassigned + assignedNotPlanned` — i.e. tasks with NO live allocation on
+   * this stand-up (`partitionPool`, `lib/standup/allocation.ts`). A blocker is
+   * naturally raised against work someone IS actively doing, which the pool
+   * structurally cannot contain, so `RaiseBlockerModal`'s "linked task"
+   * dropdown could never actually offer the task the member is blocked on,
+   * and `linkedAllocationId` could never be populated — RUN-15/16's capacity-
+   * exclusion-on-block and auto-clear-on-resolve never fired from the UI at
+   * all. Re-sourced from every member's live allocations instead, each of
+   * which already carries a real `allocationId`.
+   */
+  const allocatedBlockerTasks = board.members.flatMap((member) =>
+    member.allocations.map((allocation) => ({
+      taskId: allocation.taskId,
+      key: allocation.taskKey,
+      title: allocation.title,
+      allocationId: allocation.allocationId
+    }))
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -1240,17 +1357,31 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
       )}
 
       <BlockerPanel
-        blockers={board.blockers ?? []}
+        blockers={openBlockers}
         today={board.date}
-        onRaise={() => {
-          // Phase 10 does not yet wire a raise-blocker action — no API
-          // method exists to call. This button has nowhere to send its
-          // click until that surface is built.
-        }}
-        onResolve={() => {
-          // Same as above: blocker resolution has no API method yet.
-        }}
+        onRaise={() => setRaisingBlocker(true)}
+        onResolve={(blockerId) => setResolvingBlockerId(blockerId)}
       />
+
+      {raisingBlocker && (
+        <ModalOverlay open onClose={() => setRaisingBlocker(false)} labelledBy="raise-blocker-title">
+          <RaiseBlockerModal
+            tasks={allocatedBlockerTasks}
+            onCancel={() => setRaisingBlocker(false)}
+            onSubmit={(input) => void onSubmitRaiseBlocker(input)}
+          />
+        </ModalOverlay>
+      )}
+
+      {resolvingBlockerId && (
+        <ModalOverlay open onClose={() => setResolvingBlockerId(null)} labelledBy="resolve-blocker-title">
+          <ResolveBlockerDialog
+            blockerId={resolvingBlockerId}
+            onCancel={() => setResolvingBlockerId(null)}
+            onConfirm={(input) => void onSubmitResolveBlocker(input)}
+          />
+        </ModalOverlay>
+      )}
 
       <CompletionPanel
         checks={checks}
@@ -1265,12 +1396,14 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           `taskId` — so this only ever renders with props the modal can act
           on. */}
       {overridingCheck && overrideContext && (
-        <OverrideModal
-          type={overrideContext.type}
-          affected={overrideContext.affected}
-          onCancel={onCancelOverride}
-          onSubmit={(input) => void onSubmitOverride(input)}
-        />
+        <ModalOverlay open onClose={onCancelOverride} labelledBy="override-modal-title">
+          <OverrideModal
+            type={overrideContext.type}
+            affected={overrideContext.affected}
+            onCancel={onCancelOverride}
+            onSubmit={(input) => void onSubmitOverride(input)}
+          />
+        </ModalOverlay>
       )}
     </div>
   )

@@ -62,11 +62,7 @@ export function OverrideModal({ type, affected, onCancel, onSubmit }: OverrideMo
   const canSubmit = validation.valid && (!requiresAcknowledgement || acknowledged)
 
   return (
-    <div
-      role="dialog"
-      aria-labelledby="override-modal-title"
-      className="flex w-full max-w-md flex-col gap-3 rounded-md border border-border bg-background p-4 text-sm"
-    >
+    <div className="flex w-full max-w-md flex-col gap-3 rounded-md border border-border bg-background p-4 text-sm">
       <h2 id="override-modal-title" className="text-sm font-semibold">
         {standupStrings.override.title({ type })}
       </h2>

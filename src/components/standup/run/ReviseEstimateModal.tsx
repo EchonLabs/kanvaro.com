@@ -65,12 +65,7 @@ export function ReviseEstimateModal({
   const projectedTotal = minutes(target.totalLoggedMinutesOnTask + remaining)
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="revise-title"
-      className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4"
-    >
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
       <h3 id="revise-title" className="text-sm font-semibold">
         {standupStrings.variance.reviseTitle()}
       </h3>
