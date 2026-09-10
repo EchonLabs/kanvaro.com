@@ -25,7 +25,10 @@ import {
   MoreHorizontal,
   BarChart3,
   Settings,
-  ChevronDown
+  ChevronDown,
+  Search,
+  X,
+  RotateCcw,
 } from 'lucide-react'
 import {
   DndContext,
@@ -51,6 +54,11 @@ import { useRouter } from 'next/navigation'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
+import {
+  PRIORITY_BADGE,
+  TYPE_BADGE,
+  DEFAULT_KANBAN_COLUMNS,
+} from '@/lib/kanban-tokens'
 
 interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
   project?: {
@@ -113,14 +121,7 @@ export interface KanbanBoardProps {
   onDeleteTask?: (taskId: string) => void
 }
 
-const defaultColumns = [
-  { key: 'backlog', title: 'Backlog', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
-  { key: 'todo', title: 'To Do', color: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200' },
-  { key: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-  { key: 'review', title: 'Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
-  { key: 'testing', title: 'Testing', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
-  { key: 'done', title: 'Done', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' }
-]
+const defaultColumns = DEFAULT_KANBAN_COLUMNS
 
 export default function KanbanBoard({ projectId, filters, onProjectChange, onCreateTask, onEditTask, onDeleteTask }: KanbanBoardProps) {
   const [project, setProject] = useState<Project | null>(null)
@@ -134,6 +135,13 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
   const [showColumnSettings, setShowColumnSettings] = useState(false)
   const [createTaskStatus, setCreateTaskStatus] = useState<string | undefined>(undefined)
   const [projectSearchQuery, setProjectSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [assigneeFilter, setAssigneeFilter] = useState('all')
+  const [priorityFilterQuery, setPriorityFilterQuery] = useState('')
+  const [typeFilterQuery, setTypeFilterQuery] = useState('')
+  const [assigneeFilterQuery, setAssigneeFilterQuery] = useState('')
 
   const router = useRouter()
   const { hasPermission, permissions } = usePermissions()
@@ -156,6 +164,94 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
     const result = projects.filter((project) => project.name.toLowerCase().includes(query))
     return result.sort((a, b) => a.name.localeCompare(b.name))
   }, [projects, projectSearchQuery])
+
+  const assigneeOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; email?: string }>()
+    tasks.forEach((task) => {
+      if (task.assignedTo && Array.isArray(task.assignedTo)) {
+        task.assignedTo.forEach((assignee) => {
+          const data = (assignee as any).user && typeof (assignee as any).user === 'object'
+            ? (assignee as any).user
+            : assignee
+          const id = data?._id || data?.email || ''
+          if (!id) return
+          if (!map.has(id)) {
+            map.set(id, {
+              id,
+              name: `${data?.firstName || ''} ${data?.lastName || ''}`.trim() || 'Unknown User',
+              email: data?.email,
+            })
+          }
+        })
+      }
+    })
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [tasks])
+
+  // Apply client-side filters on top of server-side fetch
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase()
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const matchesSearch = !normalizedSearchQuery ||
+        task.title?.toLowerCase().includes(normalizedSearchQuery) ||
+        (task.description || '').toLowerCase().includes(normalizedSearchQuery) ||
+        (task.displayId || '').toLowerCase().includes(normalizedSearchQuery) ||
+        String(task.taskNumber ?? '').toLowerCase().includes(normalizedSearchQuery)
+      const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
+      const matchesType = typeFilter === 'all' || task.type === typeFilter
+      const matchesAssignee = assigneeFilter === 'all' ||
+        (Array.isArray(task.assignedTo) && task.assignedTo.some((a: any) => {
+          const data = a?.user && typeof a.user === 'object' ? a.user : a
+          return data?._id === assigneeFilter || data?.email === assigneeFilter
+        }))
+      return matchesSearch && matchesPriority && matchesType && matchesAssignee
+    })
+  }, [tasks, normalizedSearchQuery, priorityFilter, typeFilter, assigneeFilter])
+
+  const filteredAssigneeOptions = useMemo(() => {
+    const q = assigneeFilterQuery.trim().toLowerCase()
+    if (!q) return assigneeOptions
+    return assigneeOptions.filter(o =>
+      o.name.toLowerCase().includes(q) || (o.email?.toLowerCase().includes(q) ?? false)
+    )
+  }, [assigneeOptions, assigneeFilterQuery])
+
+  const priorityOptions = [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+    { value: 'critical', label: 'Critical' },
+  ]
+  const filteredPriorityOptions = useMemo(() => {
+    const q = priorityFilterQuery.trim().toLowerCase()
+    if (!q) return priorityOptions
+    return priorityOptions.filter(o => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q))
+  }, [priorityFilterQuery])
+
+  const typeOptions = [
+    { value: 'bug', label: 'Bug' },
+    { value: 'feature', label: 'Feature' },
+    { value: 'improvement', label: 'Improvement' },
+    { value: 'task', label: 'Task' },
+    { value: 'subtask', label: 'Subtask' },
+  ]
+  const filteredTypeOptions = useMemo(() => {
+    const q = typeFilterQuery.trim().toLowerCase()
+    if (!q) return typeOptions
+    return typeOptions.filter(o => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q))
+  }, [typeFilterQuery])
+
+  const hasActiveFilters = searchQuery.trim() !== '' || priorityFilter !== 'all' || typeFilter !== 'all' || assigneeFilter !== 'all'
+
+  const resetFilters = () => {
+    setSearchQuery('')
+    setPriorityFilter('all')
+    setTypeFilter('all')
+    setAssigneeFilter('all')
+    setPriorityFilterQuery('')
+    setTypeFilterQuery('')
+    setAssigneeFilterQuery('')
+  }
 
   const fetchProject = useCallback(async () => {
     // Don't fetch a specific project if "All Projects" is selected
@@ -253,35 +349,17 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
   }
 
   const getTasksByStatus = (status: string) => {
-    return tasks.filter(task => task.status === status)
+    return filteredTasks.filter(task => task.status === status)
   }
 
   const getPriorityColor = (priority: string) => {
-    switch (priority.toLowerCase()) {
-      case 'high':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      case 'low':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-    }
+    const cfg = PRIORITY_BADGE[priority] ?? PRIORITY_BADGE.medium
+    return `${cfg.bg} ${cfg.text}`
   }
 
   const getTypeColor = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'bug':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      case 'feature':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'task':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'story':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-    }
+    const cfg = TYPE_BADGE[type] ?? TYPE_BADGE.task
+    return `${cfg.bg} ${cfg.text}`
   }
 
   const handleProjectChange = (newProjectId: string) => {
@@ -460,19 +538,63 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
               Drag and drop tasks between columns to update their status. Stories, sprints, and epics will auto-complete when all their tasks are done.
             </p>
           </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="h-8 px-2"
+                title="Reset all filters"
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline text-xs">Reset</span>
+              </Button>
+            )}
+            <PermissionGate 
+              permission={Permission.TASK_EDIT_ALL}
+              projectId={selectedProjectId !== 'all' ? selectedProjectId : undefined}
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowColumnSettings(true)}
+                disabled={selectedProjectId === 'all'}
+                title={selectedProjectId === 'all' ? 'Please select a specific project to manage columns' : 'Manage Kanban columns'}
+                className="h-8"
+              >
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs ml-1">Columns</span>
+              </Button>
+            </PermissionGate>
+            {hasPermission(Permission.TASK_CREATE) && selectedProjectId !== 'all' && (
+              <Button
+                onClick={() => handleCreateTask()}
+                size="sm"
+                className="h-8"
+                title="Add a new task"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">New Task</span>
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 flex-wrap">
+
+        {/* Search + Filters */}
+        <div className="flex flex-col sm:flex-row items-stretch gap-2 sm:gap-3">
+          {/* Project Selector */}
           <Select value={selectedProjectId} onValueChange={handleProjectChange}>
-            <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectTrigger className="w-full sm:w-[200px] h-9 text-sm">
               <SelectValue placeholder="Select project" />
             </SelectTrigger>
-            <SelectContent className="p-0">
+            <SelectContent className="z-[10010] p-0">
               <div className="p-2">
                 <Input
                   value={projectSearchQuery}
                   onChange={(e) => setProjectSearchQuery(e.target.value)}
                   placeholder="Search projects"
-                  className="mb-2"
+                  className="h-7 text-xs mb-1"
                   onKeyDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                 />
@@ -491,34 +613,86 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
               </div>
             </SelectContent>
           </Select>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:ml-auto">
-            <PermissionGate 
-              permission={Permission.TASK_EDIT_ALL}
-              projectId={selectedProjectId !== 'all' ? selectedProjectId : undefined}
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowColumnSettings(true)}
-                disabled={selectedProjectId === 'all'}
-                title={selectedProjectId === 'all' ? 'Please select a specific project to manage columns' : 'Manage Kanban columns'}
-                className="w-full sm:w-auto"
+
+          {/* Search */}
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search tasks, IDs..."
+              className="h-9 pl-9 pr-3 text-sm"
+              onKeyDown={(e) => e.stopPropagation()}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
               >
-                <Settings className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Manage Columns</span>
-                <span className="sm:hidden">Columns</span>
-              </Button>
-            </PermissionGate>
-            {/* <Button
-              onClick={() => handleCreateTask()}
-              disabled={selectedProjectId === 'all'}
-              title={selectedProjectId === 'all' ? 'Please select a specific project to create tasks' : 'Add a new task'}
-              className="w-full sm:w-auto"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button> */}
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
+
+          {/* Priority Filter */}
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="w-full sm:w-[130px] h-9 text-sm">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent className="z-[10003] p-0">
+              <div className="p-1">
+                <SelectItem value="all">All Priorities</SelectItem>
+                {filteredPriorityOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </div>
+            </SelectContent>
+          </Select>
+
+          {/* Type Filter */}
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-full sm:w-[130px] h-9 text-sm">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent className="z-[10002] p-0">
+              <div className="p-1">
+                <SelectItem value="all">All Types</SelectItem>
+                {filteredTypeOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </div>
+            </SelectContent>
+          </Select>
+
+          {/* Assignee Filter */}
+          <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+            <SelectTrigger className="w-full sm:w-[140px] h-9 text-sm">
+              <SelectValue placeholder="Assignee" />
+            </SelectTrigger>
+            <SelectContent className="z-[10001] p-0">
+              <div className="p-1">
+                <div className="relative mb-1">
+                  <Input
+                    value={assigneeFilterQuery}
+                    onChange={(e) => setAssigneeFilterQuery(e.target.value)}
+                    placeholder="Search..."
+                    className="h-7 text-xs"
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+                <SelectItem value="all">All Assignees</SelectItem>
+                {filteredAssigneeOptions.length === 0 ? (
+                  <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
+                ) : (
+                  filteredAssigneeOptions.map(opt => (
+                    <SelectItem key={opt.id} value={opt.id}>{opt.name}</SelectItem>
+                  ))
+                )}
+              </div>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -546,28 +720,28 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
               const columnTasks = getTasksByStatus(column.key)
 
               return (
-                <VirtualizedColumn
-                  key={column.key}
-                  column={{
-                    key: column.key,
-                    title: column.title,
-                    color: column.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                  }}
-                  tasks={columnTasks}
-                  onCreateTask={handleCreateTask}
-                  getPriorityColor={getPriorityColor}
-                  getTypeColor={getTypeColor}
-                  onTaskClick={(task) => {
-                    // Navigate to task detail page
-                    router.push(`/tasks/${task._id}`)
-                  }}
-                  onEditTask={onEditTask}
-                  onDeleteTask={onDeleteTask}
-                  canDragTask={(task) => {
-                    // Allow dragging if task is not in backlog, or if it is in backlog but assigned to a sprint
-                    return task.status !== 'backlog' || !!task.sprint
-                  }}
-                />
+                 <VirtualizedColumn
+                   key={column.key}
+                   column={{
+                     key: column.key,
+                     title: column.title,
+                     color: column.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                   }}
+                   tasks={columnTasks}
+                   onCreateTask={handleCreateTask}
+                   getPriorityColor={getPriorityColor}
+                   getTypeColor={getTypeColor}
+                   onTaskClick={(task) => {
+                     // Navigate to task detail page
+                     router.push(`/tasks/${task._id}`)
+                   }}
+                   onEditTask={onEditTask}
+                   onDeleteTask={onDeleteTask}
+                   canDragTask={(task) => {
+                     // Allow dragging if task is not in backlog, or if it is in backlog but assigned to a sprint
+                     return task.status !== 'backlog' || !!task.sprint
+                   }}
+                 />
               )
             })}
           </div>

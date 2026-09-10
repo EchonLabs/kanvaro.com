@@ -62,6 +62,15 @@ import { format } from 'date-fns'
 import { useNotify } from '@/lib/notify'
 import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
 import { useAuthContext } from '@/contexts/AuthContext'
+import VirtualizedColumn from '@/components/tasks/VirtualizedColumn'
+import SharedSortableTask from '@/components/tasks/SortableTask'
+import {
+  getPriorityAccentColor,
+  getColumnAccentColor,
+  DEFAULT_KANBAN_COLUMNS,
+  getPriorityBadgeColor,
+  getTypeBadgeColor,
+} from '@/lib/kanban-tokens'
 
 const TRUNCATION_LENGTH = 40
 const TASK_FILTER_DROPDOWN_WIDTH = 'w-full'
@@ -106,42 +115,11 @@ interface Project {
 interface PersonOption { id: string; name: string; email?: string }
 interface TaskOption { id: string; label: string; fullLabel: string; title: string }
 
-// ─── Design Tokens ────────────────────────────────────────────────────────────
-
-const PRIORITY_ACCENT: Record<string, string> = {
-  low:      '#8E8E93',
-  medium:   '#007AFF',
-  high:     '#FF9500',
-  critical: '#FF453A',
-}
-
-const PRIORITY_BADGE: Record<string, { bg: string; text: string; border: string }> = {
-  low:      { bg: 'bg-gray-50 dark:bg-gray-900/40',      text: 'text-gray-500 dark:text-gray-400',     border: 'border-gray-200 dark:border-gray-700' },
-  medium:   { bg: 'bg-blue-50 dark:bg-blue-950/30',      text: 'text-blue-600 dark:text-blue-400',     border: 'border-blue-200 dark:border-blue-800' },
-  high:     { bg: 'bg-orange-50 dark:bg-orange-950/30',  text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-800' },
-  critical: { bg: 'bg-red-50 dark:bg-red-950/30',        text: 'text-red-600 dark:text-red-400',       border: 'border-red-200 dark:border-red-800' },
-}
-
-const TYPE_BADGE: Record<string, { bg: string; text: string; border: string }> = {
-  bug:         { bg: 'bg-red-50 dark:bg-red-950/30',        text: 'text-red-600 dark:text-red-400',        border: 'border-red-200 dark:border-red-800' },
-  feature:     { bg: 'bg-emerald-50 dark:bg-emerald-950/30',text: 'text-emerald-600 dark:text-emerald-400',border: 'border-emerald-200 dark:border-emerald-800' },
-  improvement: { bg: 'bg-blue-50 dark:bg-blue-950/30',      text: 'text-blue-600 dark:text-blue-400',      border: 'border-blue-200 dark:border-blue-800' },
-  task:        { bg: 'bg-gray-50 dark:bg-gray-900/40',       text: 'text-gray-500 dark:text-gray-400',      border: 'border-gray-200 dark:border-gray-700' },
-  subtask:     { bg: 'bg-purple-50 dark:bg-purple-950/30',   text: 'text-purple-600 dark:text-purple-400',  border: 'border-purple-200 dark:border-purple-800' },
-}
-
-const COLUMN_ACCENT: Record<string, string> = {
-  backlog:     '#8E8E93',
-  todo:        '#007AFF',
-  in_progress: '#FF9500',
-  review:      '#BF5AF2',
-  testing:     '#30B0C7',
-  done:        '#34C759',
-  cancelled:   '#FF453A',
-}
+// ─── Design Tokens (shared from @/lib/kanban-tokens) ──────────────────────────
+// Colors, badges, and accent functions are centralized in kanban-tokens to keep
 
 function getColumnAccent(id: string) {
-  return COLUMN_ACCENT[id] ?? '#007AFF'
+  return getColumnAccentColor(id)
 }
 
 const defaultColumns = [
@@ -152,6 +130,25 @@ const defaultColumns = [
   { id: 'testing',     title: 'Testing' },
   { id: 'done',        title: 'Done' },
 ]
+
+function getPriorityColor(priority: string): string {
+  const cfg = getPriorityBadgeColor(priority)
+  return `${cfg.bg} ${cfg.text}`
+}
+
+function getTypeColor(type: string): string {
+  const cfg = getTypeBadgeColor(type)
+  return `${cfg.bg} ${cfg.text}`
+}
+
+function mapColumnForVirtualized(col: { id: string; title: string; color?: string }) {
+  const defaultCol = DEFAULT_KANBAN_COLUMNS.find(c => c.key === col.id)
+  return {
+    key: col.id,
+    title: col.title,
+    color: col.color || defaultCol?.color || 'bg-gray-50 dark:bg-gray-900/40 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700',
+  }
+}
 
 // ─── Micro-badge atom ─────────────────────────────────────────────────────────
 
@@ -167,12 +164,12 @@ function MicroBadge({ children, className }: { children: React.ReactNode; classN
 }
 
 function PriorityBadge({ priority }: { priority: string }) {
-  const cfg = PRIORITY_BADGE[priority] ?? PRIORITY_BADGE.low
+  const cfg = getPriorityBadgeColor(priority)
   return <MicroBadge className={cn(cfg.bg, cfg.text, cfg.border)}>{formatToTitleCase(priority)}</MicroBadge>
 }
 
 function TypeBadge({ type }: { type: string }) {
-  const cfg = TYPE_BADGE[type] ?? TYPE_BADGE.task
+  const cfg = getTypeBadgeColor(type)
   return <MicroBadge className={cn(cfg.bg, cfg.text, cfg.border)}>{formatToTitleCase(type)}</MicroBadge>
 }
 
@@ -281,28 +278,30 @@ function KanbanSkeleton() {
         <div className="h-9 w-28 bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-md)] animate-pulse" />
       </div>
       <div className="h-10 w-full bg-[var(--apple-tertiary-fill)] rounded-[var(--apple-radius-md)] animate-pulse" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden">
-            <div className="h-[3px] bg-[var(--apple-tertiary-fill)]" />
-            <div className="px-3 py-2.5 border-b border-[var(--apple-separator)] flex items-center gap-2">
-              <div className="h-4 w-20 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
-              <div className="h-4 w-5 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
-            </div>
-            <div className="p-3 space-y-2">
-              {[1, 2, 3].map((j) => (
-                <div key={j} className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-card p-3 space-y-2">
-                  <div className="h-4 w-3/4 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
-                  <div className="h-3 w-1/2 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
-                  <div className="flex gap-1.5">
-                    <div className="h-4 w-14 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
-                    <div className="h-4 w-12 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+      <div className="overflow-x-auto pb-2 [scrollbar-width:thin] [scrollbar-color:var(--apple-separator)_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[var(--apple-separator)] [&::-webkit-scrollbar-thumb]:rounded-full">
+        <div className="grid gap-3 sm:gap-4 min-w-max sm:min-w-0" style={{ gridTemplateColumns: 'repeat(5, minmax(280px, 1fr))' }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden">
+              <div className="h-[3px] bg-[var(--apple-tertiary-fill)]" />
+              <div className="px-3 py-2.5 border-b border-[var(--apple-separator)] flex items-center gap-2">
+                <div className="h-4 w-20 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+                <div className="h-4 w-5 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+              </div>
+              <div className="p-3 space-y-2">
+                {[1, 2, 3].map((j) => (
+                  <div key={j} className="rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-card p-3 space-y-2">
+                    <div className="h-4 w-3/4 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+                    <div className="h-3 w-1/2 bg-[var(--apple-tertiary-fill)] rounded animate-pulse" />
+                    <div className="flex gap-1.5">
+                      <div className="h-4 w-14 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                      <div className="h-4 w-12 rounded-full bg-[var(--apple-tertiary-fill)] animate-pulse" />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -1075,29 +1074,41 @@ export default function KanbanPage() {
             onDragEnd={handleDragEnd}
             onDragOver={() => {}}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {getColumns().map((column) => (
-                <ColumnDropZone
-                  key={column.id}
-                  column={column}
-                  tasks={getTasksByStatus(column.id)}
-                  onCreateTask={handleCreateTask}
-                  onEditTask={handleEditTask}
-                  onDeleteTask={isAdmin ? handleDeleteTask : undefined}
-                  pendingUpdates={pendingUpdates}
-                  canCreateTask={canCreateTask}
-                  canDragTask={(task) => task.status !== 'backlog'}
-                />
-              ))}
+            <div className="overflow-x-auto pb-2 [scrollbar-width:thin] [scrollbar-color:var(--apple-separator)_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[var(--apple-separator)] [&::-webkit-scrollbar-thumb]:rounded-full">
+              <div
+                className="grid gap-3 sm:gap-4 min-w-max sm:min-w-0"
+                style={{
+                  gridTemplateColumns: `repeat(${getColumns().length}, minmax(280px, 1fr))`,
+                }}
+              >
+                {getColumns().map((column) => (
+                  <VirtualizedColumn
+                    key={column.id}
+                    column={mapColumnForVirtualized(column)}
+                    tasks={getTasksByStatus(column.id) as any}
+                    onCreateTask={handleCreateTask}
+                    getPriorityColor={getPriorityColor}
+                    getTypeColor={getTypeColor}
+                    onTaskClick={(task) => {
+                      router.push(`/tasks/${task._id}`)
+                    }}
+                    onEditTask={handleEditTask as any}
+                    onDeleteTask={isAdmin ? handleDeleteTask : undefined}
+                    canDragTask={(task) => task.status !== 'backlog'}
+                  />
+                ))}
+              </div>
             </div>
 
             <DragOverlay>
               {activeTask ? (
-                <SortableTask
-                  task={activeTask}
+                <SharedSortableTask
+                  task={activeTask as any}
                   onClick={() => {}}
+                  getPriorityColor={getPriorityColor}
+                  getTypeColor={getTypeColor}
                   isDragOverlay
-                  onEdit={handleEditTask}
+                  onEdit={handleEditTask as any}
                   onDelete={isAdmin ? handleDeleteTask : undefined}
                 />
               ) : null}
@@ -1167,7 +1178,7 @@ function SortableTask({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task._id })
 
   const style = { transform: CSS.Transform.toString(transform), transition }
-  const accent = PRIORITY_ACCENT[task.priority] ?? '#8E8E93'
+  const accent = getPriorityAccentColor(task.priority)
 
   const assignee = task.assignedTo && !Array.isArray(task.assignedTo) ? task.assignedTo : null
 

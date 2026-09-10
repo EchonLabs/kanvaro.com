@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -13,11 +13,14 @@ import {
   Target,
   Calendar,
   BarChart3,
-  Clock
+  Clock,
+  AlertCircle,
+  Flame,
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ITask } from '@/models/Task'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { getPriorityAccentColor } from '@/lib/kanban-tokens'
 
 interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
   project?: {
@@ -132,6 +135,26 @@ export default function SortableTask({
     }
   }
   const { formatDate } = useDateTime()
+
+  const isOverdue = useMemo(() => {
+    if (!task.dueDate) return false
+    const d = new Date(task.dueDate)
+    if (isNaN(d.getTime())) return false
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return d < today
+  }, [task.dueDate])
+
+  const isDueToday = useMemo(() => {
+    if (!task.dueDate) return false
+    const d = new Date(task.dueDate)
+    if (isNaN(d.getTime())) return false
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(today)
+    endOfDay.setHours(23, 59, 59, 999)
+    return d >= today && d <= endOfDay
+  }, [task.dueDate])
   const {
     attributes,
     listeners,
@@ -152,7 +175,11 @@ export default function SortableTask({
       style={style}
       {...(isDraggable ? attributes : {})}
       {...(isDraggable ? listeners : {})}
-      className={`card-fade-in rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none select-none apple-transition ${
+       className={`relative overflow-hidden card-fade-in rounded-[var(--apple-radius-lg)] border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none select-none apple-transition ${
+        isOverdue
+          ? 'border-destructive/50 dark:border-destructive/40'
+          : 'border-[var(--apple-separator)]'
+      } ${
         isDraggable
           ? 'cursor-grab active:cursor-grabbing hover:shadow-[0_8px_28px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.38)] hover:-translate-y-0.5'
           : 'cursor-not-allowed opacity-60'
@@ -165,16 +192,33 @@ export default function SortableTask({
         }
       }}
     >
-      <CardContent className="p-2 sm:p-3">
-        <div className="space-y-2 sm:space-y-3 min-w-0">
+      <CardContent className="p-3">
+        <div className="space-y-2.5 min-w-0">
+          {/* Priority left accent strip */}
+          <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-[var(--apple-radius-lg]"           style={{ background: getPriorityAccentColor(task.priority) }} />
+
           <div className="flex items-start justify-between gap-2 min-w-0">
             <div className="flex-1 min-w-0">
               <TooltipProvider delayDuration={150}>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <h4 className="font-medium text-foreground text-xs sm:text-sm line-clamp-2 truncate">
-                      {task.title}
-                    </h4>
+                    <div className="flex items-start gap-1.5 min-w-0">
+                      <h4 className={`font-semibold text-foreground text-xs sm:text-sm line-clamp-2 break-words ${
+                        isOverdue ? 'text-destructive' : task.priority === 'critical' ? 'text-red-600 dark:text-red-400' : ''
+                      }`}>
+                        {task.title}
+                      </h4>
+                      {task.priority === 'critical' && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5"><Flame className="h-3 w-3" /></span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="center">
+                            <p className="text-xs">Critical priority</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
                   </TooltipTrigger>
                   <TooltipContent side="top" align="start" className="max-w-xs break-words">
                     {task.title}
@@ -235,15 +279,15 @@ export default function SortableTask({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-            <Badge className={`${getPriorityColor(task.priority)} text-xs`}>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge className={`${getPriorityColor(task.priority)} text-xs font-medium`}>
               {formatToTitleCase(task.priority)}
             </Badge>
-            <Badge className={`${getTypeColor(task.type)} text-xs`}>
+            <Badge className={`${getTypeColor(task.type)} text-xs font-medium`}>
               {formatToTitleCase(task.type)}
             </Badge>
             {task.displayId && (
-              <span className="text-[11px] text-muted-foreground font-medium">
+              <span className="text-[11px] text-muted-foreground font-mono bg-muted/40 px-1.5 py-0.5 rounded">
                 #{task.displayId}
               </span>
             )}
@@ -261,10 +305,32 @@ export default function SortableTask({
                 </span>
               </div>
             )}
-            {task.dueDate &&  (
-              <div className="flex items-center space-x-1">
-                <Calendar className="h-3 w-3 flex-shrink-0 text-[var(--apple-chart-color)]" />
-                <span className="whitespace-nowrap">Due {formatDate(task.dueDate)}</span>
+            {task.dueDate && (
+              <div className={`flex items-center space-x-1 
+                ${
+                  isOverdue ? 'text-destructive font-medium' : ''
+                }`}
+              >
+                <Calendar className="h-3 w-3 flex-shrink-0" />
+                <span className="whitespace-nowrap">
+                  Due {formatDate(task.dueDate)}
+                </span>
+
+                {isOverdue && (
+                  <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
+                    <AlertCircle className="h-3 w-3 mr-0.5" />
+                    Overdue
+                  </Badge>
+                )}
+
+                {isDueToday && !isOverdue && (
+                  <Badge
+                    variant="outline"
+                    className="text-xs px-1.5 py-0.5 border-orange-500 text-orange-600 dark:text-orange-300"
+                  >
+                    Today
+                  </Badge>
+                )}
               </div>
             )}
             {task.storyPoints && (
