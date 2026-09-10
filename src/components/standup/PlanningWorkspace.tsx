@@ -14,13 +14,16 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import {
+  closestCorners,
   DndContext,
+  DragOverlay,
   PointerSensor,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
-  type DragEndEvent
+  type DragEndEvent,
+  type DragStartEvent
 } from '@dnd-kit/core'
 import {
   AlertTriangle,
@@ -142,6 +145,12 @@ export function PlanningWorkspace({
   // indefinitely without ever starting the sprint.
   const [history, setHistory] = useState<any[]>([])
   const [confirmingReopen, setConfirmingReopen] = useState(false)
+  // Mirrors KanbanBoard's activeTask/DragOverlay pattern: TaskPane's list is
+  // overflow-y-auto (for max-h scrolling), which per CSS forces overflow-x to
+  // auto too — an inline transform + z-index cannot escape that clip, so the
+  // dragged row visually vanishes at the pane edge without this. DragOverlay
+  // portals its content outside the clipped tree.
+  const [activeTask, setActiveTask] = useState<BacklogTask | null>(null)
 
   // UI-4 — the checklist is live. Every mutation on this screen ends by
   // refetching it, so what the PM sees and what the server will enforce cannot
@@ -408,7 +417,17 @@ export function PlanningWorkspace({
     }
   }
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const activeId = event.active.id
+    if (typeof activeId !== 'string') return
+    const task = backlog.find((candidate) => candidate._id === activeId) ??
+      scope.find((candidate) => candidate._id === activeId)
+    setActiveTask(task ?? null)
+  }
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveTask(null)
+
     const overId = event.over?.id
     const activeId = event.active.id
     if (!overId || typeof activeId !== 'string' || typeof overId !== 'string') return
@@ -559,29 +578,49 @@ export function PlanningWorkspace({
       {totals && (
         <div className="grid gap-3 sm:grid-cols-3">
           <Stat label="Net capacity" value={`${hours(totals.netCapacityMinutes)}h`} />
-          <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] p-3">
-            <p className="apple-section-label text-[var(--apple-tertiary-label)]">Estimated scope</p>
-            <p className="font-apple-mono text-lg tabular-nums text-[var(--apple-label)]">
-              {hours(totals.totalEstimatedMinutes)}h
-            </p>
-            <GradientProgress
-              value={
-                totals.netCapacityMinutes > 0
-                  ? Math.round((totals.totalEstimatedMinutes / totals.netCapacityMinutes) * 100)
-                  : 0
-              }
-              gradient={
-                totals.totalEstimatedMinutes > totals.netCapacityMinutes
-                  ? 'var(--apple-system-orange)'
-                  : 'var(--apple-chart-gradient)'
-              }
-              glow={
-                totals.totalEstimatedMinutes > totals.netCapacityMinutes
-                  ? 'var(--apple-system-orange)'
-                  : 'var(--apple-chart-glow)'
-              }
-            />
-          </div>
+          {(() => {
+            // The spec calls this number "your ceiling" — GradientProgress
+            // clamps its bar fill to [0, 100] (correct: that clamping is
+            // shared with other real callers, e.g. RecentProjects), but that
+            // means a genuinely over-capacity sprint (12h estimated against
+            // an 8h net capacity) would otherwise show a reassuring, wrong
+            // "100%" with no other signal beyond the bar turning orange. The
+            // true, uncapped percentage and the old Stat tile's tone="warning"
+            // treatment (icon + tint) are restored here, entirely in this
+            // component's own rendering — GradientProgress itself is untouched.
+            const overCapacity = totals.totalEstimatedMinutes > totals.netCapacityMinutes
+            const truePercent =
+              totals.netCapacityMinutes > 0
+                ? Math.round((totals.totalEstimatedMinutes / totals.netCapacityMinutes) * 100)
+                : 0
+
+            return (
+              <div
+                className={cn(
+                  'rounded-[var(--apple-radius-lg)] border p-3',
+                  overCapacity
+                    ? 'border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/5'
+                    : 'border-[var(--apple-separator)]'
+                )}
+              >
+                <p className="apple-section-label text-[var(--apple-tertiary-label)]">Estimated scope</p>
+                <p className="font-apple-mono text-lg tabular-nums text-[var(--apple-label)]">
+                  {hours(totals.totalEstimatedMinutes)}h
+                  {overCapacity && (
+                    <span className="ml-1.5 inline-flex items-center gap-1 align-middle text-[13px] font-medium text-[var(--apple-system-orange)]">
+                      <AlertTriangle className="h-4 w-4" />
+                      {truePercent}%
+                    </span>
+                  )}
+                </p>
+                <GradientProgress
+                  value={truePercent}
+                  gradient={overCapacity ? 'var(--apple-system-orange)' : 'var(--apple-chart-gradient)'}
+                  glow={overCapacity ? 'var(--apple-system-orange)' : 'var(--apple-chart-glow)'}
+                />
+              </div>
+            )
+          })()}
           <Stat
             label="Tasks estimated"
             value={`${totals.estimatedTaskCount} of ${totals.taskCount}`}
@@ -613,7 +652,12 @@ export function PlanningWorkspace({
           <h3 className="apple-section-label text-[var(--apple-secondary-label)]">
             Sprint scope
           </h3>
-          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
             <div className="grid gap-4 md:grid-cols-2">
               <TaskPane
                 id="backlog-pool"
@@ -634,6 +678,13 @@ export function PlanningWorkspace({
                 busy={busy}
               />
             </div>
+
+            {/* Portals outside the panes' overflow-y-auto (and thus
+                overflow-x: auto-clipped) tree, so the dragged row stays
+                visible the whole way across to the other pane. */}
+            <DragOverlay>
+              {activeTask ? <TaskRowOverlay task={activeTask} /> : null}
+            </DragOverlay>
           </DndContext>
         </section>
       )}
@@ -879,6 +930,25 @@ function DraggableTaskRow({
       >
         {actionLabel}
       </Button>
+    </div>
+  )
+}
+
+/**
+ * The DragOverlay's content — a non-interactive visual copy of
+ * `DraggableTaskRow`'s markup (no `useDraggable` wiring, no action button:
+ * `DragOverlay` follows the pointer itself, and a button that can't be
+ * clicked while riding along with the cursor would be misleading chrome).
+ * Kept in sync by hand with `DraggableTaskRow` below.
+ */
+function TaskRowOverlay({ task }: { task: BacklogTask }) {
+  return (
+    <div className="flex cursor-grabbing items-center gap-2.5 rounded-[6px] border border-[var(--apple-separator)] bg-[var(--apple-system-background)] px-2 py-1.5 shadow-lg">
+      <span className="font-apple-mono text-[12px] text-[var(--apple-system-blue)]">{task.displayId}</span>
+      <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--apple-label)]">{task.title}</span>
+      <span className="font-apple-mono text-[12px] tabular-nums text-[var(--apple-tertiary-label)]">
+        {task.originalEstimateMinutes ? `${hours(task.originalEstimateMinutes)}h` : '—'}
+      </span>
     </div>
   )
 }

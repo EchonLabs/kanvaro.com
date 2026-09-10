@@ -182,4 +182,64 @@ describe('PlanningWorkspace — capacity gauge', () => {
     // Fixture: totalEstimatedMinutes 360 / netCapacityMinutes 480 = 75%.
     expect(await screen.findByText('75%')).toBeInTheDocument()
   })
+
+  it('shows the true, uncapped percentage (not a clamped "100%") when scope exceeds net capacity', async () => {
+    // GradientProgress itself clamps its bar fill + trailing label to
+    // [0, 100] — correct, and shared with other real callers elsewhere in
+    // the app. This asserts PlanningWorkspace's own over-capacity text next
+    // to the hours value carries the true, uncapped number instead.
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes('/planning-session/checklist')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            data: {
+              checklist: {
+                items: [],
+                blockers: [],
+                canComplete: true,
+                totals: {
+                  taskCount: 1,
+                  estimatedTaskCount: 1,
+                  // 12h estimated against 8h net capacity == 150%.
+                  totalEstimatedMinutes: 720,
+                  totalCapacityMinutes: 480,
+                  netCapacityMinutes: 480
+                }
+              },
+              offendingTasks: [],
+              offendingMembers: []
+            }
+          })
+        })
+      }
+      if (url.endsWith('/planning-session')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            data: { session: { _id: 'sess-1', sprintGoal: 'Ship it' }, history: [] }
+          })
+        })
+      }
+      if (url.includes('/poker-sessions')) {
+        return Promise.resolve({ ok: true, json: async () => ({ data: { sessions: [] } }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ data: [] }) })
+    }) as unknown as typeof fetch
+
+    render(
+      <PlanningWorkspace
+        sprintId="s1"
+        sprintName="Sprint 1"
+        sprintStatus="planning"
+        projectId="p1"
+      />
+    )
+
+    expect(await screen.findByText('150%')).toBeInTheDocument()
+    // GradientProgress's own trailing label is clamped and would also render
+    // "100%" — assert it's present too, so this test fails loudly if the
+    // true-percentage text is ever accidentally removed rather than added.
+    expect(screen.getByText('100%')).toBeInTheDocument()
+  })
 })
