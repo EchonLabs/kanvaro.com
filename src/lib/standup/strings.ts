@@ -552,7 +552,23 @@ export const standupStrings = {
     editRejected: () => 'That change could not be saved.',
     addRejected: () => 'That task could not be added to your day.',
     /** A read-tolerant section (Yesterday, My position, Blockers) shown when its own fetch failed — the rest of the screen still renders. */
-    sectionLoadFailed: () => 'Could not load this section.'
+    sectionLoadFailed: () => 'Could not load this section.',
+    alsoToday: ({ count }: { count: number }) =>
+      count === 1 ? 'You also have a stand-up today:' : `You also have ${count} more stand-ups today:`,
+    dayOf: ({ day, total }: { day: number; total: number }) => `Day ${day} of ${total}`,
+    joinCall: () => 'Join',
+    capacityFull: ({ hours, taskCount }: { hours: string; taskCount: number }) =>
+      `You're planned to ${hours} today across ${taskCount} ${taskCount === 1 ? 'task' : 'tasks'}.`,
+    capacityUnder: ({ hours }: { hours: string }) => `You have ${hours} unplanned today.`,
+    capacityOver: ({ hours }: { hours: string }) => `You're planned ${hours} beyond your capacity today.`,
+    capacityZero: () => 'Nothing is planned for you today yet.',
+    capacityUnavailable: () => "You're down as unavailable today — nothing is planned.",
+    debtSentence: ({ hours }: { hours: string }) =>
+      `You are ${hours} over estimate on this sprint's completed and in-flight work.`,
+    surplusSentence: ({ hours }: { hours: string }) =>
+      `You're ${hours} ahead of estimate on this sprint's work.`,
+    strandedSentence: ({ hours }: { hours: string }) =>
+      `${hours} is still assigned to you for a day you're not available.`
   },
 
   config: {
