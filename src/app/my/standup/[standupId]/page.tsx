@@ -29,14 +29,51 @@ import {
 import { minutes } from '@/lib/standup/minutes'
 import { STANDUP_VERSION_HEADER } from '@/lib/standup/version-header'
 import { standupStrings } from '@/lib/standup/strings'
+import type { StandupCandidate } from '@/lib/standup/my-standup-candidates'
+import type { YesterdayPanelData } from '@/lib/standup/yesterday-service'
+import type { VariancePanel } from '@/lib/standup/variance-service'
+import type { CarryForwardPanelView } from '@/lib/standup/carry-forward-service'
+import type { BlockerPanelRow } from '@/lib/standup/blocker-service'
 
 interface MyStandupBoard {
   standupId: string
   standupVersion: number
   status: string
   date: string
+  scheduledStartAt?: string
+  durationMinutes?: number
+  meetingUrl?: string
+  sprintDayNumber?: number
+  totalSprintDays?: number
   member: MyStandupMember
   poolTasks: MyStandupPoolTask[]
+  allowSelfSelect: boolean
+  otherStandupsToday: StandupCandidate[]
+  yesterday?: YesterdayPanelData
+  variance?: VariancePanel
+  carryForward?: CarryForwardPanelView
+  blockers?: BlockerPanelRow[]
+}
+
+async function safeJson(response: Response): Promise<any> {
+  if (!response.ok) return undefined
+  try {
+    return await response.json()
+  } catch {
+    return undefined
+  }
+}
+
+async function fetchOtherStandupsToday(currentStandupId: string): Promise<StandupCandidate[]> {
+  try {
+    const response = await fetch('/api/my/standup/candidates')
+    if (!response.ok) return []
+    const payload = await response.json()
+    const candidates: StandupCandidate[] = payload.data ?? []
+    return candidates.filter((candidate) => candidate.standupId !== currentStandupId)
+  } catch {
+    return []
+  }
 }
 
 /** Every request the app already makes carries the auth cookie; this route
@@ -70,7 +107,7 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
   const { standupId } = params
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
-  const [board, setBoard] = useState<MyStandupBoard | null>(null)
+  const [data, setData] = useState<MyStandupBoard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
 
@@ -100,25 +137,55 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
 
     ;(async () => {
       try {
-        const response = await fetch(`/api/standups/${standupId}/allocations`)
-        if (!response.ok) throw new Error('load failed')
-        const payload = await response.json()
-        const data = payload.data ?? payload
+        const [boardRes, yesterdayRes, varianceRes, carryForwardRes, blockersRes] =
+          await Promise.all([
+            fetch(`/api/standups/${standupId}/allocations`),
+            fetch(`/api/standups/${standupId}/yesterday`),
+            fetch(`/api/standups/${standupId}/variance`),
+            fetch(`/api/standups/${standupId}/carry-forward`),
+            fetch(`/api/standups/${standupId}/blockers`)
+          ])
 
-        const memberRow = (data.members ?? []).find((m: any) => m.memberId === user.id)
+        if (!boardRes.ok) throw new Error('load failed')
+        const boardPayload = await boardRes.json()
+        const board = boardPayload.data ?? boardPayload
+
+        const memberRow = (board.members ?? []).find((m: any) => m.memberId === user.id)
         if (!memberRow) {
           if (!cancelled) setError(standupStrings.my.noStandup())
           return
         }
 
+        const otherStandupsToday = await fetchOtherStandupsToday(standupId)
+
+        // Read-tolerant: a failure on any of these four leaves the field
+        // `undefined`, and the section that needs it renders its own error
+        // state rather than blanking the whole screen (matches the run
+        // screen page's own treatment of these same endpoints).
+        const yesterday = await safeJson(yesterdayRes)
+        const variance = await safeJson(varianceRes)
+        const carryForward = await safeJson(carryForwardRes)
+        const blockers = await safeJson(blockersRes)
+
         if (!cancelled) {
-          setBoard({
-            standupId: data.standupId,
-            standupVersion: data.standupVersion,
-            status: data.status,
-            date: data.date,
+          setData({
+            standupId: board.standupId,
+            standupVersion: board.standupVersion,
+            status: board.status,
+            date: board.date,
+            scheduledStartAt: board.scheduledStartAt,
+            durationMinutes: board.durationMinutes,
+            meetingUrl: board.meetingUrl,
+            sprintDayNumber: board.sprintDayNumber,
+            totalSprintDays: board.totalSprintDays,
             member: toMemberView(memberRow),
-            poolTasks: data.pool?.unassigned ?? []
+            poolTasks: board.pool?.unassigned ?? [],
+            allowSelfSelect: true,
+            otherStandupsToday,
+            yesterday: yesterday?.data ?? yesterday,
+            variance: variance?.data ?? variance,
+            carryForward: carryForward?.data ?? carryForward,
+            blockers: blockers?.data ?? blockers
           })
         }
       } catch {
@@ -169,9 +236,47 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
       if (!response.ok) throw await asError(response)
       const payload = await response.json()
       return { standupVersion: payload.data.standupVersion }
-    }
+    },
     // No `removeAllocation`: ALO-22's member surface is additions only, the
     // screen renders no control for it, and the DELETE route stays PM-only.
+    async updateYesterdayRow(input) {
+      const response = await fetch(`/api/standups/${standupId}/yesterday`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          [STANDUP_VERSION_HEADER]: String(input.expectedVersion)
+        },
+        body: JSON.stringify({
+          taskIds: [input.taskId],
+          ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(input.loggedMinutes !== undefined ? { loggedMinutes: input.loggedMinutes } : {})
+        })
+      })
+      if (!response.ok) throw await asError(response)
+      const payload = await response.json()
+      return { standupVersion: payload.data.standupVersion, panel: payload.data.panel }
+    },
+    async raiseBlocker(input) {
+      // `POST /blockers` carries no `X-Standup-Version` header — it creates a
+      // sibling `StandupBlocker` document and never touches the stand-up's own
+      // guarded fields, so RUN-23's optimistic-concurrency check does not apply
+      // here (see the route's own doc comment). `expectedVersion` on this
+      // method's input exists only to match the other three `api` methods'
+      // shape; it is not sent.
+      const response = await fetch(`/api/standups/${standupId}/blockers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: input.taskId,
+          linkedAllocationId: input.linkedAllocationId,
+          description: input.description,
+          blockerType: input.blockerType,
+          severity: input.severity
+        })
+      })
+      if (!response.ok) throw await asError(response)
+      setReloadToken((token) => token + 1)
+    }
   }
 
   return (
@@ -181,14 +286,14 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
           <p role="alert" className="p-4 text-sm text-destructive">
             {error}
           </p>
-        ) : board ? (
+        ) : data ? (
           <MyStandupScreen
-            standupId={board.standupId}
-            standupVersion={board.standupVersion}
-            status={board.status}
-            date={board.date}
-            member={board.member}
-            poolTasks={board.poolTasks}
+            standupId={data.standupId}
+            standupVersion={data.standupVersion}
+            status={data.status}
+            date={data.date}
+            member={data.member}
+            poolTasks={data.poolTasks}
             /* Deliberately unconditional. P11-6 makes the server the real gate:
                `createAllocation` refuses a self-select when the project has
                `allowSelfSelect` off, and the screen now surfaces that refusal
@@ -197,6 +302,19 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
                that could disagree with it. */
             allowSelfSelect
             api={api}
+            scheduledStartAt={data.scheduledStartAt}
+            viewerTimeZone={
+              typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+            }
+            durationMinutes={data.durationMinutes}
+            meetingUrl={data.meetingUrl}
+            sprintDayNumber={data.sprintDayNumber}
+            totalSprintDays={data.totalSprintDays}
+            otherStandupsToday={data.otherStandupsToday}
+            yesterday={data.yesterday}
+            variance={data.variance}
+            carryForward={data.carryForward}
+            blockers={data.blockers}
           />
         ) : (
           <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">

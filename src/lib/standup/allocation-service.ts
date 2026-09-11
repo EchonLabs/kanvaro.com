@@ -439,6 +439,8 @@ export interface AllocationBoard {
   facilitatorName: string
   meetingUrl?: string
   standupVersion: number
+  /** Required on the schema — when this stand-up is due. Feeds My Stand-up's next-stand-up strip (§4.2) before it has started. */
+  scheduledStartAt: Date
   /** E57/§15.8.2. Feeds the run screen's advisory elapsed-time indicator. */
   startedAt?: Date
   durationMinutes?: number
@@ -585,6 +587,7 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
     facilitatorName: nameById.get(String(context.standup.facilitator)) ?? '',
     ...(context.standup.meetingUrl ? { meetingUrl: context.standup.meetingUrl } : {}),
     standupVersion: context.standup.version ?? 0,
+    scheduledStartAt: context.standup.scheduledStartAt,
     ...(context.standup.startedAt ? { startedAt: context.standup.startedAt } : {}),
     // `durationMinutes` is `required` on the schema, so this is always present
     // in practice — kept a plain assignment (not a conditional spread like

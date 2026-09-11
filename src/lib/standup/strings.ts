@@ -550,7 +550,9 @@ export const standupStrings = {
      * only that the change did not save.
      */
     editRejected: () => 'That change could not be saved.',
-    addRejected: () => 'That task could not be added to your day.'
+    addRejected: () => 'That task could not be added to your day.',
+    /** A read-tolerant section (Yesterday, My position, Blockers) shown when its own fetch failed — the rest of the screen still renders. */
+    sectionLoadFailed: () => 'Could not load this section.'
   },
 
   config: {
