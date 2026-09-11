@@ -588,7 +588,11 @@ export const standupStrings = {
     positionEmpty: () => 'Nothing blocked. Nothing carried.',
     positionCount: ({ count }: { count: number }) => `${count} carried over`,
     pmOwesNote: () => 'Your PM owes a note on this today.',
-    carriedAge: ({ count }: { count: number }) => `carried ${count} ${count === 1 ? 'stand-up' : 'stand-ups'}`
+    carriedAge: ({ count }: { count: number }) => `carried ${count} ${count === 1 ? 'stand-up' : 'stand-ups'}`,
+    blockersHeader: () => 'Blockers',
+    blockersEmpty: () => 'No open blockers.',
+    /** The section's own trigger button — distinct from `blocker.raise()`, the modal's internal submit button, so the two never collide as accessible names on the same screen. */
+    reportBlocker: () => 'Report a blocker'
   },
 
   config: {
