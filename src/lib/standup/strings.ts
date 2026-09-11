@@ -583,7 +583,12 @@ export const standupStrings = {
     sourcePreAssigned: () => 'pre-assigned',
     sourceAssignedInStandup: () => 'assigned',
     sourceSelfSelected: () => 'self-selected',
-    sourceAutoPrefilled: () => 'auto'
+    sourceAutoPrefilled: () => 'auto',
+    positionHeader: () => 'My position',
+    positionEmpty: () => 'Nothing blocked. Nothing carried.',
+    positionCount: ({ count }: { count: number }) => `${count} carried over`,
+    pmOwesNote: () => 'Your PM owes a note on this today.',
+    carriedAge: ({ count }: { count: number }) => `carried ${count} ${count === 1 ? 'stand-up' : 'stand-ups'}`
   },
 
   config: {
