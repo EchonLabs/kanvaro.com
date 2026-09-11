@@ -966,6 +966,53 @@ export const standupStrings = {
     sprintsLoadFailed: () => "Could not load this project's sprints.",
     scheduleLoadFailed: () => 'Could not load the stand-up schedule.',
     resume: () => 'Resume',
+    regenerate: {
+      button: () => 'Regenerate schedule',
+      title: () => 'Regenerate stand-up schedule',
+      description: () =>
+        'Reconcile this sprint’s stand-up days against the project’s latest working calendar and sprint dates. Completed stand-ups are preserved; future and unstarted days are updated.',
+      confirm: () => 'Reconcile schedule',
+      cancel: () => 'Cancel',
+      reconciling: () => 'Reconciling…',
+      success: () => 'Schedule successfully updated.',
+      failed: () => 'Could not regenerate the schedule.'
+    },
+    health: {
+      title: () => 'Sprint Health & Cadence',
+      cadenceTitle: () => 'Sprint Runway',
+      cadenceSub: ({ completed, total, percent }: { completed: number; total: number; percent: number }) =>
+        `${completed} of ${total} days completed (${percent}%)`,
+      scopeTitle: () => 'Scope vs Capacity',
+      onTrack: () => 'On track',
+      overCapacity: ({ overage }: { overage: string }) => `Over by ${overage}`,
+      scopeDetail: ({ capacity, scope }: { capacity: string; scope: string }) =>
+        `${scope} remaining scope vs ${capacity} capacity`,
+      debtTitle: () => 'Estimate Debt',
+      debtClear: () => 'Zero estimate debt',
+      debtActive: ({ debt, members }: { debt: string; members: number }) =>
+        `${debt} across ${members} ${members === 1 ? 'member' : 'members'}`,
+      debtDetail: () => 'Accumulated overrun on completed tasks',
+      cfwTitle: () => 'Carry-Forwards & Overrides',
+      cfwClear: () => 'No open carry-forwards',
+      cfwActive: ({ count, oldest }: { count: number; oldest: number }) =>
+        `${count} ${count === 1 ? 'item' : 'items'} (oldest ${oldest} ${oldest === 1 ? 'day' : 'days'})`,
+      overridesCount: ({ count }: { count: number }) =>
+        `${count} ${count === 1 ? 'override' : 'overrides'} issued`
+    },
+    metrics: {
+      allocation: ({ percent }: { percent: number }) => `${percent}% allocated`,
+      duration: ({ minutes }: { minutes: number }) => `${minutes}m`,
+      attendance: ({ present, total }: { present: number; total: number }) => `${present}/${total} present`,
+      overrides: ({ count }: { count: number }) =>
+        count === 1 ? '1 override' : `${count} overrides`,
+      carryForward: ({ count }: { count: number }) =>
+        count === 1 ? '1 carry-fwd' : `${count} carry-fwds`,
+      joinCall: () => 'Join call',
+      startStandup: () => 'Start stand-up',
+      viewSummary: () => 'View summary',
+      unallocated: () => 'Unallocated',
+      scheduled: () => 'Planned'
+    },
     status: {
       Scheduled: 'Scheduled',
       Ready: 'Ready to start',

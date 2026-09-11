@@ -54,6 +54,18 @@ const schedule = (over: Partial<SprintSchedule> = {}): SprintSchedule => ({
     day({ date: '2026-08-13', sprintDayNumber: 4 }),
     day({ date: '2026-08-14', sprintDayNumber: 5, shape: 'final_day' })
   ],
+  health: {
+    estimateDebt: { outstandingMinutes: 0 as any, affectedMembersCount: 0 },
+    carryForward: { openCount: 0, oldestAgeInStandups: 0, chronicCount: 0 },
+    overrides: { totalCount: 0 },
+    capacityBalance: {
+      remainingEstimateMinutes: 0 as any,
+      remainingCapacityMinutes: 0 as any,
+      overageMinutes: 0 as any,
+      exceedsCapacity: false
+    },
+    progress: { completedDays: 1, missedDays: 0, totalWorkingDays: 4, percentComplete: 25 }
+  },
   ...over
 })
 
@@ -140,7 +152,7 @@ describe('StandupSchedule', () => {
         {
           standupId: 'standup-1',
           date: '2026-08-01',
-          status: 'Completed',
+          status: 'Ready',
           shape: 'day_one',
           sprintDayNumber: 1,
           totalSprintDays: 8,
@@ -159,6 +171,28 @@ describe('StandupSchedule', () => {
     expect(link).toHaveAttribute(
       'href',
       '/projects/project-1/sprints/sprint-1/standups/standup-1'
+    )
+  })
+
+  /**
+   * §3.3 of the schedule redesign: a completed day is a record to read, not a
+   * meeting to run — it links straight to its summary, matching
+   * `TodayStandupHero`'s own branch for a completed *today*.
+   */
+  it('links a completed, non-today day to its summary rather than the run screen', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [day({ date: '2026-08-10', sprintDayNumber: 1, status: 'Completed' })]
+        })}
+      />
+    )
+
+    const link = screen.getByRole('link')
+    expect(link).toHaveAttribute(
+      'href',
+      '/projects/project-1/sprints/sprint-1/standups/standup-2026-08-10/summary'
     )
   })
 
@@ -219,5 +253,41 @@ describe('StandupSchedule', () => {
 
     const notToday = screen.getByTestId('schedule-day')
     expect(within(notToday).queryByText('Start stand-up')).not.toBeInTheDocument()
+  })
+
+  it('spec §15.7: renders operational metrics (allocation %, overrides, duration)', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [
+            day({
+              date: '2026-08-10',
+              status: 'Completed',
+              allocationPercentage: 100,
+              overridesCount: 1,
+              carryForwardCount: 2,
+              actualDurationMinutes: 14,
+              attendance: { present: 7, total: 8 }
+            }),
+            day({
+              date: '2026-08-11',
+              status: 'Ready',
+              allocationPercentage: 94
+            })
+          ]
+        })}
+      />
+    )
+
+    // Completed day operational metrics
+    expect(screen.getByText('100% allocated')).toBeInTheDocument()
+    expect(screen.getByText('1 override')).toBeInTheDocument()
+    expect(screen.getByText('2 carry-fwds')).toBeInTheDocument()
+    expect(screen.getByText('14m')).toBeInTheDocument()
+    expect(screen.getByText('7/8 present')).toBeInTheDocument()
+
+    // Today's row metrics
+    expect(screen.getByText('94% allocated')).toBeInTheDocument()
   })
 })

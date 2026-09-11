@@ -11,15 +11,20 @@ import path from 'path'
 
 import mongoose from 'mongoose'
 
+import { Allocation } from '@/models/Allocation'
+import { CarryForwardItem } from '@/models/CarryForwardItem'
+import { MemberSprintDebtSummary } from '@/models/MemberSprintDebtSummary'
 import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
+import { StandupOverride } from '@/models/StandupOverride'
+import { StandupSummary } from '@/models/StandupSummary'
 import { User } from '@/models/User'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
 
 import { generateStandupsForSprint } from '../generation'
 import { getSprintSchedule } from '../schedule'
-import { ids, syncIndexes, useMongo } from './helpers/mongo'
+import { anyId, ids, syncIndexes, useMongo } from './helpers/mongo'
 
 const { organization, project, member, otherMember, user } = ids
 
@@ -178,6 +183,278 @@ describe('getSprintSchedule', () => {
     const schedule = await getSprintSchedule(String(sprint._id))
 
     expect(schedule.days[0].facilitatorName).toBe(String(user))
+  })
+
+  it('spec §15.7: includes sprint health summary and operational metrics', async () => {
+    await seedProject()
+    const sprint = await seedSprint()
+
+    const schedule = await getSprintSchedule(String(sprint._id))
+
+    expect(schedule.health).toBeDefined()
+    expect(schedule.health!.progress).toEqual({
+      completedDays: 0,
+      missedDays: 0,
+      totalWorkingDays: 5,
+      percentComplete: 0
+    })
+    expect(schedule.health!.estimateDebt).toEqual({
+      outstandingMinutes: 0,
+      affectedMembersCount: 0
+    })
+    expect(schedule.health!.carryForward).toEqual({
+      openCount: 0,
+      oldestAgeInStandups: 0,
+      chronicCount: 0
+    })
+    expect(schedule.health!.overrides).toEqual({
+      totalCount: 0
+    })
+  })
+
+  describe('spec §15.7: per-day operational metrics', () => {
+    it('computes allocationPercentage from real planned minutes against expected attendee capacity', async () => {
+      await seedProject()
+      const sprint = await seedSprint()
+      const standup = (await Standup.findOne({ sprint: sprint._id, standupDate: '2026-08-10' }).lean()) as any
+
+      // Two expected attendees (member, otherMember) at 480 standard minutes
+      // each is 960 minutes of capacity for the day; 480 planned is half.
+      await Allocation.create({
+        standup: standup._id,
+        sprint: sprint._id,
+        project,
+        organization,
+        member,
+        task: anyId(),
+        plannedMinutes: 480,
+        source: 'assigned_in_standup',
+        createdBy: user
+      })
+
+      const schedule = await getSprintSchedule(String(sprint._id))
+
+      const day = schedule.days.find((d) => d.date === '2026-08-10')
+      expect(day?.allocationPercentage).toBe(50)
+      expect(day?.totalPlannedMinutes).toBe(480)
+    })
+
+    it('caps allocationPercentage at 100 even when the day is over-planned', async () => {
+      await seedProject()
+      const sprint = await seedSprint()
+      const standup = (await Standup.findOne({ sprint: sprint._id, standupDate: '2026-08-10' }).lean()) as any
+
+      await Allocation.create({
+        standup: standup._id,
+        sprint: sprint._id,
+        project,
+        organization,
+        member,
+        task: anyId(),
+        plannedMinutes: 1200,
+        source: 'assigned_in_standup',
+        createdBy: user
+      })
+
+      const schedule = await getSprintSchedule(String(sprint._id))
+
+      const day = schedule.days.find((d) => d.date === '2026-08-10')
+      expect(day?.allocationPercentage).toBe(100)
+    })
+
+    it('counts live overrides and open carry-forward items issued against an in-flight day', async () => {
+      await seedProject()
+      const sprint = await seedSprint()
+      const standup = (await Standup.findOne({ sprint: sprint._id, standupDate: '2026-08-10' }).lean()) as any
+
+      await StandupOverride.create({
+        standup: standup._id,
+        sprint: sprint._id,
+        project,
+        organization,
+        type: 'under_allocation',
+        reasonCode: 'team_member_unavailable',
+        justification: 'Team member out sick, capacity intentionally left short today.',
+        issuedBy: user
+      })
+
+      await CarryForwardItem.create({
+        sprint: sprint._id,
+        project,
+        organization,
+        type: 'unfinished_task',
+        originStandup: standup._id,
+        originDate: '2026-08-09',
+        currentStandup: standup._id,
+        ageInStandups: 1,
+        status: 'open'
+      })
+
+      const schedule = await getSprintSchedule(String(sprint._id))
+
+      const day = schedule.days.find((d) => d.date === '2026-08-10')
+      expect(day?.overridesCount).toBe(1)
+      expect(day?.carryForwardCount).toBe(1)
+    })
+
+    it('reads attendance from the live standup document before it is completed', async () => {
+      await seedProject()
+      const sprint = await seedSprint()
+
+      await Standup.updateOne(
+        { sprint: sprint._id, standupDate: '2026-08-10' },
+        { $set: { attendance: [{ user: member, state: 'present' }, { user: otherMember, state: 'absent' }] } }
+      )
+
+      const schedule = await getSprintSchedule(String(sprint._id))
+
+      const day = schedule.days.find((d) => d.date === '2026-08-10')
+      expect(day?.attendance).toEqual({ present: 1, total: 2 })
+    })
+
+    it('reads its operational metrics from the frozen StandupSummary once a day is Completed', async () => {
+      await seedProject()
+      const sprint = await seedSprint()
+      const standup = (await Standup.findOne({ sprint: sprint._id, standupDate: '2026-08-10' }).lean()) as any
+
+      await Standup.updateOne({ _id: standup._id }, { $set: { status: 'Completed' } })
+      await StandupSummary.create({
+        standup: standup._id,
+        sprint: sprint._id,
+        project,
+        organization,
+        headerFacts: { durationMinutes: 14 },
+        attendance: [
+          { memberId: member, name: 'Amal', status: 'present' },
+          { memberId: otherMember, name: 'Nadeesha', status: 'present' },
+          { memberId: user, name: 'Priya', status: 'absent' }
+        ],
+        carryForwardState: [{ itemId: 'c1' }, { itemId: 'c2' }],
+        overridesIssued: [{ overrideId: 'o1' }]
+      })
+
+      const schedule = await getSprintSchedule(String(sprint._id))
+
+      const day = schedule.days.find((d) => d.date === '2026-08-10')
+      expect(day?.actualDurationMinutes).toBe(14)
+      expect(day?.attendance).toEqual({ present: 2, total: 3 })
+      expect(day?.carryForwardCount).toBe(2)
+      expect(day?.overridesCount).toBe(1)
+    })
+  })
+
+  describe('spec §15.7: sprint-wide health summary reflects real data', () => {
+    it('sums outstanding estimate debt only across members who actually carry it', async () => {
+      await seedProject()
+      const sprint = await seedSprint()
+
+      await MemberSprintDebtSummary.create({
+        project,
+        sprint: sprint._id,
+        member,
+        organization,
+        outstandingMinutes: 90,
+        lastRebuiltAt: new Date()
+      })
+      await MemberSprintDebtSummary.create({
+        project,
+        sprint: sprint._id,
+        member: otherMember,
+        organization,
+        outstandingMinutes: 0,
+        lastRebuiltAt: new Date()
+      })
+
+      const schedule = await getSprintSchedule(String(sprint._id))
+
+      expect(schedule.health!.estimateDebt).toEqual({
+        outstandingMinutes: 90,
+        affectedMembersCount: 1
+      })
+    })
+
+    it('reports the oldest open carry-forward age and counts a tagged-chronic item even before it ages past the threshold', async () => {
+      await seedProject()
+      const sprint = await seedSprint()
+      const standup = (await Standup.findOne({ sprint: sprint._id, standupDate: '2026-08-10' }).lean()) as any
+
+      await CarryForwardItem.create({
+        sprint: sprint._id,
+        project,
+        organization,
+        type: 'unfinished_task',
+        originStandup: standup._id,
+        originDate: '2026-08-08',
+        currentStandup: standup._id,
+        ageInStandups: 5,
+        status: 'escalated'
+      })
+      await CarryForwardItem.create({
+        sprint: sprint._id,
+        project,
+        organization,
+        type: 'open_blocker',
+        originStandup: standup._id,
+        originDate: '2026-08-10',
+        currentStandup: standup._id,
+        ageInStandups: 1,
+        status: 'noted',
+        tags: ['chronic']
+      })
+      // Resolved items are not "open" and must not count.
+      await CarryForwardItem.create({
+        sprint: sprint._id,
+        project,
+        organization,
+        type: 'unfinished_task',
+        originStandup: standup._id,
+        originDate: '2026-08-09',
+        currentStandup: standup._id,
+        ageInStandups: 2,
+        status: 'resolved'
+      })
+
+      const schedule = await getSprintSchedule(String(sprint._id))
+
+      expect(schedule.health!.carryForward).toEqual({
+        openCount: 2,
+        oldestAgeInStandups: 5,
+        chronicCount: 2
+      })
+    })
+
+    it('totals overrides issued across the whole sprint, not just one day', async () => {
+      await seedProject()
+      const sprint = await seedSprint()
+      const days = await Standup.find({ sprint: sprint._id }).sort({ standupDate: 1 }).lean()
+
+      await StandupOverride.create({
+        standup: days[0]._id,
+        sprint: sprint._id,
+        project,
+        organization,
+        type: 'under_allocation',
+        reasonCode: 'team_member_unavailable',
+        justification: 'Day 1: capacity intentionally left short due to leave.',
+        issuedBy: user
+      })
+      await StandupOverride.create({
+        standup: days[1]._id,
+        sprint: sprint._id,
+        project,
+        organization,
+        type: 'over_allocation',
+        reasonCode: 'urgent_production_issue',
+        justification: 'Day 2: took on urgent work beyond planned capacity.',
+        issuedBy: user
+      })
+
+      const schedule = await getSprintSchedule(String(sprint._id))
+
+      expect(schedule.health!.overrides.totalCount).toBe(2)
+      expect(schedule.days.find((d) => d.date === '2026-08-10')?.overridesCount).toBe(1)
+      expect(schedule.days.find((d) => d.date === '2026-08-11')?.overridesCount).toBe(1)
+    })
   })
 })
 
