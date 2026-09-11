@@ -199,6 +199,8 @@ export interface BlockerPanelRow {
   severity: string
   status: string
   owner?: string
+  /** The real id behind `owner`'s display name — needed to filter "raised by me" client-side. */
+  raisedById: string
   targetResolutionDate?: string
   overdue: boolean
   freedMinutes?: number
@@ -275,6 +277,7 @@ export async function loadBlockerPanel(standupId: string): Promise<BlockerPanelR
       severity: blocker.severity,
       status: blocker.status,
       ...(blocker.owner ? { owner: ownerNameById.get(String(blocker.owner)) } : {}),
+      raisedById: String(blocker.raisedBy),
       ...(targetResolutionDate ? { targetResolutionDate } : {}),
       overdue: isOverdue(targetResolutionDate, standup.standupDate),
       ...(allocation?.excludedFromCapacity ? { freedMinutes: allocation.plannedMinutes } : {}),

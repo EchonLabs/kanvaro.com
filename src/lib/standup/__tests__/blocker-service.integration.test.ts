@@ -320,4 +320,12 @@ describe('loadBlockerPanel', () => {
   it('throws NOT_FOUND for a stand-up that does not exist', async () => {
     await expect(loadBlockerPanel(String(anyId()))).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
+
+  it('includes raisedById so a caller can filter to blockers they raised', async () => {
+    const standup = await seedStandup()
+    await raiseBlocker(raiseInput({ standupId: String(standup._id), raisedBy: String(ids.member) }))
+
+    const rows = await loadBlockerPanel(String(standup._id))
+    expect(rows[0].raisedById).toBe(String(ids.member))
+  })
 })
