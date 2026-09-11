@@ -574,7 +574,16 @@ export const standupStrings = {
     yesterdayLoggedTotal: ({ hours }: { hours: string }) => `, ${hours} logged`,
     yesterdayEmpty: () => "Nothing to review yet — your previous stand-up hasn't closed.",
     chronicSpill: ({ count }: { count: number }) => `carried ${count} stand-ups`,
-    statusFor: ({ key }: { key: string }) => `Status for ${key}`
+    statusFor: ({ key }: { key: string }) => `Status for ${key}`,
+    todayHeader: () => 'Today',
+    todayPlanned: ({ hours }: { hours: string }) => `${hours} planned`,
+    todayEmpty: () => 'Nothing planned for you yet — your PM assigns work at the stand-up.',
+    lockedReason: () => 'The stand-up has started; your day is locked.',
+    sourceCarried: () => 'carried',
+    sourcePreAssigned: () => 'pre-assigned',
+    sourceAssignedInStandup: () => 'assigned',
+    sourceSelfSelected: () => 'self-selected',
+    sourceAutoPrefilled: () => 'auto'
   },
 
   config: {
