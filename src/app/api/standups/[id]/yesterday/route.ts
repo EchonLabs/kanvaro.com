@@ -11,6 +11,7 @@
  * stand-up screen becomes something people stop trusting.
  */
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
 import { recordAudit } from '@/lib/standup/audit'
 import { StandupError } from '@/lib/standup/errors'
 import { notifyStatusChangedOnBehalf } from '@/lib/standup/notifications'
@@ -20,6 +21,7 @@ import {
   requireStandupVersion,
   withStandupIdPermission
 } from '@/lib/standup/route-helpers'
+import { resolveStandupOwner } from '@/lib/standup/task-ownership'
 import { adjustLoggedMinutes, loadYesterdayPanel } from '@/lib/standup/yesterday-service'
 import { Standup } from '@/models/Standup'
 import { Task } from '@/models/Task'
@@ -46,7 +48,7 @@ interface PatchBody {
 }
 
 export const PATCH = withStandupIdPermission(
-  { permission: Permission.STANDUP_RUN },
+  { permission: Permission.STANDUP_RUN_OWN },
   async (request, { standupId, standup, userId, organizationId, projectId }) => {
     const body = await readJson<PatchBody>(request)
     const expectedVersion = requireStandupVersion(request)
@@ -76,11 +78,52 @@ export const PATCH = withStandupIdPermission(
     }
 
     const tasks = (await Task.find({ _id: { $in: taskIds }, project: projectId })
-      .select('displayId status assignedTo')
+      .select('displayId status assignedTo standupOwner')
       .lean()) as any[]
 
     if (tasks.length !== taskIds.length) {
       throw new StandupError('NOT_FOUND', 'One of those tasks no longer exists.', { taskIds })
+    }
+
+    const canRunForOthers = await PermissionService.hasPermission(
+      userId,
+      Permission.STANDUP_RUN,
+      projectId
+    )
+
+    if (!canRunForOthers) {
+      // A caller with only STANDUP_RUN_OWN may edit their own row's status
+      // and logged hours, only while the stand-up is Ready (mirrors RUN-26's
+      // own-row lock — a PM keeps writing through In_Progress; a member does
+      // not), and never a note (design §2's explicit scope decision — notes
+      // stay a PM-only capability on this route, same as carry-forward notes).
+      if (body.note !== undefined) {
+        throw new StandupError(
+          'VALIDATION_FAILED',
+          'Only a project manager can add a note here.',
+          { field: 'note' }
+        )
+      }
+      if (standup.status !== 'Ready') {
+        throw new StandupError(
+          'VALIDATION_FAILED',
+          'Your own row can only be edited while the stand-up is Ready.',
+          { status: standup.status }
+        )
+      }
+      for (const task of tasks) {
+        const ownerId = resolveStandupOwner({
+          standupOwner: task.standupOwner ? String(task.standupOwner) : undefined,
+          assignedTo: (task.assignedTo ?? []).map((entry: any) => String(entry.user))
+        })
+        if (ownerId !== userId) {
+          throw new StandupError(
+            'VALIDATION_FAILED',
+            'You can only update your own tasks here.',
+            { taskId: String(task._id) }
+          )
+        }
+      }
     }
 
     if (body.loggedMinutes !== undefined) {

@@ -218,6 +218,8 @@ export enum Permission {
   STANDUP_VIEW = 'standup:view',
   STANDUP_GENERATE = 'standup:generate',
   STANDUP_RUN = 'standup:run',
+  /** RUN-9..13's own-row edits (status + logged hours), gated separately from STANDUP_RUN so a team member can update their own yesterday row without gaining PM-wide run rights. */
+  STANDUP_RUN_OWN = 'standup:run_own',
   STANDUP_COMPLETE = 'standup:complete',
   STANDUP_REOPEN = 'standup:reopen',
   STANDUP_ALLOCATE = 'standup:allocate',
@@ -449,6 +451,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.STANDUP_VIEW,
     Permission.STANDUP_GENERATE,
     Permission.STANDUP_RUN,
+    Permission.STANDUP_RUN_OWN,
     Permission.STANDUP_COMPLETE,
     Permission.STANDUP_REOPEN,
     Permission.STANDUP_ALLOCATE,
@@ -649,6 +652,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.STANDUP_VIEW,
     Permission.STANDUP_GENERATE,
     Permission.STANDUP_RUN,
+    Permission.STANDUP_RUN_OWN,
     Permission.STANDUP_COMPLETE,
     Permission.STANDUP_REOPEN,
     Permission.STANDUP_ALLOCATE,
@@ -1178,6 +1182,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.STANDUP_VIEW,
     Permission.STANDUP_GENERATE,
     Permission.STANDUP_RUN,
+    Permission.STANDUP_RUN_OWN,
     Permission.STANDUP_COMPLETE,
     Permission.STANDUP_REOPEN,
     Permission.STANDUP_ALLOCATE,
@@ -1250,6 +1255,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     // raises blockers, sees only their own debt (NFR-13 / D2).
     Permission.STANDUP_VIEW,
     Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_RUN_OWN,
     Permission.STANDUP_BLOCKER_RAISE,
     Permission.STANDUP_VIEW_OWN_DEBT,
     Permission.STANDUP_VIEW_ANALYTICS,
@@ -1315,6 +1321,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     // (NFR-13 / D2). Same set as a Team Member per §3.2.
     Permission.STANDUP_VIEW,
     Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_RUN_OWN,
     Permission.STANDUP_BLOCKER_RAISE,
     Permission.STANDUP_VIEW_OWN_DEBT,
     Permission.STANDUP_VIEW_ANALYTICS,
@@ -1364,6 +1371,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     // (NFR-13 / D2). Same set as a Team Member per §3.2.
     Permission.STANDUP_VIEW,
     Permission.STANDUP_ALLOCATE_OWN,
+    Permission.STANDUP_RUN_OWN,
     Permission.STANDUP_BLOCKER_RAISE,
     Permission.STANDUP_VIEW_OWN_DEBT,
     Permission.STANDUP_VIEW_ANALYTICS,

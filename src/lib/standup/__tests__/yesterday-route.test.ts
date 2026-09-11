@@ -183,3 +183,141 @@ describe('PATCH /api/standups/:id/yesterday — RUN-11 / N11', () => {
     expect(createNotification).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('PATCH /api/standups/[id]/yesterday — own-row permission (§3.2, STANDUP_RUN_OWN)', () => {
+  useMongo()
+
+  const callerId = mockUserId
+  const otherMemberId = member.toString()
+
+  // `hasPermission` is called twice per request that reaches the ownership
+  // gate: once by `withStandupIdPermission` for the wrapper's
+  // `STANDUP_RUN_OWN` check, and once inside the handler for the broader
+  // `STANDUP_RUN` check that decides whether the caller may act on someone
+  // else's row. A plain team member holds the first and not the second —
+  // exactly the split this suite exists to prove.
+  function mockOwnRowCaller() {
+    hasPermission.mockReset().mockImplementation((_userId: string, permission: string) => {
+      if (permission === 'standup:run_own') return Promise.resolve(true)
+      if (permission === 'standup:run') return Promise.resolve(false)
+      return Promise.resolve(true)
+    })
+  }
+
+  function mockPmCaller() {
+    hasPermission.mockReset().mockResolvedValue(true)
+  }
+
+  async function seedStandup(status: string) {
+    const standup = await Standup.create({
+      project,
+      sprint,
+      organization: mockOrgId,
+      standupDate: '2026-09-11',
+      scheduledStartAt: new Date('2026-09-11T03:30:00.000Z'),
+      durationMinutes: 15,
+      sprintDayNumber: 3,
+      totalSprintDays: 5,
+      shape: 'mid_sprint',
+      status,
+      facilitator: user,
+      expectedAttendees: [member],
+      version: 0
+    })
+    return standup._id.toString()
+  }
+
+  async function seedTask(ownerId: string, displayId = 'KAN-9') {
+    const task = await Task.create({
+      title: 'Some task',
+      organization: mockOrgId,
+      project,
+      sprint,
+      createdBy: user,
+      taskNumber: 9,
+      displayId,
+      status: 'in_progress',
+      assignedTo: [{ user: ownerId }]
+    })
+    return task._id.toString()
+  }
+
+  const buildRequest = (standupIdForRequest: string, body: unknown, version = 0) =>
+    new NextRequest(`http://localhost/api/standups/${standupIdForRequest}/yesterday`, {
+      method: 'PATCH',
+      headers: { 'x-standup-version': String(version) },
+      body: JSON.stringify(body)
+    })
+
+  it('lets a team member update their own task status', async () => {
+    // `loggedMinutes` is intentionally not exercised here — `adjustLoggedMinutes`
+    // requires a genuine previous stand-up to adjust against (unrelated to this
+    // permission gate), and that precondition is already covered by
+    // `yesterday-service.integration.test.ts`. This test's job is proving the
+    // ownership gate itself lets the status write through.
+    mockOwnRowCaller()
+    const standupId = await seedStandup('Ready')
+    const ownTaskId = await seedTask(callerId)
+
+    const response = await yesterdayRoute.PATCH(
+      buildRequest(standupId, { taskIds: [ownTaskId], status: 'in_progress' }),
+      { params: { id: standupId } }
+    )
+
+    expect(response.status).toBe(200)
+    const payload = await response.json()
+    expect(payload.data.panel).toBeDefined()
+  })
+
+  it('refuses a team member editing a task that is not theirs', async () => {
+    mockOwnRowCaller()
+    const standupId = await seedStandup('Ready')
+    const otherTaskId = await seedTask(otherMemberId)
+
+    const response = await yesterdayRoute.PATCH(
+      buildRequest(standupId, { taskIds: [otherTaskId], status: 'done' }),
+      { params: { id: standupId } }
+    )
+
+    expect(response.status).toBe(422)
+  })
+
+  it('refuses a team member setting a note on their own row (scope decision, design §2)', async () => {
+    mockOwnRowCaller()
+    const standupId = await seedStandup('Ready')
+    const ownTaskId = await seedTask(callerId)
+
+    const response = await yesterdayRoute.PATCH(
+      buildRequest(standupId, { taskIds: [ownTaskId], note: 'a note' }),
+      { params: { id: standupId } }
+    )
+
+    expect(response.status).toBe(422)
+  })
+
+  it('refuses a team member editing their own row once the stand-up is In_Progress (mirrors RUN-26)', async () => {
+    mockOwnRowCaller()
+    const standupId = await seedStandup('In_Progress')
+    const ownTaskId = await seedTask(callerId)
+
+    const response = await yesterdayRoute.PATCH(
+      buildRequest(standupId, { taskIds: [ownTaskId], status: 'done' }),
+      { params: { id: standupId } }
+    )
+
+    expect(response.status).toBe(422)
+  })
+
+  it('still lets a PM update any row and set notes, unaffected by this change', async () => {
+    mockPmCaller()
+    const standupId = await seedStandup('Ready')
+    const otherTaskId = await seedTask(otherMemberId)
+
+    const response = await yesterdayRoute.PATCH(
+      buildRequest(standupId, { taskIds: [otherTaskId], status: 'done', note: 'a note' }),
+      { params: { id: standupId } }
+    )
+
+    expect(response.status).toBe(200)
+  })
+})
