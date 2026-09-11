@@ -1,9 +1,11 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import { Info, Lock } from 'lucide-react'
 
 import { isOwnRowReadOnly, isSelfSelectDisabled } from '@/lib/standup/own-row'
 import { standupStrings } from '@/lib/standup/strings'
+import { IconChip } from './shared/IconChip'
 import { minutes, type Minutes } from '@/lib/standup/minutes'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
 import type { BoardAllocationView } from '@/components/standup/run/CapacityBoard'
@@ -172,13 +174,18 @@ export function MyStandupScreen({
       />
 
       {notice ? (
-        <p role="status" className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] p-2 text-[13px] text-[var(--apple-label)]">
+        <p
+          role="status"
+          className="flex items-center gap-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] p-2.5 text-[13px] text-[var(--apple-label)]"
+        >
+          <IconChip icon={<Info strokeWidth={1.75} />} size="sm" />
           {notice}
         </p>
       ) : null}
 
       {readOnly ? (
-        <p className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] p-2 text-[13px] text-[var(--apple-secondary-label)]">
+        <p className="flex items-center gap-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] p-2.5 text-[13px] text-[var(--apple-secondary-label)]">
+          <IconChip icon={<Lock strokeWidth={1.75} />} size="sm" />
           {standupStrings.my.readOnlyBanner()}
         </p>
       ) : null}

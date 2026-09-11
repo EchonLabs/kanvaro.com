@@ -1,6 +1,8 @@
 'use client'
 
+import { ClipboardCheck, CornerDownRight, Hand, ListChecks, UserCheck, Wand2 } from 'lucide-react'
 import { HoursValue } from '../shared/HoursValue'
+import { IconChip } from '../shared/IconChip'
 import { SectionCard } from '../shared/SectionCard'
 import { StatusPill } from '../shared/StatusPill'
 import { formatMinutesAsHours, sumMinutes, type Minutes } from '@/lib/standup/minutes'
@@ -13,6 +15,15 @@ const SOURCE_LABEL: Record<string, () => string> = {
   assigned_in_standup: standupStrings.my.sourceAssignedInStandup,
   self_selected: standupStrings.my.sourceSelfSelected,
   auto_prefilled: standupStrings.my.sourceAutoPrefilled
+}
+
+/** A shape per source, not a colour — where a task came from is a fact, not a state of alarm, so every icon stays neutral-toned. */
+const SOURCE_ICON: Record<string, React.ReactNode> = {
+  carried_forward: <CornerDownRight strokeWidth={1.75} />,
+  pre_assigned: <ClipboardCheck strokeWidth={1.75} />,
+  assigned_in_standup: <UserCheck strokeWidth={1.75} />,
+  self_selected: <Hand strokeWidth={1.75} />,
+  auto_prefilled: <Wand2 strokeWidth={1.75} />
 }
 
 export interface TodaysPlanSectionProps {
@@ -29,6 +40,7 @@ export function TodaysPlanSection({ allocations, readOnly, onChangeHours, locale
   return (
     <SectionCard
       title={standupStrings.my.todayHeader()}
+      icon={<ListChecks strokeWidth={1.75} />}
       summary={standupStrings.my.todayPlanned({ hours: formatMinutesAsHours(total, { locale }) })}
     >
       {allocations.length === 0 ? (
@@ -44,9 +56,11 @@ export function TodaysPlanSection({ allocations, readOnly, onChangeHours, locale
             {allocations.map((row) => (
               <li
                 key={row.allocationId}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card p-3"
+                className="flex flex-wrap items-center gap-3 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card p-3"
               >
-                <div className="flex min-w-0 flex-col gap-0.5">
+                <IconChip icon={SOURCE_ICON[row.source] ?? SOURCE_ICON.assigned_in_standup} />
+
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-[15px] font-medium text-[var(--apple-label)]">
                       {row.title}
@@ -59,7 +73,7 @@ export function TodaysPlanSection({ allocations, readOnly, onChangeHours, locale
                     {row.taskKey}
                   </span>
                 </div>
-                <label className="flex items-center gap-1.5 text-[13px]">
+                <label className="flex shrink-0 items-center gap-1.5 text-[13px]">
                   <span className="sr-only">{`Hours for ${row.title}`}</span>
                   <input
                     aria-label={`Hours for ${row.title}`}

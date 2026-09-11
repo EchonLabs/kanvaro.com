@@ -1,7 +1,8 @@
 'use client'
 
-import { Video } from 'lucide-react'
+import { CalendarClock, Video } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { IconChip } from '../shared/IconChip'
 import { formatDualTimezone } from '@/lib/standup/timezone'
 import { standupStrings } from '@/lib/standup/strings'
 
@@ -29,22 +30,25 @@ export function NextStandupStrip({
   const showDualTimezone = Boolean(scheduledStartAt && viewerTimeZone && projectTimeZone)
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-3">
-      <div className="flex flex-col gap-0.5">
-        {sprintDayNumber !== undefined && totalSprintDays !== undefined ? (
-          <span className="apple-section-label text-[var(--apple-tertiary-label)]">
-            {standupStrings.my.dayOf({ day: sprintDayNumber, total: totalSprintDays })}
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-3">
+      <div className="flex items-center gap-3">
+        <IconChip icon={<CalendarClock strokeWidth={1.75} />} tone="blue" size="md" />
+        <div className="flex flex-col gap-0.5">
+          {sprintDayNumber !== undefined && totalSprintDays !== undefined ? (
+            <span className="apple-section-label text-[var(--apple-tertiary-label)]">
+              {standupStrings.my.dayOf({ day: sprintDayNumber, total: totalSprintDays })}
+            </span>
+          ) : null}
+          <span className="text-[15px] text-[var(--apple-label)]">
+            {showDualTimezone
+              ? formatDualTimezone({
+                  instant: new Date(scheduledStartAt as string),
+                  viewerTimeZone: viewerTimeZone as string,
+                  projectTimeZone: projectTimeZone as string
+                })
+              : status}
           </span>
-        ) : null}
-        <span className="text-[15px] text-[var(--apple-label)]">
-          {showDualTimezone
-            ? formatDualTimezone({
-                instant: new Date(scheduledStartAt as string),
-                viewerTimeZone: viewerTimeZone as string,
-                projectTimeZone: projectTimeZone as string
-              })
-            : status}
-        </span>
+        </div>
       </div>
 
       {meetingUrl ? (

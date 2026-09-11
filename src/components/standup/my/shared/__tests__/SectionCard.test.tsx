@@ -24,4 +24,24 @@ describe('SectionCard', () => {
     )
     expect(screen.getByText('Blockers')).toBeInTheDocument()
   })
+
+  it('renders an icon chip when given one, hidden from the accessibility tree since the title already names the section', () => {
+    render(
+      <SectionCard title="Blockers" icon={<svg data-testid="section-icon" />} tone="red">
+        <p>content</p>
+      </SectionCard>
+    )
+    const icon = screen.getByTestId('section-icon')
+    expect(icon).toBeInTheDocument()
+    expect(icon.closest('[aria-hidden="true"]')).not.toBeNull()
+  })
+
+  it('renders without an icon chip when none is given', () => {
+    render(
+      <SectionCard title="Blockers">
+        <p>content</p>
+      </SectionCard>
+    )
+    expect(screen.queryByTestId('section-icon')).not.toBeInTheDocument()
+  })
 })

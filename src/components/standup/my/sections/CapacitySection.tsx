@@ -1,9 +1,10 @@
 'use client'
 
+import { Gauge } from 'lucide-react'
 import { HoursValue } from '../shared/HoursValue'
+import { RingGauge } from '../shared/RingGauge'
 import { SectionCard } from '../shared/SectionCard'
 import { StatusPill } from '../shared/StatusPill'
-import { Progress } from '@/components/ui/Progress'
 import { formatMinutesAsHours } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import type { CapacityBreakdown } from '@/lib/standup/capacity'
@@ -55,48 +56,68 @@ export function CapacitySection({ capacity, allocationCount, debt, locale }: Cap
   const tone = STATUS_TONE[capacity.status] ?? 'neutral'
 
   return (
-    <SectionCard title="Today" summary={<StatusPill tone={tone}>{capacity.status.toUpperCase()}</StatusPill>}>
-      <p className="text-[17px] font-semibold text-[var(--apple-label)]">
-        {headlineFor(capacity, allocationCount, locale)}
-      </p>
+    <SectionCard
+      title="Today"
+      icon={<Gauge strokeWidth={1.75} />}
+      tone={tone}
+      summary={<StatusPill tone={tone}>{capacity.status.toUpperCase()}</StatusPill>}
+    >
+      {/* The ring is the one hero visual on the whole screen — today's
+          headline number, at a glance, before anything has to be read. */}
+      <div className="flex items-center gap-4">
+        <RingGauge percentage={percentage} tone={tone}>
+          <span className="font-apple-mono text-[17px] font-semibold tabular-nums text-[var(--apple-label)]">
+            {percentage}%
+          </span>
+        </RingGauge>
 
-      {/* VAR-10's exact wording spells out "hours", unlike every other figure
-          on this screen — `withUnit: false` drops HoursValue's usual "h"
-          suffix so the word can be spelled out instead ("2.0 hours"). */}
-      {debt && debt.outstandingDebtMinutes > 0 ? (
-        <p className="text-[15px] text-[var(--apple-secondary-label)]">
-          {standupStrings.my.debtSentence({
-            hours: `${formatMinutesAsHours(debt.outstandingDebtMinutes as any, { locale, withUnit: false })} hours`
-          })}
-        </p>
-      ) : null}
-      {debt && debt.outstandingDebtMinutes === 0 && debt.surplusMinutes > 0 ? (
-        <p className="text-[15px] text-[var(--apple-secondary-label)]">
-          {standupStrings.my.surplusSentence({
-            hours: `${formatMinutesAsHours(debt.surplusMinutes as any, { locale, withUnit: false })} hours`
-          })}
-        </p>
-      ) : null}
-      {capacity.strandedMinutes > 0 ? (
-        <p className="text-[15px] text-[var(--apple-system-orange)]">
-          {standupStrings.my.strandedSentence({
-            hours: formatMinutesAsHours(capacity.strandedMinutes, { locale })
-          })}
-        </p>
-      ) : null}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <p className="text-[17px] font-semibold leading-snug text-[var(--apple-label)]">
+            {headlineFor(capacity, allocationCount, locale)}
+          </p>
 
-      <Progress value={percentage} />
+          {/* VAR-10's exact wording spells out "hours", unlike every other
+              figure on this screen — `withUnit: false` drops HoursValue's
+              usual "h" suffix so the word can be spelled out instead
+              ("2.0 hours"). */}
+          {debt && debt.outstandingDebtMinutes > 0 ? (
+            <p className="text-[13px] text-[var(--apple-secondary-label)]">
+              {standupStrings.my.debtSentence({
+                hours: `${formatMinutesAsHours(debt.outstandingDebtMinutes as any, { locale, withUnit: false })} hours`
+              })}
+            </p>
+          ) : null}
+          {debt && debt.outstandingDebtMinutes === 0 && debt.surplusMinutes > 0 ? (
+            <p className="text-[13px] text-[var(--apple-secondary-label)]">
+              {standupStrings.my.surplusSentence({
+                hours: `${formatMinutesAsHours(debt.surplusMinutes as any, { locale, withUnit: false })} hours`
+              })}
+            </p>
+          ) : null}
+          {capacity.strandedMinutes > 0 ? (
+            <p className="text-[13px] text-[var(--apple-system-orange)]">
+              {standupStrings.my.strandedSentence({
+                hours: formatMinutesAsHours(capacity.strandedMinutes, { locale })
+              })}
+            </p>
+          ) : null}
+        </div>
+      </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-[var(--apple-secondary-label)]">
-        <span>
-          Nominal <HoursValue minutes={capacity.nominalMinutes} locale={locale} />
-        </span>
-        <span>
-          Effective <HoursValue minutes={capacity.effectiveMinutes} locale={locale} />
-        </span>
-        <span>
-          Allocated <HoursValue minutes={capacity.allocatedMinutes} locale={locale} />
-        </span>
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: 'Nominal', minutes: capacity.nominalMinutes },
+          { label: 'Effective', minutes: capacity.effectiveMinutes },
+          { label: 'Allocated', minutes: capacity.allocatedMinutes }
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="flex flex-col items-center gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-quaternary-fill)] py-2"
+          >
+            <span className="apple-section-label text-[var(--apple-tertiary-label)]">{stat.label}</span>
+            <HoursValue minutes={stat.minutes} locale={locale} />
+          </div>
+        ))}
       </div>
 
       {capacity.adjustments.length > 0 ? (

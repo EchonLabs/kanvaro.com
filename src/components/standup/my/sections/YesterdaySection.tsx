@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import { AlertOctagon, CheckCircle2, Circle, CircleDot, History } from 'lucide-react'
 import { HoursValue } from '../shared/HoursValue'
+import { IconChip, type IconChipTone } from '../shared/IconChip'
 import { SectionCard } from '../shared/SectionCard'
 import { StatusPill } from '../shared/StatusPill'
 import { formatMinutesAsHours, sumMinutes } from '@/lib/standup/minutes'
@@ -10,6 +12,13 @@ import type { YesterdayPanelData, YesterdayRow } from '@/lib/standup/yesterday-s
 import type { VarianceRow } from '@/lib/standup/variance-service'
 
 const STATUS_OPTIONS = ['todo', 'in_progress', 'blocked', 'done']
+
+const STATUS_ICON: Record<string, { icon: React.ReactNode; tone: IconChipTone }> = {
+  done: { icon: <CheckCircle2 strokeWidth={1.75} />, tone: 'green' },
+  in_progress: { icon: <CircleDot strokeWidth={1.75} />, tone: 'blue' },
+  blocked: { icon: <AlertOctagon strokeWidth={1.75} />, tone: 'red' },
+  todo: { icon: <Circle strokeWidth={1.75} />, tone: 'neutral' }
+}
 
 export interface YesterdaySectionApi {
   updateYesterdayRow(input: {
@@ -79,7 +88,7 @@ export function YesterdaySection({
 
   if (!panel) {
     return (
-      <SectionCard title={standupStrings.my.yesterdayHeader()}>
+      <SectionCard title={standupStrings.my.yesterdayHeader()} icon={<History strokeWidth={1.75} />}>
         <p className="text-[15px] text-[var(--apple-secondary-label)]">
           {standupStrings.my.sectionLoadFailed()}
         </p>
@@ -93,7 +102,7 @@ export function YesterdaySection({
 
   if (!panel.previousStandupId || myRows.length === 0) {
     return (
-      <SectionCard title={standupStrings.my.yesterdayHeader()}>
+      <SectionCard title={standupStrings.my.yesterdayHeader()} icon={<History strokeWidth={1.75} />}>
         <p className="text-[15px] text-[var(--apple-secondary-label)]">
           {standupStrings.my.yesterdayEmpty()}
         </p>
@@ -108,6 +117,7 @@ export function YesterdaySection({
   return (
     <SectionCard
       title={standupStrings.my.yesterdayHeader()}
+      icon={<History strokeWidth={1.75} />}
       summary={
         <>
           {standupStrings.my.yesterdayCount({ done: doneCount, total: myRows.length })}
@@ -124,65 +134,70 @@ export function YesterdaySection({
       <div className="flex flex-col gap-2">
         {myRows.map((row) => {
           const variance = varianceByTask.get(row.taskId)
+          const statusVisual = STATUS_ICON[row.currentStatus] ?? STATUS_ICON.todo
           return (
             <div
               key={row.allocationId ?? row.taskId}
-              className="flex flex-col gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card p-3"
+              className="flex gap-3 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card p-3"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate text-[15px] font-medium text-[var(--apple-label)]">
-                    {row.title}
-                  </span>
-                  <span className="font-apple-mono text-[13px] text-[var(--apple-tertiary-label)]">
-                    {row.taskKey}
-                  </span>
+              <IconChip icon={statusVisual.icon} tone={statusVisual.tone} />
+
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate text-[15px] font-medium text-[var(--apple-label)]">
+                      {row.title}
+                    </span>
+                    <span className="font-apple-mono text-[13px] text-[var(--apple-tertiary-label)]">
+                      {row.taskKey}
+                    </span>
+                  </div>
+                  {variance?.chronicSpill ? (
+                    <StatusPill tone="orange">
+                      {standupStrings.my.chronicSpill({ count: variance.spillChainLength })}
+                    </StatusPill>
+                  ) : null}
                 </div>
-                {variance?.chronicSpill ? (
-                  <StatusPill tone="orange">
-                    {standupStrings.my.chronicSpill({ count: variance.spillChainLength })}
-                  </StatusPill>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)]">
+                    {standupStrings.my.statusFor({ key: row.taskKey ?? row.taskId })}
+                    <select
+                      aria-label={standupStrings.my.statusFor({ key: row.taskKey ?? row.taskId })}
+                      value={row.currentStatus}
+                      disabled={readOnly}
+                      onChange={(event) => void onChangeStatus(row.taskId, event.target.value)}
+                      className="h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-2 text-[13px] text-[var(--apple-label)] disabled:opacity-40"
+                    >
+                      {STATUS_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <HoursValue minutes={row.plannedMinutes} locale={locale} label="Planned" />
+                  <label className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)]">
+                    Logged
+                    <input
+                      type="number"
+                      step={15}
+                      min={0}
+                      aria-label={`Logged hours for ${row.taskKey ?? row.taskId}`}
+                      disabled={readOnly}
+                      defaultValue={row.loggedMinutes}
+                      onBlur={(event) => void onChangeLogged(row.taskId, Number(event.target.value))}
+                      className="w-16 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-2 py-1 text-[13px] text-[var(--apple-label)] disabled:opacity-40"
+                    />
+                  </label>
+                  <HoursValue minutes={row.dayVarianceMinutes} locale={locale} signed label="Variance" />
+                </div>
+
+                {variance?.explanation ? (
+                  <p className="text-[13px] text-[var(--apple-secondary-label)]">{variance.explanation}</p>
                 ) : null}
               </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)]">
-                  {standupStrings.my.statusFor({ key: row.taskKey ?? row.taskId })}
-                  <select
-                    aria-label={standupStrings.my.statusFor({ key: row.taskKey ?? row.taskId })}
-                    value={row.currentStatus}
-                    disabled={readOnly}
-                    onChange={(event) => void onChangeStatus(row.taskId, event.target.value)}
-                    className="h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-2 text-[13px] text-[var(--apple-label)] disabled:opacity-40"
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <HoursValue minutes={row.plannedMinutes} locale={locale} label="Planned" />
-                <label className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)]">
-                  Logged
-                  <input
-                    type="number"
-                    step={15}
-                    min={0}
-                    aria-label={`Logged hours for ${row.taskKey ?? row.taskId}`}
-                    disabled={readOnly}
-                    defaultValue={row.loggedMinutes}
-                    onBlur={(event) => void onChangeLogged(row.taskId, Number(event.target.value))}
-                    className="w-16 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-2 py-1 text-[13px] text-[var(--apple-label)] disabled:opacity-40"
-                  />
-                </label>
-                <HoursValue minutes={row.dayVarianceMinutes} locale={locale} signed label="Variance" />
-              </div>
-
-              {variance?.explanation ? (
-                <p className="text-[13px] text-[var(--apple-secondary-label)]">{variance.explanation}</p>
-              ) : null}
             </div>
           )
         })}

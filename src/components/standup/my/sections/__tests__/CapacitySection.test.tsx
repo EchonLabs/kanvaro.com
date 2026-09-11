@@ -107,4 +107,14 @@ describe('CapacitySection', () => {
     )
     expect(screen.getByText(/3\.0h is still assigned to you/i)).toBeInTheDocument()
   })
+
+  it('shows the allocated-vs-effective percentage inside the ring gauge', () => {
+    render(
+      <CapacitySection
+        capacity={capacity({ effectiveMinutes: minutes(480), allocatedMinutes: minutes(360) })}
+        allocationCount={2}
+      />
+    )
+    expect(screen.getByText('75%')).toBeInTheDocument()
+  })
 })

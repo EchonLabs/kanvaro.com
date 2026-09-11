@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
+import { IconChip } from '../shared/IconChip'
 import { SectionCard } from '../shared/SectionCard'
 import { StatusPill } from '../shared/StatusPill'
 import { standupStrings } from '@/lib/standup/strings'
@@ -36,7 +37,7 @@ export function BlockersSection({ memberId, blockers, allocations, onRaise }: Bl
 
   if (!blockers) {
     return (
-      <SectionCard title={standupStrings.my.blockersHeader()}>
+      <SectionCard title={standupStrings.my.blockersHeader()} icon={<ShieldAlert strokeWidth={1.75} />}>
         <p className="text-[15px] text-[var(--apple-secondary-label)]">
           {standupStrings.my.sectionLoadFailed()}
         </p>
@@ -51,6 +52,8 @@ export function BlockersSection({ memberId, blockers, allocations, onRaise }: Bl
   return (
     <SectionCard
       title={standupStrings.my.blockersHeader()}
+      icon={<ShieldAlert strokeWidth={1.75} />}
+      tone={mine.some((row) => row.overdue) ? 'red' : 'neutral'}
       summary={
         <Button variant="outline" size="sm" onClick={() => setRaising(true)}>
           {standupStrings.my.reportBlocker()}
@@ -64,24 +67,27 @@ export function BlockersSection({ memberId, blockers, allocations, onRaise }: Bl
           {mine.map((row) => (
             <li
               key={row.blockerId}
-              className="flex flex-col gap-1 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card p-3"
+              className="flex items-start gap-3 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card p-3"
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[15px] text-[var(--apple-label)]">{row.description}</span>
-                {row.overdue ? (
-                  <StatusPill tone="red">
-                    <AlertTriangle className="mr-1 h-3 w-3" strokeWidth={1.75} />
-                    overdue
-                  </StatusPill>
-                ) : (
-                  <StatusPill tone="neutral">{row.status}</StatusPill>
-                )}
+              <IconChip
+                icon={<AlertTriangle strokeWidth={1.75} />}
+                tone={row.overdue ? 'red' : 'orange'}
+              />
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[15px] text-[var(--apple-label)]">{row.description}</span>
+                  {row.overdue ? (
+                    <StatusPill tone="red">overdue</StatusPill>
+                  ) : (
+                    <StatusPill tone="orange">{row.status}</StatusPill>
+                  )}
+                </div>
+                {row.taskKey ? (
+                  <span className="font-apple-mono text-[13px] text-[var(--apple-tertiary-label)]">
+                    {row.taskKey}
+                  </span>
+                ) : null}
               </div>
-              {row.taskKey ? (
-                <span className="font-apple-mono text-[13px] text-[var(--apple-tertiary-label)]">
-                  {row.taskKey}
-                </span>
-              ) : null}
             </li>
           ))}
         </ul>
