@@ -2,21 +2,27 @@
 
 import { useCallback, useState } from 'react'
 
-import { standupStrings } from '@/lib/standup/strings'
-import { formatDualTimezone } from '@/lib/standup/timezone'
-import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import { isOwnRowReadOnly, isSelfSelectDisabled } from '@/lib/standup/own-row'
+import { standupStrings } from '@/lib/standup/strings'
+import { minutes, type Minutes } from '@/lib/standup/minutes'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
 import type { BoardAllocationView } from '@/components/standup/run/CapacityBoard'
+import type { YesterdayPanelData } from '@/lib/standup/yesterday-service'
+import type { VariancePanel } from '@/lib/standup/variance-service'
+import type { CarryForwardPanelView } from '@/lib/standup/carry-forward-service'
+import type { BlockerPanelRow } from '@/lib/standup/blocker-service'
+import type { StandupCandidate } from '@/lib/standup/my-standup-candidates'
+import type { RaiseBlockerSubmitInput } from '@/components/standup/run/RaiseBlockerModal'
 
-/**
- * The full `PoolTask` (`@/lib/standup/allocation`) requires `status`, `type`,
- * `priority`, `labels`, `position` and `assigneeIds` — real fields the board's
- * two-tab pool needs for filtering and sorting, none of which this one-button
- * "add this to my day" list uses. Narrowing locally, rather than importing the
- * full type, keeps this component's test fixtures honest about what it
- * actually reads.
- */
+import { AlsoTodayBanner } from './sections/AlsoTodayBanner'
+import { NextStandupStrip } from './sections/NextStandupStrip'
+import { CapacitySection } from './sections/CapacitySection'
+import { YesterdaySection } from './sections/YesterdaySection'
+import { TodaysPlanSection } from './sections/TodaysPlanSection'
+import { MyPositionSection } from './sections/MyPositionSection'
+import { BlockersSection } from './sections/BlockersSection'
+import { PullMoreWorkSection } from './sections/PullMoreWorkSection'
+
 export interface MyStandupPoolTask {
   taskId: string
   key?: string
@@ -44,10 +50,13 @@ export interface MyStandupApi {
     plannedMinutes: Minutes
     expectedVersion: number
   }): Promise<{ standupVersion: number }>
-  // No `removeAllocation`. ALO-22's member-facing surface is "additions only,
-  // never removals", this screen renders no control that could call one, and
-  // the DELETE route stays PM-only — so declaring it here only invited a
-  // capability the plan never intended.
+  updateYesterdayRow(input: {
+    taskId: string
+    status?: string
+    loggedMinutes?: number
+    expectedVersion: number
+  }): Promise<{ standupVersion: number; panel: YesterdayPanelData }>
+  raiseBlocker(input: RaiseBlockerSubmitInput & { expectedVersion: number }): Promise<void>
 }
 
 export interface MyStandupScreenProps {
@@ -60,25 +69,24 @@ export interface MyStandupScreenProps {
   allowSelfSelect: boolean
   api: MyStandupApi
   locale?: string
-  /**
-   * NFR-20. All three optional and only rendered together — when any is
-   * absent the header falls back to the plain `date` string unchanged.
-   */
   scheduledStartAt?: string
   viewerTimeZone?: string
   projectTimeZone?: string
+  durationMinutes?: number
+  meetingUrl?: string
+  sprintDayNumber?: number
+  totalSprintDays?: number
+  otherStandupsToday?: StandupCandidate[]
+  yesterday?: YesterdayPanelData
+  variance?: VariancePanel
+  carryForward?: CarryForwardPanelView
+  blockers?: BlockerPanelRow[]
 }
 
-/**
- * UI-12 / P11-5. A mobile-first, single-member slice of the run screen — not
- * a second implementation of it. RUN-26's lock is the shared
- * {@link isOwnRowReadOnly}, the same function `StandupRunScreen.tsx` calls —
- * not a second copy of the condition.
- */
 export function MyStandupScreen({
+  standupId,
   standupVersion,
   status,
-  date,
   member,
   poolTasks,
   allowSelfSelect,
@@ -86,44 +94,28 @@ export function MyStandupScreen({
   locale,
   scheduledStartAt,
   viewerTimeZone,
-  projectTimeZone
+  projectTimeZone,
+  durationMinutes,
+  meetingUrl,
+  sprintDayNumber,
+  totalSprintDays,
+  otherStandupsToday = [],
+  yesterday,
+  variance,
+  carryForward,
+  blockers
 }: MyStandupScreenProps) {
   const [version, setVersion] = useState(standupVersion)
   const [notice, setNotice] = useState<string | null>(null)
-  // RUN-26, shared with the run screen rather than restated. A member screen
-  // never has PM-level access, so `canAllocateOthers` is always false here.
-  const readOnly = isOwnRowReadOnly({ status, canAllocateOthers: false })
-  // E31: the "add a task" self-select control is governed separately from
-  // `readOnly` — it stays enabled on `Completed`, provided the project still
-  // allows self-select, so a member can flag extra work they did after the
-  // stand-up wrapped. Existing rows' hours stay locked under `readOnly`
-  // exactly as before; this only widens the one control meant to widen.
-  const selfSelectDisabled = isSelfSelectDisabled({
-    status,
-    canAllocateOthers: false,
-    allowSelfSelect
-  })
 
-  /**
-   * Every refusal this screen can meet is a server decision it cannot predict:
-   * `allowSelfSelect` turned off for the project, the stand-up having moved on
-   * since the page loaded, a stale version. Without a visible notice each of
-   * those was a silent no-op plus an unhandled rejection — the member is told
-   * nothing and believes the change stuck.
-   *
-   * Deliberately simpler than `StandupRunScreen`'s optimistic-rollback
-   * machinery: nothing here is applied before the server answers, so there is
-   * nothing to roll back.
-   */
+  const readOnly = isOwnRowReadOnly({ status, canAllocateOthers: false })
+  const selfSelectDisabled = isSelfSelectDisabled({ status, canAllocateOthers: false, allowSelfSelect })
+
   const onChangeHours = useCallback(
     async (allocationId: string, plannedMinutes: Minutes) => {
       setNotice(null)
       try {
-        const result = await api.changeHours({
-          allocationId,
-          plannedMinutes,
-          expectedVersion: version
-        })
+        const result = await api.changeHours({ allocationId, plannedMinutes, expectedVersion: version })
         setVersion(result.standupVersion)
       } catch {
         setNotice(standupStrings.my.editRejected())
@@ -150,89 +142,93 @@ export function MyStandupScreen({
     [api, member.memberId, version]
   )
 
+  const onRaiseBlocker = useCallback(
+    async (input: RaiseBlockerSubmitInput) => {
+      setNotice(null)
+      try {
+        await api.raiseBlocker({ ...input, expectedVersion: version })
+      } catch {
+        setNotice(standupStrings.my.editRejected())
+      }
+    },
+    [api, version]
+  )
+
+  const hasGap = member.capacity.status === 'under' || member.capacity.status === 'zero'
+
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">{standupStrings.my.title()}</h1>
-        <span className="text-sm text-muted-foreground">
-          {scheduledStartAt && viewerTimeZone && projectTimeZone
-            ? formatDualTimezone({
-                instant: new Date(scheduledStartAt),
-                viewerTimeZone,
-                projectTimeZone
-              })
-            : date}
-        </span>
-      </header>
+      <AlsoTodayBanner candidates={otherStandupsToday} />
 
-      {member.capacity.adjustments.length > 0 && (
-        <ul className="flex flex-col gap-1 rounded-md border border-border p-2 text-xs text-muted-foreground">
-          {member.capacity.adjustments.map((adjustment, index) => (
-            <li key={`${adjustment.type}-${index}`}>
-              {adjustment.label}: {formatMinutesAsHours(adjustment.minutes, { locale })}
-            </li>
-          ))}
-        </ul>
-      )}
+      <NextStandupStrip
+        status={status}
+        scheduledStartAt={scheduledStartAt}
+        durationMinutes={durationMinutes}
+        meetingUrl={meetingUrl}
+        sprintDayNumber={sprintDayNumber}
+        totalSprintDays={totalSprintDays}
+        viewerTimeZone={viewerTimeZone}
+        projectTimeZone={projectTimeZone}
+      />
 
-      {/* `status`, not `alert`: it reports what already happened rather than
-          interrupting — the same choice the run screen's notice makes. */}
-      {notice && (
-        <p role="status" className="rounded-md border border-border bg-muted p-2 text-sm">
+      {notice ? (
+        <p role="status" className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] p-2 text-[13px] text-[var(--apple-label)]">
           {notice}
         </p>
-      )}
+      ) : null}
 
-      {readOnly && (
-        <p className="rounded-md border border-border bg-muted p-2 text-sm text-muted-foreground">
+      {readOnly ? (
+        <p className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] p-2 text-[13px] text-[var(--apple-secondary-label)]">
           {standupStrings.my.readOnlyBanner()}
         </p>
-      )}
+      ) : null}
 
-      <ul className="flex flex-col gap-2">
-        {member.allocations.map((row) => (
-          <li key={row.allocationId} className="rounded-md border border-border p-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">{row.title}</span>
-              <span className="font-mono text-xs text-muted-foreground">{row.taskKey}</span>
-            </div>
-            <label className="mt-1 flex items-center gap-2 text-xs">
-              {standupStrings.my.hoursFor({ title: row.title })}
-              <input
-                aria-label={standupStrings.my.hoursFor({ title: row.title })}
-                type="number"
-                step={15}
-                min={0}
-                disabled={readOnly}
-                defaultValue={row.plannedMinutes}
-                onBlur={(event) =>
-                  void onChangeHours(row.allocationId, Number(event.target.value) as Minutes)
-                }
-                className="w-20 rounded-md border border-border px-2 py-1"
-              />
-              <span>{formatMinutesAsHours(row.plannedMinutes, { locale })}</span>
-            </label>
-          </li>
-        ))}
-      </ul>
+      <CapacitySection
+        capacity={member.capacity}
+        allocationCount={member.allocations.length}
+        debt={
+          variance?.members.find((row) => row.memberId === member.memberId)
+        }
+        locale={locale}
+      />
 
-      {allowSelfSelect && poolTasks.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold">{standupStrings.pool.title()}</h2>
-          <p className="text-xs text-muted-foreground">{standupStrings.my.selfSelectHint()}</p>
-          {poolTasks.map((task) => (
-            <button
-              key={task.taskId}
-              type="button"
-              disabled={selfSelectDisabled}
-              onClick={() => void onAdd(task.taskId)}
-              className="rounded-md border border-border px-2 py-1 text-left text-sm disabled:opacity-40"
-            >
-              {standupStrings.my.addTask({ key: task.key ?? task.taskId })} — {task.title}
-            </button>
-          ))}
-        </div>
-      )}
+      <YesterdaySection
+        standupId={standupId}
+        memberId={member.memberId}
+        panel={yesterday}
+        varianceRows={variance?.rows}
+        readOnly={status !== 'Ready'}
+        api={{ updateYesterdayRow: api.updateYesterdayRow }}
+        expectedVersion={version}
+        onVersionChange={setVersion}
+        locale={locale}
+      />
+
+      <TodaysPlanSection
+        allocations={member.allocations}
+        readOnly={readOnly}
+        onChangeHours={onChangeHours}
+        locale={locale}
+      />
+
+      <MyPositionSection memberId={member.memberId} carryForward={carryForward} locale={locale} />
+
+      <BlockersSection
+        memberId={member.memberId}
+        blockers={blockers}
+        allocations={member.allocations}
+        onRaise={onRaiseBlocker}
+        locale={locale}
+      />
+
+      <PullMoreWorkSection
+        poolTasks={poolTasks}
+        allowSelfSelect={allowSelfSelect}
+        hasGap={hasGap}
+        disabled={selfSelectDisabled}
+        onAdd={onAdd}
+        locale={locale}
+      />
     </div>
   )
 }

@@ -144,9 +144,17 @@ describe('MyStandupScreen', () => {
     })
   })
 
-  it('falls back to the plain date when the dual-timezone fields are absent (NFR-20)', () => {
+  /**
+   * The redesign moved NFR-20's dual-timezone display into `NextStandupStrip`
+   * (design §4.2). Its fallback is the stand-up's `status` word, not the raw
+   * `date` string the old inline header used to render — `date` itself is no
+   * longer rendered anywhere on this screen (superseded by the next-stand-up
+   * strip and the Yesterday/Today sections, which each carry their own dates
+   * in context), so this assertion now targets the real fallback.
+   */
+  it('falls back to the plain status when the dual-timezone fields are absent (NFR-20)', () => {
     setup()
-    expect(screen.getByText('2026-09-05')).toBeInTheDocument()
+    expect(screen.getByText('Ready')).toBeInTheDocument()
   })
 
   it('renders the dual-timezone string once all three fields are present (NFR-20)', () => {
@@ -156,7 +164,7 @@ describe('MyStandupScreen', () => {
       projectTimeZone: 'Asia/Colombo'
     })
     expect(screen.getByText(/05:00.*project time.*14:30/i)).toBeInTheDocument()
-    expect(screen.queryByText('2026-09-05')).not.toBeInTheDocument()
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument()
   })
 
   it('shows a read-only leave line from the capacity breakdown, never an edit control', () => {
@@ -212,5 +220,26 @@ describe('MyStandupScreen', () => {
       setup()
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
     })
+  })
+
+  /**
+   * A composition-level check, not a duplicate of `AlsoTodayBanner.test.tsx`:
+   * that file proves the banner itself renders correctly given candidates;
+   * this proves `MyStandupScreen` actually wires its `otherStandupsToday`
+   * prop through to it, fixing the redirector's old silent-drop end to end.
+   */
+  it('renders the also-today banner when other candidates are passed through', () => {
+    setup({
+      otherStandupsToday: [
+        {
+          standupId: 's2',
+          status: 'Ready',
+          scheduledStartAt: '2026-09-05T09:00:00.000Z',
+          projectId: 'p2',
+          projectName: 'Project Beta'
+        }
+      ]
+    })
+    expect(screen.getByText(/project beta/i)).toBeInTheDocument()
   })
 })
