@@ -21,20 +21,12 @@ export default async function MyStandupPage() {
     redirect('/login')
   }
 
-  const { Standup } = await import('@/models/Standup')
-  const candidates = (await Standup.find({
-    organization: authResult.user.organization,
-    expectedAttendees: authResult.user.id,
-    status: { $in: ['In_Progress', 'Ready', 'Scheduled'] }
+  const { findOpenStandupCandidates } = await import('@/lib/standup/my-standup-candidates')
+  const candidates = await findOpenStandupCandidates({
+    organizationId: String(authResult.user.organization),
+    userId: authResult.user.id
   })
-    .select('status scheduledStartAt')
-    .sort({ scheduledStartAt: 1 })
-    .lean()) as any[]
-
-  const byPriority = ['In_Progress', 'Ready', 'Scheduled']
-  const match = byPriority
-    .map((status) => candidates.find((c) => c.status === status))
-    .find((c) => c !== undefined)
+  const match = candidates[0]
 
   if (!match) {
     return (
@@ -58,5 +50,5 @@ export default async function MyStandupPage() {
     )
   }
 
-  redirect(`/my/standup/${String(match._id)}`)
+  redirect(`/my/standup/${match.standupId}`)
 }
