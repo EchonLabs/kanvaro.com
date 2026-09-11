@@ -27,6 +27,20 @@ describe('SprintCloseReadinessPanel', () => {
     )
     expect(screen.getByText('KAN-1')).toBeInTheDocument()
     expect(screen.getByText(/at risk/i)).toBeInTheDocument()
+    expect(screen.getByText('Amal')).toBeInTheDocument()
+    expect(screen.getByText(/1\.0h/)).toBeInTheDocument()
+  })
+
+  it('renders no owner name when the task has none', () => {
+    render(
+      <SprintCloseReadinessPanel
+        openTasks={[{ ...task, ownerName: undefined }]}
+        carryForwardOffenders={[]}
+        onSetDisposition={jest.fn()}
+        disabled={false}
+      />
+    )
+    expect(screen.getByText('KAN-1')).toBeInTheDocument()
   })
 
   it('calls onSetDisposition with the chosen type when a disposition is picked', () => {

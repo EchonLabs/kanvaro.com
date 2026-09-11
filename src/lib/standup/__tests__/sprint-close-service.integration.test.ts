@@ -12,6 +12,7 @@
 // already uses for its own `Sprint`-light seeding.
 import { Task } from '@/models/Task'
 import { Standup } from '@/models/Standup'
+import { User } from '@/models/User'
 import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { loadSprintCloseReadiness, setTaskDisposition } from '../sprint-close-service'
@@ -155,5 +156,50 @@ describe('loadSprintCloseReadiness', () => {
         actor: { userId: String(pm) }
       })
     ).rejects.toThrow()
+  })
+
+  it('resolves the open task’s owner name from its assignee', async () => {
+    const { standup } = await seed()
+    await User.create({
+      _id: pm,
+      firstName: 'Amal',
+      lastName: 'Perera',
+      email: 'amal@example.com',
+      organization,
+      role: 'team_member',
+      password: 'hashed'
+    })
+    await Task.create({
+      title: 'Owned task',
+      description: '',
+      status: 'in_progress',
+      priority: 'medium',
+      type: 'task',
+      organization,
+      project,
+      sprint,
+      taskNumber: 2,
+      displayId: 'KAN-2',
+      createdBy: pm,
+      remainingEstimateMinutes: 60,
+      assignedTo: [{ user: pm }],
+      labels: [],
+      dependencies: [],
+      attachments: []
+    })
+
+    const view = await loadSprintCloseReadiness(String(standup._id))
+
+    const owned = view.openTasks.find((t) => t.taskKey === 'KAN-2')
+    expect(owned?.ownerName).toBe('Amal Perera')
+  })
+
+  it('leaves ownerName undefined for a task nobody is assigned', async () => {
+    const { standup, openTask } = await seed()
+
+    const view = await loadSprintCloseReadiness(String(standup._id))
+
+    const unowned = view.openTasks.find((t) => t.taskId === String(openTask._id))
+    expect(unowned?.ownerName).toBeUndefined()
   })
 })

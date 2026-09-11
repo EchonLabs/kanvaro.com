@@ -4,9 +4,11 @@
  */
 import { Task } from '@/models/Task'
 import type { SprintCloseDispositionType } from '@/models/Task'
+import { User } from '@/models/User'
 import { loadCapacityContext } from './capacity-context'
 import { loadCarryForwardPanel } from './carry-forward-service'
 import { recordAudit, type AuditActor } from './audit'
+import { resolveStandupOwner } from './task-ownership'
 import {
   computeProjectedOutcome,
   evaluateFinalDayCarryForwardDisposition,
@@ -38,7 +40,7 @@ export async function loadSprintCloseReadiness(
     archived: { $ne: true },
     status: { $nin: Array.from(DONE_STATUSES) }
   })
-    .select('displayId remainingEstimateMinutes assignedTo sprintCloseDisposition')
+    .select('displayId remainingEstimateMinutes assignedTo standupOwner sprintCloseDisposition')
     .lean()) as any[]
 
   // The board's own per-member gap, summed, is "hours available today" for
@@ -49,12 +51,35 @@ export async function loadSprintCloseReadiness(
     return sum + Math.max(0, gap)
   }, 0)
 
+  const ownerIds = tasks
+    .map((task) =>
+      resolveStandupOwner({
+        standupOwner: task.standupOwner ? String(task.standupOwner) : undefined,
+        assignedTo: (task.assignedTo ?? []).map((entry: any) => String(entry.user))
+      })
+    )
+    .filter((id): id is string => id !== undefined)
+  const owners = (await User.find({ _id: { $in: Array.from(new Set(ownerIds)) } })
+    .select('firstName lastName email')
+    .lean()) as any[]
+  const ownerNameById = new Map(
+    owners.map((person) => [
+      String(person._id),
+      [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || person.email || String(person._id)
+    ])
+  )
+
   const openTasks: OpenTaskReadiness[] = tasks.map((task) => {
     const remaining = minutes(task.remainingEstimateMinutes ?? 0)
     const hoursAvailableTodayMinutes = minutes(totalGapMinutes)
+    const ownerId = resolveStandupOwner({
+      standupOwner: task.standupOwner ? String(task.standupOwner) : undefined,
+      assignedTo: (task.assignedTo ?? []).map((entry: any) => String(entry.user))
+    })
     return {
       taskId: String(task._id),
       taskKey: task.displayId,
+      ownerName: ownerId ? ownerNameById.get(ownerId) : undefined,
       remainingEstimateMinutes: remaining,
       hoursAvailableTodayMinutes,
       projectedOutcome: computeProjectedOutcome({

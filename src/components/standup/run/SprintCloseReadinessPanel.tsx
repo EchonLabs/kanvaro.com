@@ -71,7 +71,13 @@ export function SprintCloseReadinessPanel({
               <tr key={task.taskId} className="border-b border-border last:border-0">
                 <td className="py-1 pr-2 font-mono text-xs">{task.taskKey ?? task.taskId}</td>
                 <td className="py-1 pr-2 text-xs text-muted-foreground">
+                  {task.ownerName ?? '—'}
+                </td>
+                <td className="py-1 pr-2 text-xs text-muted-foreground">
                   {formatMinutesAsHours(task.remainingEstimateMinutes, { locale })}
+                </td>
+                <td className="py-1 pr-2 text-xs text-muted-foreground">
+                  {formatMinutesAsHours(task.hoursAvailableTodayMinutes, { locale })}
                 </td>
                 <td className={`py-1 pr-2 text-xs ${OUTCOME_TONE[task.projectedOutcome]}`}>
                   {OUTCOME_LABEL[task.projectedOutcome]()}
