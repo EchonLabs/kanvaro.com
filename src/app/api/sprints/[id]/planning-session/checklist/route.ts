@@ -68,7 +68,15 @@ export const GET = withSprintPermission(
         .filter(([id]) =>
           named.items.some((item) => !item.passed && item.offendingIds?.includes(id))
         )
-        .map(([id, name]) => ({ id, name }))
+        .map(([id, name]) => ({ id, name })),
+      // The Team workload board needs everyone, not just the PA-5/PA-6
+      // offenders — a PM balancing scope has to see who has room, too.
+      members: named.totals.perMember.map((member) => ({
+        id: member.memberId,
+        name: names.get(member.memberId) ?? member.name,
+        assignedMinutes: member.assignedMinutes,
+        capacityMinutes: member.capacityMinutes
+      }))
     })
   }
 )

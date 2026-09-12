@@ -37,7 +37,14 @@ function mockFetch() {
               }
             },
             offendingTasks: [],
-            offendingMembers: []
+            offendingMembers: [],
+            // Deliberately not 360/480 (75%) — that ratio collides with the
+            // "Estimated scope" gauge's own percentage in this same fixture,
+            // and two independent 75% labels on the page would make any test
+            // asserting on either one ambiguous.
+            members: [
+              { id: 'mem-1', name: 'Anessa', assignedMinutes: 400, capacityMinutes: 480 }
+            ]
           }
         })
       })
@@ -137,6 +144,81 @@ describe('PlanningWorkspace — persistent scope/backlog panes', () => {
         })
       )
     )
+  })
+})
+
+describe('PlanningWorkspace — team workload board', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('shows every sprint member\'s load, not just checklist offenders', async () => {
+    global.fetch = mockFetch()
+
+    render(
+      <PlanningWorkspace
+        sprintId="s1"
+        sprintName="Sprint 1"
+        sprintStatus="planning"
+        projectId="p1"
+      />
+    )
+
+    expect(await screen.findByText('Anessa')).toBeInTheDocument()
+    // Fixture: 400 assigned / 480 capacity ≈ 83%, i.e. "Full" (>= 70%).
+    expect(screen.getByText('Full')).toBeInTheDocument()
+    expect(screen.getByText('6.7h / 8.0h')).toBeInTheDocument()
+  })
+
+  it('labels an idle member with no assigned minutes', async () => {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes('/planning-session/checklist')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            data: {
+              checklist: {
+                items: [],
+                blockers: [],
+                canComplete: true,
+                totals: {
+                  taskCount: 0,
+                  estimatedTaskCount: 0,
+                  totalEstimatedMinutes: 0,
+                  totalCapacityMinutes: 480,
+                  netCapacityMinutes: 480
+                }
+              },
+              offendingTasks: [],
+              offendingMembers: [],
+              members: [{ id: 'mem-2', name: 'Idle Ivan', assignedMinutes: 0, capacityMinutes: 480 }]
+            }
+          })
+        })
+      }
+      if (url.endsWith('/planning-session')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ data: { session: { _id: 'sess-1', sprintGoal: 'Ship it' }, history: [] } })
+        })
+      }
+      if (url.includes('/poker-sessions')) {
+        return Promise.resolve({ ok: true, json: async () => ({ data: { sessions: [] } }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ data: [] }) })
+    }) as unknown as typeof fetch
+
+    render(
+      <PlanningWorkspace
+        sprintId="s1"
+        sprintName="Sprint 1"
+        sprintStatus="planning"
+        projectId="p1"
+      />
+    )
+
+    expect(await screen.findByText('Idle Ivan')).toBeInTheDocument()
+    expect(screen.getByText('Idle')).toBeInTheDocument()
   })
 })
 

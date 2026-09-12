@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, CalendarRange, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
 import { MainLayout } from '@/components/layout/MainLayout'
@@ -27,18 +27,27 @@ export default function SprintPlanningPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // "planning" is dropped by the auto-generator (it follows the sprint id),
-  // leaving this screen breadcrumb-identical to the plain sprint detail page
-  // it's reached from. Passed as a prop, not via `useBreadcrumb()` — that
-  // hook's provider lives inside `MainLayout`, below this component in the
-  // tree, so a page-level call to it can never reach the provider and
-  // silently no-ops. All three `<MainLayout>` render paths below (loading,
-  // error, and the real content) need it passed individually.
-  const breadcrumbItems = [
-    { label: 'Sprints', href: '/sprints' },
-    { label: 'View Sprint', href: `/sprints/${sprintId}` },
-    { label: 'Planning' }
-  ]
+  // "planning" is dropped by the auto-generator (it follows the sprint id).
+  // Passed as a prop, not via `useBreadcrumb()` — that hook's provider lives
+  // inside `MainLayout`, below this component in the tree, so a page-level
+  // call to it can never reach the provider and silently no-ops. All three
+  // `<MainLayout>` render paths below (loading, error, and the real content)
+  // need it passed individually. Includes the project trail (see the sprint
+  // detail page's own breadcrumb comment) so this screen doesn't strand a
+  // user who arrived via a project rather than the global Sprints list;
+  // falls back to the flat crumb until the sprint (and its project) loads.
+  const breadcrumbItems = sprint?.project?._id
+    ? [
+        { label: 'Projects', href: '/projects' },
+        { label: 'View Project', href: `/projects/${sprint.project._id}` },
+        { label: 'View Sprint', href: `/sprints/${sprintId}` },
+        { label: 'Planning' }
+      ]
+    : [
+        { label: 'Sprints', href: '/sprints' },
+        { label: 'View Sprint', href: `/sprints/${sprintId}` },
+        { label: 'Planning' }
+      ]
 
   const load = useCallback(async () => {
     try {
@@ -101,7 +110,7 @@ export default function SprintPlanningPage() {
 
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
-      <div className="space-y-5 p-4 sm:p-6">
+      <div className="space-y-6 p-4 sm:p-6">
         <Button
           variant="ghost"
           size="sm"
@@ -109,8 +118,20 @@ export default function SprintPlanningPage() {
           className="-ml-2"
         >
           <ArrowLeft className="mr-1.5 h-4 w-4" />
-          {sprint.name}
+          Back to {sprint.name}
         </Button>
+
+        <div className="flex items-center gap-3">
+          <CalendarRange className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
+          <div>
+            <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
+              Sprint planning
+            </h1>
+            <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
+              {sprint.name} · <span className="capitalize">{sprint.status}</span>
+            </p>
+          </div>
+        </div>
 
         <PermissionGate
           permission={Permission.SPRINT_VIEW}

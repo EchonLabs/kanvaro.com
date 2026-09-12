@@ -145,7 +145,7 @@ function Section({
         <p className="text-[12px] text-[var(--apple-tertiary-label)]">{description}</p>
       </div>
 
-      <ul className="divide-y divide-[var(--apple-separator)] overflow-hidden rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)]">
+      <ul className="divide-y divide-[var(--apple-separator)] overflow-hidden rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
         {items.map((item) => (
           <ChecklistRow
             key={item.checkId}

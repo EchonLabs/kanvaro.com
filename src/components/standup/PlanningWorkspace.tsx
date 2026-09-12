@@ -28,6 +28,7 @@ import {
 import {
   AlertTriangle,
   Check,
+  CircleDot,
   Loader2,
   PlayCircle,
   ShieldAlert,
@@ -57,6 +58,13 @@ import {
 } from './PlanningChecklist'
 import { PokerModal } from './PokerModal'
 
+interface MemberLoad {
+  id: string
+  name: string
+  assignedMinutes: number
+  capacityMinutes: number
+}
+
 interface ChecklistPayload {
   checklist: {
     items: ChecklistItemView[]
@@ -72,6 +80,8 @@ interface ChecklistPayload {
   }
   offendingTasks: OffendingTask[]
   offendingMembers: OffendingMember[]
+  /** Every sprint member's pre-assigned load, not just PA-5/PA-6's offenders. */
+  members: MemberLoad[]
 }
 
 interface ProjectMember {
@@ -459,14 +469,11 @@ export function PlanningWorkspace({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-[var(--apple-label)]">Sprint planning</h2>
-          <p className="text-[13px] text-[var(--apple-secondary-label)]">
-            {sprintName} · <span className="capitalize">{sprintStatus}</span>
-          </p>
-        </div>
-
+      {/* The page shell above (`planning/page.tsx`) owns the title and
+          sprint name/status now, matching every other redesigned page's
+          split between page chrome and the working panel below it — this
+          header is action buttons only. */}
+      <header className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {openPokerSession ? (
             <Button variant="outline" onClick={joinPoker} disabled={busy}>
@@ -597,10 +604,10 @@ export function PlanningWorkspace({
             return (
               <div
                 className={cn(
-                  'rounded-[var(--apple-radius-lg)] border p-3',
+                  'rounded-[var(--apple-radius-lg)] border p-3 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none',
                   overCapacity
                     ? 'border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/5'
-                    : 'border-[var(--apple-separator)]'
+                    : 'border-[var(--apple-separator)] bg-card'
                 )}
               >
                 <p className="apple-section-label text-[var(--apple-tertiary-label)]">Estimated scope</p>
@@ -629,8 +636,16 @@ export function PlanningWorkspace({
         </div>
       )}
 
+      {/* The number a PM actually needs before committing scope: not "is the
+          team, in aggregate, under the ceiling" but "is any specific person
+          about to be buried while someone else has nothing." PA-5/PA-6 catch
+          this too, but only as a name inside a collapsed checklist row once
+          it's already a problem — this shows everyone, live, as tasks move
+          between the panes below. */}
+      {data && (data.members ?? []).length > 0 && <TeamWorkload members={data.members} />}
+
       {session && (
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
           <Label htmlFor="sprint-goal">Sprint goal</Label>
           <Textarea
             id="sprint-goal"
@@ -732,7 +747,7 @@ export function PlanningWorkspace({
               return (
                 <label
                   key={member.memberId}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-fill-quaternary)]"
+                  className="flex cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-quaternary-fill)]"
                 >
                   <Checkbox
                     checked={ticked}
@@ -825,10 +840,10 @@ function Stat({
   return (
     <div
       className={cn(
-        'rounded-[var(--apple-radius-lg)] border p-3',
+        'rounded-[var(--apple-radius-lg)] border p-3 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none',
         tone === 'warning'
           ? 'border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/5'
-          : 'border-[var(--apple-separator)]'
+          : 'border-[var(--apple-separator)] bg-card'
       )}
     >
       <p className="apple-section-label text-[var(--apple-tertiary-label)]">{label}</p>
@@ -839,6 +854,101 @@ function Stat({
         )}
       </p>
     </div>
+  )
+}
+
+/** A member's load state, in the order the board sorts by (worst first). */
+type LoadState = 'over' | 'full' | 'room' | 'idle'
+
+function loadStateOf(assignedMinutes: number, capacityMinutes: number): LoadState {
+  if (assignedMinutes === 0) return 'idle'
+  if (capacityMinutes <= 0) return assignedMinutes > 0 ? 'over' : 'idle'
+  const ratio = assignedMinutes / capacityMinutes
+  if (ratio > 1) return 'over'
+  if (ratio >= 0.7) return 'full'
+  return 'room'
+}
+
+const LOAD_ORDER: Record<LoadState, number> = { over: 0, full: 1, room: 2, idle: 3 }
+
+/** NFR-A1 — a label and an icon, never colour alone. */
+const LOAD_CONFIG: Record<LoadState, { label: string; text: string; gradient: string; glow: string }> = {
+  over: {
+    label: 'Over',
+    text: 'text-[var(--apple-system-orange)]',
+    gradient: 'var(--apple-system-orange)',
+    glow: 'rgba(255,149,0,0.32)'
+  },
+  full: {
+    label: 'Full',
+    text: 'text-[var(--apple-system-green)]',
+    gradient: 'var(--apple-chart-gradient)',
+    glow: 'var(--apple-chart-glow)'
+  },
+  room: {
+    label: 'Room',
+    text: 'text-[var(--apple-secondary-label)]',
+    gradient: 'var(--apple-chart-gradient)',
+    glow: 'var(--apple-chart-glow)'
+  },
+  idle: {
+    label: 'Idle',
+    text: 'text-[var(--apple-tertiary-label)]',
+    gradient: '#8E8E93',
+    glow: 'rgba(142,142,147,0.24)'
+  }
+}
+
+/**
+ * The workload board: every sprint member's pre-assigned load against their
+ * own sprint capacity, sorted worst-first. Reads straight from the same
+ * checklist payload `refresh()` already re-fetches after every add/remove, so
+ * dragging a task between the panes below visibly moves its owner's bar with
+ * no extra plumbing.
+ */
+function TeamWorkload({ members }: { members: MemberLoad[] }) {
+  const sorted = [...members].sort((a, b) => {
+    const stateA = loadStateOf(a.assignedMinutes, a.capacityMinutes)
+    const stateB = loadStateOf(b.assignedMinutes, b.capacityMinutes)
+    if (LOAD_ORDER[stateA] !== LOAD_ORDER[stateB]) return LOAD_ORDER[stateA] - LOAD_ORDER[stateB]
+    return b.assignedMinutes - a.assignedMinutes
+  })
+
+  return (
+    <section
+      className="space-y-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none"
+      aria-label="Team workload"
+    >
+      <h3 className="apple-section-label text-[var(--apple-secondary-label)]">Team workload</h3>
+      <div className="space-y-2.5">
+        {sorted.map((member) => {
+          const state = loadStateOf(member.assignedMinutes, member.capacityMinutes)
+          const config = LOAD_CONFIG[state]
+          const pct =
+            member.capacityMinutes > 0
+              ? Math.round((member.assignedMinutes / member.capacityMinutes) * 100)
+              : 0
+
+          return (
+            <div key={member.id} className="flex items-center gap-3">
+              <span className="w-28 shrink-0 truncate text-[13px] text-[var(--apple-label)]" title={member.name}>
+                {member.name}
+              </span>
+              <div className="min-w-0 flex-1">
+                <GradientProgress value={pct} gradient={config.gradient} glow={config.glow} />
+              </div>
+              <span className="w-24 shrink-0 text-right font-apple-mono text-[12px] tabular-nums text-[var(--apple-tertiary-label)]">
+                {hours(member.assignedMinutes)}h / {hours(member.capacityMinutes)}h
+              </span>
+              <span className={cn('flex w-14 shrink-0 items-center justify-end gap-1 text-[12px] font-medium', config.text)}>
+                <CircleDot className="h-3 w-3" />
+                {config.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -867,7 +977,7 @@ function TaskPane({
       <div
         ref={setNodeRef}
         className={cn(
-          'max-h-[320px] space-y-1 overflow-y-auto rounded-[var(--apple-radius-md)] border p-2 apple-transition',
+          'max-h-[320px] space-y-1 overflow-y-auto rounded-[var(--apple-radius-md)] border bg-card p-2 shadow-[0_1px_4px_rgba(0,0,0,0.07)] apple-transition dark:shadow-none',
           isOver ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/5' : 'border-[var(--apple-separator)]'
         )}
       >
@@ -907,7 +1017,7 @@ function DraggableTaskRow({
           : undefined
       }
       className={cn(
-        'flex cursor-grab items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-fill-quaternary)] apple-transition',
+        'flex cursor-grab items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-quaternary-fill)] apple-transition',
         isDragging && 'opacity-50'
       )}
     >

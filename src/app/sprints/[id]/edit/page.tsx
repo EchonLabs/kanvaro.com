@@ -521,9 +521,27 @@ export default function EditSprintPage() {
 
   const hasChanges = hasFormChanges || hasTeamChanges || hasProjectChanges
 
+  // A sprint belongs to exactly one project, so the trail should say so
+  // regardless of whether the sprint was reached via the cross-project
+  // Sprints list or a standup screen's "View Sprint" link. `initialProjectId`
+  // (set once the sprint loads, unlike `projectId` which the form can change)
+  // is what the crumb should follow, not the in-progress edit.
+  const breadcrumbItems = initialProjectId
+    ? [
+        { label: 'Projects', href: '/projects' },
+        { label: 'View Project', href: `/projects/${initialProjectId}` },
+        { label: 'View Sprint', href: `/sprints/${sprintId}` },
+        { label: 'Edit Sprint' }
+      ]
+    : [
+        { label: 'Sprints', href: '/sprints' },
+        { label: 'View Sprint', href: `/sprints/${sprintId}` },
+        { label: 'Edit Sprint' }
+      ]
+
   if (loading) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
@@ -536,7 +554,7 @@ export default function EditSprintPage() {
 
   if (error) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <div className="max-w-2xl mx-auto">
           <Button variant="ghost" onClick={() => router.back()} className="mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
@@ -550,7 +568,7 @@ export default function EditSprintPage() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout breadcrumbItems={breadcrumbItems}>
       <div className="max-w-2xl mx-auto space-y-4">
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back

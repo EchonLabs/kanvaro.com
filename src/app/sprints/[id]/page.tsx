@@ -879,9 +879,25 @@ export default function SprintDetailPage() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   }
 
+  // A sprint belongs to exactly one project — show that trail regardless of
+  // whether this page was reached from the cross-project Sprints list or a
+  // standup screen's "View Sprint" link, so the project context set up
+  // earlier in the visit doesn't disappear here. Falls back to the flat
+  // "Sprints" crumb only while the sprint (and its project) hasn't loaded yet.
+  const breadcrumbItems = sprint?.project?._id
+    ? [
+        { label: 'Projects', href: '/projects' },
+        { label: 'View Project', href: `/projects/${sprint.project._id}` },
+        { label: 'View Sprint' }
+      ]
+    : [
+        { label: 'Sprints', href: '/sprints' },
+        { label: 'View Sprint' }
+      ]
+
   if (loading) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <div className="flex items-center justify-center h-64">
           <div className="text-center space-y-3">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-[var(--apple-system-blue)]" />
@@ -894,7 +910,7 @@ export default function SprintDetailPage() {
 
   if (error || !sprint) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <XCircle className="h-12 w-12 text-[var(--apple-system-red)]" />
           <h2 className="text-[22px] font-semibold text-[var(--apple-label)]">{error || 'Sprint not found'}</h2>
@@ -911,7 +927,7 @@ export default function SprintDetailPage() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout breadcrumbItems={breadcrumbItems}>
       <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
 
         {/* ── Page Header ─────────────────────────────────────────────────────── */}

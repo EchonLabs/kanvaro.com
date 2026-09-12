@@ -81,6 +81,15 @@ export interface ChecklistResult {
     totalEstimatedMinutes: number
     totalCapacityMinutes: number
     netCapacityMinutes: number
+    /**
+     * Every sprint member's pre-assigned load against their own sprint
+     * capacity — not just the PA-5/PA-6 offenders. PA-5/PA-6 only ever
+     * surface the people who are already a problem; a PM balancing scope
+     * needs to see everyone's load, including the ones with room to spare,
+     * in one place rather than inferring it from who is absent from two
+     * separate warning sentences.
+     */
+    perMember: Array<{ memberId: string; name: string; assignedMinutes: number; capacityMinutes: number }>
   }
 }
 
@@ -114,9 +123,25 @@ export function evaluatePlanningChecklist(input: ChecklistInput): ChecklistResul
   )
   const totalEstimatedMinutes = tasks.reduce((total, task) => total + estimateOf(task), 0)
 
+  // Shared by PA-5/PA-6 (who is a problem) and `totals.perMember` (everyone's
+  // load) so the two never disagree about what "assigned" means.
+  const assignedMinutes = new Map<string, number>()
+  for (const task of tasks) {
+    for (const memberId of task.assigneeIds ?? []) {
+      assignedMinutes.set(memberId, (assignedMinutes.get(memberId) ?? 0) + estimateOf(task))
+    }
+  }
+
+  const perMember = members.map((member) => ({
+    memberId: member.memberId,
+    name: member.name,
+    assignedMinutes: assignedMinutes.get(member.memberId) ?? 0,
+    capacityMinutes: member.dailyCapacityMinutes * workingDayCount
+  }))
+
   const items: ChecklistItem[] = [
     ...mandatoryChecks(input, { workingDayCount }),
-    ...advisoryChecks(input, { netCapacityMinutes, totalEstimatedMinutes, locale })
+    ...advisoryChecks(input, { netCapacityMinutes, totalEstimatedMinutes, assignedMinutes, locale })
   ]
 
   const mandatory = items.filter((item) => item.kind === 'mandatory')
@@ -134,7 +159,8 @@ export function evaluatePlanningChecklist(input: ChecklistInput): ChecklistResul
       estimatedTaskCount: tasks.filter(isEstimated).length,
       totalEstimatedMinutes,
       totalCapacityMinutes,
-      netCapacityMinutes
+      netCapacityMinutes,
+      perMember
     }
   }
 }
@@ -221,10 +247,15 @@ function mandatoryChecks(
 
 function advisoryChecks(
   input: ChecklistInput,
-  context: { netCapacityMinutes: number; totalEstimatedMinutes: number; locale?: string }
+  context: {
+    netCapacityMinutes: number
+    totalEstimatedMinutes: number
+    assignedMinutes: Map<string, number>
+    locale?: string
+  }
 ): ChecklistItem[] {
   const { tasks, members } = input
-  const { netCapacityMinutes, totalEstimatedMinutes, locale } = context
+  const { netCapacityMinutes, totalEstimatedMinutes, assignedMinutes, locale } = context
   const { planning } = standupStrings
 
   const hours = (value: number) => formatMinutesAsHours(value as any, { locale })
@@ -285,13 +316,6 @@ function advisoryChecks(
   }
 
   // PA-5 / PA-6 — per-member pre-assignment against their own sprint capacity.
-  const assignedMinutes = new Map<string, number>()
-  for (const task of tasks) {
-    for (const memberId of task.assigneeIds ?? []) {
-      assignedMinutes.set(memberId, (assignedMinutes.get(memberId) ?? 0) + estimateOf(task))
-    }
-  }
-
   const workingDayCount = input.workingDayCount
   const overloaded: ChecklistMemberInput[] = []
   const idle: ChecklistMemberInput[] = []

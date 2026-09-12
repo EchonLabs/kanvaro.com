@@ -80,7 +80,12 @@ describe('a well-planned sprint', () => {
       estimatedTaskCount: 15,
       totalEstimatedMinutes: 7200,
       totalCapacityMinutes: 9600,
-      netCapacityMinutes: 9600
+      netCapacityMinutes: 9600,
+      // 15 tasks alternate by index: 8 even-indexed go to kasun, 7 odd to amal.
+      perMember: [
+        { memberId: 'kasun', name: 'Kasun', assignedMinutes: 3840, capacityMinutes: 4800 },
+        { memberId: 'amal', name: 'Amal', assignedMinutes: 3360, capacityMinutes: 4800 }
+      ]
     })
   })
 
@@ -381,6 +386,43 @@ describe('PA-5 / PA-6 — per-member pre-assignment', () => {
     )
     expect(result.canComplete).toBe(true)
     expect(item(result, 'PA-6').passed).toBe(true)
+  })
+})
+
+describe('totals.perMember — every sprint member, not just PA-5/PA-6 offenders', () => {
+  it('reports an idle member (0 assigned) alongside a busy one', () => {
+    const result = evaluatePlanningChecklist(
+      input({ tasks: [task({ id: 'a', assigneeIds: ['kasun'] })] })
+    )
+
+    expect(result.totals.perMember).toEqual([
+      { memberId: 'kasun', name: 'Kasun', assignedMinutes: 360, capacityMinutes: 4800 },
+      { memberId: 'amal', name: 'Amal', assignedMinutes: 0, capacityMinutes: 4800 }
+    ])
+  })
+
+  it('reports a member over their own capacity', () => {
+    const result = evaluatePlanningChecklist(
+      input({
+        tasks: [task({ id: 'a', originalEstimateMinutes: 5400, assigneeIds: ['kasun'] })]
+      })
+    )
+
+    const kasun = result.totals.perMember.find((entry) => entry.memberId === 'kasun')
+    expect(kasun).toEqual({ memberId: 'kasun', name: 'Kasun', assignedMinutes: 5400, capacityMinutes: 4800 })
+  })
+
+  it('counts a task assigned to two people against both, matching PA-5/PA-6', () => {
+    const result = evaluatePlanningChecklist(
+      input({
+        tasks: [task({ id: 'a', originalEstimateMinutes: 4800, assigneeIds: ['kasun', 'amal'] })]
+      })
+    )
+
+    expect(result.totals.perMember).toEqual([
+      { memberId: 'kasun', name: 'Kasun', assignedMinutes: 4800, capacityMinutes: 4800 },
+      { memberId: 'amal', name: 'Amal', assignedMinutes: 4800, capacityMinutes: 4800 }
+    ])
   })
 })
 
