@@ -886,12 +886,11 @@ function MonthGrid({ month, workingDays }: { month: string; workingDays: Working
 
   return (
     <div>
-      {/* Width-capped, and sized by explicit height rather than `aspect-square`:
-          unconstrained, each cell grew to a seventh of the settings panel (~130px
-          tall); square cells at a comfortable width then made the month
-          needlessly deep. A fixed 44px row keeps the tap target while letting the
-          cells stay wider than they are tall, which is how a calendar reads. */}
-      <div className="grid max-w-[480px] grid-cols-7 gap-1">
+      {/* `aspect-square` so a cell's height follows its width: the grid now
+          fills the panel instead of stopping at a fixed max-width, and the
+          rows grow with it rather than staying pinned to a fixed pixel
+          height. */}
+      <div className="grid w-full grid-cols-7 gap-1.5">
         {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((label) => (
           <div
             key={label}
@@ -909,6 +908,11 @@ function MonthGrid({ month, workingDays }: { month: string; workingDays: Working
           const dayNumber = index + 1
           const date = `${month}-${String(dayNumber).padStart(2, '0')}`
           const day = byDate.get(date)
+          // A full-day holiday blocks the stand-up outright; a project
+          // override (closed day) and a plain weekend share the neutral
+          // non-working look, since the legend for those is the grey fill
+          // rather than a colour.
+          const holiday = day?.reason === 'org_holiday'
           const optional = (day?.optionalHolidays?.length ?? 0) > 0
 
           return (
@@ -916,22 +920,26 @@ function MonthGrid({ month, workingDays }: { month: string; workingDays: Working
               key={date}
               title={describeDay(day)}
               className={cn(
-                'relative flex h-11 items-center justify-center rounded-[var(--apple-radius-sm)] border text-[13px] tabular-nums font-apple-mono',
-                day?.isWorkingDay
-                  ? 'border-[var(--apple-separator)] text-[var(--apple-label)]'
-                  : 'border-transparent bg-[var(--apple-tertiary-fill)] text-[var(--apple-tertiary-label)]'
+                'relative flex aspect-square items-center justify-center rounded-[var(--apple-radius-sm)] border text-[13px] font-semibold tabular-nums font-apple-mono',
+                holiday
+                  // `color-mix()` rather than Tailwind's `/NN` opacity
+                  // modifier: this project's Tailwind (3.3) cannot resolve an
+                  // alpha channel against a `var()` colour, so
+                  // `bg-[var(--apple-system-red)]/15` silently produces no
+                  // background at all — confirmed live, the day rendered
+                  // with red text and no fill whatsoever. `color-mix` is
+                  // plain CSS the browser evaluates itself, independent of
+                  // Tailwind's opacity support.
+                  ? 'border-[color-mix(in_srgb,var(--apple-system-red)_45%,transparent)] bg-[color-mix(in_srgb,var(--apple-system-red)_16%,transparent)] text-[var(--apple-system-red)]'
+                  : day?.isWorkingDay
+                    ? 'border-[var(--apple-separator)] text-[var(--apple-label)]'
+                    : 'border-transparent bg-[var(--apple-tertiary-fill)] text-[var(--apple-tertiary-label)]'
               )}
             >
               {dayNumber}
-              {day && !day.isWorkingDay && day.reason !== 'weekend' && (
-                <span
-                  className="absolute bottom-1 h-1 w-1 rounded-full bg-[var(--apple-system-red)]"
-                  aria-hidden
-                />
-              )}
               {optional && (
                 <span
-                  className="absolute bottom-1 h-1 w-1 rounded-full bg-[var(--apple-system-orange)]"
+                  className="absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[var(--apple-system-orange)]"
                   aria-hidden
                 />
               )}

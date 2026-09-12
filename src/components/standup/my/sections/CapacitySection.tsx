@@ -57,7 +57,7 @@ export function CapacitySection({ capacity, allocationCount, debt, locale }: Cap
 
   return (
     <SectionCard
-      title="Today"
+      title={standupStrings.my.capacityHeader()}
       icon={<Gauge strokeWidth={1.75} />}
       tone={tone}
       summary={<StatusPill tone={tone}>{capacity.status.toUpperCase()}</StatusPill>}
@@ -121,10 +121,14 @@ export function CapacitySection({ capacity, allocationCount, debt, locale }: Cap
       </div>
 
       {capacity.adjustments.length > 0 ? (
-        <ul className="flex flex-col gap-1 text-[13px] text-[var(--apple-secondary-label)]">
+        <ul className="flex flex-col divide-y divide-[var(--apple-separator)] overflow-hidden rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)]">
           {capacity.adjustments.map((adjustment, index) => (
-            <li key={`${adjustment.type}-${index}`}>
-              {adjustment.label}: {formatMinutesAsHours(adjustment.minutes, { locale })}
+            <li
+              key={`${adjustment.type}-${index}`}
+              className="flex items-center justify-between gap-2 bg-card px-3 py-2 text-[13px]"
+            >
+              <span className="text-[var(--apple-secondary-label)]">{adjustment.label}</span>
+              <HoursValue minutes={adjustment.minutes} locale={locale} />
             </li>
           ))}
         </ul>

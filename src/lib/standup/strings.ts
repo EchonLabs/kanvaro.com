@@ -569,6 +569,7 @@ export const standupStrings = {
       `You're ${hours} ahead of estimate on this sprint's work.`,
     strandedSentence: ({ hours }: { hours: string }) =>
       `${hours} is still assigned to you for a day you're not available.`,
+    capacityHeader: () => "Today's Capacity",
     yesterdayHeader: () => 'Yesterday',
     yesterdayCount: ({ done, total }: { done: number; total: number }) => `${done} of ${total} done`,
     yesterdayLoggedTotal: ({ hours }: { hours: string }) => `, ${hours} logged`,

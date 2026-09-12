@@ -159,9 +159,9 @@ export function YesterdaySection({
                   ) : null}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)]">
-                    {standupStrings.my.statusFor({ key: row.taskKey ?? row.taskId })}
+                <div className="flex flex-wrap items-end gap-4">
+                  <label className="flex flex-col gap-1">
+                    <span className="apple-section-label text-[var(--apple-tertiary-label)]">Status</span>
                     <select
                       aria-label={standupStrings.my.statusFor({ key: row.taskKey ?? row.taskId })}
                       value={row.currentStatus}
@@ -177,9 +177,13 @@ export function YesterdaySection({
                     </select>
                   </label>
 
-                  <HoursValue minutes={row.plannedMinutes} locale={locale} label="Planned" />
-                  <label className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)]">
-                    Logged
+                  <div className="flex flex-col gap-1">
+                    <span className="apple-section-label text-[var(--apple-tertiary-label)]">Planned</span>
+                    <HoursValue minutes={row.plannedMinutes} locale={locale} label="Planned" />
+                  </div>
+
+                  <label className="flex flex-col gap-1">
+                    <span className="apple-section-label text-[var(--apple-tertiary-label)]">Logged</span>
                     <input
                       type="number"
                       step={15}
@@ -188,10 +192,20 @@ export function YesterdaySection({
                       disabled={readOnly}
                       defaultValue={row.loggedMinutes}
                       onBlur={(event) => void onChangeLogged(row.taskId, Number(event.target.value))}
-                      className="w-16 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-2 py-1 text-[13px] text-[var(--apple-label)] disabled:opacity-40"
+                      className="h-8 w-16 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-2 text-[13px] text-[var(--apple-label)] disabled:opacity-40"
                     />
                   </label>
-                  <HoursValue minutes={row.dayVarianceMinutes} locale={locale} signed label="Variance" />
+
+                  <div className="flex flex-col gap-1">
+                    <span className="apple-section-label text-[var(--apple-tertiary-label)]">Variance</span>
+                    <HoursValue
+                      minutes={row.dayVarianceMinutes}
+                      locale={locale}
+                      signed
+                      label="Variance"
+                      tone={row.dayVarianceMinutes > 0 ? 'red' : row.dayVarianceMinutes < 0 ? 'orange' : 'neutral'}
+                    />
+                  </div>
                 </div>
 
                 {variance?.explanation ? (

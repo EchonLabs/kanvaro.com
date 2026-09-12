@@ -11,6 +11,14 @@ const ICON_CHIP_TONE: Record<SectionCardTone, string> = {
   neutral: 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]'
 }
 
+const ACCENT_BORDER: Record<SectionCardTone, string> = {
+  blue: 'border-l-[var(--apple-system-blue)]',
+  green: 'border-l-[var(--apple-system-green)]',
+  orange: 'border-l-[var(--apple-system-orange)]',
+  red: 'border-l-[var(--apple-system-red)]',
+  neutral: 'border-l-[var(--apple-separator)]'
+}
+
 export interface SectionCardProps {
   title: string
   summary?: React.ReactNode
@@ -18,6 +26,10 @@ export interface SectionCardProps {
   icon?: React.ReactNode
   /** Tints the icon's chip. Purely identifying when `neutral`; every other tone still only appears where it already carries real meaning elsewhere on the screen. */
   tone?: SectionCardTone
+  /** Opt-in colored left edge matching `tone` — off by default so existing screens keep their current look; the summary page turns it on for scannability across many stacked cards. */
+  accent?: boolean
+  id?: string
+  className?: string
   children: React.ReactNode
 }
 
@@ -26,9 +38,18 @@ export interface SectionCardProps {
  * noun. Structural, not just a convention — a section physically cannot be
  * added to this screen without passing something into `summary`.
  */
-export function SectionCard({ title, summary, icon, tone = 'neutral', children }: SectionCardProps) {
+export function SectionCard({
+  title,
+  summary,
+  icon,
+  tone = 'neutral',
+  accent = false,
+  id,
+  className,
+  children
+}: SectionCardProps) {
   return (
-    <Card>
+    <Card id={id} className={cn(accent && 'border-l-4', accent && ACCENT_BORDER[tone], className)}>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
         <div className="flex items-center gap-2.5 min-w-0">
           {icon ? (

@@ -12,6 +12,7 @@
  */
 import { StandupSummary, type IStandupSummary } from '@/models/StandupSummary'
 import { StandupError } from './errors'
+import { standupStrings } from './strings'
 
 export type SummaryDocument = Awaited<ReturnType<typeof getSummary>>
 
@@ -141,10 +142,14 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
   lines.push('## Carry forward')
   if (summary.carryForwardState.length === 0) lines.push('Nothing carried forward.')
   for (const row of summary.carryForwardState as unknown as Record<string, unknown>[]) {
-    const taskKey = field(row, 'taskKey') ?? field(row, 'itemId') ?? 'Item'
+    const label =
+      field(row, 'taskKey') ??
+      field(row, 'taskTitle') ??
+      field(row, 'memberName') ??
+      standupStrings.carryForward.itemTypeLabel(field(row, 'type') ?? '')
     const ageBand = field(row, 'ageBand')
     const status = field(row, 'status')
-    lines.push(`- ${taskKey}${ageBand ? ` (${ageBand})` : ''}${status ? ` — ${status}` : ''}`)
+    lines.push(`- ${label}${ageBand ? ` (${ageBand})` : ''}${status ? ` — ${status}` : ''}`)
   }
   lines.push('')
 

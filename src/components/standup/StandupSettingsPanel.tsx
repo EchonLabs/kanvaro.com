@@ -9,7 +9,8 @@
  * `/projects/[id]/settings/calendar` as the spec's own §15.1 tree suggests.
  */
 import { useRef, useState, type KeyboardEvent } from 'react'
-import { CalendarDays, Settings2, Users } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowRight, CalendarDays, Settings2, Users } from 'lucide-react'
 
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -36,6 +37,7 @@ const tabId = (view: StandupSettingsView) => `standup-settings-tab-${view}`
 const panelId = (view: StandupSettingsView) => `standup-settings-panel-${view}`
 
 export function StandupSettingsPanel({ projectId }: { projectId: string }) {
+  const router = useRouter()
   const [view, setView] = useState<StandupSettingsView>('calendar')
   const { hasPermission, loading, permissions } = usePermissions()
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -117,18 +119,28 @@ export function StandupSettingsPanel({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-5 border-t border-[var(--apple-separator)] pt-6">
       <div className="space-y-5">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground">Stand-ups</h3>
-          <p className="text-sm text-muted-foreground">
-            Working days, stand-up rules, and each member&rsquo;s real daily capacity.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Stand-ups</h3>
+            <p className="text-sm text-muted-foreground">
+              Working days, stand-up rules, and each member&rsquo;s real daily capacity.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push(`/projects/${projectId}/standups`)}
+            className="apple-transition flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[var(--apple-system-blue)] px-4 text-[13px] font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)] focus-visible:ring-offset-2"
+          >
+            Scheduled Stand-ups
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
         </div>
 
-        {/* Segmented control, matching the app's existing Apple-styled tabs. */}
+        {/* Full-width pill segmented control, matching the global Settings page's tablist. */}
         <div
           role="tablist"
           aria-label="Stand-up settings"
-          className="inline-flex flex-wrap gap-1 rounded-[var(--apple-radius-md)] bg-[var(--apple-tertiary-fill)] p-1"
+          className="flex w-full items-center gap-0.5 rounded-full bg-[var(--apple-tertiary-fill)] p-0.5"
         >
           {VIEWS.map(({ id, label, icon: Icon }, index) => {
             const active = view === id
@@ -150,15 +162,15 @@ export function StandupSettingsPanel({ projectId }: { projectId: string }) {
                 onKeyDown={(event) => onTabKeyDown(event, index)}
                 onClick={() => requestView(id)}
                 className={cn(
-                  'apple-transition flex items-center gap-2 rounded-[var(--apple-radius-sm)] px-3 py-1.5 text-[13px] font-medium',
+                  'apple-transition flex h-9 flex-1 min-w-0 select-none items-center justify-center gap-1.5 rounded-full px-2 text-[13px] font-medium sm:px-3',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]',
                   active
-                    ? 'bg-card text-[var(--apple-label)] shadow-[0_1px_3px_rgba(0,0,0,0.10)]'
+                    ? 'bg-card text-[var(--apple-label)] shadow-sm'
                     : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]'
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{label}</span>
               </button>
             )
           })}

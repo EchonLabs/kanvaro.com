@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { CalendarOff } from 'lucide-react'
 
 import { MainLayout } from '@/components/layout/MainLayout'
+import { Button } from '@/components/ui/Button'
 import connectDB from '@/lib/db-config'
 import { authenticateUser } from '@/lib/auth-utils'
 import { standupStrings } from '@/lib/standup/strings'
@@ -31,20 +33,19 @@ export default async function MyStandupPage() {
   if (!match) {
     return (
       <MainLayout breadcrumbItems={[{ label: 'My Stand-up' }]}>
-        <div className="flex flex-col items-start gap-3 p-6">
-          <h1 className="text-lg font-semibold text-[var(--apple-label)]">
-            {standupStrings.my.title()}
+        <div className="flex flex-col items-center justify-center gap-1 px-8 py-20 text-center">
+          <div className="mb-4 rounded-2xl bg-[var(--apple-quaternary-fill)] p-4 text-[var(--apple-tertiary-label)]">
+            <CalendarOff className="h-6 w-6" strokeWidth={1.75} />
+          </div>
+          <h1 className="text-[17px] font-semibold text-[var(--apple-label)]">
+            {standupStrings.my.noStandup()}
           </h1>
-          <p className="text-sm text-[var(--apple-label)]">{standupStrings.my.noStandup()}</p>
-          <p className="text-sm text-[var(--apple-secondary-label)]">
+          <p className="max-w-sm text-[15px] text-[var(--apple-secondary-label)]">
             {standupStrings.my.noStandupHint()}
           </p>
-          <Link
-            href="/projects"
-            className="text-sm font-medium text-[var(--apple-system-blue)] hover:underline"
-          >
-            {standupStrings.my.noStandupProjectsLink()}
-          </Link>
+          <Button asChild variant="outline" size="sm" className="mt-4">
+            <Link href="/projects">{standupStrings.my.noStandupProjectsLink()}</Link>
+          </Button>
         </div>
       </MainLayout>
     )

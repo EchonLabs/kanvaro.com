@@ -18,6 +18,10 @@ import { fireEvent, render, screen } from '@testing-library/react'
 
 import { StandupSettingsPanel } from '../StandupSettingsPanel'
 
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() })
+}))
+
 jest.mock('@/lib/permissions/permission-context', () => ({
   usePermissions: () => ({
     hasPermission: () => true,

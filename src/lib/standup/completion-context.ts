@@ -253,7 +253,10 @@ export async function assembleCompletionContext(input: {
       })),
     carryForwardState: carryForward.items.map((item) => ({
       itemId: item.itemId,
+      type: item.type,
       taskKey: item.taskKey,
+      taskTitle: item.taskTitle,
+      memberName: item.memberName,
       ageBand: item.ageBand,
       status: item.status
     })),
