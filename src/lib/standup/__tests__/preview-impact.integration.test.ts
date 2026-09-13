@@ -18,6 +18,7 @@ import { HolidaySet } from '@/models/HolidaySet'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
 import {
   previewCalendarChange,
+  previewHolidaySubscriptionChange,
   previewOverrideRemoval,
   previewWorkingWeekChange
 } from '../preview-impact'
@@ -302,5 +303,78 @@ describe('previewWorkingWeekChange', () => {
 
     expect(preview.items).toHaveLength(0)
     expect(preview.summary).toBeTruthy()
+  })
+})
+
+describe('previewHolidaySubscriptionChange', () => {
+  useMongo()
+
+  it('names an already-scheduled stand-up that would be skipped by newly subscribing', async () => {
+    const set = await HolidaySet.create({
+      organization,
+      name: 'Sri Lanka Public Holidays',
+      countryCode: 'LK',
+      createdBy: user
+    })
+    await Holiday.create({
+      holidaySet: set._id,
+      organization,
+      date: THURSDAY,
+      name: 'Nikini Full Moon Poya Day',
+      type: 'public'
+    })
+    // Not yet subscribed — the holiday exists but has no effect until the
+    // project opts in, same as the manager screen's checkbox.
+    await createCalendar()
+    await addStandup(THURSDAY, 'Scheduled')
+
+    const preview = await previewHolidaySubscriptionChange(
+      project.toString(),
+      { subscribedHolidaySetIds: [set._id.toString()] },
+      { from: '2026-08-17', to: '2026-08-31' }
+    )
+
+    expect(preview.items).toHaveLength(1)
+    expect(preview.items[0].date).toBe(THURSDAY)
+    expect(preview.items[0].disposition).toBe('skip')
+  })
+
+  it('predicts a stand-up reappearing when unsubscribing removes a holiday', async () => {
+    const set = await HolidaySet.create({
+      organization,
+      name: 'Sri Lanka Public Holidays',
+      countryCode: 'LK',
+      createdBy: user
+    })
+    await Holiday.create({
+      holidaySet: set._id,
+      organization,
+      date: THURSDAY,
+      name: 'Nikini Full Moon Poya Day',
+      type: 'public'
+    })
+    await createCalendar({ subscribedHolidaySets: [set._id] })
+    await addStandup(THURSDAY, 'Skipped_Holiday')
+
+    const preview = await previewHolidaySubscriptionChange(
+      project.toString(),
+      { subscribedHolidaySetIds: [] },
+      { from: '2026-08-17', to: '2026-08-31' }
+    )
+
+    expect(preview.items[0].disposition).toBe('create')
+  })
+
+  it('reports nothing when the proposed subscription list changes nothing in range', async () => {
+    await createCalendar()
+
+    const preview = await previewHolidaySubscriptionChange(
+      project.toString(),
+      { subscribedHolidaySetIds: [] },
+      { from: '2026-08-17', to: '2026-08-31' }
+    )
+
+    expect(preview.items).toHaveLength(0)
+    expect(preview.hasApplicableChanges).toBe(false)
   })
 })

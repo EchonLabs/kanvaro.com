@@ -345,7 +345,10 @@ export const standupStrings = {
     },
 
     memberCount: ({ count }: { count: number }) =>
-      count === 1 ? '1 member' : `${count} members`
+      count === 1 ? '1 member' : `${count} members`,
+    capacityBoardTitle: () => "Today's capacity",
+    /** ALO-16's drop zone, shown in place of an empty allocation list. */
+    dropHint: () => 'Drag a task here, or use quick add below.'
   },
 
   /** The unassigned pool (§15.8.7, ALO-13 … ALO-17). */
@@ -402,6 +405,21 @@ export const standupStrings = {
     startPlanningGateFailed: () =>
       'This sprint has not completed planning, so this stand-up cannot start.',
     startFailed: () => 'That could not be started.',
+
+    /**
+     * E49. The only path a `Missed` stand-up has back to `Completed` — before
+     * this existed, a `Missed` day had no action anywhere in the UI at all,
+     * despite `POST /backfill` being fully built and tested.
+     */
+    backfill: () => 'Backfill stand-up',
+    backfillTitle: () => 'Backfill this stand-up',
+    backfillDescription: () =>
+      "This day was missed. Backfilling completes it using today's board as recorded, so it counts toward the sprint's history.",
+    backfillNotesLabel: () => 'Notes (optional)',
+    backfillCancel: () => 'Cancel',
+    backfillConfirm: () => 'Backfill',
+    backfillSuccess: () => 'Stand-up backfilled.',
+    backfillFailed: () => 'That could not be backfilled.',
 
     /**
      * E57/§15.8.2. Advisory-only elapsed-time indicator — never disables or
@@ -481,6 +499,12 @@ export const standupStrings = {
       `Cannot complete: ${message}`,
     completeReady: () => 'All checks passed.',
     jumpToFailure: () => 'Fix',
+    checksUnavailable: () =>
+      "This stand-up's checklist could not be loaded, so Complete is disabled until it can be — completing blind would risk skipping a real failure.",
+    everythingChecksOut: () => 'Nothing needs attention.',
+    showPassedChecks: ({ count }: { count: number }) =>
+      count === 1 ? 'Show 1 more check' : `Show ${count} more checks`,
+    hidePassedChecks: () => 'Hide',
 
     /**
      * Task 22 — Panel 7's Override action, wiring §15.12's modal to a

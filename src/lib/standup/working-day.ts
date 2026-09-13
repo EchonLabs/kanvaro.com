@@ -206,7 +206,23 @@ export function resolveWorkingDayFrom(
 
   // Layer 1: is this weekday a working day for the organisation at all.
   if (!context.workingDaysOfWeek.includes(dayOfWeek(date))) {
-    return { ...base, isWorkingDay: false, reason: 'weekend', optionalHolidays }
+    // The day is already non-working for weekend reasons — `reason` stays
+    // 'weekend', exactly as CAL-1 requires (a holiday never "resurrects" a
+    // weekend). But a full-day holiday landing on it is still real
+    // information a calendar preview needs to paint correctly: without
+    // attaching it here, a holiday that happens to fall on a Saturday was
+    // invisible — the day just looked like a plain grey weekend, identical
+    // to every other Saturday with nothing on it.
+    const weekendHoliday = blockingHolidays.find((candidate) => candidate.isFullDay)
+    return {
+      ...base,
+      isWorkingDay: false,
+      reason: 'weekend',
+      optionalHolidays,
+      ...(weekendHoliday
+        ? { holidayId: weekendHoliday.id, holidayName: weekendHoliday.name }
+        : {})
+    }
   }
 
   // Layer 2: a full-day public or company holiday removes the day.

@@ -40,7 +40,14 @@ const DEFAULT_TIMEZONE = 'UTC'
 export async function loadCalendarContext(
   projectId: string,
   from: IsoDate,
-  to: IsoDate
+  to: IsoDate,
+  /**
+   * Overrides which holiday sets are subscribed, instead of reading the
+   * saved calendar's own list. Lets `previewHolidaySubscriptionChange`
+   * (preview-impact.ts) resolve the "after" side of a not-yet-saved
+   * subscription change without writing anything.
+   */
+  overrideSubscribedHolidaySetIds?: string[]
 ): Promise<CalendarContext> {
   assertIsoDate(from, 'from')
   assertIsoDate(to, 'to')
@@ -58,7 +65,7 @@ export async function loadCalendarContext(
 
   const effective = projectCalendar ?? organizationCalendar
 
-  const subscribedSetIds = effective?.subscribedHolidaySets ?? []
+  const subscribedSetIds = overrideSubscribedHolidaySetIds ?? effective?.subscribedHolidaySets ?? []
 
   const holidays = subscribedSetIds.length
     ? await Holiday.find({

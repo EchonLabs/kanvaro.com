@@ -13,6 +13,7 @@ import { addDays, assertIsoDate } from '@/lib/standup/calendar-dates'
 import { StandupError } from '@/lib/standup/errors'
 import {
   previewCalendarChange,
+  previewHolidaySubscriptionChange,
   previewOverrideRemoval,
   previewWorkingWeekChange
 } from '@/lib/standup/preview-impact'
@@ -23,6 +24,7 @@ interface PreviewBody {
     | { kind: 'override'; date: string; effect: 'non_working' | 'observed_as_working'; recurringAnnually?: boolean }
     | { kind: 'remove_override'; overrideId: string; date: string }
     | { kind: 'working_week'; workingDaysOfWeek: number[]; from?: string; to?: string }
+    | { kind: 'holiday_subscription'; subscribedHolidaySetIds: string[]; from?: string; to?: string }
 }
 
 export const POST = withStandupPermission(
@@ -63,6 +65,25 @@ export const POST = withStandupPermission(
 
         return ok(
           await previewWorkingWeekChange(projectId!, change, { from, to })
+        )
+      }
+
+      case 'holiday_subscription': {
+        if (!Array.isArray(change.subscribedHolidaySetIds)) {
+          throw new StandupError(
+            'VALIDATION_FAILED',
+            'subscribedHolidaySetIds must be an array.'
+          )
+        }
+
+        // Same unbounded-in-time reasoning as working_week above.
+        const from = change.from ?? new Date().toISOString().slice(0, 10)
+        const to = change.to ?? addDays(from, 365)
+        assertIsoDate(from, 'from')
+        assertIsoDate(to, 'to')
+
+        return ok(
+          await previewHolidaySubscriptionChange(projectId!, change, { from, to })
         )
       }
 

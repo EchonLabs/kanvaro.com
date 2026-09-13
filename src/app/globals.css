@@ -180,6 +180,18 @@
 .card-fade-in-delay-3 { animation-delay: 120ms; }
 .card-fade-in-delay-4 { animation-delay: 160ms; }
 
+/* Check-pop — a completion check's icon flipping pass/fail/warn. Applied to
+   an element keyed on `${checkId}-${status}` (CompletionPanel.tsx), so React
+   remounts the icon on every status change and this plays fresh each time. */
+@keyframes check-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.check-pop {
+  animation: check-pop 0.32s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+
 /* Transitions.dev — Number pop-in */
 :root {
   --digit-dur: 500ms;
@@ -268,6 +280,31 @@
     overflow-x: hidden;
     width: 100%;
     position: relative;
+  }
+
+  /*
+   * MainLayout's app shell (`Sidebar`/`Header` + `<main class="overflow-auto">`
+   * inside an `h-screen` flex container) is the ONLY scroll region those pages
+   * ever intend to use — the document itself is not meant to scroll there.
+   * But `html`/`body` above are shared with the docs and landing pages, which
+   * use plain `min-h-screen` document-flow scrolling instead, so this can't be
+   * a global `overflow-y: hidden` — it has to be scoped to app-shell pages
+   * only. `MainLayout` toggles this class on `<html>` for exactly its own
+   * mount lifetime (see `MainLayout.tsx`).
+   *
+   * Without it: a `#hash` anchor jump (the completion checklist's "Fix"
+   * links, the summary page's KPI strip, the run screen's jump shortcuts)
+   * walks every scrollable ancestor to bring its target into view, including
+   * `window` if it's technically scrollable by even a few pixels — and once
+   * the window scrolls, nothing resets it, so the whole app appears to "jump
+   * up and get stuck" until a manual reload. Locking the document's own
+   * scroll to zero on these pages forces all of that scrolling into `<main>`,
+   * where it belongs.
+   */
+  html.app-shell-locked,
+  html.app-shell-locked body {
+    overflow-y: hidden;
+    height: 100%;
   }
 
   /* Prevent horizontal scrolling on all containers */

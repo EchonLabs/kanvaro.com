@@ -67,22 +67,20 @@ describe('HolidaySetManager revoke flow', () => {
       </ToastProvider>
     )
 
-    // Wait for holidays to load
+    // Wait for holidays to load. The holiday's name lives in the tile's
+    // `title` tooltip now, not as visible text, so wait on the accessible
+    // withdraw button instead.
     await waitFor(
       () => {
-        expect(screen.queryByText('Test Holiday')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /withdraw test holiday/i })).toBeInTheDocument()
       },
       { timeout: 3000 }
     )
 
-    // Find the row containing "Test Holiday" and click the withdraw button within it
-    const holidayRow = screen.getByText('Test Holiday').closest('tr')
-    if (!holidayRow) throw new Error('Holiday row not found')
-
-    // Get all buttons in the row and find the one with "Withdraw" text
-    const buttons = Array.from(holidayRow.querySelectorAll('button'))
-    const withdrawButton = buttons.find(b => b.textContent?.includes('Withdraw'))
-    if (!withdrawButton) throw new Error('Withdraw button not found in row')
+    // Holidays render as calendar-square tiles now, not table rows — the
+    // holiday's name lives in the tile's `title` tooltip rather than as
+    // visible text, so find the tile via its accessible withdraw button.
+    const withdrawButton = screen.getByRole('button', { name: /withdraw test holiday/i })
 
     fireEvent.click(withdrawButton)
 
@@ -107,21 +105,18 @@ describe('HolidaySetManager revoke flow', () => {
       </ToastProvider>
     )
 
-    // Wait for holidays to load
+    // Wait for holidays to load. The holiday's name lives in the tile's
+    // `title` tooltip now, not as visible text, so wait on the accessible
+    // withdraw button instead.
     await waitFor(
       () => {
-        expect(screen.queryByText('Test Holiday')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /withdraw test holiday/i })).toBeInTheDocument()
       },
       { timeout: 3000 }
     )
 
     // Find and click the withdraw button
-    const holidayRow = screen.getByText('Test Holiday').closest('tr')
-    if (!holidayRow) throw new Error('Holiday row not found')
-
-    const buttons = Array.from(holidayRow.querySelectorAll('button'))
-    const withdrawButton = buttons.find(b => b.textContent?.includes('Withdraw'))
-    if (!withdrawButton) throw new Error('Withdraw button not found in row')
+    const withdrawButton = screen.getByRole('button', { name: /withdraw test holiday/i })
 
     await React.act(async () => {
       fireEvent.click(withdrawButton)

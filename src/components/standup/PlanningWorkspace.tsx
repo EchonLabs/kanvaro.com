@@ -656,9 +656,7 @@ export function PlanningWorkspace({
             maxLength={500}
             placeholder="Ship the invoicing module end to end for pilot customers."
           />
-          <p className="text-[12px] text-[var(--apple-tertiary-label)]">
-            One sentence describing the outcome. At least 10 characters.
-          </p>
+          <p className="text-[12px] text-[var(--apple-tertiary-label)]">At least 10 characters.</p>
         </div>
       )}
 

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
+import { cn } from '@/lib/utils'
 import type { VarianceOutcome } from '@/models/AllocationVariance'
 
 /**
@@ -85,20 +86,24 @@ export function VariancePanel({
   const rows = useMemo(() => sortRows(data.rows, sort), [data.rows, sort])
 
   return (
-    <section id="panel-3" aria-labelledby="panel-3-heading" className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <h3 id="panel-3-heading" className="text-sm font-semibold">
+    <section
+      id="panel-3"
+      aria-labelledby="panel-3-heading"
+      className="scroll-mt-6 flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 id="panel-3-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
           {standupStrings.run.panel3()}
         </h3>
 
-        <label className="flex items-center gap-2 text-xs" htmlFor="variance-sort">
+        <label className="flex items-center gap-2 text-[12px] text-[var(--apple-secondary-label)]" htmlFor="variance-sort">
           Sort
           <select
             id="variance-sort"
             aria-label="Sort"
             value={sort}
             onChange={(event) => setSort(event.target.value as VarianceSort)}
-            className="h-8 rounded-md border border-border bg-background px-2 text-sm"
+            className="h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-[12.5px] text-[var(--apple-label)]"
           >
             <option value="member">Member</option>
             <option value="task_key">Task</option>
@@ -108,29 +113,29 @@ export function VariancePanel({
       </div>
 
       {/* VAR-13 — the member roll-up strip. */}
-      <ul className="flex flex-wrap gap-3">
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {data.members.map((member) => (
           <li
             key={member.memberId}
             data-testid={`variance-rollup-${member.memberId}`}
-            className="flex flex-col gap-0.5 rounded-md border border-border px-3 py-2 text-xs"
+            className="flex flex-col gap-1 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background px-3 py-2.5 text-[12px] text-[var(--apple-secondary-label)]"
           >
-            <span className="font-medium">{member.memberName}</span>
+            <span className="text-[13px] font-medium text-[var(--apple-label)]">{member.memberName}</span>
             <span>
               {standupStrings.variance.rollUpPlanned()}{' '}
-              <span data-testid="planned-total">
+              <span data-testid="planned-total" className="font-apple-mono tabular-nums text-[var(--apple-label)]">
                 {formatMinutesAsHours(member.plannedMinutes, { locale })}
               </span>
             </span>
             <span>
               {standupStrings.variance.rollUpLogged()}{' '}
-              <span data-testid="logged-total">
+              <span data-testid="logged-total" className="font-apple-mono tabular-nums text-[var(--apple-label)]">
                 {formatMinutesAsHours(member.loggedMinutesOnDay, { locale })}
               </span>
             </span>
             <span>
               {standupStrings.variance.rollUpDayVariance()}{' '}
-              <span data-testid="net-day-variance">
+              <span data-testid="net-day-variance" className="font-apple-mono tabular-nums text-[var(--apple-label)]">
                 {formatMinutesAsHours(member.dayVarianceMinutes, { locale, signed: true })}
               </span>
             </span>
@@ -149,7 +154,7 @@ export function VariancePanel({
             <button
               type="button"
               onClick={() => onViewLedger(member.memberId)}
-              className="self-start text-xs underline"
+              className="apple-transition self-start text-[11.5px] font-medium text-[var(--apple-system-blue)] hover:underline"
             >
               {standupStrings.debt.ledgerTitle()}
             </button>
@@ -157,24 +162,26 @@ export function VariancePanel({
         ))}
       </ul>
 
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2.5">
         {rows.map((row) => {
           const tone = toneOf(row)
           return (
             <li
               key={row.allocationId}
               data-testid={`variance-row-${row.taskKey ?? row.taskId}`}
-              className="flex flex-col gap-1 rounded-md border border-border px-3 py-2 text-sm"
+              className="flex flex-col gap-1.5 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background px-3 py-2.5 text-[13px]"
             >
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="font-medium">{row.taskKey ?? row.taskId}</span>
-                <span className="text-muted-foreground">{row.title}</span>
-                <span className="text-xs text-muted-foreground">{row.memberName}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-apple-mono text-[12px] text-[var(--apple-tertiary-label)]">
+                  {row.taskKey ?? row.taskId}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[var(--apple-label)]">{row.title}</span>
+                <span className="text-[11.5px] text-[var(--apple-secondary-label)]">{row.memberName}</span>
 
                 {row.chronicSpill && (
                   <span
                     data-testid="chronic-spill"
-                    className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-900 dark:bg-red-900/30 dark:text-red-200"
+                    className="rounded-full bg-[var(--apple-system-red)]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--apple-system-red)]"
                   >
                     {standupStrings.variance.chronicSpill({ chainLength: row.spillChainLength })}
                   </span>
@@ -182,16 +189,16 @@ export function VariancePanel({
               </div>
 
               {/* VAR-11, first line: the day. */}
-              <div className="flex flex-wrap gap-3 text-xs">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-[var(--apple-secondary-label)]">
                 <span data-testid="planned">
-                  Planned {formatMinutesAsHours(row.plannedMinutes, { locale })}
+                  Planned <span className="font-apple-mono tabular-nums text-[var(--apple-label)]">{formatMinutesAsHours(row.plannedMinutes, { locale })}</span>
                 </span>
                 <span data-testid="logged">
-                  Logged {formatMinutesAsHours(row.loggedMinutesOnDay, { locale })}
+                  Logged <span className="font-apple-mono tabular-nums text-[var(--apple-label)]">{formatMinutesAsHours(row.loggedMinutesOnDay, { locale })}</span>
                 </span>
                 <span
                   data-testid={`day-variance-${tone}`}
-                  className={TONE_CLASS[tone]}
+                  className={cn('font-apple-mono font-medium tabular-nums', TONE_CLASS[tone])}
                   // NFR-A2: the word is part of the content, not a tooltip.
                 >
                   {formatMinutesAsHours(row.dayVarianceMinutes, { locale, signed: true })}{' '}
@@ -200,46 +207,53 @@ export function VariancePanel({
               </div>
 
               {/* VAR-11, second line: the task. */}
-              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-[var(--apple-tertiary-label)]">
                 <span data-testid="original-estimate">
-                  Original estimate {formatMinutesAsHours(row.originalEstimateMinutes, { locale })}
+                  Original estimate{' '}
+                  <span className="font-apple-mono tabular-nums">{formatMinutesAsHours(row.originalEstimateMinutes, { locale })}</span>
                 </span>
                 <span data-testid="total-logged">
-                  Total logged {formatMinutesAsHours(row.totalLoggedMinutesOnTask, { locale })}
+                  Total logged{' '}
+                  <span className="font-apple-mono tabular-nums">{formatMinutesAsHours(row.totalLoggedMinutesOnTask, { locale })}</span>
                 </span>
                 <span data-testid="task-variance">
-                  {formatMinutesAsHours(row.taskVarianceMinutes, { locale, signed: true })} against
-                  estimate
+                  <span className="font-apple-mono tabular-nums">{formatMinutesAsHours(row.taskVarianceMinutes, { locale, signed: true })}</span>{' '}
+                  against estimate
                 </span>
               </div>
 
-              <p data-testid={`variance-explanation-${row.taskKey ?? row.taskId}`} className="text-xs">
+              <p data-testid={`variance-explanation-${row.taskKey ?? row.taskId}`} className="text-[11.5px] text-[var(--apple-secondary-label)]">
                 {row.explanation}
               </p>
 
-              {row.requiresRevision && row.revisedRemainingMinutes === undefined && (
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onRevise(row)}
-                  aria-label={`Revise ${row.taskKey ?? row.taskId}`}
-                  className="self-start rounded-md border border-border px-2 py-1 text-xs"
-                >
-                  {standupStrings.variance.reviseTitle()}
-                </button>
-              )}
+              {(row.requiresRevision && row.revisedRemainingMinutes === undefined) ||
+              (row.requiresReason && !row.notStartedReason) ? (
+                <div className="flex flex-wrap gap-2 pt-0.5">
+                  {row.requiresRevision && row.revisedRemainingMinutes === undefined && (
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => onRevise(row)}
+                      aria-label={`Revise ${row.taskKey ?? row.taskId}`}
+                      className="apple-transition rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1 text-[11.5px] font-medium hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
+                    >
+                      {standupStrings.variance.reviseTitle()}
+                    </button>
+                  )}
 
-              {row.requiresReason && !row.notStartedReason && (
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onGiveReason(row)}
-                  aria-label={`Give a reason for ${row.taskKey ?? row.taskId}`}
-                  className="self-start rounded-md border border-border px-2 py-1 text-xs"
-                >
-                  Give a reason
-                </button>
-              )}
+                  {row.requiresReason && !row.notStartedReason && (
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => onGiveReason(row)}
+                      aria-label={`Give a reason for ${row.taskKey ?? row.taskId}`}
+                      className="apple-transition rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1 text-[11.5px] font-medium hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
+                    >
+                      Give a reason
+                    </button>
+                  )}
+                </div>
+              ) : null}
             </li>
           )
         })}
@@ -259,10 +273,10 @@ const TONE_WORD: Record<Tone, () => string> = {
 
 /** VAR-12's palette. Under is blue — informational, not "good". */
 const TONE_CLASS: Record<Tone, string> = {
-  over: 'text-red-700 dark:text-red-300',
-  under: 'text-blue-700 dark:text-blue-300',
-  'on-estimate': 'text-green-700 dark:text-green-300',
-  'not-started': 'text-muted-foreground'
+  over: 'text-[var(--apple-system-red)]',
+  under: 'text-[var(--apple-system-blue)]',
+  'on-estimate': 'text-[var(--apple-system-green)]',
+  'not-started': 'text-[var(--apple-tertiary-label)]'
 }
 
 function toneOf(row: VariancePanelRow): Tone {

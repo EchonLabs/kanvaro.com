@@ -34,7 +34,7 @@ describe('BlockerPanel (Panel 6)', () => {
     expect(screen.queryAllByTestId('blocker-row')).toHaveLength(0)
   })
 
-  it('gives an overdue row the destructive class', () => {
+  it('gives an overdue row the destructive tone', () => {
     render(
       <BlockerPanel
         blockers={[row({ overdue: true, targetResolutionDate: '2026-08-01' })]}
@@ -46,7 +46,7 @@ describe('BlockerPanel (Panel 6)', () => {
 
     const rows = screen.getAllByTestId('blocker-row')
     expect(rows).toHaveLength(1)
-    expect(rows[0].className).toContain('text-destructive')
+    expect(rows[0].className).toContain('apple-system-red')
   })
 
   it('does not mark a non-overdue row as destructive', () => {
@@ -55,7 +55,7 @@ describe('BlockerPanel (Panel 6)', () => {
     )
 
     const rows = screen.getAllByTestId('blocker-row')
-    expect(rows[0].className).not.toContain('text-destructive')
+    expect(rows[0].className).not.toContain('apple-system-red')
   })
 
   it('renders the freed-capacity line when freedMinutes is set', () => {

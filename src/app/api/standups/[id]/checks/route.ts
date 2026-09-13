@@ -14,15 +14,18 @@
  */
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { loadAllocationBoard } from '@/lib/standup/allocation-service'
+import { loadBlockersAndSprintHealth } from '@/lib/standup/check-extras'
+import { loadCarryForwardPanel } from '@/lib/standup/carry-forward-service'
 import {
   blockingFailures,
   evaluateCompletionChecks,
   type CheckAllocation,
-  type CheckMember
+  type CheckCarryForwardItem,
+  type CheckMember,
+  type CheckVarianceRow
 } from '@/lib/standup/completion-checks'
-import { minutes } from '@/lib/standup/minutes'
+import { loadSprintCloseReadiness } from '@/lib/standup/sprint-close-service'
 import { loadVariancePanel } from '@/lib/standup/variance-service'
-import { Task } from '@/models/Task'
 import { ok, withStandupIdPermission } from '@/lib/standup/route-helpers'
 
 export const dynamic = 'force-dynamic'
@@ -30,53 +33,88 @@ export const dynamic = 'force-dynamic'
 export const GET = withStandupIdPermission(
   { permission: Permission.STANDUP_VIEW },
   async (_request, { standupId, standup }) => {
-    const board = await loadAllocationBoard(standupId)
+    const sprintId = String(standup.sprint)
 
-    // The evaluator needs each allocated task's remaining estimate (CC-2), which
-    // the board itself does not carry — the board shows what is planned, not
-    // what is left on the task.
-    const taskIds = board.members.flatMap((member) =>
-      member.allocations.map((row: any) => String(row.task))
-    )
-    const tasks = (await Task.find({ _id: { $in: taskIds } })
-      .select('displayId remainingEstimateMinutes')
-      .lean()) as any[]
-    const byId = new Map(tasks.map((task) => [String(task._id), task]))
+    const [board, variance, carryForward, { blockers, sprintHealth }, sprintCloseReadiness] =
+      await Promise.all([
+        loadAllocationBoard(standupId),
+        // CC-3 asks whether yesterday has been explained, so it needs yesterday.
+        // Passing the rows rather than omitting them is what separates
+        // "explained" from "nobody looked".
+        loadVariancePanel(standupId),
+        loadCarryForwardPanel(standupId),
+        // CC-9's blockers and CC-11's sprint health — shared with the /complete
+        // saga's server-side re-check so the two never disagree (see
+        // check-extras.ts's docblock for what happens when they do).
+        loadBlockersAndSprintHealth(standupId, sprintId),
+        // CC-8, final day only.
+        loadSprintCloseReadiness(standupId)
+      ])
 
+    // `loadAllocationBoard` already resolves each allocation row's task
+    // (`taskId`, `taskKey`, `remainingEstimateMinutes`) via its own Task join
+    // — CC-2's inputs need no second query here (this route previously ran
+    // one anyway, keyed on a `row.task` field the board's rows don't carry,
+    // which cast `"undefined"` to an ObjectId and 500'd on every call; this
+    // route had no caller to ever surface that until now).
     const attendanceByMember = new Map<string, string>(
       (standup.attendance ?? []).map((entry: any) => [String(entry.user), entry.state])
     )
 
     const members: CheckMember[] = board.members.map((member) => ({
       memberId: member.memberId,
+      name: member.name,
       attendance: attendanceByMember.get(member.memberId) as any,
       capacity: member.capacity,
-      allocations: member.allocations.map((row: any): CheckAllocation => {
-        const task = byId.get(String(row.task))
-        return {
-          allocationId: String(row._id),
-          taskId: String(row.task),
-          taskKey: task?.displayId,
+      allocations: member.allocations.map(
+        (row): CheckAllocation => ({
+          allocationId: row.allocationId,
+          taskId: row.taskId,
+          taskKey: row.taskKey,
           memberId: member.memberId,
-          plannedMinutes: minutes(row.plannedMinutes),
-          remainingEstimateMinutes: minutes(task?.remainingEstimateMinutes ?? 0),
-          isBlocked: row.isBlocked ?? false,
-          excludedFromCapacity: row.excludedFromCapacity ?? false,
+          plannedMinutes: row.plannedMinutes,
+          remainingEstimateMinutes: row.remainingEstimateMinutes,
+          isBlocked: row.isBlocked,
+          excludedFromCapacity: row.excludedFromCapacity,
           detachedReason: row.detachedReason,
-          pairedDeliberately: row.pairedDeliberately ?? false
-        }
-      })
+          pairedDeliberately: row.pairedDeliberately
+        })
+      )
     }))
 
-    // CC-3 asks whether yesterday has been explained, so it needs yesterday.
-    // Passing the rows rather than omitting them is what separates "explained"
-    // from "nobody looked".
-    const variance = await loadVariancePanel(standupId)
+    const isDayOne = board.shape === 'day_one'
+
+    const varianceRows: CheckVarianceRow[] = isDayOne
+      ? []
+      : variance.rows.map((row) => ({
+          allocationId: row.allocationId,
+          taskId: row.taskId,
+          taskKey: row.taskKey,
+          memberId: row.memberId,
+          requiresRevision: row.requiresRevision,
+          requiresReason: row.requiresReason,
+          revisedRemainingMinutes: row.revisedRemainingMinutes,
+          notStartedReason: row.notStartedReason
+        }))
+
+    const carryForwardRows: CheckCarryForwardItem[] = isDayOne
+      ? []
+      : carryForward.items.map((item) => ({
+          itemId: item.itemId,
+          taskKey: item.taskKey,
+          memberId: item.memberId,
+          requiresNoteToday: item.requiresNoteToday,
+          notedToday: item.notedToday
+        }))
 
     const checks = evaluateCompletionChecks({
       shape: board.shape as any,
       members,
-      variance: variance.rows
+      variance: varianceRows,
+      carryForward: carryForwardRows,
+      blockers,
+      sprintHealth,
+      openTasks: sprintCloseReadiness.openTasks
     })
 
     return ok({

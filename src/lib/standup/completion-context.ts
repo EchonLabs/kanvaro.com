@@ -27,15 +27,12 @@
  * real data — exactly the client/server disagreement RUN-19 exists to catch.
  */
 import { Project } from '@/models/Project'
-import { Sprint } from '@/models/Sprint'
-import { StandupBlocker } from '@/models/StandupBlocker'
 import { StandupOverride } from '@/models/StandupOverride'
-import { Task } from '@/models/Task'
 
 import { loadAllocationBoard } from './allocation-service'
+import { loadBlockersAndSprintHealth } from './check-extras'
 import {
   type CheckAllocation,
-  type CheckBlocker,
   type CheckCarryForwardItem,
   type CheckMember,
   type CheckVarianceRow,
@@ -43,9 +40,7 @@ import {
 } from './completion-checks'
 import { type CompletionContext } from './completion-saga'
 import { loadCarryForwardPanel } from './carry-forward-service'
-import { loadSprintHealthTotals } from './jobs/sprint-health'
 import { loadSprintCloseReadiness } from './sprint-close-service'
-import { minutes } from './minutes'
 import { loadVariancePanel } from './variance-service'
 
 /**
@@ -74,36 +69,24 @@ export async function assembleCompletionContext(input: {
     board,
     variance,
     carryForward,
-    blockerDocs,
+    { blockerDocs, blockers, sprintHealth },
     overrideDocs,
-    sprint,
     adminRecipientIds,
     sprintCloseReadiness
   ] = await Promise.all([
     loadAllocationBoard(standupId),
     loadVariancePanel(standupId),
     loadCarryForwardPanel(standupId),
-    StandupBlocker.find({ standup: standupId }).lean() as Promise<any[]>,
+    // CC-9's blockers and CC-11's sprint health — shared with GET /checks so
+    // the two never compute either figure differently (see check-extras.ts).
+    loadBlockersAndSprintHealth(standupId, sprintId),
     StandupOverride.find({ standup: standupId }).lean() as Promise<any[]>,
-    Sprint.findById(sprintId).select('project organization endDate').lean() as Promise<any>,
     loadProjectAdmins(projectId),
     // CC-8 and CFW-9 (Phase 11). Without this the server-side re-check reads
     // CC-8 as `not_evaluated` and CFW-9 as nothing at all — the final-day gate
     // would exist only in the browser.
     loadSprintCloseReadiness(standupId)
   ])
-
-  // `loadAllocationBoard` already resolves each allocation row's task
-  // (`taskKey`, `remainingEstimateMinutes`) via its own Task join, so CC-2's
-  // inputs need no second query here. Blockers are a separate collection —
-  // `StandupBlocker.task` — so their display key still needs one.
-  const blockerTaskIds = blockerDocs.filter((blocker) => blocker.task).map((blocker) => blocker.task)
-  const blockerTasks = blockerTaskIds.length
-    ? ((await Task.find({ _id: { $in: blockerTaskIds } })
-        .select('displayId')
-        .lean()) as any[])
-    : []
-  const taskKeyById = new Map(blockerTasks.map((task) => [String(task._id), task.displayId as string]))
 
   const attendanceByMember = new Map<string, string>(
     (standup.attendance ?? []).map((entry: any) => [String(entry.user), entry.state])
@@ -154,17 +137,6 @@ export async function assembleCompletionContext(input: {
         requiresNoteToday: item.requiresNoteToday,
         notedToday: item.notedToday
       }))
-
-  const blockers: CheckBlocker[] = blockerDocs.map((blocker) => ({
-    blockerId: String(blocker._id),
-    taskKey: blocker.task ? taskKeyById.get(String(blocker.task)) : undefined,
-    hasOwner: Boolean(blocker.owner),
-    hasTargetDate: Boolean(blocker.targetResolutionDate)
-  }))
-
-  const sprintHealth = sprint
-    ? await loadSprintHealthTotals(sprint, new Date())
-    : { remainingEstimateMinutes: minutes(0), remainingCapacityMinutes: minutes(0) }
 
   const checkInput: EvaluateCompletionChecksInput = {
     shape: board.shape as EvaluateCompletionChecksInput['shape'],

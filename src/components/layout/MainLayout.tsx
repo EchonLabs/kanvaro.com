@@ -39,6 +39,20 @@ export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
     setMounted(true)
   }, [])
 
+  // This shell's only intended scroll region is `<main>` below — see the
+  // `.app-shell-locked` rule in globals.css for why the document itself
+  // needs to be prevented from scrolling too (a stray `#hash` anchor jump
+  // could otherwise nudge `window` and leave the whole app looking
+  // permanently shifted up). Scoped to this component's own mount lifetime
+  // since docs/landing pages don't use MainLayout and need normal
+  // document-level scrolling.
+  useEffect(() => {
+    document.documentElement.classList.add('app-shell-locked')
+    return () => {
+      document.documentElement.classList.remove('app-shell-locked')
+    }
+  }, [])
+
   if (!mounted) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">

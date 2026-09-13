@@ -131,13 +131,13 @@ export function QuickAddCombobox({
           setActiveIndex(-1)
         }}
         onKeyDown={onKeyDown}
-        className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm disabled:opacity-40"
+        className="h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-[12.5px] text-[var(--apple-label)] disabled:opacity-40"
       />
 
       {open && (
-        <div className="absolute top-full z-20 mt-1 w-full rounded-md border border-border bg-popover shadow-md">
+        <div className="absolute top-full z-20 mt-1 w-full rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-popover shadow-[0_8px_24px_rgba(0,0,0,0.14)]">
           {matches.length === 0 ? (
-            <p className="px-2 py-2 text-sm text-muted-foreground">
+            <p className="px-2 py-2 text-[12.5px] text-[var(--apple-secondary-label)]">
               {standupStrings.allocation.quickAddEmpty()}
             </p>
           ) : (
@@ -155,25 +155,25 @@ export function QuickAddCombobox({
                     choose(task)
                   }}
                   className={cn(
-                    'flex cursor-pointer items-baseline justify-between gap-2 px-2 py-1 text-sm',
-                    index === activeIndex && 'bg-accent'
+                    'flex cursor-pointer items-baseline justify-between gap-2 px-2 py-1.5 text-[12.5px]',
+                    index === activeIndex && 'bg-[var(--apple-system-blue)]/10'
                   )}
                 >
-                  <span className="truncate">
+                  <span className="truncate text-[var(--apple-label)]">
                     {task.key ? `${task.key} ` : ''}
                     {task.title}
                   </span>
-                  <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                  <span className="font-apple-mono shrink-0 tabular-nums text-[11px] text-[var(--apple-secondary-label)]">
                     {formatMinutesAsHours(task.remainingEstimateMinutes, { locale })}
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
+                  <span className="shrink-0 text-[11px] text-[var(--apple-secondary-label)]">
                     {fitLabel(task.remainingEstimateMinutes, gapMinutes, locale)}
                   </span>
                 </li>
               ))}
             </ul>
           )}
-          <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
+          <p className="border-t border-[var(--apple-separator)] px-2 py-1 text-[11px] text-[var(--apple-secondary-label)]">
             {standupStrings.allocation.quickAddHint()}
           </p>
         </div>

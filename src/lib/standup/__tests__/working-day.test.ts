@@ -128,6 +128,40 @@ describe('Layer 2 — holiday sets', () => {
     expect(result.reason).toBe('weekend')
   })
 
+  it('still names a full-day holiday that falls on a weekend', () => {
+    // The day stays non-working for weekend reasons (previous test), but a
+    // calendar preview needs to know a holiday landed here too — otherwise
+    // it is indistinguishable from every other plain Saturday.
+    const result = resolveWorkingDayFrom(
+      '2026-05-30',
+      context({
+        holidaysByDate: new Map([
+          ['2026-05-30', [holiday({ id: 'poya-1', name: 'Adhi Poson Full Moon Poya Day' })]]
+        ])
+      })
+    )
+
+    expect(result.reason).toBe('weekend')
+    expect(result.holidayId).toBe('poya-1')
+    expect(result.holidayName).toBe('Adhi Poson Full Moon Poya Day')
+  })
+
+  it('does not name an optional holiday on a weekend as if it were blocking', () => {
+    const result = resolveWorkingDayFrom(
+      '2026-05-30',
+      context({
+        holidaysByDate: new Map([
+          ['2026-05-30', [holiday({ id: 'opt-1', type: 'optional', name: 'Optional observance' })]]
+        ])
+      })
+    )
+
+    expect(result.reason).toBe('weekend')
+    expect(result.holidayId).toBeUndefined()
+    expect(result.holidayName).toBeUndefined()
+    expect(result.optionalHolidays.map((h) => h.id)).toEqual(['opt-1'])
+  })
+
   it('handles two holidays sharing one date', () => {
     // Real case: 2026-05-01 is both May Day and Vesak Poya.
     const result = resolveWorkingDayFrom(

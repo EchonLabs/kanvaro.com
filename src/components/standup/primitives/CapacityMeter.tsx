@@ -25,11 +25,11 @@ import { cn } from '@/lib/utils'
  */
 
 const TONE: Record<AllocationStatus, string> = {
-  full: 'text-emerald-600 dark:text-emerald-400',
-  under: 'text-amber-600 dark:text-amber-400',
-  over: 'text-destructive',
-  zero: 'text-muted-foreground',
-  unavailable: 'text-muted-foreground'
+  full: 'text-[var(--apple-system-green)]',
+  under: 'text-[var(--apple-system-orange)]',
+  over: 'text-[var(--apple-system-red)]',
+  zero: 'text-[var(--apple-secondary-label)]',
+  unavailable: 'text-[var(--apple-secondary-label)]'
 }
 
 export interface CapacityMeterProps {
@@ -68,8 +68,8 @@ export function CapacityMeter({
 
   return (
     <div className={cn('flex flex-col gap-1', className)}>
-      <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className="tabular-nums text-muted-foreground">
+      <div className="flex items-baseline justify-between gap-2 text-[12.5px]">
+        <span className="font-apple-mono tabular-nums text-[var(--apple-secondary-label)]">
           {standupStrings.allocation.meterLabel({
             name,
             allocated: allocatedMinutes,
@@ -78,7 +78,7 @@ export function CapacityMeter({
           })}
         </span>
         {/* NFR-A1: the word, always, not only the colour. */}
-        <span className={cn('font-medium tabular-nums', TONE[status])}>
+        <span className={cn('font-apple-mono font-semibold tabular-nums', TONE[status])}>
           {statusLabel(status, gapMinutes, locale)}
         </span>
       </div>
@@ -94,7 +94,7 @@ export function CapacityMeter({
           capacity: effectiveMinutes,
           locale
         })}
-        className="relative flex h-2 w-full overflow-visible rounded-full bg-muted"
+        className="relative flex h-[6px] w-full overflow-visible rounded-full bg-[var(--apple-tertiary-fill)]"
       >
         <div
           data-testid="meter-carried"
@@ -102,7 +102,7 @@ export function CapacityMeter({
             minutes: carried as Minutes,
             locale
           })}
-          className="h-full rounded-l-full bg-sky-500/70"
+          className="h-full rounded-l-full bg-[var(--apple-system-blue)]/60"
           style={{ width: `${percent(carried)}%` }}
         />
         <div
@@ -111,7 +111,7 @@ export function CapacityMeter({
             minutes: fresh as Minutes,
             locale
           })}
-          className="h-full bg-emerald-500/70"
+          className="h-full bg-[var(--apple-system-green)]/70"
           style={{ width: `${percent(fresh)}%` }}
         />
         {overMinutes > 0 && (
@@ -122,7 +122,7 @@ export function CapacityMeter({
               locale
             })}
             // Sits past the bar's end deliberately: the overflow is the point.
-            className="absolute left-full top-0 h-full rounded-r-full bg-destructive"
+            className="absolute left-full top-0 h-full rounded-r-full bg-[var(--apple-system-red)]"
             style={{ width: `${Math.min(50, percent(overMinutes))}%` }}
           />
         )}

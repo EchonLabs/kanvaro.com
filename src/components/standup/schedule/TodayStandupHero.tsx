@@ -82,6 +82,10 @@ function todayActionLabel(status: ScheduleDay['status']): string | null {
   if (status === 'Ready' || status === 'Scheduled') return runStrings.start()
   if (status === 'In_Progress' || status === 'Reopened') return strings.resume()
   if (status === 'Completed') return runStrings.viewSummary()
+  // E49. Before this, a `Missed` day rendered no action at all — this hero
+  // card's primary button is the only way a PM ever gets from the schedule
+  // hub to the run screen's Backfill flow.
+  if (status === 'Missed') return runStrings.backfill()
   return null
 }
 

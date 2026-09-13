@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 
+import { Button } from '@/components/ui/Button'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { standupStrings } from '@/lib/standup/strings'
 
 /**
@@ -9,7 +12,16 @@ import { standupStrings } from '@/lib/standup/strings'
  *
  * Mirrors `OverrideModal`'s shape (controlled fields, one disabled-until-valid
  * submit button) rather than inventing a new form pattern.
+ *
+ * Plain `<select>` elements, styled to match the app's `Select` component
+ * rather than swapped for it — `override-modal.test.tsx` asserts against a
+ * native `<select>`/`<option>` DOM (`querySelectorAll('option')`), which the
+ * Radix-based `Select` does not render, so switching would be a behavior
+ * change disguised as a style pass.
  */
+
+const SELECT_CLASS =
+  'h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] px-2.5 text-[13px] text-[var(--apple-label)] transition-all focus-visible:border-[var(--apple-system-blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]/40 disabled:cursor-not-allowed disabled:opacity-50'
 
 const BLOCKER_TYPES = [
   'dependency',
@@ -55,17 +67,18 @@ export function RaiseBlockerModal({ tasks, onSubmit, onCancel }: RaiseBlockerMod
   const canSubmit = description.trim().length >= MIN_DESCRIPTION_LENGTH
 
   return (
-    <div className="flex w-full max-w-md flex-col gap-3 p-4 text-sm">
-      <h2 id="raise-blocker-title" className="text-sm font-semibold">
+    <div className="flex w-full flex-col gap-4 p-5">
+      <h2 id="raise-blocker-title" className="text-[15px] font-semibold text-[var(--apple-label)]">
         {standupStrings.blocker.raise()}
       </h2>
 
-      <label className="flex flex-col gap-1">
-        <span>Linked task (optional)</span>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="blocker-task">Linked task (optional)</Label>
         <select
+          id="blocker-task"
           value={taskId}
           onChange={(event) => setTaskId(event.target.value)}
-          className="h-8 rounded-md border border-border bg-background px-2"
+          className={SELECT_CLASS}
         >
           <option value="">General blocker, not tied to one task</option>
           {tasks.map((task) => (
@@ -74,53 +87,57 @@ export function RaiseBlockerModal({ tasks, onSubmit, onCancel }: RaiseBlockerMod
             </option>
           ))}
         </select>
-      </label>
+      </div>
 
-      <label className="flex flex-col gap-1" htmlFor="blocker-description">
-        Description
-        <textarea
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="blocker-description">Description</Label>
+        <Textarea
           id="blocker-description"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          className="min-h-20 rounded-md border border-border bg-background px-2 py-1"
+          rows={3}
         />
-      </label>
+      </div>
 
-      <label className="flex flex-col gap-1">
-        <span>Type</span>
-        <select
-          value={blockerType}
-          onChange={(event) => setBlockerType(event.target.value as (typeof BLOCKER_TYPES)[number])}
-          className="h-8 rounded-md border border-border bg-background px-2"
-        >
-          {BLOCKER_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type.replace(/_/g, ' ')}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="blocker-type">Type</Label>
+          <select
+            id="blocker-type"
+            value={blockerType}
+            onChange={(event) => setBlockerType(event.target.value as (typeof BLOCKER_TYPES)[number])}
+            className={SELECT_CLASS}
+          >
+            {BLOCKER_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <label className="flex flex-col gap-1">
-        <span>Severity</span>
-        <select
-          value={severity}
-          onChange={(event) => setSeverity(event.target.value as (typeof SEVERITIES)[number])}
-          className="h-8 rounded-md border border-border bg-background px-2"
-        >
-          {SEVERITIES.map((level) => (
-            <option key={level} value={level}>
-              {level}
-            </option>
-          ))}
-        </select>
-      </label>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="blocker-severity">Severity</Label>
+          <select
+            id="blocker-severity"
+            value={severity}
+            onChange={(event) => setSeverity(event.target.value as (typeof SEVERITIES)[number])}
+            className={SELECT_CLASS}
+          >
+            {SEVERITIES.map((level) => (
+              <option key={level} value={level}>
+                {level}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="rounded-md border border-border px-3 py-1 text-xs">
+      <div className="flex justify-end gap-2 pt-1">
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           disabled={!canSubmit}
           onClick={() => {
@@ -133,10 +150,9 @@ export function RaiseBlockerModal({ tasks, onSubmit, onCancel }: RaiseBlockerMod
               severity
             })
           }}
-          className="rounded-md border border-border bg-primary px-3 py-1 text-xs text-primary-foreground disabled:opacity-50"
         >
           {standupStrings.blocker.raise()}
-        </button>
+        </Button>
       </div>
     </div>
   )

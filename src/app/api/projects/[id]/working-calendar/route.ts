@@ -19,7 +19,10 @@ import { checkHolidayCoverage } from '@/lib/standup/calendar-service'
 import { StandupError } from '@/lib/standup/errors'
 import { hoursToMinutes, minutesToHours } from '@/lib/standup/minutes'
 import { notifyCalendarChangeSafely } from '@/lib/standup/notifications'
-import { previewWorkingWeekChange } from '@/lib/standup/preview-impact'
+import {
+  previewHolidaySubscriptionChange,
+  previewWorkingWeekChange
+} from '@/lib/standup/preview-impact'
 import { ok, readJson, withStandupPermission } from '@/lib/standup/route-helpers'
 
 const AUDITED_FIELDS = [
@@ -126,6 +129,26 @@ export const PUT = withStandupPermission(
         )
       : null
 
+    // Same reasoning as the working-week check above, extended to holiday
+    // subscriptions — subscribing to (or dropping) a calendar can create or
+    // erase stand-up dates just as surely as changing the working week can,
+    // and previously got no impact check or CAL-15 notification at all.
+    // Order-insensitive: only the *set* of subscribed calendars matters.
+    const beforeHolidaySetIds = ((before as any)?.subscribedHolidaySets ?? [])
+      .map((id: any) => id.toString())
+      .sort()
+    const afterHolidaySetIds = [...(body.subscribedHolidaySetIds ?? [])].sort()
+    const holidaysChanged =
+      !!before && JSON.stringify(beforeHolidaySetIds) !== JSON.stringify(afterHolidaySetIds)
+
+    const holidayImpact = holidaysChanged
+      ? await previewHolidaySubscriptionChange(
+          projectId!,
+          { subscribedHolidaySetIds: body.subscribedHolidaySetIds ?? [] },
+          { from: isoToday(), to: isoOneYearOut() }
+        )
+      : null
+
     const calendar = await WorkingCalendar.findOneAndUpdate(
       { project: projectId, scope: 'project' },
       {
@@ -166,10 +189,22 @@ export const PUT = withStandupPermission(
       })
     }
 
+    if (holidayImpact) {
+      await notifyCalendarChangeSafely({
+        projectId: projectId!,
+        organizationId,
+        recipientIds: [userId],
+        items: holidayImpact.items,
+        changeLabel: 'The holiday calendars subscribed to this project changed.'
+      })
+    }
+
     return ok({
       calendar: serialiseCalendar(calendar),
       impactSummary: weekImpact?.summary ?? null,
-      affectedStandups: weekImpact?.items ?? []
+      affectedStandups: weekImpact?.items ?? [],
+      holidayImpactSummary: holidayImpact?.summary ?? null,
+      affectedByHolidayChange: holidayImpact?.items ?? []
     })
   }
 )

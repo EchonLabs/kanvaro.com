@@ -40,6 +40,7 @@ interface MyStandupBoard {
   standupVersion: number
   status: string
   date: string
+  projectId: string
   scheduledStartAt?: string
   durationMinutes?: number
   meetingUrl?: string
@@ -173,6 +174,7 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
             standupVersion: board.standupVersion,
             status: board.status,
             date: board.date,
+            projectId: board.projectId,
             scheduledStartAt: board.scheduledStartAt,
             durationMinutes: board.durationMinutes,
             meetingUrl: board.meetingUrl,
@@ -292,6 +294,7 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
             standupVersion={data.standupVersion}
             status={data.status}
             date={data.date}
+            projectId={data.projectId}
             member={data.member}
             poolTasks={data.poolTasks}
             /* Deliberately unconditional. P11-6 makes the server the real gate:

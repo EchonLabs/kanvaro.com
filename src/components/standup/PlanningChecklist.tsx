@@ -14,7 +14,7 @@
  * failing row that cannot expand is a bug, not a styling choice.
  */
 import { useState } from 'react'
-import { AlertTriangle, Check, ChevronRight, Loader2, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react'
 
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -136,7 +136,17 @@ function Section({
   onEstimateTask: (taskId: string, hours: number) => Promise<void>
   onOpenTask: (taskId: string) => void
 }) {
+  const [showPassed, setShowPassed] = useState(false)
+
   if (items.length === 0) return null
+
+  // The wall-of-text problem this screen used to have: every check rendered
+  // in full regardless of whether there was anything to do about it. A
+  // passing check earns one word in a summary line, the same way
+  // `CompletionPanel` on the Run screen already collapses its own passed
+  // checks — only what still needs the PM's attention gets a full row.
+  const needsAttention = items.filter((item) => !item.passed)
+  const settled = items.filter((item) => item.passed)
 
   return (
     <section className="space-y-2">
@@ -145,20 +155,61 @@ function Section({
         <p className="text-[12px] text-[var(--apple-tertiary-label)]">{description}</p>
       </div>
 
-      <ul className="divide-y divide-[var(--apple-separator)] overflow-hidden rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
-        {items.map((item) => (
-          <ChecklistRow
-            key={item.checkId}
-            item={item}
-            offendingTasks={offendingTasks}
-            offendingMembers={offendingMembers}
-            acknowledged={acknowledged?.includes(item.checkId)}
-            onAcknowledge={onAcknowledge}
-            onEstimateTask={onEstimateTask}
-            onOpenTask={onOpenTask}
-          />
-        ))}
-      </ul>
+      {needsAttention.length > 0 ? (
+        <ul className="divide-y divide-[var(--apple-separator)] overflow-hidden rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+          {needsAttention.map((item) => (
+            <ChecklistRow
+              key={item.checkId}
+              item={item}
+              offendingTasks={offendingTasks}
+              offendingMembers={offendingMembers}
+              acknowledged={acknowledged?.includes(item.checkId)}
+              onAcknowledge={onAcknowledge}
+              onEstimateTask={onEstimateTask}
+              onOpenTask={onOpenTask}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className="flex items-center gap-1.5 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card px-3 py-2.5 text-[13px] text-[var(--apple-system-green)] shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+          <Check className="h-4 w-4 shrink-0" />
+          All {items.length} {items.length === 1 ? 'check' : 'checks'} pass
+        </p>
+      )}
+
+      {/* Only worth a toggle when there's a mix — if everything already
+          passed, "All N checks pass" above already says it, and repeating
+          the same N items behind a second control would be noise. */}
+      {needsAttention.length > 0 && settled.length > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowPassed((current) => !current)}
+            aria-expanded={showPassed}
+            className="apple-transition flex items-center gap-1 px-1 py-1 text-[12px] font-medium text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
+          >
+            <ChevronDown className={cn('h-3 w-3 apple-transition', showPassed && 'rotate-180')} />
+            {showPassed ? 'Hide passed checks' : `Show ${settled.length} passed`}
+          </button>
+
+          {showPassed && (
+            <ul className="divide-y divide-[var(--apple-separator)] overflow-hidden rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+              {settled.map((item) => (
+                <ChecklistRow
+                  key={item.checkId}
+                  item={item}
+                  offendingTasks={offendingTasks}
+                  offendingMembers={offendingMembers}
+                  acknowledged={acknowledged?.includes(item.checkId)}
+                  onAcknowledge={onAcknowledge}
+                  onEstimateTask={onEstimateTask}
+                  onOpenTask={onOpenTask}
+                />
+              ))}
+            </ul>
+          )}
+        </>
+      )}
     </section>
   )
 }

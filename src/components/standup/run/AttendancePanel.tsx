@@ -5,6 +5,7 @@ import { useState } from 'react'
 import type { AttendanceStatus } from '@/lib/standup/capacity'
 import { formatMinutesAsHours, hoursToMinutes, type Minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
+import { cn } from '@/lib/utils'
 
 /**
  * Panel 1 — attendance, and RUN-7's prompt (§15.8.3).
@@ -74,17 +75,27 @@ export function AttendancePanel({
     : undefined
 
   return (
-    <section id="panel-1" aria-labelledby="panel-1-heading" className="flex flex-col gap-3">
-      <h3 id="panel-1-heading" className="text-sm font-semibold">
+    <section
+      id="panel-1"
+      aria-labelledby="panel-1-heading"
+      className="scroll-mt-6 flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4"
+    >
+      <h3 id="panel-1-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
         {standupStrings.run.attendanceTitle()}
       </h3>
 
-      <ul className="flex flex-wrap gap-3">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {members.map((member) => {
           const state = stateOf(member)
           return (
-            <li key={member.memberId} className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground" htmlFor={`att-${member.memberId}`}>
+            <li
+              key={member.memberId}
+              className="flex flex-col gap-2 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background p-3"
+            >
+              <label
+                className="truncate text-[13px] font-medium text-[var(--apple-label)]"
+                htmlFor={`att-${member.memberId}`}
+              >
                 {member.name}
               </label>
               <select
@@ -101,7 +112,7 @@ export function AttendancePanel({
                     onSetAttendance({ memberId: member.memberId, state: next })
                   }
                 }}
-                className="h-8 rounded-md border border-border bg-background px-2 text-sm"
+                className="h-9 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2.5 text-[13px] text-[var(--apple-label)]"
               >
                 {STATES.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -131,13 +142,14 @@ export function AttendancePanel({
                       partialMinutes: hoursToMinutes(hours)
                     })
                   }}
-                  className="h-8 w-20 rounded-md border border-border bg-background px-2 text-sm"
+                  className="h-9 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2.5 text-[13px]"
                 />
               )}
 
               {(state === 'absent_planned' || state === 'absent_unplanned') && (
                 <input
                   type="text"
+                  placeholder={standupStrings.run.absenceReasonFor({ name: member.name })}
                   aria-label={standupStrings.run.absenceReasonFor({ name: member.name })}
                   disabled={disabled}
                   onBlur={(event) => {
@@ -145,7 +157,7 @@ export function AttendancePanel({
                     if (!reason) return
                     onSetAttendance({ memberId: member.memberId, state, reason })
                   }}
-                  className="h-8 w-40 rounded-md border border-border bg-background px-2 text-sm"
+                  className="h-9 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2.5 text-[13px]"
                 />
               )}
             </li>
@@ -159,9 +171,9 @@ export function AttendancePanel({
       {prompt && promptMember && (
         <div
           role="alert"
-          className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm"
+          className="flex flex-wrap items-center gap-2 rounded-[var(--apple-radius-md)] border border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/[0.06] p-3 text-[13px]"
         >
-          <p className="flex-1">
+          <p className="min-w-[12rem] flex-1 text-[var(--apple-label)]">
             {standupStrings.run.reassignPrompt({
               name: promptMember.name,
               count: prompt.taskCount
@@ -176,7 +188,7 @@ export function AttendancePanel({
             aria-label={standupStrings.run.reassignTo()}
             value={reassignTo}
             onChange={(event) => setReassignTo(event.target.value)}
-            className="h-8 rounded-md border border-border bg-background px-2 text-sm"
+            className="h-9 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2.5 text-[13px]"
           >
             <option value="">{standupStrings.run.reassignTo()}</option>
             {members
@@ -192,14 +204,17 @@ export function AttendancePanel({
             type="button"
             disabled={!reassignTo}
             onClick={() => onReassign(prompt.memberId, reassignTo)}
-            className="rounded-md border border-border bg-background px-2 py-1 text-xs disabled:opacity-40"
+            className={cn(
+              'apple-transition rounded-[var(--apple-radius-sm)] bg-[var(--apple-system-blue)] px-3 h-9 text-[13px] font-semibold text-white hover:opacity-90',
+              !reassignTo && 'opacity-40'
+            )}
           >
             {standupStrings.run.reassignConfirm()}
           </button>
           <button
             type="button"
             onClick={onDismissPrompt}
-            className="rounded-md px-2 py-1 text-xs text-muted-foreground"
+            className="apple-transition rounded-[var(--apple-radius-sm)] px-3 h-9 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
           >
             {standupStrings.run.reassignDismiss()}
           </button>

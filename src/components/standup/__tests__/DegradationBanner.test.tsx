@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 import { DegradationBanner } from '@/components/standup/DegradationBanner'
 import type { Degradation } from '@/lib/standup/degradation'
@@ -45,7 +45,7 @@ describe('DegradationBanner', () => {
     expect(screen.getByRole('button', { name: /dismiss/i })).toBeInTheDocument()
   })
 
-  it('orders blocking before warning before info', () => {
+  it('orders blocking before warning, and puts info behind a collapsed summary', () => {
     render(
       <DegradationBanner
         degradations={[
@@ -63,7 +63,12 @@ describe('DegradationBanner', () => {
       />
     )
 
-    const messages = screen.getAllByTestId('degradation-message').map((n) => n.textContent)
-    expect(messages).toEqual(['Blocking one.', 'Info one.'])
+    // The blocking notice is prominent immediately; the info one is not — a
+    // standing configuration note doesn't earn a full-width row every day.
+    expect(screen.getByText('Blocking one.')).toBeInTheDocument()
+    expect(screen.queryByText('Info one.')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /1 configuration notice/i }))
+    expect(screen.getByText('Info one.')).toBeInTheDocument()
   })
 })

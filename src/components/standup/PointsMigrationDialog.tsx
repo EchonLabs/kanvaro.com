@@ -191,7 +191,7 @@ export function PointsMigrationDialog({
               {preview.affected.map((task) => (
                 <label
                   key={task.id}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-fill-quaternary)]"
+                  className="flex cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-quaternary-fill)]"
                 >
                   <Checkbox
                     checked={selected.includes(task.id)}

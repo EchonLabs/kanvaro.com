@@ -94,6 +94,10 @@ interface WorkingDay {
   isWorkingDay: boolean
   reason: string
   holidayName?: string
+  /** Set only when a Layer-3 project override decided this date, per CAL-3 —
+   *  the "restores a holiday/weekend as working" case the preview needs to
+   *  tell apart from an ordinary working day. */
+  overrideName?: string
   isPartialDay: boolean
   optionalHolidays: Array<{ id: string; name: string }>
 }
@@ -188,6 +192,35 @@ export function WorkingCalendarSettings({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ change: { kind: 'working_week', workingDaysOfWeek } })
+          }
+        )
+        const payload = await response.json()
+        if (response.ok) setImpact({ items: payload.data.items, summary: payload.data.summary })
+      } catch {
+        setImpact(null)
+      }
+    },
+    [projectId]
+  )
+
+  /**
+   * Same as `previewWorkingWeek`, for the other calendar input that can move
+   * a stand-up date. Subscribing to (or dropping) a holiday calendar used to
+   * have no live feedback at all — the impact panel only ever reacted to the
+   * working-week toggles, so a PM had no way to see what a holiday
+   * subscription would do before saving it.
+   */
+  const previewHolidaySubscription = useCallback(
+    async (subscribedHolidaySetIds: string[]) => {
+      try {
+        const response = await fetch(
+          `/api/projects/${projectId}/working-calendar/preview-impact`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              change: { kind: 'holiday_subscription', subscribedHolidaySetIds }
+            })
           }
         )
         const payload = await response.json()
@@ -382,14 +415,13 @@ export function WorkingCalendarSettings({
                 >
                   <Checkbox
                     checked={subscribed}
-                    onCheckedChange={() =>
-                      setCalendar({
-                        ...calendar,
-                        subscribedHolidaySetIds: subscribed
-                          ? calendar.subscribedHolidaySetIds.filter((id) => id !== set.id)
-                          : [...calendar.subscribedHolidaySetIds, set.id]
-                      })
-                    }
+                    onCheckedChange={() => {
+                      const next = subscribed
+                        ? calendar.subscribedHolidaySetIds.filter((id) => id !== set.id)
+                        : [...calendar.subscribedHolidaySetIds, set.id]
+                      setCalendar({ ...calendar, subscribedHolidaySetIds: next })
+                      previewHolidaySubscription(next)
+                    }}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[14px] font-medium text-[var(--apple-label)]">
@@ -409,71 +441,92 @@ export function WorkingCalendarSettings({
         )}
       </Section>
 
-      {/* Project overrides — layer 3 */}
-      <Section
-        title="Project overrides"
-        action={
-          <Button variant="outline" size="sm" onClick={() => setOverrideDialogOpen(true)}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            Add override
-          </Button>
-        }
-      >
-        {calendar.overrides.length === 0 ? (
-          <p className="text-[13px] text-[var(--apple-secondary-label)]">
-            No overrides. Add one to close a working day, or to work a day the holiday calendar
-            marks as a holiday.
-          </p>
-        ) : (
-          <ul className="divide-y divide-[var(--apple-separator)]">
-            {calendar.overrides.map((override) => (
-              <li key={override.id} className="flex items-center gap-3 py-2.5">
-                <span className="font-apple-mono w-24 shrink-0 text-[13px] tabular-nums text-[var(--apple-secondary-label)]">
-                  {override.date}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[14px] text-[var(--apple-label)]">
-                  {override.name}
-                </span>
-                <Badge
-                  variant={override.effect === 'non_working' ? 'destructive' : 'default'}
-                  className="shrink-0"
-                >
-                  {override.effect === 'non_working' ? 'Non-working' : 'Observed as working'}
-                </Badge>
-                {override.recurringAnnually && (
-                  <Badge variant="secondary" className="shrink-0">
-                    Annual
+      {/* Project overrides (left) and the calendar preview (right) side by
+          side — a PM adding or reviewing an override wants to see its effect
+          on the same screen, not several scrolls apart. Stacks below `lg`,
+          same as everywhere else this pattern is used. Deliberately stretch
+          (the grid default, not `items-start`) so both cards share the row's
+          height — the calendar sets it, and the overrides card grows to
+          match rather than the two bottoms landing at different levels. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Section
+          title="Project overrides"
+          action={
+            <Button variant="outline" size="sm" onClick={() => setOverrideDialogOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Add override
+            </Button>
+          }
+        >
+          {calendar.overrides.length === 0 ? (
+            <p className="text-[13px] text-[var(--apple-secondary-label)]">
+              No overrides. Add one to close a working day, or to work a day the holiday calendar
+              marks as a holiday.
+            </p>
+          ) : (
+            // Grows with the card (which now stretches to match the
+            // calendar preview's height — see `Section`) and only starts
+            // scrolling once the list itself would exceed that, so the two
+            // cards' bottoms line up instead of the list forcing this card
+            // taller than its neighbour.
+            <ul className="min-h-0 flex-1 divide-y divide-[var(--apple-separator)] overflow-y-auto pr-1">
+              {calendar.overrides.map((override) => (
+                <li key={override.id} className="flex items-center gap-2 py-2.5">
+                  <span className="font-apple-mono w-20 shrink-0 text-[12px] tabular-nums text-[var(--apple-secondary-label)]">
+                    {override.date}
+                  </span>
+                  {/* The narrower column this now sits in is exactly why this
+                      needs to truncate rather than push the row wider — a
+                      long override name (the closest thing this form has to
+                      a "reason") must never force the badges/remove button
+                      off the edge of their half of the grid. */}
+                  <span
+                    className="min-w-0 flex-1 truncate text-[14px] text-[var(--apple-label)]"
+                    title={override.name}
+                  >
+                    {override.name}
+                  </span>
+                  <Badge
+                    variant={override.effect === 'non_working' ? 'destructive' : 'default'}
+                    className="shrink-0"
+                  >
+                    {override.effect === 'non_working' ? 'Non-working' : 'Observed as working'}
                   </Badge>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeOverride(override)}
-                  aria-label={`Remove ${override.name}`}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
+                  {override.recurringAnnually && (
+                    <Badge variant="secondary" className="shrink-0">
+                      Annual
+                    </Badge>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeOverride(override)}
+                    aria-label={`Remove ${override.name}`}
+                    className="shrink-0"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
 
-      {/* Calendar preview */}
-      <Section
-        title="Calendar preview"
-        action={
-          <Input
-            type="month"
-            value={previewMonth}
-            onChange={(event) => setPreviewMonth(event.target.value)}
-            className="h-8 w-40 text-[13px]"
-            aria-label="Preview month"
-          />
-        }
-      >
-        <MonthGrid month={previewMonth} workingDays={workingDays} />
-      </Section>
+        <Section
+          title="Calendar preview"
+          action={
+            <Input
+              type="month"
+              value={previewMonth}
+              onChange={(event) => setPreviewMonth(event.target.value)}
+              className="h-8 w-40 text-[13px]"
+              aria-label="Preview month"
+            />
+          }
+        >
+          <MonthGrid month={previewMonth} workingDays={workingDays} />
+        </Section>
+      </div>
 
       {/* UI-1 — live impact panel */}
       {impact && impact.items.length > 0 && (
@@ -828,7 +881,7 @@ function AddOverrideDialog({
                   {members.map((member) => (
                     <label
                       key={member.memberId}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-fill-quaternary)]"
+                      className="flex cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-quaternary-fill)]"
                     >
                       <Checkbox
                         checked={selectedMemberIds.includes(member.memberId)}
@@ -908,11 +961,18 @@ function MonthGrid({ month, workingDays }: { month: string; workingDays: Working
           const dayNumber = index + 1
           const date = `${month}-${String(dayNumber).padStart(2, '0')}`
           const day = byDate.get(date)
-          // A full-day holiday blocks the stand-up outright; a project
-          // override (closed day) and a plain weekend share the neutral
-          // non-working look, since the legend for those is the grey fill
-          // rather than a colour.
-          const holiday = day?.reason === 'org_holiday'
+          // A full-day holiday paints red whether or not it actually removed
+          // the day — `holidayName` is now attached even when the date was
+          // already a weekend (`working-day.ts`'s Layer 1 short-circuit no
+          // longer throws that information away), so a Poya day that lands
+          // on a Saturday still reads as a holiday instead of looking like
+          // any other plain weekend.
+          const holiday = Boolean(day?.holidayName)
+          // "Operational" — CAL-3's `observed_as_working` override, which
+          // restores a day that would otherwise be a holiday or a weekend.
+          // Distinct from an ordinary working day on purpose: this is a
+          // deliberate exception someone decided on, not the default.
+          const operational = Boolean(day?.isWorkingDay && day?.overrideName)
           const optional = (day?.optionalHolidays?.length ?? 0) > 0
 
           return (
@@ -921,19 +981,21 @@ function MonthGrid({ month, workingDays }: { month: string; workingDays: Working
               title={describeDay(day)}
               className={cn(
                 'relative flex aspect-square items-center justify-center rounded-[var(--apple-radius-sm)] border text-[13px] font-semibold tabular-nums font-apple-mono',
+                // `color-mix()` rather than Tailwind's `/NN` opacity modifier:
+                // this project's Tailwind (3.3) cannot resolve an alpha
+                // channel against a `var()` colour, so
+                // `bg-[var(--apple-system-red)]/15` silently produces no
+                // background at all — confirmed live, the day rendered with
+                // red text and no fill whatsoever. `color-mix` is plain CSS
+                // the browser evaluates itself, independent of Tailwind's
+                // opacity support.
                 holiday
-                  // `color-mix()` rather than Tailwind's `/NN` opacity
-                  // modifier: this project's Tailwind (3.3) cannot resolve an
-                  // alpha channel against a `var()` colour, so
-                  // `bg-[var(--apple-system-red)]/15` silently produces no
-                  // background at all — confirmed live, the day rendered
-                  // with red text and no fill whatsoever. `color-mix` is
-                  // plain CSS the browser evaluates itself, independent of
-                  // Tailwind's opacity support.
                   ? 'border-[color-mix(in_srgb,var(--apple-system-red)_45%,transparent)] bg-[color-mix(in_srgb,var(--apple-system-red)_16%,transparent)] text-[var(--apple-system-red)]'
-                  : day?.isWorkingDay
-                    ? 'border-[var(--apple-separator)] text-[var(--apple-label)]'
-                    : 'border-transparent bg-[var(--apple-tertiary-fill)] text-[var(--apple-tertiary-label)]'
+                  : operational
+                    ? 'border-[color-mix(in_srgb,var(--apple-system-blue)_45%,transparent)] bg-[color-mix(in_srgb,var(--apple-system-blue)_16%,transparent)] text-[var(--apple-system-blue)]'
+                    : day?.isWorkingDay
+                      ? 'border-[var(--apple-separator)] text-[var(--apple-label)]'
+                      : 'border-transparent bg-[var(--apple-tertiary-fill)] text-[var(--apple-tertiary-label)]'
               )}
             >
               {dayNumber}
@@ -950,10 +1012,11 @@ function MonthGrid({ month, workingDays }: { month: string; workingDays: Working
 
       {/* Colour is never the only carrier of meaning (NFR-A1). */}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-[var(--apple-secondary-label)]">
-        <LegendItem className="border border-[var(--apple-separator)]" label="Working day" />
-        <LegendItem className="bg-[var(--apple-tertiary-fill)]" label="Weekend / non-working" />
+        <LegendItem className="border border-[var(--apple-separator)]" label="Working" />
+        <LegendItem className="bg-[var(--apple-tertiary-fill)]" label="Weekend" />
         <LegendItem className="bg-[var(--apple-system-red)]" label="Holiday" />
-        <LegendItem className="bg-[var(--apple-system-orange)]" label="Optional holiday" />
+        <LegendItem className="bg-[var(--apple-system-blue)]" label="Operational" />
+        <LegendItem className="bg-[var(--apple-system-orange)]" label="Optional" />
       </div>
     </div>
   )
@@ -961,8 +1024,8 @@ function MonthGrid({ month, workingDays }: { month: string; workingDays: Working
 
 function LegendItem({ className, label }: { className: string; label: string }) {
   return (
-    <span className="flex items-center gap-1.5">
-      <span className={cn('h-2.5 w-2.5 rounded-sm', className)} aria-hidden />
+    <span className="flex items-center gap-1.5 whitespace-nowrap">
+      <span className={cn('h-2.5 w-2.5 shrink-0 rounded-sm', className)} aria-hidden />
       {label}
     </span>
   )
@@ -971,6 +1034,7 @@ function LegendItem({ className, label }: { className: string; label: string }) 
 function describeDay(day?: WorkingDay): string {
   if (!day) return ''
   if (day.holidayName) return day.holidayName
+  if (day.isWorkingDay && day.overrideName) return `${day.overrideName} (made operational)`
   if (day.optionalHolidays?.length) {
     return `${day.optionalHolidays.map((h) => h.name).join(', ')} (optional)`
   }
@@ -996,12 +1060,21 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+    // `flex h-full flex-col`: a no-op stacked full-width (the common case —
+    // block children already behave the same way), but it's what lets a
+    // Section stretched by a parent grid (Project overrides next to the
+    // Calendar preview) actually fill that height instead of just sitting at
+    // its own content height inside a taller cell.
+    <section className="flex h-full flex-col rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h5 className="apple-section-label text-[var(--apple-secondary-label)]">{title}</h5>
         {action}
       </div>
-      {children}
+      {/* `min-h-0` is the part that's easy to forget: without it a flex child
+          refuses to shrink below its content size, and the overrides list's
+          own `overflow-y-auto` would never actually engage — the card would
+          just grow past the calendar instead of matching it. */}
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </section>
   )
 }

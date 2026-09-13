@@ -36,6 +36,10 @@ export interface ProposedWorkingWeek {
   workingDaysOfWeek: number[]
 }
 
+export interface ProposedHolidaySubscription {
+  subscribedHolidaySetIds: string[]
+}
+
 export interface PreviewResult {
   items: CalendarImpactItem[]
   summary: string
@@ -88,6 +92,38 @@ export async function previewWorkingWeekChange(
   }
 
   return buildPreview(projectId, before, after)
+}
+
+/**
+ * Previews subscribing to (or unsubscribing from) holiday calendars.
+ *
+ * Toggling a holiday-set checkbox used to have no live preview at all — only
+ * a working-week change got one (`previewWorkingWeekChange`), even though
+ * subscribing to a calendar covering an already-scheduled stand-up date is
+ * exactly the kind of change UI-1 exists to warn about before it's saved.
+ * Resolves the "after" side by asking `loadCalendarContext` for the proposed
+ * subscription list instead of the one actually saved, so nothing is written
+ * to preview it.
+ */
+export async function previewHolidaySubscriptionChange(
+  projectId: string,
+  proposed: ProposedHolidaySubscription,
+  range: { from: IsoDate; to: IsoDate }
+): Promise<PreviewResult> {
+  const [before, after] = await Promise.all([
+    loadCalendarContext(projectId, range.from, range.to),
+    loadCalendarContext(projectId, range.from, range.to, proposed.subscribedHolidaySetIds)
+  ])
+
+  const beforeMap = new Map<IsoDate, boolean>()
+  const afterMap = new Map<IsoDate, boolean>()
+
+  for (const date of eachDateInRange(range.from, range.to)) {
+    beforeMap.set(date, resolveWorkingDayFrom(date, before).isWorkingDay)
+    afterMap.set(date, resolveWorkingDayFrom(date, after).isWorkingDay)
+  }
+
+  return buildPreview(projectId, beforeMap, afterMap)
 }
 
 /**

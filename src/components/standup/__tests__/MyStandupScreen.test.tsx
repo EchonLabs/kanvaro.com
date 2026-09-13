@@ -7,6 +7,17 @@ import type { CapacityBreakdown } from '@/lib/standup/capacity'
 import { minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 
+const mockPush = jest.fn()
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush })
+}))
+
+// `mock`-prefixed so Jest's hoisting exception lets this factory reference it.
+const mockHasPermission = jest.fn().mockReturnValue(false)
+jest.mock('@/lib/permissions/permission-context', () => ({
+  usePermissions: () => ({ hasPermission: mockHasPermission })
+}))
+
 /**
  * Builds a complete `CapacityBreakdown` fixture. `MyStandupMember.capacity`
  * keeps the full type (not narrowed) because Task 15's read-only leave
@@ -241,5 +252,31 @@ describe('MyStandupScreen', () => {
       ]
     })
     expect(screen.getByText(/project beta/i)).toBeInTheDocument()
+  })
+
+  describe('the schedule-hub button', () => {
+    afterEach(() => {
+      mockHasPermission.mockReturnValue(false)
+      mockPush.mockClear()
+    })
+
+    it('is absent for a viewer without SPRINT_UPDATE on the project', () => {
+      setup({ projectId: 'p1' })
+      expect(screen.queryByRole('button', { name: /view stand-up schedule/i })).not.toBeInTheDocument()
+    })
+
+    it('is absent when no project could be resolved, even for a PM', () => {
+      mockHasPermission.mockReturnValue(true)
+      setup({ projectId: undefined })
+      expect(screen.queryByRole('button', { name: /view stand-up schedule/i })).not.toBeInTheDocument()
+    })
+
+    it('navigates to the project schedule hub for a PM', () => {
+      mockHasPermission.mockReturnValue(true)
+      setup({ projectId: 'p1' })
+
+      fireEvent.click(screen.getByRole('button', { name: /view stand-up schedule/i }))
+      expect(mockPush).toHaveBeenCalledWith('/projects/p1/standups')
+    })
   })
 })

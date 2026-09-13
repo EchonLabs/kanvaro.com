@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 
 import { standupStrings } from '@/lib/standup/strings'
+import { cn } from '@/lib/utils'
 
 /**
  * Panel 4 — the carry-forward register (§13, CFW-1..11).
@@ -119,42 +120,51 @@ export function CarryForwardPanel({ data, api, disabled = false }: CarryForwardP
   }
 
   return (
-    <section id="panel-4" aria-labelledby="panel-4-heading" className="flex flex-col gap-3">
-      <h3 id="panel-4-heading" className="text-sm font-semibold">
-        {standupStrings.carryForward.title()}
-      </h3>
-      <p className="text-xs text-muted-foreground">{standupStrings.carryForward.subtitle()}</p>
+    <section
+      id="panel-4"
+      aria-labelledby="panel-4-heading"
+      className="scroll-mt-6 flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4"
+    >
+      <div>
+        <h3 id="panel-4-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
+          {standupStrings.carryForward.title()}
+        </h3>
+        <p className="mt-1 text-[12px] text-[var(--apple-secondary-label)]">
+          {standupStrings.carryForward.subtitle()}
+        </p>
+      </div>
 
       {/* CFW-11's summary strip. */}
-      <div className="flex flex-wrap gap-2 text-xs" data-testid="carry-forward-summary">
-        <span className="rounded-full border border-border px-2 py-0.5">
+      <div className="flex flex-wrap gap-2 text-[12px]" data-testid="carry-forward-summary">
+        <span className="rounded-full border border-[var(--apple-separator)] px-2.5 py-1 text-[var(--apple-secondary-label)]">
           {standupStrings.carryForward.summaryOpen({ count: data.summary.totalOpen })}
         </span>
         <span
-          className={
+          className={cn(
+            'rounded-full border px-2.5 py-1',
             data.summary.needingNoteToday > 0
-              ? 'rounded-full border border-amber-400 bg-amber-100 px-2 py-0.5 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200'
-              : 'rounded-full border border-border px-2 py-0.5'
-          }
+              ? 'border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/10 text-[var(--apple-system-orange)]'
+              : 'border-[var(--apple-separator)] text-[var(--apple-secondary-label)]'
+          )}
         >
           {standupStrings.carryForward.summaryNeedingNote({ count: data.summary.needingNoteToday })}
         </span>
-        <span className="rounded-full border border-border px-2 py-0.5">
+        <span className="rounded-full border border-[var(--apple-separator)] px-2.5 py-1 text-[var(--apple-secondary-label)]">
           {standupStrings.carryForward.summaryEscalated({ count: data.summary.escalated })}
         </span>
-        <span className="rounded-full border border-border px-2 py-0.5">
+        <span className="rounded-full border border-[var(--apple-separator)] px-2.5 py-1 text-[var(--apple-secondary-label)]">
           {standupStrings.carryForward.summaryResolved({ count: data.summary.resolvedYesterday })}
         </span>
       </div>
 
       {/* CFW-10's filters. */}
-      <div className="flex flex-wrap gap-2 text-xs">
-        <label className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-2 text-[12px] text-[var(--apple-secondary-label)]">
+        <label className="flex items-center gap-1.5">
           {standupStrings.carryForward.filterType()}
           <select
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
-            className="h-7 rounded-md border border-border bg-background px-1"
+            className="h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-[12.5px] text-[var(--apple-label)]"
           >
             <option value="all">All</option>
             {types.map((type) => (
@@ -164,12 +174,12 @@ export function CarryForwardPanel({ data, api, disabled = false }: CarryForwardP
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-1">
+        <label className="flex items-center gap-1.5">
           {standupStrings.carryForward.filterAgeBand()}
           <select
             value={ageFilter}
             onChange={(event) => setAgeFilter(event.target.value)}
-            className="h-7 rounded-md border border-border bg-background px-1"
+            className="h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-[12.5px] text-[var(--apple-label)]"
           >
             <option value="all">All</option>
             <option value="normal">Normal</option>
@@ -178,16 +188,18 @@ export function CarryForwardPanel({ data, api, disabled = false }: CarryForwardP
             <option value="chronic">Chronic</option>
           </select>
         </label>
-        <span className="ml-auto self-center text-muted-foreground">
+        <span className="ml-auto self-center">
           {standupStrings.carryForward.sortedByAge()}
         </span>
       </div>
 
       {visible.length === 0 && (
-        <p className="text-sm text-muted-foreground">{standupStrings.carryForward.empty()}</p>
+        <p className="rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] px-3 py-3 text-center text-[13px] text-[var(--apple-tertiary-label)]">
+          {standupStrings.carryForward.empty()}
+        </p>
       )}
 
-      <ul className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-2.5">
         {visible.map((item) => {
           const resolved = !OPEN_STATUSES.includes(item.status)
 
@@ -195,26 +207,29 @@ export function CarryForwardPanel({ data, api, disabled = false }: CarryForwardP
             <li
               key={item.itemId}
               data-testid={`carry-forward-item-${item.itemId}`}
-              className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm"
+              className="flex flex-col gap-2 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background p-3 text-[13px]"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{item.taskKey ?? standupStrings.carryForward.itemTypeLabel(item.type)}</span>
-                <span className="text-muted-foreground">
+                <span className="font-medium text-[var(--apple-label)]">
+                  {item.taskKey ?? standupStrings.carryForward.itemTypeLabel(item.type)}
+                </span>
+                <span className="text-[var(--apple-secondary-label)]">
                   {standupStrings.carryForward.itemTypeLabel(item.type)}
                 </span>
                 {item.memberName && (
-                  <span className="text-xs text-muted-foreground">{item.memberName}</span>
+                  <span className="text-[11.5px] text-[var(--apple-secondary-label)]">{item.memberName}</span>
                 )}
 
                 <span
                   data-testid="age-badge"
-                  className={
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-[11px] font-medium',
                     item.ageBand === 'chronic'
-                      ? 'rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive'
+                      ? 'bg-[var(--apple-system-red)]/15 text-[var(--apple-system-red)]'
                       : item.ageBand === 'escalated'
-                        ? 'rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200'
-                        : 'rounded bg-muted px-1.5 py-0.5 text-xs'
-                  }
+                        ? 'bg-[var(--apple-system-orange)]/15 text-[var(--apple-system-orange)]'
+                        : 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]'
+                  )}
                 >
                   {standupStrings.carryForward.ageBadge({ age: item.ageInStandups })}
                   {item.ageBand === 'chronic'
@@ -225,7 +240,9 @@ export function CarryForwardPanel({ data, api, disabled = false }: CarryForwardP
                 </span>
 
                 {resolved && (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{item.status}</span>
+                  <span className="rounded-full bg-[var(--apple-tertiary-fill)] px-2 py-0.5 text-[11px] text-[var(--apple-secondary-label)]">
+                    {item.status}
+                  </span>
                 )}
               </div>
 
@@ -233,14 +250,14 @@ export function CarryForwardPanel({ data, api, disabled = false }: CarryForwardP
               {item.notes.length > 0 && (
                 <div
                   data-testid="note-history"
-                  className="flex flex-col gap-1 rounded-md bg-muted/50 p-2 text-xs"
+                  className="flex flex-col gap-1 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] p-2.5 text-[12px]"
                 >
-                  <p className="font-medium text-muted-foreground">
+                  <p className="font-medium text-[var(--apple-secondary-label)]">
                     {standupStrings.carryForward.noteHistory()}
                   </p>
                   {item.notes.map((note, index) => (
-                    <p key={index}>
-                      <span className="text-muted-foreground">{note.standupDate}</span>
+                    <p key={index} className="text-[var(--apple-label)]">
+                      <span className="text-[var(--apple-tertiary-label)]">{note.standupDate}</span>
                       {note.authorName ? ` — ${note.authorName}: ` : ': '}
                       {note.text}
                     </p>
@@ -251,7 +268,7 @@ export function CarryForwardPanel({ data, api, disabled = false }: CarryForwardP
               {!resolved && (
                 <>
                   {item.requiresNoteToday && !item.notedToday && (
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                    <p className="text-[12px] font-medium text-[var(--apple-system-orange)]">
                       {standupStrings.carryForward.noteRequired()}
                     </p>
                   )}
@@ -272,21 +289,21 @@ export function CarryForwardPanel({ data, api, disabled = false }: CarryForwardP
                       }
                       placeholder={standupStrings.carryForward.notePlaceholder()}
                       disabled={disabled}
-                      className="min-h-14 w-full max-w-sm rounded-md border border-border bg-background px-2 py-1 text-sm sm:w-auto"
+                      className="min-h-14 w-full min-w-[12rem] flex-1 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2.5 py-1.5 text-[12.5px] disabled:opacity-40"
                     />
                     <button
                       type="button"
                       data-testid="add-note"
                       disabled={disabled || !(draftText[item.itemId] ?? '').trim()}
                       onClick={() => void submitNote(item)}
-                      className="rounded-md border border-border px-2 py-1 text-xs disabled:opacity-50"
+                      className="apple-transition shrink-0 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1.5 text-[12px] font-medium hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
                     >
                       {standupStrings.carryForward.addNote()}
                     </button>
                   </div>
 
                   {errors[item.itemId] && (
-                    <p role="alert" className="text-xs text-destructive">
+                    <p role="alert" className="text-[12px] text-[var(--apple-system-red)]">
                       {errors[item.itemId]}
                     </p>
                   )}
@@ -299,7 +316,7 @@ export function CarryForwardPanel({ data, api, disabled = false }: CarryForwardP
                           type="button"
                           disabled={disabled}
                           onClick={() => void resolve(item, resolutionType)}
-                          className="rounded-md border border-border px-2 py-1 text-xs"
+                          className="apple-transition rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1 text-[12px] font-medium hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
                         >
                           {resolutionLabel(resolutionType)}
                         </button>

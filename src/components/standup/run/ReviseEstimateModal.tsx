@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/label'
 import { MIN_REVISION_DETAIL_LENGTH, REVISION_REASONS, type RevisionReason } from '@/lib/standup/estimates'
 import { formatMinutesAsHours, hoursToMinutes, minutes, type Minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
@@ -19,7 +22,21 @@ import { standupStrings } from '@/lib/standup/strings'
  *   explicitly: seeing eleven hours against a six-hour estimate is the moment a
  *   PM decides whether to split the task or descope it. Without it the dialog
  *   asks for a number in a vacuum.
+ *
+ * The Reason field stays a plain `<select>`, styled to match the app's
+ * `Select` component rather than swapped for it — `variance-panel.test.tsx`
+ * drives it with `fireEvent.change(getByLabelText('Reason'), { target:
+ * { value } })`, which only works on a native form control.
+ *
+ * Unlike `RaiseBlockerModal`/`ResolveBlockerDialog`/`OverrideModal`, nothing
+ * currently mounts this inside `ModalOverlay` (grep confirms no import in
+ * `StandupRunScreen.tsx` or `VariancePanel.tsx` — `onRevise` there calls the
+ * API directly), so its own root keeps a self-contained card shell rather
+ * than assuming a wrapper supplies one.
  */
+
+const SELECT_CLASS =
+  'h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] px-2.5 text-[13px] text-[var(--apple-label)] transition-all focus-visible:border-[var(--apple-system-blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]/40 disabled:cursor-not-allowed disabled:opacity-50'
 
 export interface ReviseEstimateTarget {
   allocationId: string
@@ -65,37 +82,41 @@ export function ReviseEstimateModal({
   const projectedTotal = minutes(target.totalLoggedMinutesOnTask + remaining)
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
-      <h3 id="revise-title" className="text-sm font-semibold">
-        {standupStrings.variance.reviseTitle()}
-      </h3>
+    <div className="flex w-full flex-col gap-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-5 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+      <div>
+        <h3 id="revise-title" className="text-[15px] font-semibold text-[var(--apple-label)]">
+          {standupStrings.variance.reviseTitle()}
+        </h3>
+        <p className="mt-1 text-[13px] text-[var(--apple-secondary-label)]">
+          <span className="font-medium text-[var(--apple-label)]">{target.taskKey}</span> {target.title}
+        </p>
+      </div>
 
-      <p className="text-sm">
-        <span className="font-medium">{target.taskKey}</span> {target.title}
-      </p>
-
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <dt>Original estimate</dt>
-        <dd data-testid="revise-original">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3 text-[12.5px]">
+        <dt className="text-[var(--apple-tertiary-label)]">Original estimate</dt>
+        <dd data-testid="revise-original" className="text-right font-apple-mono tabular-nums text-[var(--apple-label)]">
           {formatMinutesAsHours(target.originalEstimateMinutes, { locale })}
         </dd>
-        <dt>Total logged so far</dt>
-        <dd data-testid="revise-logged">
+        <dt className="text-[var(--apple-tertiary-label)]">Total logged so far</dt>
+        <dd data-testid="revise-logged" className="text-right font-apple-mono tabular-nums text-[var(--apple-label)]">
           {formatMinutesAsHours(target.totalLoggedMinutesOnTask, { locale })}
         </dd>
         {target.taskVarianceMinutes > 0 && (
           <>
-            <dt>Currently over by</dt>
-            <dd data-testid="revise-over">
+            <dt className="text-[var(--apple-system-orange)]">Currently over by</dt>
+            <dd
+              data-testid="revise-over"
+              className="text-right font-apple-mono tabular-nums text-[var(--apple-system-orange)]"
+            >
               {formatMinutesAsHours(target.taskVarianceMinutes, { locale })}
             </dd>
           </>
         )}
       </dl>
 
-      <label className="flex flex-col gap-1 text-sm" htmlFor="revise-hours">
-        {standupStrings.variance.reviseHoursLabel()}
-        <input
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="revise-hours">{standupStrings.variance.reviseHoursLabel()}</Label>
+        <Input
           id="revise-hours"
           type="number"
           min={0}
@@ -103,17 +124,17 @@ export function ReviseEstimateModal({
           step={0.25}
           value={hours}
           onChange={(event) => setHours(event.target.value)}
-          className="h-8 w-24 rounded-md border border-border bg-background px-2"
+          className="w-28"
         />
-      </label>
+      </div>
 
-      <label className="flex flex-col gap-1 text-sm" htmlFor="revise-reason">
-        Reason
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="revise-reason">Reason</Label>
         <select
           id="revise-reason"
           value={reason}
           onChange={(event) => setReason(event.target.value as RevisionReason)}
-          className="h-8 rounded-md border border-border bg-background px-2"
+          className={SELECT_CLASS}
         >
           {REVISION_REASONS.map((option) => (
             <option key={option} value={option}>
@@ -121,22 +142,21 @@ export function ReviseEstimateModal({
             </option>
           ))}
         </select>
-      </label>
+      </div>
 
       {reason === 'other' && (
-        <div className="flex flex-col gap-1 text-sm">
+        <div className="flex flex-col gap-1.5">
           {/* The hint sits outside the label: nesting it would fold the whole
               sentence into the field's accessible name. */}
-          <label htmlFor="revise-detail">Detail</label>
-          <input
+          <Label htmlFor="revise-detail">Detail</Label>
+          <Input
             id="revise-detail"
             type="text"
             value={detail}
             onChange={(event) => setDetail(event.target.value)}
             aria-describedby="revise-detail-hint"
-            className="h-8 rounded-md border border-border bg-background px-2"
           />
-          <span id="revise-detail-hint" className="text-xs text-muted-foreground">
+          <span id="revise-detail-hint" className="text-[12px] text-[var(--apple-tertiary-label)]">
             {standupStrings.variance.reviseDetailRequired({
               minLength: MIN_REVISION_DETAIL_LENGTH
             })}
@@ -144,12 +164,12 @@ export function ReviseEstimateModal({
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-[12px] text-[var(--apple-tertiary-label)]">
         {standupStrings.variance.reviseOriginalUnchanged()}
       </p>
 
       {hasHours && (
-        <p data-testid="revise-projected" className="text-sm">
+        <p data-testid="revise-projected" className="text-[13px] text-[var(--apple-label)]">
           {standupStrings.variance.reviseProjectedTotal({
             name: target.memberName,
             total: projectedTotal,
@@ -158,11 +178,11 @@ export function ReviseEstimateModal({
         </p>
       )}
 
-      <div className="flex gap-2">
-        <button type="button" onClick={onCancel} className="rounded-md border border-border px-3 py-1 text-sm">
+      <div className="flex justify-end gap-2 pt-1">
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           disabled={!canSave}
           onClick={() =>
@@ -173,10 +193,9 @@ export function ReviseEstimateModal({
               ...(detail.trim() ? { detail: detail.trim() } : {})
             })
           }
-          className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground disabled:opacity-50"
         >
           Save
-        </button>
+        </Button>
       </div>
     </div>
   )

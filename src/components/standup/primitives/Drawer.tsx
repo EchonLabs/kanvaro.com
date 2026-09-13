@@ -93,17 +93,17 @@ export function Drawer({ open, onClose, title, children, className }: DrawerProp
         aria-label={title}
         onKeyDown={onKeyDown}
         className={cn(
-          'relative flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto border-l border-border bg-background p-4 shadow-lg',
+          'relative flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto border-l border-[var(--apple-separator)] bg-card p-4 shadow-[-8px_0_28px_rgba(0,0,0,0.14)]',
           className
         )}
       >
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-base font-semibold">{title}</h2>
+          <h2 className="text-[17px] font-semibold text-[var(--apple-label)]">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label={standupStrings.allocation.drawerClose()}
-            className="rounded-md border border-border px-2 py-1 text-sm"
+            className="apple-transition rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-1 text-[13px] hover:bg-[var(--apple-quaternary-fill)]"
           >
             ✕
           </button>

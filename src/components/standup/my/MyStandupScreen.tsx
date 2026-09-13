@@ -1,8 +1,12 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { Info, Lock } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { CalendarDays, Info, Lock } from 'lucide-react'
 
+import { Button } from '@/components/ui/Button'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import { isOwnRowReadOnly, isSelfSelectDisabled } from '@/lib/standup/own-row'
 import { standupStrings } from '@/lib/standup/strings'
 import { IconChip } from './shared/IconChip'
@@ -66,6 +70,10 @@ export interface MyStandupScreenProps {
   standupVersion: number
   status: string
   date: string
+  /** Lets a PM jump to this stand-up's project schedule hub without leaving
+   *  their own stand-up screen to go find it. Omitted entirely when the
+   *  caller could not resolve a project (nothing renders in that case). */
+  projectId?: string
   member: MyStandupMember
   poolTasks: readonly MyStandupPoolTask[]
   allowSelfSelect: boolean
@@ -89,6 +97,7 @@ export function MyStandupScreen({
   standupId,
   standupVersion,
   status,
+  projectId,
   member,
   poolTasks,
   allowSelfSelect,
@@ -109,6 +118,15 @@ export function MyStandupScreen({
 }: MyStandupScreenProps) {
   const [version, setVersion] = useState(standupVersion)
   const [notice, setNotice] = useState<string | null>(null)
+  const router = useRouter()
+  const { hasPermission } = usePermissions()
+
+  // A PM lands here to run their own stand-up, but often also wants the
+  // schedule hub for the same project — today that means leaving to hunt for
+  // it via the project. Gated the same way `PlanningWorkspace`'s facilitator
+  // controls are, so the button only ever appears for someone who could
+  // actually use the destination.
+  const canViewSchedule = Boolean(projectId) && hasPermission(Permission.SPRINT_UPDATE, projectId)
 
   const readOnly = isOwnRowReadOnly({ status, canAllocateOthers: false })
   const selfSelectDisabled = isSelfSelectDisabled({ status, canAllocateOthers: false, allowSelfSelect })
@@ -160,6 +178,19 @@ export function MyStandupScreen({
 
   return (
     <div className="flex flex-col gap-4 p-4">
+      {canViewSchedule && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/projects/${projectId}/standups`)}
+          >
+            <CalendarDays className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
+            View stand-up schedule
+          </Button>
+        </div>
+      )}
+
       <AlsoTodayBanner candidates={otherStandupsToday} />
 
       <NextStandupStrip

@@ -151,8 +151,24 @@ describe('NFR-13 — individual debt is not retrievable by a Stakeholder', () =>
 describe('CC-3 is answered from the checks route', () => {
   it('loads the variance panel and passes its rows to the evaluator', () => {
     // Omitting them would leave CC-3 `not_evaluated` forever, which looks
-    // identical to the check having been built.
+    // identical to the check having been built. The route maps each row into
+    // `CheckVarianceRow` (day-one included, where an unopened yesterday
+    // passes trivially rather than reading as "nobody asked") rather than
+    // passing `variance.rows` straight through — `variance.rows.map` is the
+    // substring that survives that mapping.
     expect(checks).toContain('loadVariancePanel')
-    expect(checks).toContain('variance: variance.rows')
+    expect(checks).toContain('variance.rows.map')
+  })
+
+  // The route used to stop at CC-2/CC-3 and never load blockers, carry
+  // forward, sprint health or sprint-close readiness at all — so CC-4/CC-8/
+  // CC-9/CC-11 were `not_evaluated` here even when a client's own provisional
+  // check saw real data for them. `check-extras.ts`'s shared loader is what
+  // `assembleCompletionContext` (the `/complete` saga) already used for
+  // CC-9/CC-11; this route now shares it rather than omitting the two.
+  it('answers CC-4, CC-8, CC-9 and CC-11 too, not only CC-2/CC-3', () => {
+    expect(checks).toContain('loadCarryForwardPanel')
+    expect(checks).toContain('loadSprintCloseReadiness')
+    expect(checks).toContain('loadBlockersAndSprintHealth')
   })
 })

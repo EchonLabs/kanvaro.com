@@ -75,14 +75,16 @@ export default function StandupRunPage({
       yesterdayResponse,
       carryForwardResponse,
       sprintCloseResponse,
-      blockersResponse
+      blockersResponse,
+      checksResponse
     ] = await Promise.all([
       fetch(`/api/standups/${standupId}/allocations`),
       fetch(`/api/standups/${standupId}/variance`),
       fetch(`/api/standups/${standupId}/yesterday`),
       fetch(`/api/standups/${standupId}/carry-forward`),
       fetch(`/api/standups/${standupId}/sprint-close`),
-      fetch(`/api/standups/${standupId}/blockers`)
+      fetch(`/api/standups/${standupId}/blockers`),
+      fetch(`/api/standups/${standupId}/checks`)
     ])
     if (!boardResponse.ok) throw await asError(boardResponse)
 
@@ -96,6 +98,10 @@ export default function StandupRunPage({
     const sprintClosePayload = sprintCloseResponse.ok ? await sprintCloseResponse.json() : null
     // Panel 6 (Phase 10), same read-tolerant terms as the panels above.
     const blockersPayload = blockersResponse.ok ? await blockersResponse.json() : null
+    // Panel 7's checklist — the server-side source of truth, same read-tolerant
+    // terms: a failed fetch degrades the checklist to "unavailable" (which
+    // `StandupRunScreen` keeps Complete disabled for) rather than the board.
+    const checksPayload = checksResponse.ok ? await checksResponse.json() : null
 
     return toRunScreenData(
       boardPayload.data ?? boardPayload,
@@ -103,7 +109,8 @@ export default function StandupRunPage({
       yesterdayPayload?.data ?? yesterdayPayload,
       carryForwardPayload?.data ?? carryForwardPayload,
       sprintClosePayload?.data ?? sprintClosePayload,
-      blockersPayload?.data ?? blockersPayload
+      blockersPayload?.data ?? blockersPayload,
+      checksPayload?.data ?? checksPayload
     )
   }, [standupId])
 
@@ -208,6 +215,19 @@ export default function StandupRunPage({
           expectedVersion
         })
       )
+    },
+
+    // E49. `Missed -> Completed`. No `X-Standup-Version` header, matching
+    // the route's own contract (a `Missed` stand-up was never edited under a
+    // version the PM could have read), so this is a plain `fetch`, not
+    // `mutate()`, the same way `overrides`/`blockers` above are.
+    async backfill({ notes }) {
+      const response = await fetch(`/api/standups/${standupId}/backfill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notes ? { notes } : {})
+      })
+      return unwrap(response)
     },
 
     // --- Phase 8 -------------------------------------------------------
@@ -570,7 +590,8 @@ function toRunScreenData(
   yesterday?: any,
   carryForward?: any,
   sprintClose?: any,
-  blockers?: any
+  blockers?: any,
+  checks?: any
 ): RunScreenData {
   return {
     standupId: board.standupId,
@@ -622,6 +643,10 @@ function toRunScreenData(
     ...(carryForward ? { carryForward: toCarryForwardView(carryForward) } : {}),
     ...(sprintClose ? { sprintClose: toSprintCloseView(sprintClose) } : {}),
     ...(blockers ? { blockers: toBlockerRows(blockers) } : {}),
+    // `checks` is `undefined` (not `[]`) whenever the fetch failed — that
+    // distinction is what lets `StandupRunScreen` tell "server says nothing
+    // is blocking" apart from "we don't actually know."
+    ...(checks?.checks ? { checks: checks.checks } : {}),
     ...(board.dayOne ? { dayOne: board.dayOne } : {}),
     completionState: board.completionState ?? null
   }

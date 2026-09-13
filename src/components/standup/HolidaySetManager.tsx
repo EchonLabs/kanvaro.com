@@ -17,9 +17,8 @@
  *   mode this module has.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CalendarPlus, Check, Loader2, Plus, Undo2, Upload } from 'lucide-react'
+import { AlertTriangle, CalendarPlus, Loader2, Plus, Undo2, Upload } from 'lucide-react'
 
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -32,6 +31,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { useNotify } from '@/lib/notify'
+import { cn } from '@/lib/utils'
 
 const REVOKE_REASON_MIN_LENGTH = 20
 
@@ -58,6 +58,30 @@ const TYPE_LABELS: Record<HolidayRow['type'], string> = {
   public: 'Public',
   company: 'Company',
   optional: 'Optional'
+}
+
+const MONTH_ABBR = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+]
+
+/**
+ * Groups holidays by calendar year so the year can be a single collective
+ * label above a block of tiles, rather than repeating on every row the way
+ * the old table's date column did. Sorted ascending, both years and the
+ * dates within a year.
+ */
+function groupByYear(holidays: HolidayRow[]): Array<[string, HolidayRow[]]> {
+  const byYear = new Map<string, HolidayRow[]>()
+  for (const holiday of holidays) {
+    const year = holiday.date.slice(0, 4)
+    const existing = byYear.get(year)
+    if (existing) existing.push(holiday)
+    else byYear.set(year, [holiday])
+  }
+
+  return Array.from(byYear.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([year, rows]) => [year, [...rows].sort((a, b) => a.date.localeCompare(b.date))])
 }
 
 /** The year a set has to reach before it stops being a scheduling risk. */
@@ -380,61 +404,101 @@ export function HolidaySetManager() {
               No holidays loaded yet. Import a CSV or add one above.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="py-2 pr-4 font-medium">Date</th>
-                    <th className="py-2 pr-4 font-medium">Name</th>
-                    <th className="py-2 pr-4 font-medium">Type</th>
-                    <th className="py-2 pr-4 font-medium">Status</th>
-                    <th className="sr-only py-2 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.map((holiday) => (
-                    <tr key={holiday.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-mono text-xs">{holiday.date}</td>
-                      <td className="py-2 pr-4">{holiday.name}</td>
-                      <td className="py-2 pr-4">
-                        <Badge variant="outline">{TYPE_LABELS[holiday.type]}</Badge>
-                      </td>
-                      <td className="py-2 pr-4">
-                        {holiday.status === 'revoked' ? (
-                          <span
-                            className="text-muted-foreground"
-                            title={holiday.revokeReason ?? undefined}
-                          >
-                            Withdrawn
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-muted-foreground">
-                            <Check className="h-3 w-3" />
-                            Active
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2 text-right">
-                        {holiday.status === 'revoked' ? null : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => revokeHoliday(holiday)}
-                          >
-                            <Undo2 className="mr-1 h-3 w-3" />
-                            Withdraw
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-5">
+              {groupByYear(visible).map(([year, rows]) => (
+                <div key={year} className="space-y-2">
+                  <p className="apple-section-label text-[var(--apple-tertiary-label)]">{year}</p>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2.5">
+                    {rows.map((holiday) => (
+                      <HolidayTile
+                        key={holiday.id}
+                        holiday={holiday}
+                        busy={busy}
+                        onWithdraw={revokeHoliday}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+/**
+ * One calendar-square tile: date + month prominent, type carried by both a
+ * colour accent and its text label (NFR-A1), the holiday's full name in a
+ * tooltip rather than crammed into the square. Withdrawing (DO-3 — this
+ * never deletes) is a small always-visible affordance in the corner rather
+ * than a separate table action column.
+ */
+function HolidayTile({
+  holiday,
+  busy,
+  onWithdraw
+}: {
+  holiday: HolidayRow
+  busy: boolean
+  onWithdraw: (holiday: HolidayRow) => void
+}) {
+  const revoked = holiday.status === 'revoked'
+  const [, monthPart, dayPart] = holiday.date.split('-')
+  const day = Number(dayPart)
+  const month = MONTH_ABBR[Number(monthPart) - 1] ?? monthPart
+
+  return (
+    <div
+      title={
+        revoked
+          ? `${holiday.name} — withdrawn${holiday.revokeReason ? `: ${holiday.revokeReason}` : ''}`
+          : holiday.name
+      }
+      // The org's own accent theme (Settings → Organization → Accent Theme,
+      // `--apple-chart-*` tokens) drives this tile's colour rather than a
+      // fixed red/orange/blue per type — the same tokens `GradientProgress`
+      // and every stat tile elsewhere in the app already read, so the
+      // calendar matches whatever theme is actually selected instead of
+      // three colours that never moved with it.
+      style={!revoked ? { borderTopColor: 'var(--apple-chart-gradient)', borderTopWidth: '3px' } : undefined}
+      className={cn(
+        'apple-transition relative flex aspect-square w-full flex-col items-center justify-center gap-0.5 rounded-[var(--apple-radius-md)] border bg-card p-2 text-center',
+        revoked
+          ? 'border-[var(--apple-separator)] opacity-45'
+          : 'border-[var(--apple-separator)] shadow-[0_1px_4px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 hover:shadow-[0_4px_16px_var(--apple-chart-glow)]'
+      )}
+    >
+      {!revoked && (
+        <button
+          type="button"
+          onClick={() => onWithdraw(holiday)}
+          disabled={busy}
+          aria-label={`Withdraw ${holiday.name}`}
+          className="apple-transition absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full text-[var(--apple-tertiary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-[var(--apple-system-red)] disabled:pointer-events-none disabled:opacity-40"
+        >
+          <Undo2 className="h-3 w-3" />
+        </button>
+      )}
+
+      <span
+        className={cn(
+          'font-apple-mono text-[22px] font-bold leading-none tabular-nums',
+          revoked ? 'text-[var(--apple-tertiary-label)] line-through' : 'text-[var(--apple-label)]'
+        )}
+      >
+        {day}
+      </span>
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--apple-tertiary-label)]">
+        {month}
+      </span>
+      <span
+        className="text-[10px] font-medium"
+        style={{ color: revoked ? 'var(--apple-tertiary-label)' : 'var(--apple-chart-to)' }}
+      >
+        {revoked ? 'Withdrawn' : TYPE_LABELS[holiday.type]}
+      </span>
     </div>
   )
 }

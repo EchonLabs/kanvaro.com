@@ -105,7 +105,7 @@ export function HourStepper({
           aria-label={standupStrings.allocation.stepperDecrease()}
           disabled={disabled || atFloor}
           onClick={() => step(-1)}
-          className="h-7 w-7 rounded-md border border-border text-sm leading-none disabled:opacity-40"
+          className="apple-transition h-7 w-7 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] text-[13px] leading-none text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
         >
           −
         </button>
@@ -139,7 +139,7 @@ export function HourStepper({
               step(-1)
             }
           }}
-          className="h-7 w-16 rounded-md border border-border bg-background px-2 text-right text-sm tabular-nums disabled:opacity-40"
+          className="font-apple-mono h-7 w-16 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-right text-[13px] tabular-nums disabled:opacity-40"
         />
 
         <button
@@ -147,14 +147,14 @@ export function HourStepper({
           aria-label={standupStrings.allocation.stepperIncrease()}
           disabled={disabled}
           onClick={() => step(1)}
-          className="h-7 w-7 rounded-md border border-border text-sm leading-none disabled:opacity-40"
+          className="apple-transition h-7 w-7 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] text-[13px] leading-none text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
         >
           +
         </button>
       </div>
 
       {split && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[11px] text-[var(--apple-secondary-label)]">
           {standupStrings.allocation.stepperSplit({
             planned: split.plannedMinutes,
             remaining: split.remainingEstimateMinutes,

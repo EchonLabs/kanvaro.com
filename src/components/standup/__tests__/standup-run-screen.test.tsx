@@ -24,7 +24,10 @@ import { StandupRunScreen } from '@/components/standup/run/StandupRunScreen'
 import type { RunScreenData } from '@/components/standup/run/StandupRunScreen'
 import type { BlockerRow } from '@/components/standup/run/BlockerPanel'
 import type { CapacityBreakdown } from '@/lib/standup/capacity'
-import { evaluateCompletionChecks } from '@/lib/standup/completion-checks'
+import {
+  evaluateCompletionChecks,
+  type CompletionCheckResult
+} from '@/lib/standup/completion-checks'
 import { minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 
@@ -49,8 +52,72 @@ function capacity(overrides: Partial<CapacityBreakdown> = {}): CapacityBreakdown
   }
 }
 
+/**
+ * `StandupRunScreen` no longer computes Panel 7's checks itself — that moved
+ * server-side, to `GET /api/standups/:id/checks`, so the client and the
+ * `/complete` saga's re-check can never see a different answer (see
+ * `check-extras.ts` and `StandupRunScreen.tsx`'s `checksUnavailable` doc).
+ * This mirrors that computation the same way the fixed route does, so a test
+ * that only sets up `members`/`variance`/`carryForward`/`sprintClose` (as
+ * every test below already did, before that move) still gets the same
+ * `checks` a real server response would carry — without every one of those
+ * tests having to compute and pass its own `checks` array by hand. A test
+ * that cares about `blockers`/`sprintHealth` (CC-9/CC-11) still has to pass
+ * `checks` explicitly, the same way the real board payload would.
+ */
+function defaultChecks(board: Omit<RunScreenData, 'checks'>): CompletionCheckResult[] {
+  return evaluateCompletionChecks({
+    shape: board.shape,
+    members: board.members.map((member) => ({
+      memberId: member.memberId,
+      name: member.name,
+      attendance: member.attendance,
+      capacity: member.capacity,
+      allocations: member.allocations.map((row) => ({
+        allocationId: row.allocationId,
+        taskId: row.taskId,
+        taskKey: row.taskKey,
+        memberId: member.memberId,
+        plannedMinutes: row.plannedMinutes,
+        remainingEstimateMinutes: row.remainingEstimateMinutes,
+        isBlocked: row.isBlocked,
+        excludedFromCapacity: row.excludedFromCapacity,
+        detachedReason: row.detachedReason,
+        pairedDeliberately: row.pairedDeliberately
+      }))
+    })),
+    variance: board.variance
+      ? board.variance.rows.map((row) => ({
+          allocationId: row.allocationId,
+          taskId: row.taskId,
+          taskKey: row.taskKey,
+          memberId: row.memberId,
+          requiresRevision: row.requiresRevision,
+          requiresReason: row.requiresReason,
+          revisedRemainingMinutes: row.revisedRemainingMinutes,
+          notStartedReason: row.notStartedReason
+        }))
+      : board.shape === 'day_one'
+        ? []
+        : undefined,
+    carryForward: board.carryForward
+      ? board.carryForward.items.map((item) => ({
+          itemId: item.itemId,
+          taskKey: item.taskKey,
+          memberId: item.memberId,
+          requiresNoteToday: item.requiresNoteToday,
+          notedToday: item.notedToday
+        }))
+      : board.shape === 'day_one'
+        ? []
+        : undefined,
+    openTasks: board.sprintClose?.openTasks
+  })
+}
+
 function data(overrides: Partial<RunScreenData> = {}): RunScreenData {
-  return {
+  const { checks: checksOverride, ...boardOverrides } = overrides
+  const board: Omit<RunScreenData, 'checks'> = {
     standupId: 's1',
     standupVersion: 3,
     date: '2026-08-17',
@@ -84,8 +151,10 @@ function data(overrides: Partial<RunScreenData> = {}): RunScreenData {
     ],
     pool: { unassigned: [], assignedNotPlanned: [] },
     poolTotal: 0,
-    ...overrides
+    ...boardOverrides
   }
+
+  return { ...board, checks: checksOverride ?? defaultChecks(board) }
 }
 
 /** Succeeds, echoing back an incremented version the way the server does. */
@@ -231,7 +300,7 @@ describe('Start stand-up (RUN-2/3, AC-5, Task 1)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
       standupStrings.run.startSuccess()
     )
     await waitFor(() => expect(api.start).toHaveBeenCalled())
@@ -247,7 +316,7 @@ describe('Start stand-up (RUN-2/3, AC-5, Task 1)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
       standupStrings.run.startPlanningGateFailed()
     )
   })
@@ -258,7 +327,7 @@ describe('Start stand-up (RUN-2/3, AC-5, Task 1)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
       standupStrings.run.staleReload()
     )
     await waitFor(() => expect(api.refresh).toHaveBeenCalled())
@@ -270,7 +339,7 @@ describe('Start stand-up (RUN-2/3, AC-5, Task 1)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
       standupStrings.run.startFailed()
     )
   })
@@ -393,12 +462,17 @@ describe('the elapsed-time timer (E57, §15.8.2)', () => {
   })
 })
 
-describe('the jump bar and the shapes (§15.8.10)', () => {
-  it('lists all seven panels mid-sprint', () => {
+describe('the shapes (§15.8.10)', () => {
+  // The always-visible top "jump to section" bar was removed: it linked to
+  // panels that were sometimes not mounted (a soft-failed fetch for
+  // yesterday/variance/carry-forward left the anchor with nothing to land
+  // on, and clicking it snapped the whole page to the top per the browser's
+  // native fragment-navigation fallback). The sticky Panel 7 checklist's own
+  // "Fix" links are now the only jump mechanism, and they only ever appear
+  // next to a check that is actually failing.
+  it('renders no standalone panel-jump navigation bar', () => {
     renderScreen()
-
-    const bar = screen.getByRole('navigation', { name: /panels/i })
-    expect(within(bar).getAllByRole('link')).toHaveLength(7)
+    expect(screen.queryByRole('navigation', { name: /panels/i })).not.toBeInTheDocument()
   })
 
   it('hides panels 2, 3 and 4 on day one', () => {
@@ -407,36 +481,6 @@ describe('the jump bar and the shapes (§15.8.10)', () => {
     expect(screen.queryByText(standupStrings.run.panel2())).not.toBeInTheDocument()
     expect(screen.queryByText(standupStrings.run.panel3())).not.toBeInTheDocument()
     expect(screen.queryByText(standupStrings.run.panel4())).not.toBeInTheDocument()
-  })
-
-  it('lists the jump nav links in Panel 5 -> 1 -> 6 -> 7 order on day one, matching the DOM', () => {
-    renderScreen({ shape: 'day_one' })
-
-    const bar = screen.getByRole('navigation', { name: /panels/i })
-    const hrefs = within(bar)
-      .getAllByRole('link')
-      .map((link) => link.getAttribute('href'))
-
-    expect(hrefs).toEqual(['#panel-5', '#panel-1', '#panel-6', '#panel-7'])
-  })
-
-  it('keeps the jump nav links in 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 order mid-sprint', () => {
-    renderScreen()
-
-    const bar = screen.getByRole('navigation', { name: /panels/i })
-    const hrefs = within(bar)
-      .getAllByRole('link')
-      .map((link) => link.getAttribute('href'))
-
-    expect(hrefs).toEqual([
-      '#panel-1',
-      '#panel-2',
-      '#panel-3',
-      '#panel-4',
-      '#panel-5',
-      '#panel-6',
-      '#panel-7'
-    ])
   })
 
   it('shows the ALO-20 progress meter on day one', () => {
@@ -655,7 +699,7 @@ describe('RUN-25 — optimistic edits roll back visibly', () => {
     )
 
     // A silent revert is worse than no optimism: the PM believes it stuck.
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
       standupStrings.run.editRejected()
     )
     await waitFor(() => expect(screen.getByRole('spinbutton')).toHaveValue(8))
@@ -670,7 +714,7 @@ describe('RUN-25 — optimistic edits roll back visibly', () => {
       screen.getByRole('button', { name: standupStrings.allocation.stepperIncrease() })
     )
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
       standupStrings.run.staleReload()
     )
     await waitFor(() => expect(api.refresh).toHaveBeenCalled())
@@ -722,19 +766,46 @@ describe('RUN-26 — a member’s own row locks when the stand-up starts', () =>
 })
 
 describe('Panel 7 — completion (§15.8.9)', () => {
-  it('lists every check, including the ones no phase has built', () => {
+  // Only the checks a PM has something to do about (fail/warn) show by
+  // default now — passed and not-yet-evaluated ones collapse behind a "Show
+  // N more checks" toggle, so the panel isn't eleven rows of mostly green
+  // checkmarks a PM has to scan past. Expanding it still surfaces every one
+  // of the eleven, which is the property these tests actually care about.
+  it('lists every check, including the ones no phase has built, once expanded', () => {
     renderScreen()
+
+    fireEvent.click(screen.getByRole('button', { name: /show \d+ more checks?/i }))
 
     const rows = screen.getAllByTestId('check-row')
     expect(rows).toHaveLength(evaluateCompletionChecks({ shape: 'mid_sprint', members: [] }).length)
   })
 
-  it('names the owning phase on an unbuilt check', () => {
+  it('names the owning phase on an unbuilt check, once expanded', () => {
     renderScreen()
+
+    fireEvent.click(screen.getByRole('button', { name: /show \d+ more checks?/i }))
 
     expect(
       screen.getByText(standupStrings.run.checkNotEvaluated({ phase: 'Phase 8' }))
     ).toBeInTheDocument()
+  })
+
+  // `GET /api/standups/:id/checks` is the sole source of the checklist now
+  // (StandupRunScreen no longer re-derives it from `board` itself) — if that
+  // fetch fails, `board.checks` is `undefined`, and Complete must not become
+  // pressable just because there is nothing left to say no.
+  it('disables Complete and shows an unavailable notice when the checklist fetch failed', () => {
+    render(<StandupRunScreen data={{ ...data(), checks: undefined }} api={okApi()} />)
+
+    // Rendered twice, deliberately: the banner where a PM's eye lands, and
+    // the button's own `aria-describedby` reason (which must never say "all
+    // checks passed" just because there is nothing left to report on).
+    expect(
+      screen.getAllByText(standupStrings.run.checksUnavailable())
+    ).toHaveLength(2)
+    expect(
+      screen.getByRole('button', { name: standupStrings.run.complete() })
+    ).toBeDisabled()
   })
 
   it('evaluates CC-3 from Panel 3’s own variance data, not a stub', () => {
@@ -920,7 +991,7 @@ describe('Panel 7 — the Override action (Task 22)', () => {
     )
     fireEvent.click(within(dialog).getByRole('button', { name: standupStrings.override.submit() }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
       standupStrings.run.overrideFailed()
     )
     expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -1083,7 +1154,7 @@ describe('Panel 6 — blockers, the resolve fix (Task 5)', () => {
     })
     fireEvent.click(within(dialog).getByRole('button', { name: /resolve/i }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
       standupStrings.blocker.resolveFailed()
     )
     expect(screen.getByRole('dialog')).toBeInTheDocument()

@@ -1,8 +1,11 @@
 'use client'
 
+import { AlertTriangle } from 'lucide-react'
+
 import { standupStrings } from '@/lib/standup/strings'
 import { freedCapacityMessage } from '@/lib/standup/blocker'
 import type { Minutes } from '@/lib/standup/minutes'
+import { cn } from '@/lib/utils'
 
 /**
  * Panel 6 — blockers (§13, RUN-14..18).
@@ -45,22 +48,28 @@ export function BlockerPanel({ blockers, onRaise, onResolve }: BlockerPanelProps
   const sorted = [...blockers].sort((a, b) => (b.overdue ? 1 : 0) - (a.overdue ? 1 : 0))
 
   return (
-    <section id="panel-6" aria-labelledby="panel-6-heading" className="flex flex-col gap-3">
+    <section
+      id="panel-6"
+      aria-labelledby="panel-6-heading"
+      className="scroll-mt-6 flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4"
+    >
       <div className="flex items-center justify-between">
-        <h3 id="panel-6-heading" className="text-sm font-semibold">
+        <h3 id="panel-6-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
           {standupStrings.run.panel6()}
         </h3>
         <button
           type="button"
           onClick={onRaise}
-          className="rounded-md border border-border px-2 py-1 text-xs"
+          className="apple-transition rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1 text-[12px] font-medium hover:bg-[var(--apple-quaternary-fill)]"
         >
           {standupStrings.blocker.raise()}
         </button>
       </div>
 
       {sorted.length === 0 && (
-        <p className="text-sm text-muted-foreground">{standupStrings.blocker.empty()}</p>
+        <p className="rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] px-3 py-3 text-center text-[13px] text-[var(--apple-tertiary-label)]">
+          {standupStrings.blocker.empty()}
+        </p>
       )}
 
       <ul className="flex flex-col gap-2">
@@ -68,20 +77,33 @@ export function BlockerPanel({ blockers, onRaise, onResolve }: BlockerPanelProps
           <li
             key={row.blockerId}
             data-testid="blocker-row"
-            className={
+            className={cn(
+              'flex flex-col gap-1.5 rounded-[var(--apple-radius-md)] border p-3 text-[13px]',
               row.overdue
-                ? 'flex flex-col gap-1 rounded-md border border-destructive/50 p-2 text-sm text-destructive'
-                : 'flex flex-col gap-1 rounded-md border border-border p-2 text-sm'
-            }
+                ? 'border-[var(--apple-system-red)]/40 bg-[var(--apple-system-red)]/[0.05]'
+                : 'border-[var(--apple-separator)] bg-background'
+            )}
           >
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{row.taskKey ?? standupStrings.blocker.general()}</span>
-              <span>{row.description}</span>
-              <span className="text-xs uppercase text-muted-foreground">{row.severity}</span>
+              {row.overdue && (
+                <AlertTriangle
+                  className="h-3.5 w-3.5 shrink-0 text-[var(--apple-system-red)]"
+                  strokeWidth={2}
+                />
+              )}
+              <span className={cn('font-medium', row.overdue ? 'text-[var(--apple-system-red)]' : 'text-[var(--apple-label)]')}>
+                {row.taskKey ?? standupStrings.blocker.general()}
+              </span>
+              <span className={cn('min-w-0 flex-1', row.overdue ? 'text-[var(--apple-system-red)]' : 'text-[var(--apple-label)]')}>
+                {row.description}
+              </span>
+              <span className="shrink-0 rounded-full bg-[var(--apple-tertiary-fill)] px-2 py-0.5 text-[10.5px] font-medium uppercase tracking-wide text-[var(--apple-secondary-label)]">
+                {row.severity}
+              </span>
             </div>
 
             {row.freedMinutes !== undefined && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[11.5px] text-[var(--apple-secondary-label)]">
                 {freedCapacityMessage(row.freedMinutes, row.blockerLabel)}
               </span>
             )}
@@ -90,7 +112,7 @@ export function BlockerPanel({ blockers, onRaise, onResolve }: BlockerPanelProps
               <button
                 type="button"
                 onClick={() => onResolve(row.blockerId)}
-                className="self-start rounded-md border border-border px-2 py-1 text-xs"
+                className="apple-transition self-start rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1 text-[12px] font-medium hover:bg-[var(--apple-quaternary-fill)]"
               >
                 {standupStrings.blocker.resolve()}
               </button>

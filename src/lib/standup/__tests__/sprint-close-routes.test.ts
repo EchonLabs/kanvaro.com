@@ -6,6 +6,8 @@ import { Task } from '@/models/Task'
 import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
 
+import { STANDUP_VERSION_HEADER } from '@/lib/standup/version-header'
+
 import { ids, useMongo } from './helpers/mongo'
 
 const hasPermission = jest.fn()
@@ -103,10 +105,13 @@ async function seed() {
 }
 
 const buildGet = (url: string) => new NextRequest(`http://localhost${url}`, { method: 'GET' })
-const buildPatch = (url: string, body: unknown) =>
+const buildPatch = (url: string, body: unknown, expectedVersion = 0) =>
   new NextRequest(`http://localhost${url}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      [STANDUP_VERSION_HEADER]: String(expectedVersion)
+    },
     body: JSON.stringify(body)
   })
 
@@ -182,5 +187,26 @@ describe('PATCH /api/standups/:id/sprint-close/tasks/:taskId', () => {
     )
 
     expect(response.status).toBe(403)
+  })
+
+  // Every other mutation route in the module rejects a write based on a
+  // version the caller could not have seen; this route used to be the one
+  // silent exception (it accepted `expectedVersion` from the client but never
+  // checked it against the standup's real `version`).
+  it('returns 409 STALE_STANDUP when the sent version does not match', async () => {
+    const { standup, openTask } = await seed()
+
+    const response = await dispositionRoute.PATCH(
+      buildPatch(
+        `/api/standups/${standup._id}/sprint-close/tasks/${openTask._id}`,
+        { type: 'descope' },
+        99
+      ),
+      { params: { id: String(standup._id), taskId: String(openTask._id) } }
+    )
+
+    expect(response.status).toBe(409)
+    const payload = await response.json()
+    expect(payload.error.code).toBe('STALE_STANDUP')
   })
 })

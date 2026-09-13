@@ -2,6 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, RefreshCw, Users, Video, Zap } from 'lucide-react'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent
+} from '@dnd-kit/core'
 
 import type { QuickAddTask } from '@/components/standup/primitives/QuickAddCombobox'
 import { AttendancePanel, type ReassignPromptView } from './AttendancePanel'
@@ -15,7 +24,7 @@ import { OverrideModal, type OverridableType, type OverrideModalAffectedMember, 
 import { RaiseBlockerModal, type RaiseBlockerSubmitInput } from './RaiseBlockerModal'
 import { ResolveBlockerDialog, type ResolveBlockerSubmitInput } from './ResolveBlockerDialog'
 import { ModalOverlay } from '@/components/standup/primitives/ModalOverlay'
-import { UnassignedPool } from './UnassignedPool'
+import { UnassignedPool, PoolCardPreview } from './UnassignedPool'
 import { SprintCloseReadinessPanel } from './SprintCloseReadinessPanel'
 import { useStandupShortcuts } from './useStandupShortcuts'
 import {
@@ -28,10 +37,6 @@ import type { BucketedRows, YesterdayRow } from '@/lib/standup/yesterday'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
 import {
   blockingFailures,
-  evaluateCompletionChecks,
-  type CheckCarryForwardItem,
-  type CheckMember,
-  type CheckVarianceRow,
   type CompletionCheckResult
 } from '@/lib/standup/completion-checks'
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
@@ -50,6 +55,8 @@ import { standupStrings } from '@/lib/standup/strings'
  * overridable, and the rest of the table names types with no `checkId`
  * (e.g. `complete_with_absent_facilitator_role`) that Panel 7 does not emit.
  */
+const EMPTY_CHECKS: readonly CompletionCheckResult[] = []
+
 const CHECK_ID_TO_OVERRIDE_TYPE: Partial<Record<string, OverridableType>> = Object.fromEntries(
   Object.entries(OVERRIDE_TABLE)
     .filter(([, entry]) => entry.overridable && entry.checkId)
@@ -256,6 +263,13 @@ export interface RunScreenData {
    * again.
    */
   completionState?: { runId: string; lastCompletedStep: string | null } | null
+  /**
+   * `GET /api/standups/:id/checks`'s full eleven-check evaluation. `undefined`
+   * only when that fetch failed — see `checksUnavailable` in
+   * `StandupRunScreen`, which keeps Complete from being pressable blind in
+   * that case rather than defaulting to an empty (falsely all-clear) list.
+   */
+  checks?: readonly CompletionCheckResult[]
   /** Phase 11. Present only on `final_day`. */
   sprintClose?: {
     openTasks: OpenTaskReadiness[]
@@ -321,6 +335,16 @@ export interface RunScreenApi {
     notes?: string
     expectedVersion: number
   }): Promise<{ status: string; summaryId: string }>
+
+  /**
+   * `POST /api/standups/:id/backfill` (E49). Runs the completion saga against
+   * a `Missed` stand-up instead of an `In_Progress` one — the only way a
+   * `Missed` day ever reaches `Completed`. Intentionally requires no
+   * `X-Standup-Version` header (the route's own docblock explains why), so
+   * this takes no `expectedVersion`, unlike `completeStandup` above. Optional
+   * so the header's Backfill action only renders once wired.
+   */
+  backfill?(input: { notes?: string }): Promise<{ status: string; summaryId: string }>
 
   // --- Phase 8 -------------------------------------------------------------
   // Optional so a caller that has not wired Panels 2 and 3 yet still compiles;
@@ -403,7 +427,14 @@ const STATUS_PILL: Record<string, string> = {
   Ready: 'bg-blue-50 dark:bg-blue-950/30 text-[var(--apple-system-blue)]',
   In_Progress: 'bg-blue-50 dark:bg-blue-950/30 text-[var(--apple-system-blue)]',
   Completed: 'bg-emerald-50 dark:bg-emerald-950/30 text-[var(--apple-system-green)]',
-  Reopened: 'bg-orange-50 dark:bg-orange-950/30 text-[var(--apple-system-orange)]'
+  Reopened: 'bg-orange-50 dark:bg-orange-950/30 text-[var(--apple-system-orange)]',
+  // Three of the model's eight legal statuses previously fell back to the
+  // generic tertiary-fill styling below, which reads identically to
+  // `Scheduled` — a PM who lands here on a `Missed` day had no visual signal
+  // anything was wrong.
+  Missed: 'bg-red-50 dark:bg-red-950/30 text-[var(--apple-system-red)]',
+  Skipped_Holiday: 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]',
+  Cancelled: 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]'
 }
 
 export interface RunScreenViewer {
@@ -666,67 +697,25 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     [api, reload]
   )
 
-  const checks = useMemo(
-    () =>
-      evaluateCompletionChecks({
-        shape: board.shape,
-        members: board.members.map(
-          (member): CheckMember => ({
-            memberId: member.memberId,
-            name: member.name,
-            attendance: member.attendance,
-            capacity: member.capacity,
-            allocations: member.allocations.map((row) => ({
-              allocationId: row.allocationId,
-              taskId: row.taskId,
-              taskKey: row.taskKey,
-              memberId: member.memberId,
-              plannedMinutes: row.plannedMinutes,
-              remainingEstimateMinutes: row.remainingEstimateMinutes,
-              isBlocked: row.isBlocked,
-              excludedFromCapacity: row.excludedFromCapacity,
-              detachedReason: row.detachedReason,
-              pairedDeliberately: row.pairedDeliberately
-            }))
-          })
-        ),
-        // Day one has no yesterday to load: `[]` says CC-3 was asked and passes
-        // trivially, where `undefined` would say nobody asked (not_evaluated).
-        variance: board.variance
-          ? board.variance.rows.map(
-              (row): CheckVarianceRow => ({
-                allocationId: row.allocationId,
-                taskId: row.taskId,
-                taskKey: row.taskKey,
-                memberId: row.memberId,
-                requiresRevision: row.requiresRevision,
-                requiresReason: row.requiresReason,
-                revisedRemainingMinutes: row.revisedRemainingMinutes,
-                notStartedReason: row.notStartedReason
-              })
-            )
-          : board.shape === 'day_one'
-            ? []
-            : undefined,
-        // CC-4. Day one has no register yet either — `[]` says it was asked
-        // and trivially passes, the same convention `variance` uses above.
-        carryForward: board.carryForward
-          ? board.carryForward.items.map(
-              (item): CheckCarryForwardItem => ({
-                itemId: item.itemId,
-                taskKey: item.taskKey,
-                memberId: item.memberId,
-                requiresNoteToday: item.requiresNoteToday,
-                notedToday: item.notedToday
-              })
-            )
-          : board.shape === 'day_one'
-            ? []
-            : undefined,
-        openTasks: board.sprintClose?.openTasks
-      }),
-    [board]
-  )
+  /**
+   * The completion checks come from `GET /api/standups/:id/checks` (fetched by
+   * `page.tsx` alongside this screen's other panels), not a client-side
+   * recomputation — the two used to be separate implementations fed different
+   * inputs, and `checks/route.ts` (and this screen's own prior `useMemo`)
+   * silently omitted `blockers`/`sprintHealth`, so CC-9/CC-11 always read
+   * `not_evaluated` even with both visibly loaded on screen. One server-side
+   * evaluation, reused for both the provisional look here and the `/complete`
+   * saga's re-check, is what `completion-context.ts`'s docblock already asks
+   * for. `board.checks` is `undefined` only when that fetch itself failed —
+   * `checksUnavailable` below keeps Complete from being pressable blind in
+   * that case, the same way a missing `board.variance` etc. degrades its own
+   * panel rather than pretending nothing is wrong.
+   */
+  // A stable empty-array reference: `board.checks ?? []` would otherwise
+  // create a new array every render whenever the fetch failed, defeating the
+  // `blocking` useMemo below (it never sees the same `checks` twice).
+  const checks = useMemo(() => board.checks ?? EMPTY_CHECKS, [board.checks])
+  const checksUnavailable = board.checks === undefined
 
   /**
    * Task 22. Overrides issued this session, tracked client-side from each
@@ -901,6 +890,43 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
   }, [api, reload])
 
   /**
+   * E49. `Missed -> Completed` via the same completion saga backfill runs
+   * server-side. `setNotice`'s error branches mirror `onComplete` below —
+   * `backfillStandup` throws from the same `StandupError` catalogue
+   * (`STANDUP_ALREADY_COMPLETED`, `COMPLETION_CHECKS_FAILED`) since it is,
+   * underneath, the same saga.
+   */
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillNotes, setBackfillNotes] = useState('')
+  const [backfillSubmitting, setBackfillSubmitting] = useState(false)
+
+  const onBackfill = useCallback(async () => {
+    if (!api.backfill) return
+    setBackfillSubmitting(true)
+    setNotice(null)
+    try {
+      await api.backfill({ notes: backfillNotes.trim() || undefined })
+      setBackfilling(false)
+      setBackfillNotes('')
+      setNotice(standupStrings.run.backfillSuccess())
+      await reload()
+    } catch (error) {
+      const code = (error as { code?: string })?.code
+      if (code === 'STANDUP_ALREADY_COMPLETED') {
+        setNotice(standupStrings.run.completeAlreadyDone())
+        setBackfilling(false)
+        await reload()
+      } else if (code === 'COMPLETION_CHECKS_FAILED') {
+        setNotice(standupStrings.run.completeChecksFailed())
+      } else {
+        setNotice(standupStrings.run.backfillFailed())
+      }
+    } finally {
+      setBackfillSubmitting(false)
+    }
+  }, [api, backfillNotes, reload])
+
+  /**
    * E57/§15.8.2. A live, client-side-only elapsed-time indicator — advisory
    * only, per D-6, and it must never disable or gate the Complete button or
    * any other action (see `completionPanelDisabled`/`completeDisabled`
@@ -982,7 +1008,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
    * visible Complete button can never silently drift apart.
    */
   const completionPanelDisabled =
-    readOnly || completing || carryForwardCloseFailures.length > 0
+    readOnly || completing || carryForwardCloseFailures.length > 0 || checksUnavailable
   const completeDisabled = completionPanelDisabled || blocking.length > 0
 
   useStandupShortcuts({
@@ -1052,11 +1078,47 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
   )
 
   /**
+   * ALO-16's drag-and-drop, wired through `@dnd-kit/core` (already used for
+   * the task board's Kanban drag — see `src/components/tasks/KanbanBoard.tsx`
+   * for the same `PointerSensor` + `distance` activation pattern). The
+   * `distance: 8` constraint is what lets a plain click still reach the
+   * pool's "+" button and the member card's other controls: drag only starts
+   * once the pointer has moved past that threshold, so a click with no
+   * movement never becomes a drag.
+   *
+   * `onDragEnd` reads the dragged `PoolTask` and the target member id
+   * straight off each side's `data` and calls `onAdd` — the exact same
+   * function the pool's "+" button and the capacity board's quick-add box
+   * already call. This is deliberate, not incidental: `UnassignedPool.tsx`'s
+   * own docblock states the drag path and the keyboard path must issue an
+   * identical call, or the board would behave differently depending on how
+   * the PM got here.
+   */
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
+  const [draggingTask, setDraggingTask] = useState<PoolTask | null>(null)
+
+  const onDragStart = useCallback((event: DragStartEvent) => {
+    setDraggingTask((event.active.data.current?.task as PoolTask | undefined) ?? null)
+  }, [])
+
+  const onDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      setDraggingTask(null)
+      const task = event.active.data.current?.task as PoolTask | undefined
+      const memberId = event.over?.data.current?.memberId as string | undefined
+      if (task && memberId) void onAdd(memberId, task.taskId)
+    },
+    [onAdd]
+  )
+
+  /**
    * §15.8.10: on day one the pool takes the primary position and the board
    * is secondary but always visible.
    */
   const panelFive = (
-    <section id="panel-5" aria-labelledby="panel-5-heading" className="flex flex-col gap-3">
+    <section id="panel-5" aria-labelledby="panel-5-heading" className="scroll-mt-6 flex flex-col gap-3">
       <h3 id="panel-5-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
         {standupStrings.run.panel5()}
       </h3>
@@ -1084,60 +1146,67 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         </div>
       )}
 
-      <div
-        className={
-          isDayOne ? 'grid gap-4 lg:grid-cols-[2fr_1fr]' : 'grid gap-4 lg:grid-cols-[1fr_2fr]'
-        }
-      >
-        <UnassignedPool
-          unassigned={board.pool.unassigned}
-          assignedNotPlanned={board.pool.assignedNotPlanned}
-          selectedMember={
-            selectedMember
-              ? {
-                  memberId: selectedMember.memberId,
-                  name: selectedMember.name,
-                  gapMinutes: selectedMember.capacity.gapMinutes
-                }
-              : null
+      <DndContext sensors={dndSensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <div
+          className={
+            isDayOne ? 'grid gap-4 lg:grid-cols-[2fr_1fr]' : 'grid gap-4 lg:grid-cols-[1fr_2fr]'
           }
-          totalCount={board.poolTotal}
-          readOnly={readOnly}
-          locale={locale}
-          onAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
-        />
-
-        <div onFocusCapture={() => setSelectedMemberId(selectedMemberId)}>
-          <CapacityBoard
-            members={board.members}
-            poolTasks={poolTasks}
-            ceremoniesConsumeCapacity={board.ceremoniesConsumeCapacity}
+        >
+          <UnassignedPool
+            unassigned={board.pool.unassigned}
+            assignedNotPlanned={board.pool.assignedNotPlanned}
+            selectedMember={
+              selectedMember
+                ? {
+                    memberId: selectedMember.memberId,
+                    name: selectedMember.name,
+                    gapMinutes: selectedMember.capacity.gapMinutes
+                  }
+                : null
+            }
+            totalCount={board.poolTotal}
             readOnly={readOnly}
             locale={locale}
-            onChangeHours={onChangeHours}
-            onRemove={onRemove}
-            onQuickAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
-            onReassignStranded={(memberId) => {
-              setSelectedMemberId(memberId)
-              setPrompt({
-                memberId,
-                taskCount: board.members
-                  .find((member) => member.memberId === memberId)
-                  ?.allocations.filter((row) => row.detachedReason).length ?? 0,
-                totalMinutes:
-                  board.members.find((member) => member.memberId === memberId)?.capacity
-                    .strandedMinutes ?? (0 as Minutes),
-                tasks: []
-              })
-            }}
+            onAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
           />
+
+          <div onFocusCapture={() => setSelectedMemberId(selectedMemberId)}>
+            <CapacityBoard
+              members={board.members}
+              poolTasks={poolTasks}
+              ceremoniesConsumeCapacity={board.ceremoniesConsumeCapacity}
+              readOnly={readOnly}
+              locale={locale}
+              onChangeHours={onChangeHours}
+              onRemove={onRemove}
+              onQuickAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
+              onReassignStranded={(memberId) => {
+                setSelectedMemberId(memberId)
+                setPrompt({
+                  memberId,
+                  taskCount: board.members
+                    .find((member) => member.memberId === memberId)
+                    ?.allocations.filter((row) => row.detachedReason).length ?? 0,
+                  totalMinutes:
+                    board.members.find((member) => member.memberId === memberId)?.capacity
+                      .strandedMinutes ?? (0 as Minutes),
+                  tasks: []
+                })
+              }}
+            />
+          </div>
         </div>
-      </div>
+
+        <DragOverlay>
+          {draggingTask ? <PoolCardPreview task={draggingTask} locale={locale} /> : null}
+        </DragOverlay>
+      </DndContext>
     </section>
   )
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="flex min-w-0 flex-col gap-6">
       <header className="flex flex-col gap-3 border-b border-[var(--apple-separator)] pb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -1170,6 +1239,19 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
                 className="apple-transition rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] px-3.5 h-9 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40"
               >
                 {standupStrings.run.start()}
+              </button>
+            )}
+            {/* E49. Before this, a `Missed` day was a dead end — no Start (it
+                only ever renders for Ready/Scheduled above), no Backfill
+                anywhere in the UI, despite the endpoint and saga behind it
+                being fully built. */}
+            {board.status === 'Missed' && api.backfill && (
+              <button
+                type="button"
+                onClick={() => setBackfilling(true)}
+                className="apple-transition rounded-[var(--apple-radius-md)] bg-[var(--apple-system-red)] px-3.5 h-9 text-[13px] font-semibold text-white hover:opacity-90"
+              >
+                {standupStrings.run.backfill()}
               </button>
             )}
             {board.status === 'Completed' && summaryHref && (
@@ -1233,29 +1315,12 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         </div>
       </header>
 
-      <nav
-        aria-label="Stand-up panels"
-        className="flex flex-wrap gap-1.5 text-xs text-[var(--apple-secondary-label)]"
-      >
-        {isDayOne && <JumpLink id={5} label={standupStrings.run.panel5()} />}
-        <JumpLink id={1} label={standupStrings.run.panel1()} />
-        {!isDayOne && (
-          <>
-            <JumpLink id={2} label={standupStrings.run.panel2()} />
-            <JumpLink id={3} label={standupStrings.run.panel3()} />
-            <JumpLink id={4} label={standupStrings.run.panel4()} />
-            <JumpLink id={5} label={standupStrings.run.panel5()} />
-          </>
-        )}
-        <JumpLink id={6} label={standupStrings.run.panel6()} />
-        <JumpLink id={7} label={standupStrings.run.panel7()} />
-      </nav>
-
       {/* RUN-25's rollback notice, and the RUN-23 reload. `status` rather than
           `alert`: it reports what already happened, it does not interrupt. */}
       {notice && (
         <p
           role="status"
+          data-testid="run-notice"
           className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] px-3 py-2 text-[13px] text-[var(--apple-label)]"
         >
           {notice}
@@ -1391,14 +1456,39 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           />
         </ModalOverlay>
       )}
+    </div>
 
+    {/*
+     * The completion checklist's sticky right rail. Replaces the old top
+     * "jump to section" bar entirely — its own "Fix" links (shown only on a
+     * failing check) are now the only navigation aid on this screen, so a
+     * link only ever appears when something is actually wrong, and only for
+     * a section that is actually mounted (no more clicking a stale anchor
+     * into the browser's "no such id, scroll to top" fallback). Falls back
+     * to normal document flow below `lg` — a fixed sidebar has nowhere to go
+     * on a phone-width screen.
+     *
+     * `top-0`, not `top-6`: `<main>` in `MainLayout` already gives the whole
+     * page `lg:p-6` of breathing room, so a sticky offset on top of that
+     * doubled the gap once the panel was actually stuck, making it look like
+     * it was hanging low with dead space above it. No `max-h`/`overflow-y-auto`
+     * either — clamping this panel's height meant "Show passed checks" opened
+     * a cramped inner scrollbar that could clip the Complete button out of
+     * view. Letting the panel grow with its own content means expanding it
+     * scrolls the page itself, and the Complete button — always the last
+     * thing in the panel — surfaces the same way everything else on the page
+     * does, not behind a second, easy-to-miss scroll gesture.
+     */}
+    <aside className="lg:sticky lg:top-0 lg:self-start">
       <CompletionPanel
         checks={checks}
         blocking={blocking}
         disabled={completionPanelDisabled}
+        checksUnavailable={checksUnavailable}
         onComplete={() => void onComplete()}
         onOverride={onOverride}
       />
+    </aside>
 
       {/* Task 22. `overrideContext` is null whenever `overridingCheck` is —
           and also, for CC-3/CC-10, when no entity carried a resolvable
@@ -1414,17 +1504,54 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           />
         </ModalOverlay>
       )}
-    </div>
-  )
-}
 
-function JumpLink({ id, label }: { id: number; label: string }) {
-  return (
-    <a
-      href={`#panel-${id}`}
-      className="apple-transition rounded-full border border-[var(--apple-separator)] px-2.5 py-1 text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-[var(--apple-label)]"
-    >
-      {id}. {label}
-    </a>
+      {backfilling && (
+        <ModalOverlay
+          open
+          onClose={() => (backfillSubmitting ? undefined : setBackfilling(false))}
+          labelledBy="backfill-title"
+        >
+          <div className="flex w-full max-w-sm flex-col gap-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-5">
+            <div>
+              <h3 id="backfill-title" className="text-[15px] font-semibold text-[var(--apple-label)]">
+                {standupStrings.run.backfillTitle()}
+              </h3>
+              <p className="mt-1 text-[13px] text-[var(--apple-secondary-label)]">
+                {standupStrings.run.backfillDescription()}
+              </p>
+            </div>
+
+            <label className="flex flex-col gap-1.5 text-[13px] text-[var(--apple-label)]">
+              {standupStrings.run.backfillNotesLabel()}
+              <textarea
+                value={backfillNotes}
+                onChange={(event) => setBackfillNotes(event.target.value)}
+                className="min-h-20 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background px-2.5 py-2 text-[13px]"
+                disabled={backfillSubmitting}
+              />
+            </label>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setBackfilling(false)}
+                disabled={backfillSubmitting}
+                className="apple-transition rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] px-3.5 h-9 text-[13px] font-medium text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
+              >
+                {standupStrings.run.backfillCancel()}
+              </button>
+              <button
+                type="button"
+                onClick={() => void onBackfill()}
+                disabled={backfillSubmitting}
+                className="apple-transition rounded-[var(--apple-radius-md)] bg-[var(--apple-system-red)] px-3.5 h-9 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40"
+              >
+                {standupStrings.run.backfillConfirm()}
+              </button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
   )
 }

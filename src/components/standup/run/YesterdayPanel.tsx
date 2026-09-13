@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 
 import { formatMinutesAsHours, hoursToMinutes, minutes as toMinutes, roundToStep, type Minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import type { BucketedRows, YesterdayBucket, YesterdayRow } from '@/lib/standup/yesterday'
+import { cn } from '@/lib/utils'
 
 /**
  * Panel 2 — yesterday's review (§15.8.4, RUN-9..RUN-13).
@@ -144,19 +146,26 @@ export function YesterdayPanel({
   }
 
   return (
-    <section id="panel-2" aria-labelledby="panel-2-heading" className="flex flex-col gap-3">
-      <h3 id="panel-2-heading" className="text-sm font-semibold">
+    <section
+      id="panel-2"
+      aria-labelledby="panel-2-heading"
+      className="scroll-mt-6 flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4"
+    >
+      <h3 id="panel-2-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
         {standupStrings.yesterday.title()}
       </h3>
 
       {toast && (
-        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-[var(--apple-radius-md)] border border-[var(--apple-system-red)]/30 bg-[var(--apple-system-red)]/[0.06] px-3 py-2 text-[13px] text-[var(--apple-system-red)]"
+        >
           {toast}
         </p>
       )}
 
       {!hasYesterday && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[13px] text-[var(--apple-secondary-label)]">
           {standupStrings.yesterday.noPreviousStandup()}
         </p>
       )}
@@ -179,15 +188,20 @@ export function YesterdayPanel({
                     [bucket.bucket]: !isCollapsed
                   }))
                 }
-                className="flex items-center gap-2 text-left text-sm font-medium"
+                className="apple-transition flex items-center gap-1.5 self-start text-left text-[13px] font-semibold text-[var(--apple-label)]"
               >
+                <ChevronDown
+                  className={cn('h-3.5 w-3.5 shrink-0 apple-transition', isCollapsed && '-rotate-90')}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
                 <h4>{standupStrings.yesterday.bucketCount({ label: heading, count: bucket.rows.length })}</h4>
               </button>
 
               {!isCollapsed && (
-                <ul id={bodyId} className="flex flex-col gap-2">
+                <ul id={bodyId} className="flex flex-col gap-2.5">
                   {bucket.rows.length === 0 && (
-                    <li className="text-xs text-muted-foreground">
+                    <li className="rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] px-3 py-2.5 text-[12.5px] text-[var(--apple-tertiary-label)]">
                       {standupStrings.yesterday.emptyBucket()}
                     </li>
                   )}
@@ -196,146 +210,201 @@ export function YesterdayPanel({
                     <li
                       key={row.allocationId ?? `${row.memberId}:${row.taskId}`}
                       data-testid={`yesterday-row-${row.taskKey ?? row.taskId}`}
-                      className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2 text-sm"
+                      className="flex flex-col gap-3 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background p-3"
                     >
-                      <span className="font-medium">{row.taskKey ?? row.taskId}</span>
-                      <span className="text-muted-foreground">{row.title}</span>
-                      <span aria-label={row.memberName} className="text-xs text-muted-foreground">
-                        {initialsOf(row.memberName)}
-                      </span>
-
-                      <span data-testid="previous-status" className="text-xs text-muted-foreground">
-                        {standupStrings.yesterday.previousStatus()} {row.previousStatus}
-                      </span>
-
-                      <label className="sr-only" htmlFor={`status-${row.taskId}`}>
-                        {`Status for ${row.taskKey ?? row.taskId}`}
-                      </label>
-                      <select
-                        id={`status-${row.taskId}`}
-                        data-testid="current-status"
-                        aria-label={`Status for ${row.taskKey ?? row.taskId}`}
-                        value={statusOf(row)}
-                        disabled={disabled}
-                        onChange={(event) => changeStatus(row, event.target.value)}
-                        className="h-8 rounded-md border border-border bg-background px-2 text-sm"
-                      >
-                        {statusOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-
-                      <span data-testid="planned">
-                        {formatMinutesAsHours(row.plannedMinutes, { locale })}
-                      </span>
-                      <span data-testid="logged">
-                        {formatMinutesAsHours(loggedOf(row), { locale })}
-                      </span>
-                      <span data-testid="day-variance">
-                        {formatMinutesAsHours(row.dayVarianceMinutes, { locale, signed: true })}
-                      </span>
-                      <span data-testid="remaining">
-                        {formatMinutesAsHours(row.remainingEstimateMinutes, { locale })}
-                      </span>
-
-                      <label className="sr-only" htmlFor={`logged-${row.taskId}`}>
-                        {`Logged hours for ${row.taskKey ?? row.taskId}`}
-                      </label>
-                      <input
-                        id={`logged-${row.taskId}`}
-                        data-testid="logged-hours-edit"
-                        aria-label={`Logged hours for ${row.taskKey ?? row.taskId}`}
-                        type="number"
-                        inputMode="decimal"
-                        step={0.25}
-                        min={0}
-                        disabled={disabled}
-                        value={loggedDraft[row.taskId] ?? hoursText(loggedOf(row))}
-                        onChange={(event) =>
-                          setLoggedDraft((current) => ({ ...current, [row.taskId]: event.target.value }))
-                        }
-                        onBlur={() => commitLoggedHours(row)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            commitLoggedHours(row)
-                          }
-                        }}
-                        className="h-7 w-16 rounded-md border border-border bg-background px-2 text-right text-sm tabular-nums disabled:opacity-40"
-                      />
-
-                      <label className="sr-only" htmlFor={`note-${row.taskId}`}>
-                        {`Note for ${row.taskKey ?? row.taskId}`}
-                      </label>
-                      <input
-                        id={`note-${row.taskId}`}
-                        data-testid="note-input"
-                        aria-label={`Note for ${row.taskKey ?? row.taskId}`}
-                        type="text"
-                        placeholder="Add a note"
-                        disabled={disabled}
-                        value={noteDraft[row.taskId] ?? ''}
-                        onChange={(event) => {
-                          setNoteDraft((current) => ({ ...current, [row.taskId]: event.target.value }))
-                          setNoteStatus((current) => {
-                            const next = { ...current }
-                            delete next[row.taskId]
-                            return next
-                          })
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            submitNote(row)
-                          }
-                        }}
-                        className="h-7 w-32 rounded-md border border-border bg-background px-2 text-sm disabled:opacity-40"
-                      />
-                      <button
-                        type="button"
-                        data-testid="note-save"
-                        disabled={disabled || !((noteDraft[row.taskId] ?? '').trim())}
-                        onClick={() => submitNote(row)}
-                        className="text-xs underline disabled:opacity-40"
-                      >
-                        {noteStatus[row.taskId] === 'saved'
-                          ? standupStrings.yesterday.noteSaved()
-                          : standupStrings.yesterday.saveNote()}
-                      </button>
-
-                      {row.ageInStandups > 1 && (
-                        <span data-testid="age-badge" className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                          {standupStrings.yesterday.ageBadge({ standups: row.ageInStandups })}
+                      {/* Identity line */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-apple-mono text-[12px] text-[var(--apple-tertiary-label)]">
+                          {row.taskKey ?? row.taskId}
                         </span>
-                      )}
-
-                      {row.unplanned && (
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--apple-label)]">
+                          {row.title}
+                        </span>
                         <span
-                          title={standupStrings.yesterday.unplannedHint()}
-                          className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
+                          aria-label={row.memberName}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--apple-tertiary-fill)] text-[10px] font-semibold text-[var(--apple-secondary-label)]"
                         >
-                          {standupStrings.yesterday.unplannedBadge()}
+                          {initialsOf(row.memberName)}
                         </span>
-                      )}
 
-                      <button
-                        type="button"
-                        onClick={() => api.reviseEstimate(row)}
-                        disabled={disabled}
-                        className="text-xs underline"
-                      >
-                        {standupStrings.variance.reviseTitle()}
-                      </button>
+                        {row.ageInStandups > 1 && (
+                          <span
+                            data-testid="age-badge"
+                            className="rounded-full bg-[var(--apple-tertiary-fill)] px-2 py-0.5 text-[11px] text-[var(--apple-secondary-label)]"
+                          >
+                            {standupStrings.yesterday.ageBadge({ standups: row.ageInStandups })}
+                          </span>
+                        )}
 
-                      <button
-                        type="button"
-                        onClick={() => api.openTask(row.taskId)}
-                        className="text-xs underline"
-                      >
-                        {`Open ${row.taskKey ?? row.taskId}`}
-                      </button>
+                        {row.unplanned && (
+                          <span
+                            title={standupStrings.yesterday.unplannedHint()}
+                            className="rounded-full bg-[var(--apple-system-orange)]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--apple-system-orange)]"
+                          >
+                            {standupStrings.yesterday.unplannedBadge()}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Stat grid — every RUN-12 field, full width at every breakpoint. */}
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                        <div
+                          data-testid="previous-status"
+                          className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1.5"
+                        >
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
+                            {standupStrings.yesterday.previousStatus()}
+                          </span>
+                          <span className="text-[12.5px] text-[var(--apple-label)]">{row.previousStatus}</span>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1">
+                          <label
+                            className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]"
+                            htmlFor={`status-${row.taskId}`}
+                          >
+                            {standupStrings.yesterday.currentStatus()}
+                          </label>
+                          <select
+                            id={`status-${row.taskId}`}
+                            data-testid="current-status"
+                            aria-label={`Status for ${row.taskKey ?? row.taskId}`}
+                            value={statusOf(row)}
+                            disabled={disabled}
+                            onChange={(event) => changeStatus(row, event.target.value)}
+                            className="h-6 w-full rounded-[var(--apple-radius-sm)] border-0 bg-transparent p-0 text-[12.5px] text-[var(--apple-label)]"
+                          >
+                            {statusOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1.5">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
+                            Planned
+                          </span>
+                          <span data-testid="planned" className="font-apple-mono text-[12.5px] tabular-nums text-[var(--apple-label)]">
+                            {formatMinutesAsHours(row.plannedMinutes, { locale })}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1.5">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
+                            Logged
+                          </span>
+                          <span data-testid="logged" className="font-apple-mono text-[12.5px] tabular-nums text-[var(--apple-label)]">
+                            {formatMinutesAsHours(loggedOf(row), { locale })}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1.5">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
+                            Variance
+                          </span>
+                          <span data-testid="day-variance" className="font-apple-mono text-[12.5px] tabular-nums text-[var(--apple-label)]">
+                            {formatMinutesAsHours(row.dayVarianceMinutes, { locale, signed: true })}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1.5">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
+                            Remaining
+                          </span>
+                          <span data-testid="remaining" className="font-apple-mono text-[12.5px] tabular-nums text-[var(--apple-label)]">
+                            {formatMinutesAsHours(row.remainingEstimateMinutes, { locale })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Actions line — the note field takes whatever width is left. */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="sr-only" htmlFor={`logged-${row.taskId}`}>
+                          {`Logged hours for ${row.taskKey ?? row.taskId}`}
+                        </label>
+                        <input
+                          id={`logged-${row.taskId}`}
+                          data-testid="logged-hours-edit"
+                          aria-label={`Logged hours for ${row.taskKey ?? row.taskId}`}
+                          type="number"
+                          inputMode="decimal"
+                          step={0.25}
+                          min={0}
+                          disabled={disabled}
+                          value={loggedDraft[row.taskId] ?? hoursText(loggedOf(row))}
+                          onChange={(event) =>
+                            setLoggedDraft((current) => ({ ...current, [row.taskId]: event.target.value }))
+                          }
+                          onBlur={() => commitLoggedHours(row)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault()
+                              commitLoggedHours(row)
+                            }
+                          }}
+                          className="h-8 w-20 shrink-0 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-right text-[12.5px] tabular-nums disabled:opacity-40"
+                        />
+
+                        <label className="sr-only" htmlFor={`note-${row.taskId}`}>
+                          {`Note for ${row.taskKey ?? row.taskId}`}
+                        </label>
+                        <input
+                          id={`note-${row.taskId}`}
+                          data-testid="note-input"
+                          aria-label={`Note for ${row.taskKey ?? row.taskId}`}
+                          type="text"
+                          placeholder="Add a note"
+                          disabled={disabled}
+                          value={noteDraft[row.taskId] ?? ''}
+                          onChange={(event) => {
+                            setNoteDraft((current) => ({ ...current, [row.taskId]: event.target.value }))
+                            setNoteStatus((current) => {
+                              const next = { ...current }
+                              delete next[row.taskId]
+                              return next
+                            })
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault()
+                              submitNote(row)
+                            }
+                          }}
+                          className="h-8 min-w-[10rem] flex-1 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2.5 text-[12.5px] disabled:opacity-40"
+                        />
+                        <button
+                          type="button"
+                          data-testid="note-save"
+                          disabled={disabled || !((noteDraft[row.taskId] ?? '').trim())}
+                          onClick={() => submitNote(row)}
+                          className="apple-transition shrink-0 text-[12px] font-medium text-[var(--apple-system-blue)] hover:underline disabled:opacity-40"
+                        >
+                          {noteStatus[row.taskId] === 'saved'
+                            ? standupStrings.yesterday.noteSaved()
+                            : standupStrings.yesterday.saveNote()}
+                        </button>
+
+                        <span className="ml-auto flex shrink-0 flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => api.reviseEstimate(row)}
+                            disabled={disabled}
+                            className="apple-transition text-[12px] font-medium text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:underline"
+                          >
+                            {standupStrings.variance.reviseTitle()}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => api.openTask(row.taskId)}
+                            className="apple-transition text-[12px] font-medium text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:underline"
+                          >
+                            {`Open ${row.taskKey ?? row.taskId}`}
+                          </button>
+                        </span>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -349,7 +418,7 @@ export function YesterdayPanel({
                   onClick={() =>
                     api.confirmCompleted({ taskIds: bucket.rows.map((row) => row.taskId) })
                   }
-                  className="self-start rounded-md border border-border px-2 py-1 text-xs"
+                  className="apple-transition self-start rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1 text-[12px] font-medium hover:bg-[var(--apple-quaternary-fill)]"
                 >
                   {standupStrings.yesterday.markAllConfirmed()}
                 </button>
@@ -365,31 +434,36 @@ export function YesterdayPanel({
           is not an "always all four" section). */}
       {hasYesterday && data.addedAfterCompletion.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h4 className="text-sm font-medium">
+          <h4 className="text-[13px] font-semibold text-[var(--apple-label)]">
             {standupStrings.yesterday.bucketCount({
               label: standupStrings.yesterday.addedAfterCompletion(),
               count: data.addedAfterCompletion.length
             })}
           </h4>
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col gap-2.5">
             {data.addedAfterCompletion.map((row) => (
               <li
                 key={row.allocationId ?? `${row.memberId}:${row.taskId}`}
                 data-testid={`yesterday-added-row-${row.taskKey ?? row.taskId}`}
-                className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2 text-sm"
+                className="flex flex-wrap items-center gap-3 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background p-3 text-[12.5px]"
               >
-                <span className="font-medium">{row.taskKey ?? row.taskId}</span>
-                <span className="text-muted-foreground">{row.title}</span>
-                <span aria-label={row.memberName} className="text-xs text-muted-foreground">
+                <span className="font-apple-mono text-[12px] text-[var(--apple-tertiary-label)]">
+                  {row.taskKey ?? row.taskId}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[var(--apple-label)]">{row.title}</span>
+                <span
+                  aria-label={row.memberName}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--apple-tertiary-fill)] text-[10px] font-semibold text-[var(--apple-secondary-label)]"
+                >
                   {initialsOf(row.memberName)}
                 </span>
-                <span data-testid="added-current-status" className="text-xs text-muted-foreground">
+                <span data-testid="added-current-status" className="shrink-0 text-[var(--apple-secondary-label)]">
                   {standupStrings.yesterday.currentStatus()} {row.currentStatus}
                 </span>
-                <span data-testid="planned">
+                <span data-testid="planned" className="font-apple-mono shrink-0 tabular-nums text-[var(--apple-label)]">
                   {formatMinutesAsHours(row.plannedMinutes, { locale })}
                 </span>
-                <span data-testid="logged">
+                <span data-testid="logged" className="font-apple-mono shrink-0 tabular-nums text-[var(--apple-label)]">
                   {formatMinutesAsHours(row.loggedMinutes, { locale })}
                 </span>
               </li>

@@ -33,9 +33,9 @@ const OUTCOME_LABEL: Record<ProjectedOutcome, () => string> = {
 }
 
 const OUTCOME_TONE: Record<ProjectedOutcome, string> = {
-  will_finish: 'text-emerald-600 dark:text-emerald-400',
-  at_risk: 'text-amber-600 dark:text-amber-400',
-  cannot_finish: 'text-destructive'
+  will_finish: 'text-[var(--apple-system-green)]',
+  at_risk: 'text-[var(--apple-system-orange)]',
+  cannot_finish: 'text-[var(--apple-system-red)]'
 }
 
 export interface SprintCloseReadinessPanelProps {
@@ -57,72 +57,86 @@ export function SprintCloseReadinessPanel({
     <section
       id="panel-5-5"
       aria-labelledby="panel-5-5-heading"
-      className="flex flex-col gap-3 rounded-md border border-border p-3"
+      className="scroll-mt-6 flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/[0.03] p-4"
     >
-      <h3 id="panel-5-5-heading" className="text-sm font-semibold">
+      <h3 id="panel-5-5-heading" className="apple-section-label text-[var(--apple-system-orange)]">
         {standupStrings.run.sprintCloseTitle()}
       </h3>
 
-      <table className="w-full text-sm">
-        <tbody>
-          {openTasks.map((task) => {
-            const labelId = `disposition-label-${task.taskId}`
-            return (
-              <tr key={task.taskId} className="border-b border-border last:border-0">
-                <td className="py-1 pr-2 font-mono text-xs">{task.taskKey ?? task.taskId}</td>
-                <td className="py-1 pr-2 text-xs text-muted-foreground">
-                  {task.ownerName ?? '—'}
-                </td>
-                <td className="py-1 pr-2 text-xs text-muted-foreground">
-                  {formatMinutesAsHours(task.remainingEstimateMinutes, { locale })}
-                </td>
-                <td className="py-1 pr-2 text-xs text-muted-foreground">
-                  {formatMinutesAsHours(task.hoursAvailableTodayMinutes, { locale })}
-                </td>
-                <td className={`py-1 pr-2 text-xs ${OUTCOME_TONE[task.projectedOutcome]}`}>
-                  {OUTCOME_LABEL[task.projectedOutcome]()}
-                </td>
-                <td className="py-1">
-                  <label id={labelId} className="sr-only">
-                    {standupStrings.run.sprintCloseDispositionFor({ key: task.taskKey ?? task.taskId })}
-                  </label>
-                  <select
-                    aria-labelledby={labelId}
-                    aria-label={standupStrings.run.sprintCloseDispositionFor({
-                      key: task.taskKey ?? task.taskId
-                    })}
-                    value={task.disposition ?? ''}
-                    disabled={disabled}
-                    onChange={(event) =>
-                      onSetDisposition(task.taskId, event.target.value as DispositionType)
-                    }
-                    className="rounded-md border border-border bg-background px-2 py-1 text-xs"
-                  >
-                    <option value="" disabled>
-                      {standupStrings.run.sprintCloseNoDisposition()}
-                    </option>
-                    {DISPOSITION_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {DISPOSITION_LABEL[type]()}
+      <div className="overflow-x-auto rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background">
+        <table className="w-full min-w-[36rem] text-[13px]">
+          <thead>
+            <tr className="border-b border-[var(--apple-separator)] text-left text-[11px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
+              <th className="py-2 pl-3 pr-2 font-medium">Task</th>
+              <th className="py-2 pr-2 font-medium">Owner</th>
+              <th className="py-2 pr-2 font-medium">Remaining</th>
+              <th className="py-2 pr-2 font-medium">Available today</th>
+              <th className="py-2 pr-2 font-medium">Outcome</th>
+              <th className="py-2 pr-3 font-medium">Disposition</th>
+            </tr>
+          </thead>
+          <tbody>
+            {openTasks.map((task) => {
+              const labelId = `disposition-label-${task.taskId}`
+              return (
+                <tr key={task.taskId} className="border-b border-[var(--apple-separator)] last:border-0">
+                  <td className="py-2 pl-3 pr-2 font-apple-mono text-[12px] text-[var(--apple-label)]">
+                    {task.taskKey ?? task.taskId}
+                  </td>
+                  <td className="py-2 pr-2 text-[12.5px] text-[var(--apple-secondary-label)]">
+                    {task.ownerName ?? '—'}
+                  </td>
+                  <td className="py-2 pr-2 font-apple-mono text-[12.5px] tabular-nums text-[var(--apple-secondary-label)]">
+                    {formatMinutesAsHours(task.remainingEstimateMinutes, { locale })}
+                  </td>
+                  <td className="py-2 pr-2 font-apple-mono text-[12.5px] tabular-nums text-[var(--apple-secondary-label)]">
+                    {formatMinutesAsHours(task.hoursAvailableTodayMinutes, { locale })}
+                  </td>
+                  <td className={`py-2 pr-2 text-[12.5px] font-medium ${OUTCOME_TONE[task.projectedOutcome]}`}>
+                    {OUTCOME_LABEL[task.projectedOutcome]()}
+                  </td>
+                  <td className="py-2 pr-3">
+                    <label id={labelId} className="sr-only">
+                      {standupStrings.run.sprintCloseDispositionFor({ key: task.taskKey ?? task.taskId })}
+                    </label>
+                    <select
+                      aria-labelledby={labelId}
+                      aria-label={standupStrings.run.sprintCloseDispositionFor({
+                        key: task.taskKey ?? task.taskId
+                      })}
+                      value={task.disposition ?? ''}
+                      disabled={disabled}
+                      onChange={(event) =>
+                        onSetDisposition(task.taskId, event.target.value as DispositionType)
+                      }
+                      className="h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-[12.5px] text-[var(--apple-label)]"
+                    >
+                      <option value="" disabled>
+                        {standupStrings.run.sprintCloseNoDisposition()}
                       </option>
-                    ))}
-                  </select>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                      {DISPOSITION_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {DISPOSITION_LABEL[type]()}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {carryForwardOffenders.length > 0 && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-xs">
-          <p className="font-medium">{standupStrings.run.sprintCloseCarryForwardTitle()}</p>
-          <ul className="list-disc pl-4">
+        <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/[0.06] p-3 text-[12.5px]">
+          <p className="font-medium text-[var(--apple-label)]">{standupStrings.run.sprintCloseCarryForwardTitle()}</p>
+          <ul className="list-disc pl-4 text-[var(--apple-label)]">
             {carryForwardOffenders.map((item) => (
               <li key={item.itemId}>{item.taskKey ?? item.itemId}</li>
             ))}
           </ul>
-          <p className="mt-1 text-muted-foreground">
+          <p className="mt-1 text-[var(--apple-secondary-label)]">
             {standupStrings.run.sprintCloseCarryForwardHint()}
           </p>
         </div>
