@@ -18,6 +18,7 @@ import { NextRequest } from 'next/server'
 
 import { Holiday } from '@/models/Holiday'
 import { HolidaySet } from '@/models/HolidaySet'
+import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { recordAudit } from '@/lib/standup/audit'
 import { StandupError } from '@/lib/standup/errors'
@@ -45,7 +46,21 @@ export const GET = withStandupPermission(
 
     const statsBySet = new Map(stats.map((row) => [row._id.toString(), row]))
 
+    // The org-level calendar's subscriptions are what "the global default
+    // calendar" actually means downstream — every project with no calendar of
+    // its own inherits this. Reported here so the admin's picker in Global
+    // Settings can show which set is currently selected.
+    const orgCalendar = await WorkingCalendar.findOne({
+      organization: organizationId,
+      scope: 'organization'
+    })
+      .select('subscribedHolidaySets')
+      .lean()
+    const defaultHolidaySetId =
+      (orgCalendar as any)?.subscribedHolidaySets?.[0]?.toString() ?? null
+
     return ok({
+      defaultHolidaySetId,
       holidaySets: (sets as any[]).map((set) => {
         const stat = statsBySet.get(set._id.toString())
         return {
@@ -57,7 +72,9 @@ export const GET = withStandupPermission(
           holidayCount: stat?.count ?? 0,
           // Sets are perpetual and topped up each year, so coverage is what
           // tells a PM whether next year's gazette has been loaded yet.
-          coverage: stat ? { from: stat.from, to: stat.to } : null
+          coverage: stat ? { from: stat.from, to: stat.to } : null,
+          source: set.source ?? 'manual',
+          lastRefreshedAt: set.lastRefreshedAt ?? null
         }
       })
     })
