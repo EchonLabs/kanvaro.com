@@ -17,7 +17,7 @@
  *   mode this module has.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CalendarPlus, Loader2, Plus, Undo2, Upload } from 'lucide-react'
+import { AlertTriangle, CalendarPlus, Loader2, Plus, RefreshCw, Undo2, Upload } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -42,6 +42,8 @@ interface HolidaySetSummary {
   count: number
   from?: string
   to?: string
+  source?: 'manual' | 'api'
+  lastRefreshedAt?: string | null
 }
 
 interface HolidayRow {
@@ -96,6 +98,12 @@ export function HolidaySetManager() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [showRevoked, setShowRevoked] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [hasApiKey, setHasApiKey] = useState(false)
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [savingKey, setSavingKey] = useState(false)
+  const [defaultHolidaySetId, setDefaultHolidaySetId] = useState<string | null>(null)
+  const [savingDefault, setSavingDefault] = useState(false)
 
   const [draft, setDraft] = useState({
     name: '',
@@ -113,9 +121,11 @@ export function HolidaySetManager() {
       const response = await fetch('/api/organization/holiday-sets')
       if (!response.ok) throw new Error('Could not load holiday calendars')
       const data = await response.json()
-      const loaded: HolidaySetSummary[] = data.holidaySets ?? data.data?.holidaySets ?? []
+      const body = data.data ?? data
+      const loaded: HolidaySetSummary[] = body.holidaySets ?? []
       setSets(loaded)
       setSelectedId((current) => current ?? loaded[0]?.id ?? null)
+      setDefaultHolidaySetId(body.defaultHolidaySetId ?? null)
     } catch {
       notifyError({ title: 'Could not load holiday calendars' })
     } finally {
@@ -137,9 +147,21 @@ export function HolidaySetManager() {
     [notifyError]
   )
 
+  const loadApiKeyStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/organization/holiday-sets/api-key')
+      if (!response.ok) return
+      const data = await response.json()
+      setHasApiKey(Boolean(data.hasApiKey ?? data.data?.hasApiKey))
+    } catch {
+      // Non-critical: the refresh button simply calls the API keyless if this fails.
+    }
+  }, [])
+
   useEffect(() => {
     void loadSets()
-  }, [loadSets])
+    void loadApiKeyStatus()
+  }, [loadSets, loadApiKeyStatus])
 
   useEffect(() => {
     if (selectedId) void loadHolidays(selectedId)
@@ -222,6 +244,72 @@ export function HolidaySetManager() {
     }
   }
 
+  const setAsDefault = async (holidaySetId: string) => {
+    setSavingDefault(true)
+    try {
+      const response = await fetch('/api/organization/holiday-sets/default', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ holidaySetId })
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data?.error?.message ?? 'Could not set the default calendar')
+
+      setDefaultHolidaySetId(holidaySetId)
+      notifySuccess({ title: 'Global default calendar updated' })
+    } catch (error) {
+      notifyError({ title: (error as Error).message })
+    } finally {
+      setSavingDefault(false)
+    }
+  }
+
+  const refreshFromApi = async () => {
+    setRefreshing(true)
+    try {
+      const response = await fetch('/api/organization/holiday-sets/refresh', { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data?.error?.message ?? 'Could not refresh from the API')
+
+      const summary = data.data ?? data
+      notifySuccess({
+        title: 'Sri Lanka Public Holidays refreshed',
+        message: `${summary.fetched} fetched, ${summary.inserted} added, ${summary.updated} updated${
+          summary.skippedRevoked ? `, ${summary.skippedRevoked} withdrawn dates left untouched` : ''
+        }.`
+      })
+      await loadSets()
+      setSelectedId(summary.setId ?? null)
+      if (summary.setId) await loadHolidays(summary.setId)
+    } catch (error) {
+      notifyError({ title: (error as Error).message })
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const saveApiKey = async () => {
+    if (!apiKeyInput.trim()) return
+    setSavingKey(true)
+    try {
+      const response = await fetch('/api/organization/holiday-sets/api-key', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: apiKeyInput.trim() })
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data?.error?.message ?? 'Could not save the API key')
+
+      notifySuccess({ title: 'API key saved' })
+      setApiKeyInput('')
+      setHasApiKey(true)
+    } catch (error) {
+      notifyError({ title: (error as Error).message })
+    } finally {
+      setSavingKey(false)
+    }
+  }
+
   const importCsv = async (file: File) => {
     if (!selectedId) return
     setBusy(true)
@@ -299,7 +387,72 @@ export function HolidaySetManager() {
                 />
               </label>
             </Button>
+
+            <Button variant="outline" onClick={refreshFromApi} disabled={refreshing || busy}>
+              {refreshing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Refresh from API
+            </Button>
           </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[240px] flex-1">
+              <Label htmlFor="holiday-default">Global default calendar</Label>
+              <Select
+                value={defaultHolidaySetId ?? ''}
+                onValueChange={setAsDefault}
+                disabled={savingDefault || sets.length === 0}
+              >
+                <SelectTrigger id="holiday-default">
+                  <SelectValue placeholder="Choose the default calendar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sets.map((set) => (
+                    <SelectItem key={set.id} value={set.id}>
+                      {set.name}
+                      {set.source === 'api' ? ' — API' : ' — Seeded/manual'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Every project without its own calendar inherits this one.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[240px] flex-1">
+              <Label htmlFor="holiday-api-key">induwara.lk API key</Label>
+              <Input
+                id="holiday-api-key"
+                type="password"
+                value={apiKeyInput}
+                placeholder={hasApiKey ? 'Key configured — enter a new key to replace it' : 'Paste your API key'}
+                onChange={(event) => setApiKeyInput(event.target.value)}
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={saveApiKey}
+              disabled={savingKey || !apiKeyInput.trim()}
+            >
+              {savingKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save key
+            </Button>
+          </div>
+
+          {selected?.source === 'api' ? (
+            <p className="text-xs text-muted-foreground">
+              Populated from the induwara.lk public holidays API.{' '}
+              {selected.lastRefreshedAt
+                ? `Last refreshed ${new Date(selected.lastRefreshedAt).toLocaleString()}.`
+                : 'Not refreshed yet.'}
+            </p>
+          ) : null}
 
           {selected && coverage.shortfall ? (
             <div

@@ -9,6 +9,24 @@ import { ToastProvider } from '@/components/ui/Toast'
 function createFetchMock() {
   return jest.fn((url: string) => {
     const urlStr = String(url)
+    // API key status — checked before the general holiday-sets branch below,
+    // since that branch's `/holiday-sets` substring match would otherwise
+    // swallow this more specific path.
+    if (urlStr.includes('/holiday-sets/api-key')) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ data: { hasApiKey: false } })
+      })
+    }
+    // Refresh endpoint
+    if (urlStr.includes('/holiday-sets/refresh')) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          data: { setId: 'set1', fetched: 2, inserted: 2, updated: 0, skippedRevoked: 0 }
+        })
+      })
+    }
     // List all holiday sets
     if (urlStr.includes('/holiday-sets') && !urlStr.includes('/holidays')) {
       return Promise.resolve({
@@ -129,5 +147,57 @@ describe('HolidaySetManager revoke flow', () => {
       String(url).includes('/revoke')
     )
     expect(revokeCalls).toHaveLength(1)
+  })
+})
+
+describe('HolidaySetManager API refresh', () => {
+  it('calls the refresh endpoint when "Refresh from API" is clicked', async () => {
+    const fetchMock = createFetchMock()
+    global.fetch = fetchMock as any
+
+    render(
+      <ToastProvider>
+        <HolidaySetManager />
+      </ToastProvider>
+    )
+
+    const refreshButton = await screen.findByRole('button', { name: /refresh from api/i })
+
+    await React.act(async () => {
+      fireEvent.click(refreshButton)
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    })
+
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes('/holiday-sets/refresh')
+    )
+    expect(refreshCalls).toHaveLength(1)
+  })
+
+  it('calls the API-key endpoint when a key is saved', async () => {
+    const fetchMock = createFetchMock()
+    global.fetch = fetchMock as any
+
+    render(
+      <ToastProvider>
+        <HolidaySetManager />
+      </ToastProvider>
+    )
+
+    const keyInput = await screen.findByLabelText(/induwara\.lk api key/i)
+    fireEvent.change(keyInput, { target: { value: 'secret-key-123' } })
+
+    const saveButton = screen.getByRole('button', { name: /save key/i })
+
+    await React.act(async () => {
+      fireEvent.click(saveButton)
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    })
+
+    const keyCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes('/holiday-sets/api-key')
+    )
+    // One GET on mount, one PUT on save.
+    expect(keyCalls.length).toBeGreaterThanOrEqual(2)
   })
 })
