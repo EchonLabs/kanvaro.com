@@ -251,7 +251,7 @@ describe('MyStandupScreen', () => {
         }
       ]
     })
-    expect(screen.getByText(/project beta/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View Standups' })).toBeInTheDocument()
   })
 
   describe('the schedule-hub button', () => {

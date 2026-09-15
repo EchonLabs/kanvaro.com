@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { CalendarPlus, ChevronRight } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 import { IconChip } from '../shared/IconChip'
 import { StatusPill, type StatusPillTone } from '../shared/StatusPill'
 import { standupStrings } from '@/lib/standup/strings'
@@ -19,39 +20,39 @@ const STATUS_TONE: Record<string, StatusPillTone> = {
   Scheduled: 'neutral'
 }
 
-/** Collapsed past this many so a member with several open stand-ups gets a scannable list, not a wall of rows. */
-const VISIBLE_LIMIT = 3
-
 function formatLocalTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
 /**
  * Fixes the redirector's old silent-drop: a second stand-up today is normal,
- * hiding it is not. Each row carries its own time and status — project name
- * alone repeats when several open projects share a name, and a bare list of
- * identical labels read as a bug rather than real information.
+ * hiding it is not. Collapsed behind a "View Standups" button rather than an
+ * always-open list, since a member usually only cares once they choose to look.
  */
 export function AlsoTodayBanner({ candidates }: AlsoTodayBannerProps) {
-  const [expanded, setExpanded] = useState(false)
+  const [open, setOpen] = useState(false)
 
   if (candidates.length === 0) return null
-
-  const visible = expanded ? candidates : candidates.slice(0, VISIBLE_LIMIT)
-  const hiddenCount = candidates.length - visible.length
 
   return (
     <div
       role="status"
-      className="flex gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-blue)]/30 bg-[var(--apple-system-blue)]/10 p-3"
+      className="flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-blue)]/30 bg-[var(--apple-system-blue)]/10 p-3"
     >
-      <IconChip icon={<CalendarPlus strokeWidth={1.75} />} tone="blue" />
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <span className="text-[13px] font-medium text-[var(--apple-label)]">
-          {standupStrings.my.alsoToday({ count: candidates.length })}
-        </span>
+      <div className="flex items-center gap-3">
+        <IconChip icon={<CalendarPlus strokeWidth={1.75} />} tone="blue" />
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <span className="text-[13px] font-medium text-[var(--apple-label)]">
+            {standupStrings.my.otherStandupsToday({ count: candidates.length })}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => setOpen((prev) => !prev)}>
+            {standupStrings.my.viewStandups()}
+          </Button>
+        </div>
+      </div>
+      {open ? (
         <ul className="flex flex-col gap-1.5">
-          {visible.map((candidate) => (
+          {candidates.map((candidate) => (
             <li key={candidate.standupId}>
               <Link
                 href={`/my/standup/${candidate.standupId}`}
@@ -71,16 +72,7 @@ export function AlsoTodayBanner({ candidates }: AlsoTodayBannerProps) {
             </li>
           ))}
         </ul>
-        {hiddenCount > 0 ? (
-          <button
-            type="button"
-            onClick={() => setExpanded(true)}
-            className="self-start text-[13px] font-medium text-[var(--apple-system-blue)] hover:underline"
-          >
-            {standupStrings.pool.showMore()} ({hiddenCount})
-          </button>
-        ) : null}
-      </div>
+      ) : null}
     </div>
   )
 }

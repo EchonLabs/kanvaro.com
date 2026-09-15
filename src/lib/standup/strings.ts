@@ -577,8 +577,9 @@ export const standupStrings = {
     addRejected: () => 'That task could not be added to your day.',
     /** A read-tolerant section (Yesterday, My position, Blockers) shown when its own fetch failed — the rest of the screen still renders. */
     sectionLoadFailed: () => 'Could not load this section.',
-    alsoToday: ({ count }: { count: number }) =>
-      count === 1 ? 'You also have a stand-up today:' : `You also have ${count} more stand-ups today:`,
+    otherStandupsToday: ({ count }: { count: number }) =>
+      count === 1 ? 'You have another stand-up today' : `You have ${count} other stand-ups today`,
+    viewStandups: () => 'View Standups',
     dayOf: ({ day, total }: { day: number; total: number }) => `Day ${day} of ${total}`,
     joinCall: () => 'Join',
     capacityFull: ({ hours, taskCount }: { hours: string; taskCount: number }) =>

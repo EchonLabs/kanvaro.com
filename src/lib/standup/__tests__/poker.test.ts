@@ -4,7 +4,6 @@
 import {
   CONSENSUS_RULES,
   DECK_TYPES,
-  NON_NUMERIC_CARDS,
   TSHIRT_POINTS,
   assertValidVote,
   cardValue,
@@ -32,29 +31,22 @@ describe('decks — PLN-10', () => {
   })
 
   it('deals the fibonacci deck the spec names', () => {
-    expect(deckCards('fibonacci')).toEqual([1, 2, 3, 5, 8, 13, 21, '?', 'coffee'])
+    expect(deckCards('fibonacci')).toEqual([1, 2, 3, 4, 6, 8, 12, 14, 16])
   })
 
   it('deals t-shirt sizes from XS to XL', () => {
-    expect(deckCards('tshirt')).toEqual(['XS', 'S', 'M', 'L', 'XL', '?', 'coffee'])
-  })
-
-  it('appends the two non-numeric cards to every deck', () => {
-    for (const deck of DECK_TYPES) {
-      const cards = deckCards(deck)
-      for (const card of NON_NUMERIC_CARDS) expect(cards).toContain(card)
-    }
+    expect(deckCards('tshirt')).toEqual(['XS', 'S', 'M', 'L', 'XL'])
   })
 
   it('validates cards against their own deck', () => {
-    expect(isValidCard('fibonacci', 13)).toBe(true)
-    expect(isValidCard('fibonacci', 4)).toBe(false)
+    expect(isValidCard('fibonacci', 12)).toBe(true)
+    expect(isValidCard('fibonacci', 5)).toBe(false)
     expect(isValidCard('tshirt', 'M')).toBe(true)
     expect(isValidCard('tshirt', 3)).toBe(false)
   })
 
   it('rejects an off-deck vote by name', () => {
-    expect(() => assertValidVote('fibonacci', 4)).toThrow(/not a card in the fibonacci deck/)
+    expect(() => assertValidVote('fibonacci', 5)).toThrow(/not a card in the fibonacci deck/)
     expect(() => assertValidVote('fibonacci', 8)).not.toThrow()
   })
 })
@@ -70,28 +62,27 @@ describe('cardValue', () => {
     expect(cardValue('tshirt', 'XL')).toBe(8)
   })
 
-  it('returns null for the non-numeric cards, never zero', () => {
+  it('returns null for a card outside the deck, never zero', () => {
     // Zero would drag every median and average down and silently understate
-    // the estimate — an abstention is not a vote for "no effort".
-    expect(cardValue('fibonacci', '?')).toBeNull()
-    expect(cardValue('fibonacci', 'coffee')).toBeNull()
+    // the estimate.
+    expect(cardValue('fibonacci', 'not-a-card')).toBeNull()
   })
 })
 
 describe('revealVotes — PLN-11 / PLN-12', () => {
   it('computes spread as max minus min', () => {
     const result = revealVotes('fibonacci', 'facilitator_decides', votes(
-      ['kasun', 5], ['priya', 8], ['nuwan', 5], ['dilani', 13], ['amal', 5], ['ravi', 8]
+      ['kasun', 5], ['priya', 8], ['nuwan', 5], ['dilani', 14], ['amal', 5], ['ravi', 8]
     ))
 
     expect(result.min).toBe(5)
-    expect(result.max).toBe(13)
-    expect(result.spread).toBe(8)
+    expect(result.max).toBe(14)
+    expect(result.spread).toBe(9)
   })
 
   it('marks both ends of a disagreement as outliers', () => {
     const result = revealVotes('fibonacci', 'facilitator_decides', votes(
-      ['kasun', 5], ['priya', 8], ['dilani', 13]
+      ['kasun', 5], ['priya', 8], ['dilani', 14]
     ))
 
     const outliers = result.votes.filter((vote) => vote.isOutlier).map((vote) => vote.voterId)
@@ -108,9 +99,11 @@ describe('revealVotes — PLN-11 / PLN-12', () => {
     expect(result.spread).toBe(0)
   })
 
-  it('excludes abstentions from every calculation', () => {
+  it('excludes votes carrying no numeric value from every calculation', () => {
+    // Defensive: a card outside the current deck (e.g. from legacy stored
+    // data) should never be coerced to zero and drag the median down.
     const result = revealVotes('fibonacci', 'median', votes(
-      ['kasun', 5], ['priya', 5], ['nuwan', '?'], ['amal', 'coffee']
+      ['kasun', 5], ['priya', 5], ['nuwan', 'invalid'], ['amal', 'invalid']
     ))
 
     expect(result.numericCount).toBe(2)
@@ -119,8 +112,8 @@ describe('revealVotes — PLN-11 / PLN-12', () => {
     expect(result.unanimous).toBe(true)
   })
 
-  it('handles a round where everyone abstained', () => {
-    const result = revealVotes('fibonacci', 'median', votes(['kasun', '?'], ['priya', 'coffee']))
+  it('handles a round where no vote carried a numeric value', () => {
+    const result = revealVotes('fibonacci', 'median', votes(['kasun', 'invalid'], ['priya', 'invalid']))
 
     expect(result.min).toBeNull()
     expect(result.spread).toBeNull()
@@ -131,7 +124,7 @@ describe('revealVotes — PLN-11 / PLN-12', () => {
 
   it('takes the middle value for an odd number of votes', () => {
     const result = revealVotes('fibonacci', 'median', votes(
-      ['a', 2], ['b', 5], ['c', 13]
+      ['a', 2], ['b', 5], ['c', 14]
     ))
     expect(result.median).toBe(5)
   })
@@ -144,8 +137,8 @@ describe('revealVotes — PLN-11 / PLN-12', () => {
   })
 
   it('is not fooled by vote order', () => {
-    const ascending = revealVotes('fibonacci', 'median', votes(['a', 1], ['b', 8], ['c', 21]))
-    const descending = revealVotes('fibonacci', 'median', votes(['c', 21], ['b', 8], ['a', 1]))
+    const ascending = revealVotes('fibonacci', 'median', votes(['a', 1], ['b', 8], ['c', 16]))
+    const descending = revealVotes('fibonacci', 'median', votes(['c', 16], ['b', 8], ['a', 1]))
 
     expect(ascending.median).toBe(descending.median)
     expect(ascending.spread).toBe(descending.spread)
@@ -153,7 +146,7 @@ describe('revealVotes — PLN-11 / PLN-12', () => {
 })
 
 describe('consensus rules — PLN-10', () => {
-  const cast = () => votes(['a', 3], ['b', 5], ['c', 13])
+  const cast = () => votes(['a', 3], ['b', 5], ['c', 14])
 
   const suggestion = (rule: ConsensusRule) =>
     revealVotes('fibonacci', rule, cast()).suggestedValue
@@ -172,7 +165,7 @@ describe('consensus rules — PLN-10', () => {
   })
 
   it('highest proposes the largest', () => {
-    expect(suggestion('highest')).toBe(13)
+    expect(suggestion('highest')).toBe(14)
   })
 
   it('unanimous proposes nothing until the team agrees', () => {
@@ -183,7 +176,7 @@ describe('consensus rules — PLN-10', () => {
   })
 
   it('facilitator_decides offers the median as a starting point', () => {
-    // The least distorted by one person voting 21 to make a point.
+    // The least distorted by one person voting 14 to make a point.
     expect(suggestion('facilitator_decides')).toBe(5)
   })
 })
@@ -246,14 +239,14 @@ describe('finalizeVote', () => {
     const result = finalizeVote({
       deckType: 'fibonacci',
       rule: 'median',
-      votes: votes(['a', 5], ['b', '?']),
+      votes: votes(['a', 5], ['b', 8]),
       finalValue: 5,
       roundCount: 1
     })
 
     expect(result.votes).toEqual([
       { voterId: 'a', card: 5, value: 5 },
-      { voterId: 'b', card: '?', value: null }
+      { voterId: 'b', card: 8, value: 8 }
     ])
   })
 

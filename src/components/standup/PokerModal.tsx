@@ -9,13 +9,14 @@
  * where the network tab makes "hidden" meaningless.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Coffee, Eye, HelpCircle, Loader2, RotateCcw } from 'lucide-react'
+import { Eye, Loader2, RotateCcw } from 'lucide-react'
 
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
+import { PokerCardCarousel } from '@/components/standup/poker/PokerCardCarousel'
 import { useNotify } from '@/lib/notify'
 import { resolveVisibleTask } from '@/lib/standup/poker'
 import { cn } from '@/lib/utils'
@@ -278,8 +279,11 @@ export function PokerModal({
     <ResponsiveDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Planning poker"
+      title="Let's Plan Together"
       description={task ? `${task.key} — ${task.title}` : 'No task selected'}
+      className="sm:max-w-2xl lg:max-w-5xl"
+      headerClassName="text-center"
+      dismissible={false}
     >
       <div className="space-y-5">
         <p className="text-[12px] text-[var(--apple-tertiary-label)]">
@@ -290,37 +294,7 @@ export function PokerModal({
         {!reveal && (
           <div className="space-y-3">
             <Label>Your card</Label>
-            <div className="flex flex-wrap gap-2">
-              {cards.map((card) => (
-                <button
-                  key={String(card)}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => vote(card)}
-                  aria-pressed={selected === card}
-                  className={cn(
-                    'apple-transition flex h-14 w-12 items-center justify-center rounded-[var(--apple-radius-md)] border text-[15px] font-medium',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]',
-                    selected === card
-                      ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)] text-white'
-                      : 'border-[var(--apple-separator)] bg-card text-[var(--apple-label)] hover:border-[var(--apple-system-blue)]/50'
-                  )}
-                >
-                  {card === '?' ? (
-                    <HelpCircle className="h-5 w-5" />
-                  ) : card === 'coffee' ? (
-                    <Coffee className="h-5 w-5" />
-                  ) : (
-                    card
-                  )}
-                </button>
-              ))}
-            </div>
-
-            <p className="text-[12px] text-[var(--apple-tertiary-label)]">
-              <HelpCircle className="mr-1 inline h-3 w-3" />
-              means you need more information. Neither it nor coffee counts towards the estimate.
-            </p>
+            <PokerCardCarousel cards={cards} selected={selected} disabled={busy} onSelect={vote} />
 
             {progress && (
               <div className="flex items-center justify-between rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-3 py-2">

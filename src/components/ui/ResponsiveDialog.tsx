@@ -14,17 +14,20 @@ interface ResponsiveDialogProps {
   className?: string
   /** When false, dialog can only be closed via explicit close controls (close icon/buttons). */
   dismissible?: boolean
+  /** Extra classes for the header block, e.g. to center the title. */
+  headerClassName?: string
 }
 
-export function ResponsiveDialog({ 
-  open, 
-  onOpenChange, 
-  title, 
+export function ResponsiveDialog({
+  open,
+  onOpenChange,
+  title,
   description,
-  children, 
+  children,
   footer,
   className,
-  dismissible = true
+  dismissible = true,
+  headerClassName
 }: ResponsiveDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -36,7 +39,7 @@ export function ResponsiveDialog({
         onInteractOutside={dismissible ? undefined : (e) => e.preventDefault()}
         onEscapeKeyDown={dismissible ? undefined : (e) => e.preventDefault()}
       >
-        <DialogHeader>
+        <DialogHeader className={headerClassName}>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>

@@ -53,7 +53,7 @@ function renderModal(props: Partial<React.ComponentProps<typeof PokerModal>> = {
         open
         onOpenChange={onOpenChange}
         sessionId="session-1"
-        cards={[1, 2, 3, 5, 8, '?', 'coffee']}
+        cards={[1, 2, 3, 4, 6, 8, 12, 14, 16]}
         queue={baseQueue}
         currentTaskId="t1"
         isFacilitator={false}

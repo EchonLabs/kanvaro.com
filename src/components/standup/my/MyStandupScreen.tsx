@@ -2,9 +2,10 @@
 
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarDays, Info, Lock } from 'lucide-react'
+import { CalendarDays, Info, Lock, Zap } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
+import { PageHeader } from '@/components/tasks/TasksShared'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { isOwnRowReadOnly, isSelfSelectDisabled } from '@/lib/standup/own-row'
@@ -178,6 +179,8 @@ export function MyStandupScreen({
 
   return (
     <div className="flex flex-col gap-4 p-4">
+      <PageHeader title="My Stand-up" icon={Zap} />
+
       {canViewSchedule && (
         <div className="flex justify-end">
           <Button

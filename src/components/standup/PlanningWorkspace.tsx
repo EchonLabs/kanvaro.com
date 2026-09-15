@@ -57,6 +57,7 @@ import {
   type OffendingTask
 } from './PlanningChecklist'
 import { PokerModal } from './PokerModal'
+import { PokerResultsModal, type PokerResultsQueueEntry } from './PokerResultsModal'
 
 interface MemberLoad {
   id: string
@@ -134,6 +135,12 @@ export function PlanningWorkspace({
 
   const [data, setData] = useState<ChecklistPayload | null>(null)
   const [openPokerSession, setOpenPokerSession] = useState<any>(null)
+  // The most recently finished round, kept around only so "View poker
+  // results" has something to open — refresh()'s own poker-sessions fetch
+  // otherwise only ever surfaces the `status === 'open'` session, discarding
+  // a just-completed one the instant the round ends.
+  const [lastCompletedPokerSession, setLastCompletedPokerSession] = useState<any>(null)
+  const [viewingPokerResults, setViewingPokerResults] = useState(false)
   const [session, setSession] = useState<any>(null)
   const [goal, setGoal] = useState('')
   const [acknowledged, setAcknowledged] = useState<string[]>([])
@@ -181,8 +188,12 @@ export function PlanningWorkspace({
 
       if (pokerResponse.ok) {
         const pokerPayload = await pokerResponse.json()
-        setOpenPokerSession(
-          (pokerPayload.data?.sessions ?? []).find((entry: any) => entry.status === 'open') ?? null
+        const sessions = pokerPayload.data?.sessions ?? []
+        setOpenPokerSession(sessions.find((entry: any) => entry.status === 'open') ?? null)
+        // Sessions come back sorted by `createdAt` descending, so the first
+        // completed one is the most recent round.
+        setLastCompletedPokerSession(
+          sessions.find((entry: any) => entry.status === 'completed') ?? null
         )
       }
 
@@ -496,6 +507,16 @@ export function PlanningWorkspace({
             )
           )}
 
+          {/* Server-side gating (SPRINT_UPDATE, same as `finalize`) is what
+              actually restricts who set these estimates — this button only
+              decides who sees a shortcut to look back at them. */}
+          {canFacilitate && lastCompletedPokerSession && (
+            <Button variant="outline" onClick={() => setViewingPokerResults(true)} disabled={busy}>
+              <Spade className="mr-1.5 h-4 w-4" />
+              View poker results
+            </Button>
+          )}
+
           {/* UI-6 — disabled with a tooltip naming the first blocking item. */}
           {canFacilitate && (
             <span title={canComplete ? undefined : blockerTooltip(blockers, session)}>
@@ -793,6 +814,28 @@ export function PlanningWorkspace({
           pointsToHours={poker.session.pointsToHours}
           estimationUnit={poker.session.estimationUnit}
           onEstimated={refresh}
+        />
+      )}
+
+      {lastCompletedPokerSession && (
+        <PokerResultsModal
+          open={viewingPokerResults}
+          onOpenChange={setViewingPokerResults}
+          sessionId={lastCompletedPokerSession._id}
+          estimationUnit={lastCompletedPokerSession.estimationUnit}
+          queue={(lastCompletedPokerSession.queue ?? []).map((entry: any): PokerResultsQueueEntry => {
+            const taskId = String(entry.task)
+            const task = scope.find((candidate) => candidate._id === taskId)
+            return {
+              taskId,
+              key: task?.displayId,
+              title: task?.title ?? 'Task',
+              status: entry.status,
+              finalValue: entry.finalValue,
+              consensusReached: entry.consensusReached,
+              voteSpread: entry.voteSpread
+            }
+          })}
         />
       )}
     </div>

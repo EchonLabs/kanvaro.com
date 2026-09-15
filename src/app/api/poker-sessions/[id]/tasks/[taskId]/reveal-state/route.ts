@@ -10,6 +10,11 @@
  * with no way to learn what was revealed. This route re-derives the same
  * result from the same stored `PokerVote` rows `revealVotes` already reads,
  * so any participant can ask for it once the entry is revealed.
+ *
+ * `'estimated'` is included alongside `'revealed'` so a completed round stays
+ * inspectable afterwards — finalizing a task never deletes its `PokerVote`
+ * rows, and a "view results" screen needs the same breakdown after the fact,
+ * not only in the moment right after reveal.
  */
 import { User } from '@/models/User'
 import { PokerVote } from '@/models/PokerSession'
@@ -25,7 +30,7 @@ export const GET = withPokerPermission(
     const taskId = params.taskId
     const entry = pokerSession.queue.find((item: any) => item.task.toString() === taskId)
 
-    if (!entry || entry.status !== 'revealed') {
+    if (!entry || (entry.status !== 'revealed' && entry.status !== 'estimated')) {
       return ok({ revealed: false })
     }
 

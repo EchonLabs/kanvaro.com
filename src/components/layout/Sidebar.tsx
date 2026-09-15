@@ -342,6 +342,17 @@ const navigationItems = [
   }
 ]
 
+/**
+ * Some nav items (e.g. `/my/standup`) point at a server redirector rather
+ * than a landable URL, so the browser's actual pathname is a nested route
+ * (`/my/standup/[standupId]`) that never strictly equals `child.path`.
+ * A prefix match keeps those items highlighted/expanded without affecting
+ * siblings whose paths are exact, landable routes.
+ */
+function isNavPathActive(pathname: string, itemPath: string): boolean {
+  return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
+}
+
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -363,7 +374,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     
     navigationItems.forEach(item => {
       if (item.children) {
-        const isChildActive = item.children.some(child => pathname === child.path)
+        const isChildActive = item.children.some(child => isNavPathActive(pathname, child.path))
         if (isChildActive) {
           activeParentIds.push(item.id)
         }
@@ -666,7 +677,7 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
         {hasChildren && isExpanded && !collapsed && (
           <div className="ml-3 space-y-0.5 border-l border-[var(--apple-separator)] pl-2">
             {item.children.map((child: any) => {
-              const isChildActive = pathname === child.path
+              const isChildActive = isNavPathActive(pathname, child.path)
               const link = (
                 <Button
                   variant="ghost"

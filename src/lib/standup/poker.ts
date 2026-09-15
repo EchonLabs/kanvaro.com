@@ -5,12 +5,6 @@
  * broadcast live in the service and route layers, so the interesting logic —
  * "what does the deck offer", "was consensus reached", "which votes are
  * outliers" — can be tested without a database or a socket.
- *
- * The two non-numeric cards matter and are not estimates:
- *   ?       "I do not know enough to vote"
- *   coffee  "I need a break"
- * Neither counts towards consensus, spread or the suggested value. Treating `?`
- * as zero would quietly drag every average down.
  */
 import { StandupError } from './errors'
 
@@ -31,10 +25,6 @@ export const CONSENSUS_RULES = [
 ] as const
 export type ConsensusRule = typeof CONSENSUS_RULES[number]
 
-/** Cards that carry no estimate. Always appended to every deck. */
-export const NON_NUMERIC_CARDS = ['?', 'coffee'] as const
-export type NonNumericCard = typeof NON_NUMERIC_CARDS[number]
-
 /**
  * T-shirt sizes map to points so the allocation engine has a number to work
  * with. The mapping is fixed rather than configurable: a project that wants its
@@ -49,18 +39,15 @@ export const TSHIRT_POINTS: Record<string, number> = {
 }
 
 const NUMERIC_DECKS: Record<Exclude<DeckType, 'tshirt'>, number[]> = {
-  fibonacci: [1, 2, 3, 5, 8, 13, 21],
-  modified_fibonacci: [0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100],
+  fibonacci: [1, 2, 3, 4, 6, 8, 12, 14, 16],
+  modified_fibonacci: [0.5, 1, 2, 3, 5, 8, 12, 14, 16, 40, 100],
   hours: [0.5, 1, 2, 4, 8, 16, 24, 40],
   powers_of_two: [1, 2, 4, 8, 16, 32, 64]
 }
 
-/** The cards a deck offers, in order, including the two non-numeric ones. */
+/** The cards a deck offers, in order. */
 export function deckCards(deckType: DeckType): Array<string | number> {
-  const values: Array<string | number> =
-    deckType === 'tshirt' ? Object.keys(TSHIRT_POINTS) : [...NUMERIC_DECKS[deckType]]
-
-  return [...values, ...NON_NUMERIC_CARDS]
+  return deckType === 'tshirt' ? Object.keys(TSHIRT_POINTS) : [...NUMERIC_DECKS[deckType]]
 }
 
 /** Whether a card belongs to a deck. */
@@ -68,14 +55,9 @@ export function isValidCard(deckType: DeckType, card: string | number): boolean 
   return deckCards(deckType).some((candidate) => String(candidate) === String(card))
 }
 
-/**
- * The numeric weight of a card, or `null` when it carries no estimate.
- *
- * `null` rather than `0` on purpose — see the module note.
- */
+/** The numeric weight of a card, or `null` when it is not on the deck. */
 export function cardValue(deckType: DeckType, card: string | number): number | null {
   const asString = String(card)
-  if ((NON_NUMERIC_CARDS as readonly string[]).includes(asString)) return null
 
   if (deckType === 'tshirt') return TSHIRT_POINTS[asString] ?? null
 

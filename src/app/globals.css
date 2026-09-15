@@ -192,6 +192,23 @@
   animation: check-pop 0.32s cubic-bezier(0.34, 1.45, 0.64, 1) both;
 }
 
+/* Poker card select — the confirm-pop when a carousel card is voted.
+   Applied via an element keyed on the card's value (PokerCardCarousel.tsx),
+   so React remounts it and the animation replays on every new selection. */
+@keyframes poker-card-select {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(0, 122, 255, 0.55); }
+  40%  { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(0, 122, 255, 0); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(0, 122, 255, 0); }
+}
+.poker-card-select {
+  animation: poker-card-select 0.45s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+
+/* Poker carousel — snap-settle after a drag/wheel rotation ends. */
+.poker-card-snap {
+  transition: transform 0.45s cubic-bezier(0.34, 1.45, 0.64, 1), opacity 0.3s ease;
+}
+
 /* Transitions.dev — Number pop-in */
 :root {
   --digit-dur: 500ms;
@@ -363,6 +380,36 @@
     --apple-system-cyan: #32ADE6;
     --apple-system-teal: #30B0C7;
 
+    /* ============================================================
+       Chart palette (stand-up oversight dashboard)
+
+       Separate from the --apple-system-* tokens on purpose: those are UI
+       chrome colours chosen for fills and text, and several of them do not
+       clear 3:1 against a white card as a chart mark (system green measures
+       2.22:1, system orange 2.20:1). These are the same hue families
+       re-stepped until they pass, so a bar is never a colour a reader
+       cannot see.
+
+       Validated against #FFFFFF (light) and #1C1C1E (dark) cards:
+         · discipline trio (good / neutral / critical) — all >= 3:1, worst
+           adjacent CVD dE 8.7, normal-vision dE 16.7, in both modes. The
+           neutral sits *between* good and critical in the stack so the
+           green/red pair never touches.
+         · age ramp — single hue, monotone lightness, every adjacent step
+           >= 0.06 L apart, light end clear of the surface. The ramp flips
+           anchor in dark mode so "older" is always the more prominent step.
+       ============================================================ */
+    --viz-good: #2D9F4A;       /* stand-ups completed        4 3.40:1 on white */
+    --viz-neutral: #8E8E93;    /* not yet run / midpoint     4 3.26:1 */
+    --viz-critical: #FF3B30;   /* missed / over capacity     4 3.55:1 */
+    --viz-accent: #007AFF;     /* single-series magnitude    4 4.02:1 */
+    --viz-age-1: #FF9500;      /* carry-forward age 1-2  (normal)        */
+    --viz-age-2: #D98200;      /* age 3-4  (note required, CFW-3)        */
+    --viz-age-3: #A66300;      /* age 5-7  (escalated)                   */
+    --viz-age-4: #734400;      /* age 8+   (chronic, E63)                */
+    --viz-surface: #FFFFFF;    /* the gap colour between touching marks  */
+    --viz-grid: #E5E5EA;       /* hairline, one step off the surface     */
+
     /* Background hierarchy */
     --apple-system-background: #FFFFFF;
     --apple-secondary-system-background: #F2F2F7;
@@ -439,6 +486,20 @@
     --apple-system-gray: #8E8E93;
     --apple-system-cyan: #64D2FF;
     --apple-system-teal: #40C8E0;
+
+    /* Chart palette — dark steps, selected for the #1C1C1E card and
+       validated against it, not an automatic flip of the light values.
+       The age ramp reverses so the chronic band stays the brightest step. */
+    --viz-good: #2D9F4A;       /* 5.00:1 on #1C1C1E */
+    --viz-neutral: #8E8E93;    /* 5.22:1 */
+    --viz-critical: #FF453A;   /* 4.99:1 */
+    --viz-accent: #0A84FF;     /* 4.66:1 */
+    --viz-age-1: #8F5600;      /* normal        (dimmest) */
+    --viz-age-2: #B36B00;      /* note required */
+    --viz-age-3: #D98200;      /* escalated     */
+    --viz-age-4: #FF9500;      /* chronic       (brightest) */
+    --viz-surface: #1C1C1E;
+    --viz-grid: #2C2C2E;
 
     /* Background hierarchy — dark */
     --apple-system-background: #000000;

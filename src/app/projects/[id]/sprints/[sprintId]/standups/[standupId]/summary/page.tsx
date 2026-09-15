@@ -27,17 +27,23 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertTriangle,
+  ArrowRight,
+  Box,
   CalendarClock,
   CheckCircle2,
+  ChevronsRight,
   ClipboardCopy,
+  Clock,
   CornerDownRight,
   ListChecks,
   MessageSquare,
+  Pencil,
   Printer,
   ShieldAlert,
   ShieldCheck,
   Users,
   Wallet,
+  Wrench,
   Zap
 } from 'lucide-react'
 
@@ -45,12 +51,13 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { Button } from '@/components/ui/Button'
 import { standupStrings } from '@/lib/standup/strings'
 import { minutes as toMinutes, sumMinutes, type Minutes } from '@/lib/standup/minutes'
-import { IconChip } from '@/components/standup/my/shared/IconChip'
 import { SectionCard } from '@/components/standup/my/shared/SectionCard'
 import { StatusPill, type StatusPillTone } from '@/components/standup/my/shared/StatusPill'
 import { HoursValue } from '@/components/standup/my/shared/HoursValue'
 import { TaskRow } from '@/components/standup/my/shared/TaskRow'
 import { RingGauge, type RingGaugeTone } from '@/components/standup/my/shared/RingGauge'
+import { StatCard } from '@/components/standup/my/shared/StatCard'
+import { AttendanceAvatar } from '@/components/standup/my/shared/AttendanceAvatar'
 
 interface HeaderFacts {
   standupDate: string
@@ -119,23 +126,15 @@ function asMinutes(value: unknown): Minutes {
 }
 
 /**
- * Deliberately a two-tone vocabulary — neutral or red, nothing else. Five
- * simultaneous hues (blue/green/orange/red/neutral) across a page this dense
- * read as decoration, not signal, and buried the one thing a PM actually
- * scans for: what needs attention. Everything expected or already-handled
- * (present, a planned absence, a completed task, a documented override)
- * stays neutral; only a genuine problem — someone missing unplanned, work
- * that ran over, an open blocker, unresolved debt — earns the one accent
- * colour on the page.
+ * The detail sections below the hero keep the original two-tone vocabulary —
+ * neutral or red, nothing else — because a dense list is where an extra hue
+ * per row would read as noise and bury what actually needs attention.
+ * (Attendance itself is no longer a list here — see `AttendanceAvatar` — so
+ * status now shows as a dot badge instead of this tone map.) The hero's own
+ * stat grid is the deliberate exception: those tiles mirror the reference
+ * design's fixed category colours (green/blue/red) rather than this rule,
+ * since they're a glanceable summary strip, not a scan-for-problems list.
  */
-const ATTENDANCE_TONE: Record<string, StatusPillTone> = {
-  present: 'neutral',
-  absent_planned: 'neutral',
-  absent_unplanned: 'red',
-  partial: 'neutral',
-  partial_day: 'neutral'
-}
-
 function outcomeTone(outcome: string): StatusPillTone {
   const lower = outcome.toLowerCase()
   if (lower.includes('blocked') || lower.includes('over')) return 'red'
@@ -221,6 +220,20 @@ export default function StandupSummaryPage({
     return match?.name ?? String(memberId ?? '')
   }
 
+  // The hero's big calendar figure reads the date apart into day/month/weekday
+  // — `standupDate` itself is only ever an ISO calendar date (`YYYY-MM-DD`),
+  // so there's no timezone to reconcile here, just a local parse.
+  const dateParts = useMemo(() => {
+    if (!summary) return null
+    const parsed = new Date(`${summary.headerFacts.standupDate}T00:00:00`)
+    if (Number.isNaN(parsed.getTime())) return null
+    return {
+      day: parsed.getDate(),
+      month: parsed.toLocaleDateString(undefined, { month: 'long' }),
+      weekday: parsed.toLocaleDateString(undefined, { weekday: 'long' })
+    }
+  }, [summary])
+
   const stats = useMemo(() => {
     if (!summary) return null
 
@@ -265,7 +278,10 @@ export default function StandupSummaryPage({
       `}</style>
       <div className="flex flex-col gap-4 p-4 md:p-6">
         <div className="standup-summary-no-print flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-[20px] font-semibold text-[var(--apple-label)]">{s.title()}</h1>
+          <div className="flex items-center gap-2">
+            <Box className="h-5 w-5 text-[var(--apple-label)]" strokeWidth={1.75} />
+            <h1 className="text-[20px] font-semibold text-[var(--apple-label)]">{s.title()}</h1>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
@@ -322,96 +338,116 @@ export default function StandupSummaryPage({
             {/* Hero — the one large visual on this screen, same instrument the
                 My Stand-up capacity card uses, so a summary reads as native to
                 this module rather than as a plain document dump. */}
-            <div className="flex flex-wrap items-center gap-5 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-5">
-              <RingGauge percentage={stats.attendancePercent} tone={stats.attendanceTone} size={96} strokeWidth={10}>
-                <span className="font-apple-mono text-[19px] font-semibold tabular-nums text-[var(--apple-label)]">
-                  {stats.presentCount}/{stats.totalAttendance}
-                </span>
-              </RingGauge>
+            <div className="flex flex-wrap items-center gap-6 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-6">
+              {dateParts ? (
+                <div className="flex flex-col items-start">
+                  <span className="font-apple-mono text-[52px] font-bold leading-none tabular-nums text-[var(--apple-label)]">
+                    {dateParts.day}
+                  </span>
+                  <span className="text-[15px] font-semibold text-[var(--apple-label)]">{dateParts.month}</span>
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">{dateParts.weekday}</span>
+                </div>
+              ) : null}
 
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="text-[20px] font-semibold leading-snug text-[var(--apple-label)]">
-                  {summary.headerFacts.standupDate} —{' '}
+              <div className="flex min-w-[220px] flex-1 flex-col gap-2">
+                <span className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)]">
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
                   {s.dayOf({ day: summary.headerFacts.dayNumber, total: summary.headerFacts.totalDays })}
                 </span>
                 <span className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)]">
                   <CalendarClock className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  {s.facilitator({ name: summary.headerFacts.facilitatorName })} ·{' '}
+                  {s.facilitator({ name: summary.headerFacts.facilitatorName })}
+                </span>
+                <span className="flex items-center gap-1.5 text-[13px] text-[var(--apple-secondary-label)]">
+                  <Clock className="h-3.5 w-3.5" strokeWidth={1.75} />
                   {s.duration({ minutes: summary.headerFacts.durationMinutes })}
                 </span>
               </div>
+
+              <RingGauge percentage={stats.attendancePercent} tone={stats.attendanceTone} size={112} strokeWidth={9}>
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="font-apple-mono text-[24px] font-bold leading-none tabular-nums text-[var(--apple-label)]">
+                    {stats.presentCount}
+                    <span className="text-[14px] font-medium text-[var(--apple-secondary-label)]">
+                      /{stats.totalAttendance}
+                    </span>
+                  </span>
+                  <span className="text-center text-[10px] leading-tight text-[var(--apple-tertiary-label)]">
+                    participants
+                    <br />
+                    attended
+                  </span>
+                </div>
+              </RingGauge>
             </div>
 
-            {/* KPI strip — each tile jumps to its own section below, so the
-                hero doubles as a table of contents for a document this long. */}
-            <div className="flex flex-wrap gap-2">
-              <StatTile
+            {/* Stat grid — mirrors the hero's own card language: an icon
+                circle, one big figure, its label underneath. Each tile still
+                jumps to its own section below, so the grid doubles as a table
+                of contents for a document this long. */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <StatCard
                 href="#completed-yesterday-section"
                 icon={<CheckCircle2 strokeWidth={1.75} />}
-                tone="neutral"
-                value={String(stats.completedCount)}
+                tone="green"
+                value={stats.completedCount}
                 label={s.sectionCompletedYesterday()}
               />
-              <StatTile
+              <StatCard
                 href="#variance-section"
-                icon={<ListChecks strokeWidth={1.75} />}
-                tone={stats.varianceOverCount > 0 ? 'red' : 'neutral'}
-                value={String(stats.varianceOverCount)}
-                label="Over estimate"
+                icon={<AlertTriangle strokeWidth={1.75} />}
+                tone="red"
+                value={stats.varianceOverCount}
+                label="Over estimated tasks"
               />
-              <StatTile
+              <StatCard
                 href="#debt-section"
-                icon={<Wallet strokeWidth={1.75} />}
-                tone={stats.totalDebt > 0 ? 'red' : 'neutral'}
-                value={<HoursValue minutes={stats.totalDebt} tone={stats.totalDebt > 0 ? 'red' : 'neutral'} />}
+                icon={<ArrowRight strokeWidth={1.75} />}
+                tone="blue"
+                value={<HoursValue minutes={stats.totalDebt} />}
                 label={s.sectionDebtMovements()}
               />
-              <StatTile
+              <StatCard
                 href="#blockers-raised-section"
-                icon={<AlertTriangle strokeWidth={1.75} />}
-                tone={stats.openBlockers > 0 ? 'red' : 'neutral'}
-                value={String(stats.openBlockers)}
+                icon={<ShieldCheck strokeWidth={1.75} />}
+                tone="blue"
+                value={stats.openBlockers}
                 label="Open blockers"
               />
-              <StatTile
+              <StatCard
                 href="#carry-forward-section"
-                icon={<CornerDownRight strokeWidth={1.75} />}
-                tone={stats.carryForwardCount > 0 ? 'red' : 'neutral'}
-                value={String(stats.carryForwardCount)}
+                icon={<ChevronsRight strokeWidth={1.75} />}
+                tone="red"
+                value={stats.carryForwardCount}
                 label={s.sectionCarryForward()}
               />
-              <StatTile
+              <StatCard
                 href="#overrides-section"
-                icon={<ShieldAlert strokeWidth={1.75} />}
-                tone="neutral"
-                value={String(stats.overridesCount)}
+                icon={<Wrench strokeWidth={1.75} />}
+                tone="red"
+                value={stats.overridesCount}
                 label={s.sectionOverrides()}
               />
             </div>
 
-            <SectionCard
+            <div
               id="attendance-section"
-              accent
-              tone={stats.attendanceTone}
-              title={s.sectionAttendance()}
-              icon={<Users strokeWidth={1.75} />}
+              className="flex flex-col gap-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-5"
             >
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-[var(--apple-secondary-label)]" strokeWidth={1.75} />
+                <span className="text-[15px] font-semibold text-[var(--apple-label)]">{s.sectionAttendance()}</span>
+              </div>
               {summary.attendance.length === 0 ? (
                 <Empty text={s.emptyAttendance()} />
               ) : (
-                <ul className="flex flex-col gap-2">
-                  {summary.attendance.map((row) => (
-                    <li
-                      key={row.memberId}
-                      className="flex items-center justify-between gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card p-3"
-                    >
-                      <span className="text-[15px] text-[var(--apple-label)]">{row.name}</span>
-                      <StatusPill tone={ATTENDANCE_TONE[row.status] ?? 'neutral'}>{row.status}</StatusPill>
-                    </li>
+                <div className="flex flex-wrap gap-4">
+                  {summary.attendance.map((row, index) => (
+                    <AttendanceAvatar key={row.memberId} name={row.name} status={row.status} colorIndex={index} />
                   ))}
-                </ul>
+                </div>
               )}
-            </SectionCard>
+            </div>
 
             <SectionCard
               id="completed-yesterday-section"
@@ -694,36 +730,4 @@ export default function StandupSummaryPage({
 
 function Empty({ text }: { text: string }) {
   return <p className="text-[15px] text-[var(--apple-secondary-label)]">{text}</p>
-}
-
-interface StatTileProps {
-  href: string
-  icon: React.ReactNode
-  /** Two-tone by design (see the module docblock) — neutral, or red for something worth a look. */
-  tone: 'red' | 'neutral'
-  value: React.ReactNode
-  label: string
-}
-
-/**
- * One KPI in the hero's "table of contents" strip. Deliberately a real link
- * to an in-page anchor, not a `<button>` with an `onClick` scroll — a screen
- * this long benefits from a real jump target a reader can also open in a new
- * tab or bookmark, and a link never needs JS to work.
- */
-function StatTile({ href, icon, tone, value, label }: StatTileProps) {
-  return (
-    <a
-      href={href}
-      className="flex items-center gap-2.5 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card px-3 py-2 hover:bg-[var(--apple-tertiary-fill)]"
-    >
-      <IconChip icon={icon} tone={tone} size="md" />
-      <span className="flex flex-col gap-0">
-        <span className="font-apple-mono text-[15px] font-semibold tabular-nums text-[var(--apple-label)]">
-          {value}
-        </span>
-        <span className="text-[11px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">{label}</span>
-      </span>
-    </a>
-  )
 }

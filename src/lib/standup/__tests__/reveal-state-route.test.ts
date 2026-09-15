@@ -114,6 +114,32 @@ describe('GET /api/poker-sessions/:id/tasks/:taskId/reveal-state', () => {
     expect(body.data.max).toBe(5)
   })
 
+  it('stays readable after finalize, once the entry is "estimated" rather than "revealed"', async () => {
+    const { GET } = loadRoute({
+      context: {
+        userId: 'user-1',
+        pokerSession: {
+          _id: 'session-1',
+          deckType: 'fibonacci',
+          consensusRule: 'facilitator_decides',
+          hideVoterIdentity: false,
+          queue: [{ task: { toString: () => 'task-1' }, status: 'estimated', roundCount: 1 }]
+        },
+        params: { taskId: 'task-1' }
+      },
+      votes: [
+        { voter: 'voter-1', card: 3 },
+        { voter: 'voter-2', card: 5 }
+      ]
+    })
+
+    const response = await GET(new NextRequest('http://localhost/x'), { params: { id: 'session-1', taskId: 'task-1' } })
+    const body = await response.json()
+
+    expect(body.data.revealed).toBe(true)
+    expect(body.data.votes).toHaveLength(2)
+  })
+
   it('hides voter identity when the session has hideVoterIdentity set', async () => {
     const { GET } = loadRoute({
       context: {

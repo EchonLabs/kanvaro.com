@@ -4,9 +4,13 @@ import { CalendarOff } from 'lucide-react'
 
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Button } from '@/components/ui/Button'
+import { StandupOversightScreen } from '@/components/standup/oversight/StandupOversightScreen'
 import connectDB from '@/lib/db-config'
 import { authenticateUser } from '@/lib/auth-utils'
+import { Role } from '@/lib/permissions/permission-definitions'
 import { standupStrings } from '@/lib/standup/strings'
+
+const OVERSIGHT_ROLES: string[] = [Role.ADMIN, Role.SUPER_ADMIN]
 
 /**
  * UI-12. The N1 reminder's one-click destination. Resolves the caller's
@@ -31,6 +35,19 @@ export default async function MyStandupPage() {
   const match = candidates[0]
 
   if (!match) {
+    // An org admin, per this app's own team-membership convention, is
+    // deliberately not on any project's stand-up rotation — the plain
+    // "nothing to run" empty state below is a dead end for them every single
+    // day. Give them the one thing they actually came here for: a
+    // cross-project read on which sprints need attention.
+    if (OVERSIGHT_ROLES.includes(authResult.user.role)) {
+      return (
+        <MainLayout breadcrumbItems={[{ label: 'My Stand-up' }]}>
+          <StandupOversightScreen />
+        </MainLayout>
+      )
+    }
+
     return (
       <MainLayout breadcrumbItems={[{ label: 'My Stand-up' }]}>
         <div className="flex flex-col items-center justify-center gap-1 px-8 py-20 text-center">
