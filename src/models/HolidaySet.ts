@@ -22,6 +22,10 @@ export interface IHolidaySet extends Document {
   countryCode?: string
   isActive: boolean
   createdBy: mongoose.Types.ObjectId
+  /** 'manual' sets are only ever edited by hand or CSV import. 'api' sets are populated by a refresh. */
+  source: 'manual' | 'api'
+  apiProvider?: 'induwara'
+  lastRefreshedAt?: Date
   createdAt: Date
   updatedAt: Date
 }
@@ -58,7 +62,17 @@ const HolidaySetSchema = new Schema<IHolidaySet>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true
-    }
+    },
+    source: {
+      type: String,
+      enum: ['manual', 'api'],
+      default: 'manual'
+    },
+    apiProvider: {
+      type: String,
+      enum: ['induwara']
+    },
+    lastRefreshedAt: Date
   },
   { timestamps: true }
 )
@@ -66,6 +80,13 @@ const HolidaySetSchema = new Schema<IHolidaySet>(
 // One set name per organisation, so "Sri Lanka Public Holidays" is unambiguous
 // when a project picks subscriptions.
 HolidaySetSchema.index({ organization: 1, name: 1 }, { unique: true })
+// Lookup key for the API sync's find-or-create — keyed on provider rather than
+// name, so renaming the set in the UI doesn't cause a refresh to create a
+// second one.
+HolidaySetSchema.index(
+  { organization: 1, source: 1, apiProvider: 1 },
+  { unique: true, partialFilterExpression: { source: 'api' } }
+)
 
 export const HolidaySet =
   mongoose.models.HolidaySet || mongoose.model<IHolidaySet>('HolidaySet', HolidaySetSchema)

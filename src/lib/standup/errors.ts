@@ -47,7 +47,9 @@ export const STANDUP_ERROR_CODES = {
   /** Request body or query parameters failed validation. */
   VALIDATION_FAILED: 422,
   /** The addressed record does not exist. */
-  NOT_FOUND: 404
+  NOT_FOUND: 404,
+  /** A third-party integration (e.g. the holiday API) failed or was unreachable. */
+  EXTERNAL_SERVICE_ERROR: 502
 } as const
 
 export type StandupErrorCode = keyof typeof STANDUP_ERROR_CODES

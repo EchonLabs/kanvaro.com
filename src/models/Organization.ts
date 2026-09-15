@@ -83,6 +83,12 @@ export interface IOrganization extends Document {
     ssl: boolean
     uri: string
   }
+  holidayApiConfig?: {
+    provider: 'induwara'
+    /** Plaintext, same precedent as emailConfig.smtp.password. */
+    apiKey?: string
+    lastRefreshedAt?: Date
+  }
   landingPageImages?: {
     heroDashboard?: string
     modulePreview?: string
@@ -193,6 +199,11 @@ const OrganizationSchema = new Schema<IOrganization>({
     authSource: String,
     ssl: Boolean,
     uri: String
+  },
+  holidayApiConfig: {
+    provider: { type: String, enum: ['induwara'] },
+    apiKey: String,
+    lastRefreshedAt: Date
   },
   landingPageImages: {
     heroDashboard: String,
