@@ -506,6 +506,7 @@ export async function POST(request: NextRequest) {
       status,
       priority,
       type,
+      category: rawCategory,
       project,
       story,
       epic,
@@ -525,9 +526,9 @@ export async function POST(request: NextRequest) {
     const normalizedTitle = typeof title === 'string' ? title.trim() : ''
 
     // Validate required fields first (fail fast)
-    if (!normalizedTitle || !project) {
+    if (!normalizedTitle || !project || typeof rawCategory !== 'string' || !rawCategory.trim()) {
       return NextResponse.json(
-        { error: 'Title and project are required' },
+        { error: 'Title, project, and category are required' },
         { status: 400 }
       )
     }
@@ -541,7 +542,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch project and check permissions in parallel for better performance
     const [projectDoc, canCreateTask] = await Promise.all([
-      Project.findById(project).select('projectNumber organization name teamMembers createdBy isBillableByDefault'),
+      Project.findById(project).select('projectNumber organization name teamMembers createdBy isBillableByDefault settings.taskCategories'),
       PermissionService.hasPermission(userId, Permission.TASK_CREATE, project)
     ])
 
@@ -562,6 +563,14 @@ export async function POST(request: NextRequest) {
         { error: 'Insufficient permissions to create tasks' },
         { status: 403 }
       )
+    }
+
+    const categoryInput = rawCategory.trim()
+    const category = (projectDoc.settings?.taskCategories || []).find((item: any) =>
+      item.key === categoryInput || item.title === categoryInput
+    )
+    if (!category) {
+      return NextResponse.json({ error: 'Select a valid task category for this project' }, { status: 400 })
     }
 
     // Get the next position for this project/status combination
@@ -623,6 +632,7 @@ export async function POST(request: NextRequest) {
         status: taskStatus,
         priority: priority || 'medium',
         type: type || 'task',
+        category: category.key,
         organization: user.organization,
         project,
         taskNumber,
