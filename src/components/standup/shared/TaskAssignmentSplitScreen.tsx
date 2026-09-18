@@ -47,7 +47,12 @@ import { cn } from '@/lib/utils'
 
 import type { AssignableMemberView, AssignableTaskView } from './AssignableTask'
 import { ExpandableMemberCard, memberIdFromDroppableId } from './ExpandableMemberCard'
-import { TaskCard, TaskCardPreview, taskIdFromDraggableId } from './TaskCard'
+import {
+  TaskCard,
+  TaskCardPreview,
+  taskIdFromDraggableId,
+  type AssignOption
+} from './TaskCard'
 
 /** The pool's own droppable — dropping here clears an assignment. */
 export const POOL_DROPPABLE_ID = 'assignment-pool'
@@ -166,6 +171,13 @@ export interface TaskAssignmentSplitScreenProps {
   busy?: boolean
   /** `null` clears the assignment. Resolves once the server has agreed. */
   onAssign: (taskId: string, memberId: string | null) => Promise<void>
+  /**
+   * Overrides the per-card picker's options, which default to every member
+   * shown on the right. Planning narrows and groups them: only the sprint team
+   * plus QA who would be admitted by the assignment, the latter under their own
+   * optgroup. Drop targets are unaffected — every member card still takes one.
+   */
+  assignOptions?: AssignOption[]
   renderMemberExpanded?: (member: AssignableMemberView) => React.ReactNode
   emptyPoolMessage?: string
   locale?: string
@@ -178,6 +190,7 @@ export function TaskAssignmentSplitScreen({
   members,
   busy = false,
   onAssign,
+  assignOptions: assignOptionsProp,
   renderMemberExpanded,
   emptyPoolMessage,
   locale,
@@ -215,10 +228,11 @@ export function TaskAssignmentSplitScreen({
     return sortAssignableTasks(filtered, sort)
   }, [tasks, search, priority, skill, sort])
 
-  const assignOptions = useMemo(
+  const derivedAssignOptions = useMemo(
     () => members.map((member) => ({ id: member.id, name: member.name })),
     [members]
   )
+  const assignOptions = assignOptionsProp ?? derivedAssignOptions
 
   const runAssign = async (taskId: string, memberId: string | null) => {
     setAssigning(true)
@@ -381,7 +395,7 @@ function TaskRepository({
   sort: AssignableSort
   filtersActive: boolean
   locked: boolean
-  assignOptions: Array<{ id: string; name: string }>
+  assignOptions: AssignOption[]
   emptyPoolMessage?: string
   locale?: string
   onSearch: (value: string) => void
