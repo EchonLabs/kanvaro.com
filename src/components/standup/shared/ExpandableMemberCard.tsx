@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils'
 
 import { CapacityMeter } from '../primitives/CapacityMeter'
 
-import type { AssignableMemberView } from './AssignableTask'
+import type { AssignableMemberView, AssignableTaskView } from './AssignableTask'
 import { readOnlyTaskDraggableId, TaskCard } from './TaskCard'
 
 /** The dnd-kit droppable id for a member card. Kept next to its parser. */
@@ -51,6 +51,22 @@ export interface ExpandableMemberCardProps {
   disabled?: boolean
   /** Context-specific content appended to the expanded body (Tasks 7-8). */
   renderExpandedExtra?: (member: AssignableMemberView) => React.ReactNode
+  /**
+   * Context-specific content shown under the meter whether the card is
+   * expanded or not (Task 8). The run screen's stranded-hours alert (OB-12)
+   * and estimate-debt badge live here: both are warnings, and a warning
+   * hidden behind a disclosure is a warning nobody sees.
+   */
+  renderAlways?: (member: AssignableMemberView) => React.ReactNode
+  /**
+   * Replaces the default read-only row for one of the member's tasks (Task 8).
+   * The run screen's rows carry an `HourStepper` and a remove button, and it
+   * needs them *instead of* the read-only rows, not beside them.
+   */
+  renderTaskRow?: (
+    member: AssignableMemberView,
+    task: AssignableTaskView
+  ) => React.ReactNode
   locale?: string
   className?: string
 }
@@ -62,6 +78,8 @@ export function ExpandableMemberCard({
   isOver = false,
   disabled = false,
   renderExpandedExtra,
+  renderAlways,
+  renderTaskRow,
   locale,
   className
 }: ExpandableMemberCardProps) {
@@ -174,6 +192,8 @@ export function ExpandableMemberCard({
         </p>
       )}
 
+      {renderAlways?.(member)}
+
       {/* Drop affordance, and the reason the collapsed card is worth keeping
           shallow: the target reads as a target before anything is dragged. */}
       {!expanded && member.tasks.length === 0 && (
@@ -209,13 +229,17 @@ export function ExpandableMemberCard({
                           namespaced because the same task is usually still in
                           that panel, and dnd-kit's registry is keyed by id —
                           `disabled` does not unregister the node. */}
-                      <TaskCard
-                        task={task}
-                        draggable={false}
-                        dragId={readOnlyTaskDraggableId(member.id, task.id)}
-                        compact
-                        locale={locale}
-                      />
+                      {renderTaskRow ? (
+                        renderTaskRow(member, task)
+                      ) : (
+                        <TaskCard
+                          task={task}
+                          draggable={false}
+                          dragId={readOnlyTaskDraggableId(member.id, task.id)}
+                          compact
+                          locale={locale}
+                        />
+                      )}
                     </li>
                   ))}
                 </ul>

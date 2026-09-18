@@ -46,6 +46,8 @@ describe('fromScopeTask', () => {
       displayId: undefined,
       title: 'Bare task',
       estimateMinutes: undefined,
+      // Planning tasks have no type, so the split screen offers no type filter.
+      type: undefined,
       assigneeId: null
     })
   })
@@ -82,9 +84,14 @@ describe('fromPoolTask', () => {
       title: 'Pool task',
       priority: 'high',
       estimateMinutes: 90,
+      type: 'task',
       skills: ['backend', 'urgent'],
       assigneeId: 'user-5'
     })
+  })
+
+  it('carries the task type through, so ALO-15’s type filter has something to filter on', () => {
+    expect(fromPoolTask({ ...base, type: 'bug' }).type).toBe('bug')
   })
 
   it('omits optional fields when absent: no key, no assignees', () => {

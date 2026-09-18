@@ -29,6 +29,12 @@ export interface AssignableTaskView {
   title: string
   priority?: 'critical' | 'high' | 'medium' | 'low'
   estimateMinutes?: number
+  /**
+   * `PoolTask.type` (bug/feature/…), which ALO-15's pool filter needs. The
+   * planning context's `ScopeTask` does not carry it, so it stays undefined
+   * there and the split screen simply offers no type filter.
+   */
+  type?: string
   /** Stand-in: `PoolTask.labels` where available; omitted for planning-context tasks. */
   skills?: string[]
   assigneeId?: string | null
@@ -92,6 +98,7 @@ export function fromPoolTask(t: PoolTask): AssignableTaskView {
     title: t.title,
     priority: t.priority as AssignableTaskView['priority'],
     estimateMinutes: t.remainingEstimateMinutes,
+    type: t.type,
     skills: t.labels.length > 0 ? t.labels : undefined,
     assigneeId: t.assigneeIds[0] ?? null
   }

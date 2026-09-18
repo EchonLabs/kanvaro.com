@@ -57,8 +57,16 @@ import {
 /** The pool's own droppable — dropping here clears an assignment. */
 export const POOL_DROPPABLE_ID = 'assignment-pool'
 
-/** Matches `UnassignedPool`'s filter-control styling, verbatim. */
-const FIELD_CLASSES =
+/**
+ * The filter-control styling for this surface and the run screen's tab strip
+ * around it.
+ *
+ * It used to exist byte-identically here and in `UnassignedPool.tsx`; now that
+ * the run screen renders this component, one of the two copies would have been
+ * styling nothing. Exported rather than moved to a constants file because this
+ * is the only surface that has these controls.
+ */
+export const FIELD_CLASSES =
   'h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-[12.5px] text-[var(--apple-label)]'
 
 const PRIORITIES = ['critical', 'high', 'medium', 'low'] as const
@@ -77,19 +85,17 @@ export interface AssignableFilter {
   search?: string
   priorities?: string[]
   skills?: string[]
+  types?: string[]
 }
 
 /**
  * The pool filter, over `AssignableTaskView`.
  *
- * `allocation.ts`'s `filterPool` was not widened in place: it filters on
- * `type`, `epicId` and `position`, none of which exist on the canonical view
- * (both source shapes could not agree on them, which is why Task 5 left them
- * out). Widening the parameter type would have meant either adding three
- * fields to `AssignableTaskView` that half its callers cannot fill, or
- * silently skipping criteria — so this is the thin equivalent over the fields
- * the canonical shape does guarantee, keeping `filterPool` untouched for the
- * run screen that still uses it against `PoolTask`. Conjunctive, like it.
+ * `allocation.ts`'s `filterPool` was not widened in place: it also filters on
+ * `epicId`, which no canonical view carries. `type` is here because ALO-15
+ * names it and the run screen would otherwise have lost a filter it shipped
+ * with; like `skills` it is optional, and a context whose tasks have none
+ * never offers the control. Conjunctive, like `filterPool`.
  */
 export function filterAssignableTasks(
   tasks: readonly AssignableTaskView[],
@@ -100,6 +106,9 @@ export function filterAssignableTasks(
   return tasks.filter((task) => {
     if (filter.priorities?.length) {
       if (!task.priority || !filter.priorities.includes(task.priority)) return false
+    }
+    if (filter.types?.length) {
+      if (!task.type || !filter.types.includes(task.type)) return false
     }
     if (filter.skills?.length) {
       if (!task.skills?.some((skill) => filter.skills!.includes(skill))) return false
@@ -179,6 +188,22 @@ export interface TaskAssignmentSplitScreenProps {
    */
   assignOptions?: AssignOption[]
   renderMemberExpanded?: (member: AssignableMemberView) => React.ReactNode
+  /**
+   * Context-specific content that stays visible on the collapsed card. The
+   * run screen puts OB-12's stranded-hours alert and the estimate-debt badge
+   * here — an alert only readable after expanding a card is an alert nobody
+   * reads.
+   */
+  renderMemberAlways?: (member: AssignableMemberView) => React.ReactNode
+  /**
+   * Replaces the read-only row the expanded card renders per assigned task.
+   * The run screen swaps in its `HourStepper` + remove controls rather than
+   * listing the same work twice.
+   */
+  renderMemberTaskRow?: (
+    member: AssignableMemberView,
+    task: AssignableTaskView
+  ) => React.ReactNode
   emptyPoolMessage?: string
   locale?: string
   className?: string
@@ -192,6 +217,8 @@ export function TaskAssignmentSplitScreen({
   onAssign,
   assignOptions: assignOptionsProp,
   renderMemberExpanded,
+  renderMemberAlways,
+  renderMemberTaskRow,
   emptyPoolMessage,
   locale,
   className
@@ -205,13 +232,14 @@ export function TaskAssignmentSplitScreen({
   const [search, setSearch] = useState('')
   const [priority, setPriority] = useState('')
   const [skill, setSkill] = useState('')
+  const [type, setType] = useState('')
   const [sort, setSort] = useState<AssignableSort>('priority')
   const [activeTask, setActiveTask] = useState<AssignableTaskView | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [assigning, setAssigning] = useState(false)
 
   const locked = busy || assigning
-  const filtersActive = Boolean(search.trim() || priority || skill)
+  const filtersActive = Boolean(search.trim() || priority || skill || type)
 
   const skillOptions = useMemo(() => {
     const all = new Set<string>()
@@ -219,14 +247,21 @@ export function TaskAssignmentSplitScreen({
     return Array.from(all).sort()
   }, [tasks])
 
+  const typeOptions = useMemo(() => {
+    const all = new Set<string>()
+    for (const task of tasks) if (task.type) all.add(task.type)
+    return Array.from(all).sort()
+  }, [tasks])
+
   const visible = useMemo(() => {
     const filtered = filterAssignableTasks(tasks, {
       ...(search.trim() ? { search } : {}),
       ...(priority ? { priorities: [priority] } : {}),
-      ...(skill ? { skills: [skill] } : {})
+      ...(skill ? { skills: [skill] } : {}),
+      ...(type ? { types: [type] } : {})
     })
     return sortAssignableTasks(filtered, sort)
-  }, [tasks, search, priority, skill, sort])
+  }, [tasks, search, priority, skill, type, sort])
 
   const derivedAssignOptions = useMemo(
     () => members.map((member) => ({ id: member.id, name: member.name })),
@@ -287,6 +322,8 @@ export function TaskAssignmentSplitScreen({
           priority={priority}
           skill={skill}
           skillOptions={skillOptions}
+          type={type}
+          typeOptions={typeOptions}
           sort={sort}
           filtersActive={filtersActive}
           locked={locked}
@@ -296,11 +333,13 @@ export function TaskAssignmentSplitScreen({
           onSearch={setSearch}
           onPriority={setPriority}
           onSkill={setSkill}
+          onType={setType}
           onSort={setSort}
           onClearFilters={() => {
             setSearch('')
             setPriority('')
             setSkill('')
+            setType('')
           }}
           onAssign={(taskId, memberId) => void runAssign(taskId, memberId)}
         />
@@ -338,6 +377,8 @@ export function TaskAssignmentSplitScreen({
                     }
                     disabled={locked}
                     renderExpandedExtra={renderMemberExpanded}
+                    renderAlways={renderMemberAlways}
+                    renderTaskRow={renderMemberTaskRow}
                     locale={locale}
                   />
                 </li>
@@ -372,6 +413,8 @@ function TaskRepository({
   priority,
   skill,
   skillOptions,
+  type,
+  typeOptions,
   sort,
   filtersActive,
   locked,
@@ -381,6 +424,7 @@ function TaskRepository({
   onSearch,
   onPriority,
   onSkill,
+  onType,
   onSort,
   onClearFilters,
   onAssign
@@ -392,6 +436,8 @@ function TaskRepository({
   priority: string
   skill: string
   skillOptions: string[]
+  type: string
+  typeOptions: string[]
   sort: AssignableSort
   filtersActive: boolean
   locked: boolean
@@ -401,6 +447,7 @@ function TaskRepository({
   onSearch: (value: string) => void
   onPriority: (value: string) => void
   onSkill: (value: string) => void
+  onType: (value: string) => void
   onSort: (value: AssignableSort) => void
   onClearFilters: () => void
   onAssign: (taskId: string, memberId: string | null) => void
@@ -456,6 +503,24 @@ function TaskRepository({
             </option>
           ))}
         </select>
+
+        {/* ALO-15's type filter. Same rule as the skill filter below: only the
+            run screen's tasks carry a type, so planning never sees it. */}
+        {typeOptions.length > 0 && (
+          <select
+            aria-label="Type"
+            value={type}
+            onChange={(event) => onType(event.target.value)}
+            className={FIELD_CLASSES}
+          >
+            <option value="">Type</option>
+            {typeOptions.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        )}
 
         {/* Only offered where the context actually has skills to filter on —
             the planning screen's tasks carry none, and an empty dropdown is a

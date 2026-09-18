@@ -13,7 +13,7 @@
  * The rest is what the PM does with the left panel: narrow a long repository
  * down to the task they are looking for, and assign it without a pointer.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import type {
   AssignableMemberView,
@@ -140,6 +140,18 @@ describe('filterAssignableTasks / sortAssignableTasks', () => {
     expect(filterAssignableTasks(tasks, { skills: ['frontend'] }).map((t) => t.id)).toEqual(['t2'])
   })
 
+  it('keeps only tasks of the requested type, and drops those with no type at all', () => {
+    // ALO-15. A task with no type is not "any type": the run screen's filter
+    // asked for bugs, and a typeless planning task is not one.
+    const typed = [
+      { id: 'a', title: 'A bug', type: 'bug' },
+      { id: 'b', title: 'A feature', type: 'feature' },
+      { id: 'c', title: 'Typeless' }
+    ]
+
+    expect(filterAssignableTasks(typed, { types: ['bug'] }).map((t) => t.id)).toEqual(['a'])
+  })
+
   it('is conjunctive across criteria', () => {
     expect(
       filterAssignableTasks(tasks, { search: 'the', priorities: ['critical'] }).map((t) => t.id)
@@ -206,6 +218,32 @@ describe('TaskAssignmentSplitScreen — the left panel', () => {
 
     expect(visibleTitles()).toHaveLength(1)
     expect(visibleTitles()[0]).toContain('KAN-1')
+  })
+
+  it('narrows the list by type, and only offers types the tasks actually carry', () => {
+    renderScreen({
+      tasks: [
+        { id: 't1', displayId: 'KAN-1', title: 'Wire the webhook', type: 'task' },
+        { id: 't2', displayId: 'KAN-2', title: 'Fix the login redirect', type: 'bug' }
+      ]
+    })
+
+    expect(
+      within(screen.getByLabelText('Type')).queryByRole('option', { name: 'feature' })
+    ).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'bug' } })
+
+    expect(visibleTitles()).toHaveLength(1)
+    expect(visibleTitles()[0]).toContain('KAN-2')
+  })
+
+  it('hides the type filter entirely when no task has a type', () => {
+    // The planning context: `ScopeTask` carries no type, so the control that
+    // could only ever be empty is not rendered at all.
+    renderScreen({ tasks: [{ id: 't1', title: 'Plain task' }] })
+
+    expect(screen.queryByLabelText('Type')).not.toBeInTheDocument()
   })
 
   it('hides the skill filter entirely when no task has a skill', () => {
