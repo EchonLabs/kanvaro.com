@@ -1230,7 +1230,11 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         sprintLabel={board.sprintName}
         readOnly={readOnly}
         locale={locale}
-        onAssign={(memberId, taskId) => void onAdd(memberId, taskId)}
+        // Returned, not discarded: `onAdd`'s round-trip is what the split
+        // screen's in-flight lock waits on, and a `void` here would drop the
+        // lock immediately and let a second drop race the first into a
+        // STALE_STANDUP conflict.
+        onAssign={(memberId, taskId) => onAdd(memberId, taskId)}
         renderMemberAlways={renderMemberAlways}
         renderMemberTaskRow={renderMemberTaskRow}
         renderMemberExpanded={renderMemberExpanded}
