@@ -555,6 +555,9 @@ export default function SprintDetailPage() {
   }
 
   const handleStartSprint = async () => {
+    // The button only carries aria-disabled, which styles and announces but does
+    // not block clicks, so a double-click would otherwise POST /start twice.
+    if (startingSprint) return
     if (!canStartSprint) {
       setActionError('You do not have permission to start this sprint.')
       notifyError({ title: 'You do not have permission to start this sprint.' })
