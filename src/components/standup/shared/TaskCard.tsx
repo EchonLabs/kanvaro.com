@@ -75,13 +75,46 @@ const PRIORITY_BADGE: Record<NonNullable<AssignableTaskView['priority']>, string
   low: 'bg-[var(--apple-secondary-fill)] text-[var(--apple-secondary-label)]'
 }
 
+export interface AssignOption {
+  id: string
+  name: string
+  /** Renders this option inside an `<optgroup>` carrying this label. */
+  group?: string
+}
+
+/** Ungrouped options first, then one `<optgroup>` per label, in first-seen order. */
+function groupAssignOptions(
+  options: AssignOption[]
+): { ungrouped: AssignOption[]; groups: Array<{ label: string; options: AssignOption[] }> } {
+  const ungrouped: AssignOption[] = []
+  const groups: Array<{ label: string; options: AssignOption[] }> = []
+
+  for (const option of options) {
+    if (!option.group) {
+      ungrouped.push(option)
+      continue
+    }
+    const existing = groups.find((group) => group.label === option.group)
+    if (existing) existing.options.push(option)
+    else groups.push({ label: option.group, options: [option] })
+  }
+
+  return { ungrouped, groups }
+}
+
 export interface TaskCardProps {
   task: AssignableTaskView
   /** Forces the dragged-ghost treatment — set by `DragOverlay` clones. */
   isDragging?: boolean
   /** The keyboard equivalent of a drop. `null` clears the assignment. */
   onAssignVia?: (memberId: string | null) => void
-  assignOptions?: Array<{ id: string; name: string }>
+  /**
+   * An option with a `group` is rendered inside an `<optgroup>` of that label,
+   * after the ungrouped ones. Planning uses it for people who are not on the
+   * sprint team yet — picking them changes the roster, so the picker says so
+   * instead of listing them beside everyone else.
+   */
+  assignOptions?: AssignOption[]
   /**
    * False turns the card into a read-only row: no grip, no drag listeners.
    * `ExpandableMemberCard` uses it for the tasks a member already owns —
@@ -128,6 +161,7 @@ export function TaskCard({
 
   const dragging = isDragging || dragActive
   const showPicker = Boolean(onAssignVia && assignOptions && assignOptions.length > 0)
+  const { ungrouped, groups } = groupAssignOptions(assignOptions ?? [])
 
   return (
     <div
@@ -234,10 +268,19 @@ export function TaskCard({
             className="h-7 max-w-[8rem] shrink-0 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-transparent px-1.5 text-[11px] text-[var(--apple-label)]"
           >
             <option value="">Unassigned</option>
-            {assignOptions!.map((option) => (
+            {ungrouped.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.name}
               </option>
+            ))}
+            {groups.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.options.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </>
