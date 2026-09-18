@@ -4,6 +4,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 
 import { PlanningWorkspace, resolveDrop } from '../PlanningWorkspace'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 jest.mock('@/lib/permissions/permission-context', () => ({
   usePermissions: () => ({
@@ -89,12 +90,14 @@ describe('PlanningWorkspace — persistent scope/backlog panes', () => {
     global.fetch = mockFetch()
 
     render(
-      <PlanningWorkspace
-        sprintId="s1"
-        sprintName="Sprint 1"
-        sprintStatus="planning"
-        projectId="p1"
-      />
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planning"
+          projectId="p1"
+        />
+      </TooltipProvider>
     )
 
     expect(await screen.findByText('Already in sprint')).toBeInTheDocument()
@@ -104,12 +107,14 @@ describe('PlanningWorkspace — persistent scope/backlog panes', () => {
     global.fetch = mockFetch()
 
     render(
-      <PlanningWorkspace
-        sprintId="s1"
-        sprintName="Sprint 1"
-        sprintStatus="planning"
-        projectId="p1"
-      />
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planning"
+          projectId="p1"
+        />
+      </TooltipProvider>
     )
 
     expect(await screen.findByText('Not yet scoped')).toBeInTheDocument()
@@ -120,12 +125,14 @@ describe('PlanningWorkspace — persistent scope/backlog panes', () => {
     global.fetch = fetchMock
 
     render(
-      <PlanningWorkspace
-        sprintId="s1"
-        sprintName="Sprint 1"
-        sprintStatus="planning"
-        projectId="p1"
-      />
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planning"
+          projectId="p1"
+        />
+      </TooltipProvider>
     )
 
     // Exact name, not a substring match: the draggable row wrapping this
@@ -156,12 +163,14 @@ describe('PlanningWorkspace — team workload board', () => {
     global.fetch = mockFetch()
 
     render(
-      <PlanningWorkspace
-        sprintId="s1"
-        sprintName="Sprint 1"
-        sprintStatus="planning"
-        projectId="p1"
-      />
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planning"
+          projectId="p1"
+        />
+      </TooltipProvider>
     )
 
     expect(await screen.findByText('Anessa')).toBeInTheDocument()
@@ -209,12 +218,14 @@ describe('PlanningWorkspace — team workload board', () => {
     }) as unknown as typeof fetch
 
     render(
-      <PlanningWorkspace
-        sprintId="s1"
-        sprintName="Sprint 1"
-        sprintStatus="planning"
-        projectId="p1"
-      />
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planning"
+          projectId="p1"
+        />
+      </TooltipProvider>
     )
 
     expect(await screen.findByText('Idle Ivan')).toBeInTheDocument()
@@ -253,12 +264,14 @@ describe('PlanningWorkspace — capacity gauge', () => {
     global.fetch = mockFetch()
 
     render(
-      <PlanningWorkspace
-        sprintId="s1"
-        sprintName="Sprint 1"
-        sprintStatus="planning"
-        projectId="p1"
-      />
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planning"
+          projectId="p1"
+        />
+      </TooltipProvider>
     )
 
     // Fixture: totalEstimatedMinutes 360 / netCapacityMinutes 480 = 75%.
@@ -310,12 +323,14 @@ describe('PlanningWorkspace — capacity gauge', () => {
     }) as unknown as typeof fetch
 
     render(
-      <PlanningWorkspace
-        sprintId="s1"
-        sprintName="Sprint 1"
-        sprintStatus="planning"
-        projectId="p1"
-      />
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planning"
+          projectId="p1"
+        />
+      </TooltipProvider>
     )
 
     expect(await screen.findByText('150%')).toBeInTheDocument()

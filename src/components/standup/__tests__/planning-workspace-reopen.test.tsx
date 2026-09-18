@@ -12,6 +12,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import { PlanningWorkspace } from '../PlanningWorkspace'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 jest.mock('@/lib/permissions/permission-context', () => ({
   usePermissions: () => ({
@@ -72,12 +73,14 @@ describe('PlanningWorkspace — reopening an already-planned sprint (E20)', () =
     global.fetch = mockFetchFor({ history: [] })
 
     render(
-      <PlanningWorkspace
-        sprintId="s1"
-        sprintName="Sprint 1"
-        sprintStatus="planning"
-        projectId="p1"
-      />
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planning"
+          projectId="p1"
+        />
+      </TooltipProvider>
     )
 
     expect(await screen.findByRole('button', { name: /start planning/i })).toBeInTheDocument()
@@ -91,12 +94,14 @@ describe('PlanningWorkspace — reopening an already-planned sprint (E20)', () =
     global.fetch = fetchMock
 
     render(
-      <PlanningWorkspace
-        sprintId="s1"
-        sprintName="Sprint 1"
-        sprintStatus="planned"
-        projectId="p1"
-      />
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planned"
+          projectId="p1"
+        />
+      </TooltipProvider>
     )
 
     const reopenButton = await screen.findByRole('button', { name: /reopen planning/i })
