@@ -253,6 +253,14 @@ export function TaskAssignmentSplitScreen({
     return Array.from(all).sort()
   }, [tasks])
 
+  // Same rule as type and skill: planning-context tasks (ScopeTask via
+  // fromScopeTask) carry no priority, so a hardcoded list would filter every
+  // task away. Keep PRIORITIES' severity order rather than sorting.
+  const priorityOptions = useMemo(
+    () => PRIORITIES.filter((value) => tasks.some((task) => task.priority === value)),
+    [tasks]
+  )
+
   const visible = useMemo(() => {
     const filtered = filterAssignableTasks(tasks, {
       ...(search.trim() ? { search } : {}),
@@ -320,6 +328,7 @@ export function TaskAssignmentSplitScreen({
           totalCount={tasks.length}
           search={search}
           priority={priority}
+          priorityOptions={priorityOptions}
           skill={skill}
           skillOptions={skillOptions}
           type={type}
@@ -411,6 +420,7 @@ function TaskRepository({
   totalCount,
   search,
   priority,
+  priorityOptions,
   skill,
   skillOptions,
   type,
@@ -434,6 +444,7 @@ function TaskRepository({
   totalCount: number
   search: string
   priority: string
+  priorityOptions: readonly string[]
   skill: string
   skillOptions: string[]
   type: string
@@ -490,19 +501,24 @@ function TaskRepository({
           />
         </label>
 
-        <select
-          aria-label="Priority"
-          value={priority}
-          onChange={(event) => onPriority(event.target.value)}
-          className={FIELD_CLASSES}
-        >
-          <option value="">Priority</option>
-          {PRIORITIES.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
+        {/* Gated like the type and skill filters below: planning-context tasks
+            have no priority, so an ungated select would silently filter the
+            whole repository away. */}
+        {priorityOptions.length > 0 && (
+          <select
+            aria-label="Priority"
+            value={priority}
+            onChange={(event) => onPriority(event.target.value)}
+            className={FIELD_CLASSES}
+          >
+            <option value="">Priority</option>
+            {priorityOptions.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        )}
 
         {/* ALO-15's type filter. Same rule as the skill filter below: only the
             run screen's tasks carry a type, so planning never sees it. */}
