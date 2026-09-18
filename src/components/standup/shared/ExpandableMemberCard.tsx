@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils'
 import { CapacityMeter } from '../primitives/CapacityMeter'
 
 import type { AssignableMemberView } from './AssignableTask'
-import { TaskCard } from './TaskCard'
+import { readOnlyTaskDraggableId, TaskCard } from './TaskCard'
 
 /** The dnd-kit droppable id for a member card. Kept next to its parser. */
 export function memberDroppableId(memberId: string): string {
@@ -197,8 +197,17 @@ export function ExpandableMemberCard({
                   {member.tasks.map((task) => (
                     <li key={task.id}>
                       {/* Read-only inside the card it already landed in: the
-                          left panel is where work is picked up from. */}
-                      <TaskCard task={task} draggable={false} compact locale={locale} />
+                          left panel is where work is picked up from. The id is
+                          namespaced because the same task is usually still in
+                          that panel, and dnd-kit's registry is keyed by id —
+                          `disabled` does not unregister the node. */}
+                      <TaskCard
+                        task={task}
+                        draggable={false}
+                        dragId={readOnlyTaskDraggableId(member.id, task.id)}
+                        compact
+                        locale={locale}
+                      />
                     </li>
                   ))}
                 </ul>
