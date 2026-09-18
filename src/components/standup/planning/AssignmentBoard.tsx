@@ -80,6 +80,19 @@ export function AssignmentBoard({ tasks, members, busy, onAssign }: AssignmentBo
   // task whose assignee is not on the board is parked as unassigned: PC-8
   // blocks on it either way, and hiding it in a lane nobody can see would
   // leave the PM with a blocking check and no row to fix it on.
+  //
+  // Deliberate divergence from the stand-up-run context: `taskViews` below is
+  // built from *every* scope task, assigned ones included, so the left-hand
+  // Task Repository lists the whole sprint scope. The run screen's
+  // `UnassignedPool` instead feeds the left panel only genuinely unassigned /
+  // not-yet-planned tasks. The reason is that planning is where assignments
+  // are *made and changed*: an already-assigned task has to stay draggable so
+  // the PM can move it to someone else, and a task that vanished from the left
+  // panel the moment it was assigned could never be reassigned by drag. The
+  // visible consequence — an assigned task appearing both in the left panel
+  // and inside its assignee's expanded member card at the same time — is
+  // intended, not a duplication bug. Do not "align" this with UnassignedPool
+  // in either direction without replacing the reassignment affordance first.
   const { taskViews, memberViews, unassignedCount } = useMemo(() => {
     const byAssignee = new Map<string, AssignableTaskView[]>()
     for (const member of members) byAssignee.set(member.memberId, [])
