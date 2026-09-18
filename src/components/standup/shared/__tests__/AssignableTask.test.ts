@@ -128,6 +128,7 @@ describe('fromAssignableMember', () => {
       role: 'developer',
       assignedMinutes: 240,
       capacityMinutes: 480,
+      onSprintTeam: true,
       tasks
     })
     expect(result.avatarUrl).toBeUndefined()
@@ -149,8 +150,22 @@ describe('fromAssignableMember', () => {
       role: undefined,
       assignedMinutes: undefined,
       capacityMinutes: undefined,
+      onSprintTeam: false,
       tasks: []
     })
+  })
+
+  it('carries onSprintTeam through, so the picker can group people not yet on the team', () => {
+    const onTeam: AssignableMember = { memberId: 'm-on', name: 'On Team', onSprintTeam: true }
+    const offTeam: AssignableMember = {
+      memberId: 'm-off',
+      name: 'Off Team QA',
+      onSprintTeam: false,
+      role: 'project_qa_lead'
+    }
+
+    expect(fromAssignableMember(onTeam, []).onSprintTeam).toBe(true)
+    expect(fromAssignableMember(offTeam, []).onSprintTeam).toBe(false)
   })
 })
 
@@ -199,6 +214,9 @@ describe('fromBoardMemberView', () => {
     expect(result.assignedMinutes).toBe(300)
     expect(result.capacityMinutes).toBe(480)
     expect(result.capacityBreakdown).toBe(capacity)
+    // The run context has no sprint-team roster concept, so it stays absent
+    // rather than being faked as false.
+    expect(result.onSprintTeam).toBeUndefined()
     expect(result.tasks).toEqual<AssignableTaskView[]>([
       {
         id: 'task-9',

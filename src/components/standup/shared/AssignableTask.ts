@@ -41,6 +41,13 @@ export interface AssignableMemberView {
   assignedMinutes?: number
   capacityMinutes?: number
   capacityBreakdown?: CapacityBreakdown
+  /**
+   * Planning-context only: already on `Sprint.teamMembers`. The assignment
+   * picker groups people who are not separately ("will be added to the sprint
+   * team"), because assigning to them changes the roster. The stand-up run has
+   * no equivalent concept, so `fromBoardMemberView` leaves it undefined.
+   */
+  onSprintTeam?: boolean
   tasks: AssignableTaskView[]
 }
 
@@ -87,6 +94,7 @@ export function fromAssignableMember(
     role: m.role,
     assignedMinutes: m.assignedMinutes,
     capacityMinutes: m.capacityMinutes,
+    onSprintTeam: m.onSprintTeam,
     tasks
   }
 }
