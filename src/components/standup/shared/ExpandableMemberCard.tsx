@@ -113,6 +113,12 @@ export function ExpandableMemberCard({
             {member.role ? <span className="capitalize">{formatRole(member.role)}</span> : null}
             {member.role ? ' · ' : ''}
             {member.tasks.length === 1 ? '1 task' : `${member.tasks.length} tasks`}
+            {/* Assigning here changes the sprint roster, so the card says so
+                before the drop, not after it. Absent (rather than false)
+                means the context has no roster concept at all. */}
+            {member.onSprintTeam === false && (
+              <span className="text-[var(--apple-tertiary-label)]"> · not on sprint team</span>
+            )}
           </p>
         </div>
 
