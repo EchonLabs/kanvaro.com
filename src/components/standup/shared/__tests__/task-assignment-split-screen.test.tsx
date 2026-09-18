@@ -26,6 +26,7 @@ import {
   sortAssignableTasks,
   TaskAssignmentSplitScreen
 } from '@/components/standup/shared/TaskAssignmentSplitScreen'
+import { taskIdFromDraggableId } from '@/components/standup/shared/TaskCard'
 
 const tasks: AssignableTaskView[] = [
   {
@@ -305,6 +306,31 @@ describe('TaskAssignmentSplitScreen — the right panel', () => {
     expect(screen.getByText('Daily workload')).toBeInTheDocument()
     // No skills sub-section: member skills have no data source.
     expect(screen.queryByText('Skills')).not.toBeInTheDocument()
+  })
+
+  it('never registers the same dnd-kit id twice when a task shows in both panels', () => {
+    // The left panel is not filtered by assignee, so an assigned task is in
+    // both places at once. dnd-kit's registry is keyed by id and `disabled`
+    // does not unregister a node, so a shared id would let the read-only copy
+    // overwrite the real card's node ref and corrupt its drag rect.
+    renderScreen({
+      tasks: [{ ...tasks[1], assigneeId: 'kasun' }],
+      members: [{ ...members[0], tasks: [{ ...tasks[1], assigneeId: 'kasun' }] }]
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: "Expand Kasun Perera's details" }))
+
+    const ids = screen
+      .getAllByTestId('task-card')
+      .map((card) => card.getAttribute('data-drag-id'))
+
+    expect(ids).toHaveLength(2)
+    expect(new Set(ids).size).toBe(2)
+    expect(ids).toContain('task-t2')
+    // And the read-only copy's id can never be parsed back into a task, so no
+    // drop can resolve through it.
+    const readOnlyId = ids.find((id) => id !== 'task-t2')!
+    expect(taskIdFromDraggableId(readOnlyId)).toBeNull()
   })
 
   it('renders the caller’s injected content at the end of the expanded card', () => {
