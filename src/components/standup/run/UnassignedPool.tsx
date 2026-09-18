@@ -59,8 +59,16 @@ export interface UnassignedPoolProps {
   totalCount: number
   /** Shown once in the split screen's header rather than on every card. */
   sprintLabel?: string
-  /** The one call a drop and the picker both make. */
-  onAssign: (memberId: string, taskId: string) => void
+  /**
+   * The one call a drop and the picker both make.
+   *
+   * A promise is returned through to the split screen, which keeps its
+   * `assigning` lock raised until it settles. Returning nothing is allowed so a
+   * synchronous caller (a test stub, say) still type-checks — but a caller
+   * doing real work must return its promise or the shell's guard against a
+   * second drop racing the first is silently defeated.
+   */
+  onAssign: (memberId: string, taskId: string) => void | Promise<void>
   /** Run-only card content — see `CapacityBoard.tsx`'s three exports. */
   renderMemberAlways?: (member: AssignableMemberView) => React.ReactNode
   renderMemberExpanded?: (member: AssignableMemberView) => React.ReactNode
@@ -193,7 +201,9 @@ export function UnassignedPool({
           // component's no-op guard has already swallowed it. Guarded anyway
           // rather than trusting that from a distance.
           if (!memberId) return
-          onAssign(memberId, taskId)
+          // Awaited, not fired-and-forgotten: the split screen keeps its
+          // pickers and droppables locked for exactly as long as this resolves.
+          await onAssign(memberId, taskId)
         }}
       />
     </section>
