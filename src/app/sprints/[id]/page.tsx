@@ -19,6 +19,8 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { useNotify } from '@/lib/notify'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { hasStandups, isLiveSprint, type SprintState } from '@/lib/standup/sprint-states'
+import { standupStrings } from '@/lib/standup/strings'
+import { InfoTooltip } from '@/components/ui/InfoTooltip'
 import {
   ArrowLeft,
   Calendar,
@@ -563,6 +565,14 @@ export default function SprintDetailPage() {
       notifyError({ title: 'Add tasks to this sprint before starting it.' })
       return
     }
+    // The server refuses this too; saying so here saves a round trip and, more
+    // to the point, names the fix instead of reporting a failure.
+    if (sprint?.status !== 'planned') {
+      const reason = standupStrings.planning.startBlockedNotPlanned()
+      setActionError(reason)
+      notifyError({ title: reason })
+      return
+    }
     try {
       setStartingSprint(true)
       setActionError('')
@@ -926,6 +936,11 @@ export default function SprintDetailPage() {
     )
   }
 
+  // Only relevant when the Start Sprint button is shown while not yet
+  // startable (`planning`); once `planned`, the sprint is ready to start and
+  // needs no explanation.
+  const startReason = sprint.status === 'planned' ? null : standupStrings.planning.startBlockedNotPlanned()
+
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
       <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
@@ -949,18 +964,29 @@ export default function SprintDetailPage() {
             </div>
 
             <div className="flex flex-col gap-2 flex-shrink-0">
-              {((sprint.status === 'planning' && canStartSprint) || (sprint.status === 'active' && canCompleteSprint)) && (
+              {(((sprint.status === 'planning' || sprint.status === 'planned') && canStartSprint) || (sprint.status === 'active' && canCompleteSprint)) && (
                 <div className="flex items-center gap-2 justify-end">
-                  {sprint.status === 'planning' && canStartSprint && (
+                  {/* A sprint can only start once it is Planned. It is still
+                      rendered while Planning, disabled with the reason and a
+                      route to the fix: a button that simply disappears tells
+                      the PM nothing about why they cannot start. */}
+                  {(sprint.status === 'planning' || sprint.status === 'planned') && canStartSprint && (
                     <button
                       onClick={handleStartSprint}
-                      disabled={startingSprint}
+                      aria-disabled={startingSprint || sprint.status !== 'planned'}
+                      aria-describedby="start-sprint-reason"
                       className="inline-flex items-center justify-center gap-1.5 rounded-full text-white text-[13px] font-semibold px-4 h-9 hover:opacity-90 apple-transition disabled:opacity-40"
-                      style={{ background: 'linear-gradient(90deg,#34C759 0%,#30D158 100%)' }}
+                      style={{
+                        background: 'linear-gradient(90deg,#34C759 0%,#30D158 100%)',
+                        opacity: sprint.status === 'planned' ? undefined : 0.4
+                      }}
                     >
                       {startingSprint ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                       {startingSprint ? 'Starting…' : 'Start Sprint'}
                     </button>
+                  )}
+                  {(sprint.status === 'planning' || sprint.status === 'planned') && canStartSprint && startReason && (
+                    <InfoTooltip id="start-sprint-reason" content={startReason} />
                   )}
                   {sprint.status === 'active' && canCompleteSprint && (
                     <button
