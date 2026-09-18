@@ -133,6 +133,9 @@ describe('fromAssignableMember', () => {
     })
     expect(result.avatarUrl).toBeUndefined()
     expect(result.capacityBreakdown).toBeUndefined()
+    // Planning has no per-day allocations, so there is no carried figure to
+    // give — absent rather than a faked zero.
+    expect(result.carriedMinutes).toBeUndefined()
   })
 
   it('omits optional fields when absent', () => {
@@ -240,5 +243,62 @@ describe('fromBoardMemberView', () => {
 
     expect(result.tasks).toEqual([])
     expect(result.assignedMinutes).toBe(0)
+    expect(result.carriedMinutes).toBe(0)
+  })
+
+  /**
+   * `CapacityBreakdown` carries no "carried" field — `outstandingDebtMinutes`
+   * is VAR-6 estimate debt and `strandedMinutes` is undoable work — so the
+   * figure comes off the allocations, exactly as `CapacityBoard`'s own
+   * `MemberCard` derives it. A misread here shows the meter's tooltip the
+   * wrong hours.
+   */
+  describe('carriedMinutes', () => {
+    const carriedRow: BoardAllocationView = {
+      ...allocation,
+      allocationId: 'alloc-carried',
+      source: 'carried_forward',
+      plannedMinutes: minutes(90)
+    }
+
+    const memberWith = (allocations: BoardAllocationView[]): BoardMemberView => ({
+      memberId: 'member-5',
+      name: 'Carrier',
+      capacity: { ...capacity, memberId: 'member-5' },
+      allocations
+    })
+
+    it('sums the planned minutes of carried-forward allocations', () => {
+      const result = fromBoardMemberView(
+        memberWith([
+          allocation,
+          carriedRow,
+          { ...carriedRow, allocationId: 'alloc-carried-2', plannedMinutes: minutes(30) }
+        ])
+      )
+
+      expect(result.carriedMinutes).toBe(120)
+    })
+
+    it('ignores allocations that are not carried forward', () => {
+      expect(fromBoardMemberView(memberWith([allocation])).carriedMinutes).toBe(0)
+    })
+
+    it('excludes a detached carried row — that work is waiting to be reassigned', () => {
+      const result = fromBoardMemberView(
+        memberWith([carriedRow, { ...carriedRow, allocationId: 'alloc-detached', detachedReason: 'absent' }])
+      )
+
+      expect(result.carriedMinutes).toBe(90)
+    })
+
+    it('is never read off outstandingDebtMinutes, which is a different concept', () => {
+      const member: BoardMemberView = {
+        ...memberWith([allocation]),
+        capacity: { ...capacity, memberId: 'member-5', outstandingDebtMinutes: minutes(240) }
+      }
+
+      expect(fromBoardMemberView(member).carriedMinutes).toBe(0)
+    })
   })
 })

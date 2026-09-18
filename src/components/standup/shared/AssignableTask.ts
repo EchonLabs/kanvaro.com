@@ -17,6 +17,7 @@
  */
 import type { CapacityBreakdown } from '@/lib/standup/capacity'
 import type { PoolTask } from '@/lib/standup/allocation'
+import type { Minutes } from '@/lib/standup/minutes'
 
 import type { AssignableMember, ScopeTask } from '../planning/types'
 import { assigneeIdOf } from '../planning/types'
@@ -41,6 +42,23 @@ export interface AssignableMemberView {
   assignedMinutes?: number
   capacityMinutes?: number
   capacityBreakdown?: CapacityBreakdown
+  /**
+   * The carried-over portion of `assignedMinutes`, which `CapacityMeter`
+   * shades differently (§15.8.7).
+   *
+   * Deliberately *not* read off `CapacityBreakdown`: that type has no carried
+   * field at all. Its nearest-looking neighbour, `outstandingDebtMinutes`, is
+   * VAR-6 estimate debt — work that overran its estimate on earlier days — and
+   * `strandedMinutes` is allocated work nobody can do today. Neither is "hours
+   * carried into this day". The only source for that is the allocations
+   * themselves, whose `source` says `carried_forward`, which is exactly how
+   * `CapacityBoard`'s own `MemberCard` derives it.
+   *
+   * Run context only. The planning screen has no per-day allocations at all,
+   * so `fromAssignableMember` leaves it undefined and the meter falls back to
+   * treating the whole allocation as fresh.
+   */
+  carriedMinutes?: Minutes
   /**
    * Planning-context only: already on `Sprint.teamMembers`. The assignment
    * picker groups people who are not separately ("will be added to the sprint
@@ -107,8 +125,21 @@ export function fromBoardMemberView(m: BoardMemberView): AssignableMemberView {
     assignedMinutes: m.capacity.allocatedMinutes,
     capacityMinutes: m.capacity.effectiveMinutes,
     capacityBreakdown: m.capacity,
+    carriedMinutes: carriedMinutesOf(m.allocations),
     tasks: m.allocations.map((allocation) => fromBoardAllocationView(allocation, m.memberId))
   }
+}
+
+/**
+ * The carried share of a member's day, derived the same way `CapacityBoard`'s
+ * `MemberCard` derives it: rows that came forward from a previous day and are
+ * still attached to this member. A detached row is not part of what they are
+ * carrying — it is work waiting to be given to somebody else.
+ */
+function carriedMinutesOf(allocations: readonly BoardAllocationView[]): Minutes {
+  return allocations
+    .filter((row) => row.source === 'carried_forward' && !row.detachedReason)
+    .reduce((total, row) => total + row.plannedMinutes, 0) as Minutes
 }
 
 /**

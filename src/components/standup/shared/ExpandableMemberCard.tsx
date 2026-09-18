@@ -146,7 +146,9 @@ export function ExpandableMemberCard({
           name={member.name}
           effectiveMinutes={member.capacityBreakdown.effectiveMinutes}
           allocatedMinutes={member.capacityBreakdown.allocatedMinutes}
-          carriedMinutes={0 as Minutes}
+          // Absent only where the context has no carried-forward concept
+          // (planning); zero is then the honest figure rather than a stand-in.
+          carriedMinutes={member.carriedMinutes ?? (0 as Minutes)}
           gapMinutes={member.capacityBreakdown.gapMinutes}
           status={member.capacityBreakdown.status}
           locale={locale}
