@@ -18,10 +18,12 @@ import {
   Plus,
   X,
   Trash2,
-  Paperclip
+  Paperclip,
+  Info
 } from 'lucide-react'
 import { AttachmentList } from '@/components/ui/AttachmentList'
 import { countWords, TASK_TITLE_MAX_WORDS, truncateToMaxWords } from '@/lib/text/word-limit'
+import { computeIsFormValid } from './isFormValid'
 
 interface Project {
   _id: string
@@ -303,12 +305,6 @@ export default function CreateTaskPage() {
         return
       }
 
-      if (assignedTo.length === 0) {
-        notifyError({ title: 'Assignment Required', message: 'Please assign this task to at least one user' })
-        setLoading(false)
-        return
-      }
-
       const titleTrimmed = formData.title.trim()
       if (countWords(titleTrimmed) > TASK_TITLE_MAX_WORDS) {
         notifyError({ title: 'Validation Error', message: `Task title must be ${TASK_TITLE_MAX_WORDS} words or fewer.` })
@@ -577,14 +573,13 @@ export default function CreateTaskPage() {
 
   // Required field validation (only fields marked with *)
   const isFormValid = useMemo(() => {
-    return (
-      !!formData.title.trim() &&
-      !!formData.project &&
-      !!formData.dueDate &&
-      assignedTo.length > 0 &&
-      !subtasks.some(st => !(st.title && st.title.trim().length > 0))
-    )
-  }, [formData.title, formData.project, formData.dueDate, assignedTo.length, subtasks])
+    return computeIsFormValid({
+      title: formData.title,
+      project: formData.project,
+      dueDate: formData.dueDate,
+      subtasks
+    })
+  }, [formData.title, formData.project, formData.dueDate, subtasks])
 
   const attachmentListItems = useMemo(
     () =>
@@ -710,8 +705,12 @@ export default function CreateTaskPage() {
 
                   {formData.project && (
                     <div>
-                      <label className="text-sm font-medium text-foreground">Assigned To *</label>
-                      <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Assigned To</label>
+                      <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[var(--apple-tertiary-label)]">
+                        <Info className="h-3 w-3 shrink-0" />
+                        Optional — tasks are assigned during sprint planning.
+                      </p>
+                      <div className="space-y-2 mt-1">
                         <Select
                           value=""
                           onValueChange={(value) => {
