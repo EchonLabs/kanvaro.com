@@ -464,6 +464,14 @@ export const standupStrings = {
     panelPending: ({ phase }: { phase: string }) =>
       `Not built yet — arrives in ${phase}.`,
 
+    /**
+     * ALO-16's confirmation. Raised by the run screen once the server has
+     * agreed, for both the drop and the keyboard paths — the drop animation
+     * alone cannot say whether the allocation actually stuck.
+     */
+    allocationAdded: ({ task, name }: { task: string; name: string }) =>
+      `Added ${task} to ${name}'s day`,
+
     /** RUN-25's rollback toast. */
     editRejected: () => 'That change was not saved. The board has been put back.',
     /** RUN-23 lost the race. */

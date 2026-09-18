@@ -2,15 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, RefreshCw, Users, Video, Zap } from 'lucide-react'
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent
-} from '@dnd-kit/core'
 
 import type { QuickAddTask } from '@/components/standup/primitives/QuickAddCombobox'
 import { AttendancePanel, type ReassignPromptView } from './AttendancePanel'
@@ -18,19 +9,27 @@ import { CarryForwardPanel, type CarryForwardItemRow, type CarryForwardPanelData
 import { BlockerPanel, type BlockerRow } from './BlockerPanel'
 import { VariancePanel, type VariancePanelMember, type VariancePanelRow } from './VariancePanel'
 import { YesterdayPanel, type YesterdayPanelApi } from './YesterdayPanel'
-import { CapacityBoard, type BoardAllocationView } from './CapacityBoard'
+import {
+  MemberAllocationRow,
+  MemberRunAlerts,
+  MemberRunDetails,
+  type BoardAllocationView,
+  type BoardMemberView
+} from './CapacityBoard'
 import { CompletionPanel } from './CompletionPanel'
 import { OverrideModal, type OverridableType, type OverrideModalAffectedMember, type OverrideModalSubmitInput } from './OverrideModal'
 import { RaiseBlockerModal, type RaiseBlockerSubmitInput } from './RaiseBlockerModal'
 import { ResolveBlockerDialog, type ResolveBlockerSubmitInput } from './ResolveBlockerDialog'
 import { ModalOverlay } from '@/components/standup/primitives/ModalOverlay'
-import { UnassignedPool, PoolCardPreview } from './UnassignedPool'
+import { UnassignedPool } from './UnassignedPool'
 import { SprintCloseReadinessPanel } from './SprintCloseReadinessPanel'
 import { useStandupShortcuts } from './useStandupShortcuts'
 import {
   evaluateFinalDayCarryForwardDisposition,
   type OpenTaskReadiness
 } from '@/lib/standup/sprint-close'
+import { useNotify } from '@/lib/notify'
+import type { AssignableMemberView, AssignableTaskView } from '../shared/AssignableTask'
 import { formatDualTimezone } from '@/lib/standup/timezone'
 import type { PoolTask } from '@/lib/standup/allocation'
 import type { BucketedRows, YesterdayRow } from '@/lib/standup/yesterday'
@@ -225,6 +224,13 @@ export interface RunScreenData {
   shape: 'day_one' | 'mid_sprint' | 'final_day'
   status: string
   facilitatorName: string
+  /**
+   * The sprint this stand-up belongs to, shown once in Panel 5's header
+   * rather than on every task card. Optional so a caller that has not wired
+   * it yet still compiles — the board GET does not carry a sprint name today,
+   * and the header simply omits the line when it is absent.
+   */
+  sprintName?: string
   meetingUrl?: string
   ceremoniesConsumeCapacity: boolean
   members: RunScreenMember[]
@@ -461,6 +467,7 @@ export interface StandupRunScreenProps {
 
 export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: StandupRunScreenProps) {
   const [board, setBoard] = useState(data)
+  const notify = useNotify()
 
   /**
    * The stand-up version, in a ref rather than state.
@@ -476,9 +483,6 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
   const versionRef = useRef(data.standupVersion)
   const [notice, setNotice] = useState<string | null>(null)
   const [prompt, setPrompt] = useState<ReassignPromptView | null>(null)
-  const [selectedMemberId, setSelectedMemberId] = useState(
-    data.members[0]?.memberId ?? null
-  )
 
   const isDayOne = board.shape === 'day_one'
 
@@ -581,10 +585,22 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
    * The server assigns the allocation id and the ALO-5 default hours, so an
    * optimistic row would have to invent both and then be reconciled — and a row
    * whose id changes underneath the PM's stepper is worse than a moment's wait.
+   *
+   * The success toast is raised here, at the screen level, rather than inside
+   * the split screen or the pool: this is the layer that knows the server
+   * agreed, and it is the one call both the drop and the keyboard paths make,
+   * so neither can confirm something the other would not.
    */
   const onAdd = useCallback(
     async (memberId: string, taskId: string) => {
       setNotice(null)
+      const memberName =
+        board.members.find((member) => member.memberId === memberId)?.name ?? 'the member'
+      const taskLabel =
+        [...board.pool.unassigned, ...board.pool.assignedNotPlanned].find(
+          (task) => task.taskId === taskId
+        )?.key ?? 'Task'
+
       try {
         const result = await api.addAllocation({
           memberId,
@@ -592,6 +608,9 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           expectedVersion: versionRef.current
         })
         versionRef.current = result.standupVersion
+        notify.success({
+          title: standupStrings.run.allocationAdded({ task: taskLabel, name: memberName })
+        })
         await reload()
       } catch (error) {
         if ((error as { code?: string })?.code === 'STALE_STANDUP') {
@@ -602,7 +621,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         setNotice(standupStrings.run.editRejected())
       }
     },
-    [api, reload]
+    [api, board.members, board.pool, notify, reload]
   )
 
   /**
@@ -1024,10 +1043,6 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     }
   })
 
-  const selectedMember = board.members.find(
-    (member) => member.memberId === selectedMemberId
-  )
-
   const presentCount = board.members.filter(
     (member) => member.attendance === 'present' || member.attendance === 'partial'
   ).length
@@ -1078,39 +1093,100 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
   )
 
   /**
-   * ALO-16's drag-and-drop, wired through `@dnd-kit/core` (already used for
-   * the task board's Kanban drag — see `src/components/tasks/KanbanBoard.tsx`
-   * for the same `PointerSensor` + `distance` activation pattern). The
-   * `distance: 8` constraint is what lets a plain click still reach the
-   * pool's "+" button and the member card's other controls: drag only starts
-   * once the pointer has moved past that threshold, so a click with no
-   * movement never becomes a drag.
+   * ALO-16's drag-and-drop no longer lives here.
    *
-   * `onDragEnd` reads the dragged `PoolTask` and the target member id
-   * straight off each side's `data` and calls `onAdd` — the exact same
-   * function the pool's "+" button and the capacity board's quick-add box
-   * already call. This is deliberate, not incidental: `UnassignedPool.tsx`'s
-   * own docblock states the drag path and the keyboard path must issue an
-   * identical call, or the board would behave differently depending on how
-   * the PM got here.
+   * This screen used to own the single `DndContext` for Panel 5, with the
+   * pool's cards as draggables and the capacity board's member cards as
+   * droppables. Task 8 moved that whole interaction into
+   * `TaskAssignmentSplitScreen`, which owns the identical
+   * `PointerSensor`/`distance: 8` sensor, the drag overlay and the drop
+   * animation, and hands back `(taskId, memberId)`.
+   *
+   * Ownership could move cleanly because the context coordinated exactly one
+   * interaction — pool task onto member card — and nothing else on this
+   * screen dragged anything. What is left is the callback it used to end in:
+   * `onAdd`, the same function the keyboard paths call, so the two can never
+   * diverge.
    */
-  const dndSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  )
-  const [draggingTask, setDraggingTask] = useState<PoolTask | null>(null)
-
-  const onDragStart = useCallback((event: DragStartEvent) => {
-    setDraggingTask((event.active.data.current?.task as PoolTask | undefined) ?? null)
-  }, [])
-
-  const onDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      setDraggingTask(null)
-      const task = event.active.data.current?.task as PoolTask | undefined
-      const memberId = event.over?.data.current?.memberId as string | undefined
-      if (task && memberId) void onAdd(memberId, task.taskId)
+  const onReassignStranded = useCallback(
+    (memberId: string) => {
+      setPrompt({
+        memberId,
+        taskCount:
+          board.members
+            .find((member) => member.memberId === memberId)
+            ?.allocations.filter((row) => row.detachedReason).length ?? 0,
+        totalMinutes:
+          board.members.find((member) => member.memberId === memberId)?.capacity
+            .strandedMinutes ?? (0 as Minutes),
+        tasks: []
+      })
     },
-    [onAdd]
+    [board.members]
+  )
+
+  /**
+   * The run-only halves of a member card, supplied to the shared card through
+   * its render props. Each one resolves the canonical `AssignableMemberView`
+   * back to this screen's richer `RunScreenMember` — the split screen speaks
+   * the shared shape, and everything below needs the allocations behind it.
+   */
+  const memberById = useMemo(() => {
+    const index = new Map<string, BoardMemberView>()
+    for (const member of board.members) index.set(member.memberId, member)
+    return index
+  }, [board.members])
+
+  const renderMemberAlways = useCallback(
+    (view: AssignableMemberView) => {
+      const member = memberById.get(view.id)
+      if (!member) return null
+      return (
+        <MemberRunAlerts
+          member={member}
+          onReassignStranded={onReassignStranded}
+          locale={locale}
+        />
+      )
+    },
+    [memberById, onReassignStranded, locale]
+  )
+
+  const renderMemberTaskRow = useCallback(
+    (view: AssignableMemberView, task: AssignableTaskView) => {
+      const allocation = memberById
+        .get(view.id)
+        ?.allocations.find((row) => row.taskId === task.id)
+      if (!allocation) return null
+      return (
+        <MemberAllocationRow
+          allocation={allocation}
+          onChangeHours={onChangeHours}
+          onRemove={onRemove}
+          readOnly={readOnly}
+          locale={locale}
+        />
+      )
+    },
+    [memberById, onChangeHours, onRemove, readOnly, locale]
+  )
+
+  const renderMemberExpanded = useCallback(
+    (view: AssignableMemberView) => {
+      const member = memberById.get(view.id)
+      if (!member) return null
+      return (
+        <MemberRunDetails
+          member={member}
+          poolTasks={poolTasks}
+          ceremoniesConsumeCapacity={board.ceremoniesConsumeCapacity}
+          onQuickAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
+          readOnly={readOnly}
+          locale={locale}
+        />
+      )
+    },
+    [memberById, poolTasks, board.ceremoniesConsumeCapacity, onAdd, readOnly, locale]
   )
 
   /**
@@ -1146,61 +1222,19 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         </div>
       )}
 
-      <DndContext sensors={dndSensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <div
-          className={
-            isDayOne ? 'grid gap-4 lg:grid-cols-[2fr_1fr]' : 'grid gap-4 lg:grid-cols-[1fr_2fr]'
-          }
-        >
-          <UnassignedPool
-            unassigned={board.pool.unassigned}
-            assignedNotPlanned={board.pool.assignedNotPlanned}
-            selectedMember={
-              selectedMember
-                ? {
-                    memberId: selectedMember.memberId,
-                    name: selectedMember.name,
-                    gapMinutes: selectedMember.capacity.gapMinutes
-                  }
-                : null
-            }
-            totalCount={board.poolTotal}
-            readOnly={readOnly}
-            locale={locale}
-            onAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
-          />
-
-          <div onFocusCapture={() => setSelectedMemberId(selectedMemberId)}>
-            <CapacityBoard
-              members={board.members}
-              poolTasks={poolTasks}
-              ceremoniesConsumeCapacity={board.ceremoniesConsumeCapacity}
-              readOnly={readOnly}
-              locale={locale}
-              onChangeHours={onChangeHours}
-              onRemove={onRemove}
-              onQuickAdd={(memberId, task) => void onAdd(memberId, task.taskId)}
-              onReassignStranded={(memberId) => {
-                setSelectedMemberId(memberId)
-                setPrompt({
-                  memberId,
-                  taskCount: board.members
-                    .find((member) => member.memberId === memberId)
-                    ?.allocations.filter((row) => row.detachedReason).length ?? 0,
-                  totalMinutes:
-                    board.members.find((member) => member.memberId === memberId)?.capacity
-                      .strandedMinutes ?? (0 as Minutes),
-                  tasks: []
-                })
-              }}
-            />
-          </div>
-        </div>
-
-        <DragOverlay>
-          {draggingTask ? <PoolCardPreview task={draggingTask} locale={locale} /> : null}
-        </DragOverlay>
-      </DndContext>
+      <UnassignedPool
+        unassigned={board.pool.unassigned}
+        assignedNotPlanned={board.pool.assignedNotPlanned}
+        members={board.members}
+        totalCount={board.poolTotal}
+        sprintLabel={board.sprintName}
+        readOnly={readOnly}
+        locale={locale}
+        onAssign={(memberId, taskId) => void onAdd(memberId, taskId)}
+        renderMemberAlways={renderMemberAlways}
+        renderMemberTaskRow={renderMemberTaskRow}
+        renderMemberExpanded={renderMemberExpanded}
+      />
     </section>
   )
 

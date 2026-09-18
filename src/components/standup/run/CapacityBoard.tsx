@@ -1,11 +1,8 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
-import { useDroppable } from '@dnd-kit/core'
+import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
-import { CapacityMeter } from '@/components/standup/primitives/CapacityMeter'
 import { Drawer } from '@/components/standup/primitives/Drawer'
 import { HourStepper } from '@/components/standup/primitives/HourStepper'
 import {
@@ -22,11 +19,21 @@ import { cn } from '@/lib/utils'
  * The capacity board (§15.8.7) — Panel 5's right half, and the phase's visible
  * half.
  *
- * It computes nothing. `computeCapacity()` is the module's sole capacity
- * authority and every write returns a fresh `CapacityBreakdown`; this component
- * renders what it is handed. A board that re-derived a meter would eventually
- * disagree with the server that decides whether the stand-up may complete, and
- * the PM would have no way to tell which number was real.
+ * The *layout* is no longer this file's business. Task 8 moved the per-member
+ * card onto `shared/ExpandableMemberCard`, rendered by the same
+ * `TaskAssignmentSplitScreen` sprint planning uses, so what is left here is
+ * the run-specific content that card cannot know about, supplied to it through
+ * its three render props:
+ *
+ *   `renderAlways`      → `MemberRunAlerts`      — debt, reduced capacity, OB-12
+ *   `renderTaskRow`     → `MemberAllocationRow`  — source, hours, remove
+ *   `renderExpandedExtra` → `MemberRunDetails`   — quick add + the breakdown drawer
+ *
+ * It still computes nothing. `computeCapacity()` is the module's sole capacity
+ * authority and every write returns a fresh `CapacityBreakdown`; these
+ * components render what they are handed. A board that re-derived a meter
+ * would eventually disagree with the server that decides whether the stand-up
+ * may complete, and the PM would have no way to tell which number was real.
  *
  * Three obligations inherited from Phase 6 are discharged here, and all three
  * are the same class of bug — a number correct on the server and invisible or
@@ -44,11 +51,10 @@ import { cn } from '@/lib/utils'
  *   reassign action, never as a variant of the calm `unavailable` chip.
  *   `allocationStatus` decides `unavailable` from effective capacity before it
  *   looks at what is allocated, so six parked hours and an empty day are
- *   otherwise indistinguishable.
+ *   otherwise indistinguishable. It goes through `renderAlways`, not
+ *   `renderExpandedExtra`: an alert behind a disclosure triangle is an alert
+ *   nobody reads.
  */
-
-/** Past this many members the list virtualises rather than mounting every card. */
-const VIRTUALISE_ABOVE = 25
 
 export interface BoardAllocationView {
   allocationId: string
@@ -72,190 +78,45 @@ export interface BoardMemberView {
   allocations: BoardAllocationView[]
 }
 
-export interface CapacityBoardProps {
-  members: BoardMemberView[]
-  /** Sprint tasks offered by the quick-add combobox — the keyboard path. */
-  poolTasks: readonly QuickAddTask[]
-  /** DN-6. False means the breakdown must carry OB-10's notice. */
-  ceremoniesConsumeCapacity: boolean
-  onChangeHours: (allocationId: string, minutes: Minutes) => void
-  onRemove: (allocationId: string) => void
-  onQuickAdd: (memberId: string, task: QuickAddTask) => void
-  onReassignStranded: (memberId: string) => void
-  /** RUN-26 — the stand-up moved to In_Progress and this viewer may not edit. */
-  readOnly?: boolean
-  locale?: string
-  className?: string
-}
-
-export function CapacityBoard({
-  members,
-  poolTasks,
-  ceremoniesConsumeCapacity,
-  onChangeHours,
-  onRemove,
-  onQuickAdd,
-  onReassignStranded,
-  readOnly = false,
-  locale,
-  className
-}: CapacityBoardProps) {
-  const scrollRef = useRef<HTMLDivElement | null>(null)
-  const virtualise = members.length > VIRTUALISE_ABOVE
-
-  const virtualizer = useVirtualizer({
-    count: virtualise ? members.length : 0,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 260,
-    overscan: 4
-  })
-
-  const cardFor = (member: BoardMemberView) => (
-    <MemberCard
-      key={member.memberId}
-      member={member}
-      poolTasks={poolTasks}
-      ceremoniesConsumeCapacity={ceremoniesConsumeCapacity}
-      onChangeHours={onChangeHours}
-      onRemove={onRemove}
-      onQuickAdd={onQuickAdd}
-      onReassignStranded={onReassignStranded}
-      readOnly={readOnly}
-      locale={locale}
-    />
-  )
-
-  return (
-    <section
-      className={cn(
-        'flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-3.5',
-        className
-      )}
-      aria-label="Capacity board"
-    >
-      <header className="flex items-baseline justify-between">
-        <h3 className="apple-section-label text-[var(--apple-tertiary-label)]">
-          {standupStrings.allocation.capacityBoardTitle()}
-        </h3>
-        {/* The full count, always — a member scrolled out of a virtualised
-            window must never read as absent from the sprint. */}
-        <span
-          data-testid="member-count"
-          className="font-apple-mono text-[11px] tabular-nums text-[var(--apple-tertiary-label)]"
-        >
-          {standupStrings.allocation.memberCount({ count: members.length })}
-        </span>
-      </header>
-
-      {virtualise ? (
-        <div
-          ref={scrollRef}
-          data-testid="board-scroll"
-          className="max-h-[70vh] overflow-y-auto pr-0.5"
-        >
-          <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
-            {virtualizer.getVirtualItems().map((row) => (
-              <div
-                key={row.key}
-                className="absolute left-0 top-0 w-full pb-3"
-                style={{ transform: `translateY(${row.start}px)` }}
-              >
-                {cardFor(members[row.index])}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-0.5">
-          {members.map(cardFor)}
-        </div>
-      )}
-    </section>
-  )
-}
-
-function MemberCard({
+/**
+ * Everything about a member's day that must be legible without expanding
+ * their card: the estimate-debt badge, AC-16's capacity-reduced sentence, and
+ * OB-12's stranded-hours alert.
+ */
+export function MemberRunAlerts({
   member,
-  poolTasks,
-  ceremoniesConsumeCapacity,
-  onChangeHours,
-  onRemove,
-  onQuickAdd,
   onReassignStranded,
-  readOnly,
   locale
 }: {
   member: BoardMemberView
-  poolTasks: readonly QuickAddTask[]
-  ceremoniesConsumeCapacity: boolean
-  onChangeHours: (allocationId: string, minutes: Minutes) => void
-  onRemove: (allocationId: string) => void
-  onQuickAdd: (memberId: string, task: QuickAddTask) => void
   onReassignStranded: (memberId: string) => void
-  readOnly: boolean
   locale?: string
 }) {
-  const [breakdownOpen, setBreakdownOpen] = useState(false)
   const { capacity } = member
 
-  const carriedMinutes = member.allocations
-    .filter((row) => row.source === 'carried_forward' && !row.detachedReason)
-    .reduce((total, row) => total + row.plannedMinutes, 0) as Minutes
+  const hasDebt = capacity.outstandingDebtMinutes > 0
+  const reduced =
+    capacity.overrunPolicy === 'reduce' &&
+    hasDebt &&
+    capacity.adjustedMinutes !== capacity.effectiveMinutes
 
-  /**
-   * ALO-16's drop zone. Disabled the same way the pool's draggable cards are
-   * — a read-only viewer gets neither end of the interaction. `isOver` drives
-   * the highlight below; the actual allocation happens in
-   * `StandupRunScreen`'s `DndContext.onDragEnd`, which reads `memberId` back
-   * off `data` and calls the identical `onAdd`/`onQuickAdd` the "+" button and
-   * the combobox already call.
-   */
-  const { setNodeRef, isOver } = useDroppable({
-    id: `member-card-${member.memberId}`,
-    data: { memberId: member.memberId },
-    disabled: readOnly
-  })
+  if (!hasDebt && capacity.strandedMinutes === 0) return null
 
   return (
-    <article
-      ref={setNodeRef}
-      data-testid="member-card"
-      className={cn(
-        'apple-transition flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border bg-background p-3.5',
-        isOver
-          ? 'border-[var(--apple-system-blue)] shadow-[0_0_0_3px_rgba(0,122,255,0.15)]'
-          : 'border-[var(--apple-separator)]'
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <h4 className="truncate text-[14px] font-semibold text-[var(--apple-label)]">
-            {member.name}
-          </h4>
-          {capacity.outstandingDebtMinutes > 0 && (
-            <span
-              data-testid="debt-badge"
-              className="shrink-0 rounded-full bg-[var(--apple-system-orange)]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--apple-system-orange)]"
-            >
-              {standupStrings.allocation.debtBadge({
-                minutes: capacity.outstandingDebtMinutes,
-                locale
-              })}
-            </span>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setBreakdownOpen(true)}
-          aria-label={standupStrings.allocation.breakdownTrigger({ name: member.name })}
-          className="apple-transition font-apple-mono shrink-0 rounded-full border border-[var(--apple-separator)] px-2 py-0.5 text-[11px] tabular-nums text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)]"
+    <div className="flex flex-col gap-2">
+      {hasDebt && (
+        <span
+          data-testid="debt-badge"
+          className="self-start rounded-full bg-[var(--apple-system-orange)]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--apple-system-orange)]"
         >
-          {formatMinutesAsHours(capacity.effectiveMinutes, { locale })}
-        </button>
-      </div>
+          {standupStrings.allocation.debtBadge({
+            minutes: capacity.outstandingDebtMinutes,
+            locale
+          })}
+        </span>
+      )}
 
-      {capacity.overrunPolicy === 'reduce' && capacity.outstandingDebtMinutes > 0 && capacity.adjustedMinutes !== capacity.effectiveMinutes ? (
+      {reduced && (
         <p className="text-[11px] text-[var(--apple-secondary-label)]">
           {standupStrings.variance.capacityReduced({
             nominal: capacity.adjustedMinutes,
@@ -264,17 +125,7 @@ function MemberCard({
             locale
           })}
         </p>
-      ) : null}
-
-      <CapacityMeter
-        name={member.name}
-        effectiveMinutes={capacity.effectiveMinutes}
-        allocatedMinutes={capacity.allocatedMinutes}
-        carriedMinutes={carriedMinutes}
-        gapMinutes={capacity.gapMinutes}
-        status={capacity.status}
-        locale={locale}
-      />
+      )}
 
       {/* OB-12. Loud, and never the calm slate chip: these hours belong to
           somebody who cannot do them today, and the day is not finished until
@@ -300,69 +151,104 @@ function MemberCard({
           </button>
         </div>
       )}
+    </div>
+  )
+}
 
-      {member.allocations.length === 0 ? (
-        <p
-          className={cn(
-            'rounded-[var(--apple-radius-md)] border border-dashed px-2.5 py-3 text-center text-[12px] apple-transition',
-            isOver
-              ? 'border-[var(--apple-system-blue)] text-[var(--apple-system-blue)]'
-              : 'border-[var(--apple-separator)] text-[var(--apple-tertiary-label)]'
-          )}
-        >
-          {standupStrings.allocation.dropHint()}
+/**
+ * One allocated row inside an expanded member card, with the two controls the
+ * shared read-only row has no notion of: ALO-5's hours and the remove action.
+ *
+ * It *replaces* the shared card's read-only row rather than being appended
+ * below it — the same task listed twice, once editable and once not, is worse
+ * than either alone.
+ */
+export function MemberAllocationRow({
+  allocation,
+  onChangeHours,
+  onRemove,
+  readOnly = false,
+  locale
+}: {
+  allocation: BoardAllocationView
+  onChangeHours: (allocationId: string, minutes: Minutes) => void
+  onRemove: (allocationId: string) => void
+  readOnly?: boolean
+  locale?: string
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 py-1.5">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[12.5px] text-[var(--apple-label)]">
+          {allocation.taskKey ? (
+            <span className="font-apple-mono text-[11px] text-[var(--apple-tertiary-label)]">
+              {allocation.taskKey}{' '}
+            </span>
+          ) : null}
+          {allocation.title}
         </p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {member.allocations.map((row) => (
-            <li
-              key={row.allocationId}
-              className="flex items-start justify-between gap-2 rounded-[var(--apple-radius-sm)] px-1 py-1"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[12.5px] text-[var(--apple-label)]">
-                  {row.taskKey ? (
-                    <span className="font-apple-mono text-[11px] text-[var(--apple-tertiary-label)]">
-                      {row.taskKey}{' '}
-                    </span>
-                  ) : null}
-                  {row.title}
-                </p>
-                <span
-                  data-testid={`source-${row.allocationId}`}
-                  className="text-[11px] text-[var(--apple-secondary-label)]"
-                >
-                  {standupStrings.allocation.source[row.source]()}
-                </span>
-              </div>
+        <span
+          data-testid={`source-${allocation.allocationId}`}
+          className="text-[11px] text-[var(--apple-secondary-label)]"
+        >
+          {standupStrings.allocation.source[allocation.source]()}
+        </span>
+      </div>
 
-              <HourStepper
-                taskLabel={row.taskKey ?? row.title}
-                valueMinutes={row.plannedMinutes}
-                remainingEstimateMinutes={row.remainingEstimateMinutes}
-                disabled={readOnly}
-                locale={locale}
-                onChange={(next) => onChangeHours(row.allocationId, next)}
-              />
+      <HourStepper
+        taskLabel={allocation.taskKey ?? allocation.title}
+        valueMinutes={allocation.plannedMinutes}
+        remainingEstimateMinutes={allocation.remainingEstimateMinutes}
+        disabled={readOnly}
+        locale={locale}
+        onChange={(next) => onChangeHours(allocation.allocationId, next)}
+      />
 
-              <button
-                type="button"
-                disabled={readOnly}
-                onClick={() => onRemove(row.allocationId)}
-                aria-label={standupStrings.allocation.removeRow({
-                  task: row.taskKey ?? row.title
-                })}
-                className="apple-transition shrink-0 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-1 text-[11px] text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-[var(--apple-system-red)] disabled:opacity-40"
-              >
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <button
+        type="button"
+        disabled={readOnly}
+        onClick={() => onRemove(allocation.allocationId)}
+        aria-label={standupStrings.allocation.removeRow({
+          task: allocation.taskKey ?? allocation.title
+        })}
+        className="apple-transition shrink-0 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-1 text-[11px] text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-[var(--apple-system-red)] disabled:opacity-40"
+      >
+        ✕
+      </button>
+    </div>
+  )
+}
 
-      {/* The keyboard equivalent of the drop zone (NFR-A2). Present on every
-          card, not behind a menu: it is the only path for some of the team. */}
+/**
+ * The run-only tail of an expanded member card: the keyboard path to
+ * allocation (NFR-A2) and the itemised capacity breakdown behind a drawer.
+ *
+ * The quick-add combobox is present on every card, not behind a menu: it is
+ * the only path for some of the team, and it is also where ALO-17's fit
+ * indicator now lives — measured against *this* member's gap rather than
+ * against a single globally "selected" member, which is what the pool used to
+ * do.
+ */
+export function MemberRunDetails({
+  member,
+  poolTasks,
+  ceremoniesConsumeCapacity,
+  onQuickAdd,
+  readOnly = false,
+  locale
+}: {
+  member: BoardMemberView
+  poolTasks: readonly QuickAddTask[]
+  ceremoniesConsumeCapacity: boolean
+  onQuickAdd: (memberId: string, task: QuickAddTask) => void
+  readOnly?: boolean
+  locale?: string
+}) {
+  const [breakdownOpen, setBreakdownOpen] = useState(false)
+  const { capacity } = member
+
+  return (
+    <div className="flex flex-col gap-2.5">
       {!readOnly && (
         <QuickAddCombobox
           memberName={member.name}
@@ -372,6 +258,17 @@ function MemberCard({
           onSelect={(task) => onQuickAdd(member.memberId, task)}
         />
       )}
+
+      <button
+        type="button"
+        onClick={() => setBreakdownOpen(true)}
+        aria-label={standupStrings.allocation.breakdownTrigger({ name: member.name })}
+        className={cn(
+          'apple-transition font-apple-mono self-start rounded-full border border-[var(--apple-separator)] px-2 py-0.5 text-[11px] tabular-nums text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)]'
+        )}
+      >
+        {formatMinutesAsHours(capacity.effectiveMinutes, { locale })}
+      </button>
 
       <Drawer
         open={breakdownOpen}
@@ -386,7 +283,7 @@ function MemberCard({
           locale={locale}
         />
       </Drawer>
-    </article>
+    </div>
   )
 }
 

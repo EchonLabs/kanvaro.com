@@ -20,6 +20,7 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
+import { ToastProvider } from '@/components/ui/Toast'
 import { StandupRunScreen } from '@/components/standup/run/StandupRunScreen'
 import type { RunScreenData } from '@/components/standup/run/StandupRunScreen'
 import type { BlockerRow } from '@/components/standup/run/BlockerPanel'
@@ -189,9 +190,22 @@ const renderScreen = (
   api = okApi(),
   props: Record<string, unknown> = {}
 ) => {
-  render(<StandupRunScreen data={data(overrides)} api={api} {...props} />)
+  render(
+    <ToastProvider>
+      <StandupRunScreen data={data(overrides)} api={api} {...props} />
+    </ToastProvider>
+  )
   return api
 }
+
+/**
+ * Panel 5's allocation controls live inside an expanded member card since
+ * Task 8 — the collapsed card answers "can this person take more work?" and
+ * nothing else. Tests that drive an hour stepper or the quick-add box open
+ * the card first, the way a PM does.
+ */
+const expandMember = (name = 'Kasun') =>
+  fireEvent.click(screen.getByRole('button', { name: `Expand ${name}'s details` }))
 
 describe('the header (§15.8.2)', () => {
   it('shows the working-day ordinal, never a calendar count', () => {
@@ -676,6 +690,7 @@ describe('RUN-25 — optimistic edits roll back visibly', () => {
     let resolve: (value: unknown) => void = () => {}
     api.changeHours.mockReturnValue(new Promise((r) => { resolve = r }))
     renderScreen({}, api)
+    expandMember()
 
     fireEvent.click(
       screen.getByRole('button', { name: standupStrings.allocation.stepperIncrease() })
@@ -693,6 +708,7 @@ describe('RUN-25 — optimistic edits roll back visibly', () => {
     const api = okApi()
     api.changeHours.mockRejectedValue(new Error('nope'))
     renderScreen({}, api)
+    expandMember()
 
     fireEvent.click(
       screen.getByRole('button', { name: standupStrings.allocation.stepperIncrease() })
@@ -709,6 +725,7 @@ describe('RUN-25 — optimistic edits roll back visibly', () => {
     const api = okApi()
     api.changeHours.mockRejectedValue({ code: 'STALE_STANDUP' })
     renderScreen({}, api)
+    expandMember()
 
     fireEvent.click(
       screen.getByRole('button', { name: standupStrings.allocation.stepperIncrease() })
@@ -722,6 +739,7 @@ describe('RUN-25 — optimistic edits roll back visibly', () => {
 
   it('carries the server’s new version into the next write', async () => {
     const api = renderScreen()
+    expandMember()
 
     fireEvent.click(
       screen.getByRole('button', { name: standupStrings.allocation.stepperIncrease() })
@@ -744,6 +762,7 @@ describe('RUN-26 — a member’s own row locks when the stand-up starts', () =>
     renderScreen({ status: 'Ready' }, okApi(), {
       viewer: { userId: 'kasun', canAllocateOthers: false }
     })
+    expandMember()
 
     expect(screen.getByRole('spinbutton')).not.toBeDisabled()
   })
@@ -752,6 +771,7 @@ describe('RUN-26 — a member’s own row locks when the stand-up starts', () =>
     renderScreen({ status: 'In_Progress' }, okApi(), {
       viewer: { userId: 'kasun', canAllocateOthers: false }
     })
+    expandMember()
 
     expect(screen.getByRole('spinbutton')).toBeDisabled()
   })
@@ -760,6 +780,7 @@ describe('RUN-26 — a member’s own row locks when the stand-up starts', () =>
     renderScreen({ status: 'In_Progress' }, okApi(), {
       viewer: { userId: 'priya', canAllocateOthers: true }
     })
+    expandMember()
 
     expect(screen.getByRole('spinbutton')).not.toBeDisabled()
   })
@@ -795,7 +816,11 @@ describe('Panel 7 — completion (§15.8.9)', () => {
   // fetch fails, `board.checks` is `undefined`, and Complete must not become
   // pressable just because there is nothing left to say no.
   it('disables Complete and shows an unavailable notice when the checklist fetch failed', () => {
-    render(<StandupRunScreen data={{ ...data(), checks: undefined }} api={okApi()} />)
+    render(
+      <ToastProvider>
+        <StandupRunScreen data={{ ...data(), checks: undefined }} api={okApi()} />
+      </ToastProvider>
+    )
 
     // Rendered twice, deliberately: the banner where a PM's eye lands, and
     // the button's own `aria-describedby` reason (which must never say "all

@@ -2,24 +2,51 @@
  * @jest-environment jsdom
  */
 /**
- * The unassigned pool (Phase 7, Task 11 — ALO-13 … ALO-17).
+ * Panel 5's assignment surface (Phase 7, Task 11 — ALO-13 … ALO-17), as
+ * rebuilt in Task 8 on the shared `TaskAssignmentSplitScreen`.
  *
- * The pool is the left half of Panel 5 and it answers one question: what work
- * is not yet planned for today? The partitioning itself is pure and already
- * tested in `allocation-pool.test.ts`; what this suite covers is the part only
- * a rendered component can be wrong about.
+ * The partitioning and the sorts are pure and already tested in
+ * `allocation-pool.test.ts`, and the split screen's own filter/sort/drag
+ * mechanics are tested in `shared/__tests__`. What this suite covers is the
+ * part only this composition can be wrong about: ALO-14's two tabs choosing
+ * which pool the shared surface is handed, the run-only content the member
+ * cards render through the render props, and ALO-16's keyboard equivalence.
  *
- * The load-bearing case is ALO-16's keyboard equivalence. A task must reach a
- * member's day by keyboard exactly as it does by drag — same request, same
- * result — because HTML drag-and-drop has no keyboard path and a pool that can
- * only be dragged from is a pool part of the team cannot use.
- *
- * Driven with `fireEvent`, matching the rest of the repo's component suites.
+ * The load-bearing case is still ALO-16: a task must reach a member's day by
+ * keyboard exactly as it does by drag — same call, same result — because HTML
+ * drag-and-drop has no keyboard path. It is also why the collapsed-card drop
+ * is pinned below: the card most drops land on is the one nobody expanded.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import type { DragEndEvent } from '@dnd-kit/core'
+
+let capturedOnDragEnd: ((event: DragEndEvent) => void) | undefined
+
+// jsdom cannot honestly simulate dnd-kit's pointer mechanics, so the drop
+// tests call the handler with the event shape dnd-kit would hand it. Every
+// other dnd-kit export stays real — the droppable/draggable registrations the
+// cards make are part of what is under test.
+jest.mock('@dnd-kit/core', () => {
+  const actual = jest.requireActual('@dnd-kit/core')
+  return {
+    ...actual,
+    DndContext: ({
+      children,
+      onDragEnd
+    }: {
+      children: React.ReactNode
+      onDragEnd?: (event: DragEndEvent) => void
+    }) => {
+      capturedOnDragEnd = onDragEnd
+      return <>{children}</>
+    }
+  }
+})
 
 import { UnassignedPool } from '@/components/standup/run/UnassignedPool'
+import type { BoardMemberView } from '@/components/standup/run/CapacityBoard'
 import type { PoolTask } from '@/lib/standup/allocation'
+import type { CapacityBreakdown } from '@/lib/standup/capacity'
 import { minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 
@@ -52,19 +79,66 @@ const assignedNotPlanned = [
   task('KAN-260', { title: 'SSO callback', assigneeIds: ['ravi'] })
 ]
 
+function capacity(overrides: Partial<CapacityBreakdown> = {}): CapacityBreakdown {
+  return {
+    memberId: 'kasun',
+    date: '2026-08-17',
+    nominalMinutes: m(480),
+    adjustments: [],
+    adjustedMinutes: m(480),
+    outstandingDebtMinutes: m(0),
+    overrunPolicy: 'absorb',
+    effectiveMinutes: m(480),
+    allocatedMinutes: m(180),
+    gapMinutes: m(300),
+    status: 'under',
+    isUnavailable: false,
+    strandedMinutes: m(0),
+    ...overrides
+  }
+}
+
+const members: BoardMemberView[] = [
+  {
+    memberId: 'kasun',
+    name: 'Kasun',
+    capacity: capacity(),
+    allocations: [
+      {
+        allocationId: 'a1',
+        taskId: 't1',
+        taskKey: 'KAN-214',
+        title: 'Invoice model',
+        plannedMinutes: m(180),
+        remainingEstimateMinutes: m(420),
+        source: 'carried_forward',
+        isBlocked: false,
+        excludedFromCapacity: false,
+        pairedDeliberately: false
+      }
+    ]
+  },
+  {
+    memberId: 'nimal',
+    name: 'Nimal',
+    capacity: capacity({ memberId: 'nimal', allocatedMinutes: m(0), gapMinutes: m(480) }),
+    allocations: []
+  }
+]
+
 const renderPool = (props: Partial<Parameters<typeof UnassignedPool>[0]> = {}) => {
-  const onAdd = jest.fn()
+  const onAssign = jest.fn()
   render(
     <UnassignedPool
       unassigned={unassigned}
       assignedNotPlanned={assignedNotPlanned}
-      selectedMember={{ memberId: 'kasun', name: 'Kasun', gapMinutes: m(300) }}
+      members={members}
       totalCount={unassigned.length + assignedNotPlanned.length}
-      onAdd={onAdd}
+      onAssign={onAssign}
       {...props}
     />
   )
-  return onAdd
+  return onAssign
 }
 
 /**
@@ -74,6 +148,20 @@ const renderPool = (props: Partial<Parameters<typeof UnassignedPool>[0]> = {}) =
  * parentheses (ALO-14), and `(3)` is a capture group, not a literal.
  */
 const tab = (name: string | RegExp) => screen.getByRole('tab', { name })
+
+const cards = () => screen.getAllByTestId('task-card')
+
+/** The shape dnd-kit hands `onDragEnd`, narrowed to what the handler reads. */
+function dropEvent(activeId: string, overId: string | null): DragEndEvent {
+  return {
+    active: { id: activeId, data: { current: undefined }, rect: { current: {} } },
+    over: overId === null ? null : { id: overId, data: { current: undefined }, rect: {} }
+  } as unknown as DragEndEvent
+}
+
+beforeEach(() => {
+  capturedOnDragEnd = undefined
+})
 
 describe('UnassignedPool', () => {
   describe('ALO-14 — two tabs, counts in the labels', () => {
@@ -112,50 +200,57 @@ describe('UnassignedPool', () => {
 
       expect(tab(/^Assigned but not planned/)).toHaveAttribute('aria-selected', 'true')
     })
+
+    it('hands an assigned-but-not-planned task over with no assignee, so it can be dropped on its own owner', () => {
+      // The tab's tasks *are* assigned — they have no allocation on this
+      // stand-up, which is what the right-hand side is about. Carrying the
+      // assignee through would make the most common drop on this tab a no-op.
+      renderPool()
+
+      fireEvent.click(tab(/^Assigned but not planned/))
+
+      expect(screen.getByLabelText('Assign Rate limiter to')).toHaveValue('')
+    })
   })
 
   describe('ALO-15 — search, filter, sort', () => {
     it('searches on key and title', () => {
       renderPool()
 
-      fireEvent.change(screen.getByLabelText(standupStrings.pool.searchLabel()), {
+      fireEvent.change(screen.getByLabelText('Search tasks'), {
         target: { value: 'audit' }
       })
 
-      expect(screen.getAllByTestId('pool-task')).toHaveLength(1)
+      expect(cards()).toHaveLength(1)
       expect(screen.getByText('Audit log')).toBeInTheDocument()
     })
 
     it('filters by type', () => {
       renderPool()
 
-      fireEvent.change(screen.getByLabelText(standupStrings.pool.filterType()), {
-        target: { value: 'bug' }
-      })
+      fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'bug' } })
 
-      expect(screen.getAllByTestId('pool-task')).toHaveLength(1)
+      expect(cards()).toHaveLength(1)
       expect(screen.getByText('Audit log')).toBeInTheDocument()
     })
 
     it('filters by priority', () => {
       renderPool()
 
-      fireEvent.change(screen.getByLabelText(standupStrings.pool.filterPriority()), {
-        target: { value: 'high' }
-      })
+      fireEvent.change(screen.getByLabelText('Priority'), { target: { value: 'high' } })
 
-      expect(screen.getAllByTestId('pool-task')).toHaveLength(1)
+      expect(cards()).toHaveLength(1)
       expect(screen.getByText('Export CSV')).toBeInTheDocument()
     })
 
     it('sorts smallest first', () => {
       renderPool()
 
-      fireEvent.change(screen.getByLabelText(standupStrings.pool.sortLabel()), {
+      fireEvent.change(screen.getByLabelText('Sort'), {
         target: { value: 'estimate_asc' }
       })
 
-      expect(screen.getAllByTestId('pool-task').map((el) => el.textContent)).toEqual([
+      expect(cards().map((el) => el.textContent)).toEqual([
         expect.stringContaining('Health check'),
         expect.stringContaining('Export CSV'),
         expect.stringContaining('Audit log')
@@ -165,11 +260,11 @@ describe('UnassignedPool', () => {
     it('sorts largest first', () => {
       renderPool()
 
-      fireEvent.change(screen.getByLabelText(standupStrings.pool.sortLabel()), {
+      fireEvent.change(screen.getByLabelText('Sort'), {
         target: { value: 'estimate_desc' }
       })
 
-      expect(screen.getAllByTestId('pool-task')[0]).toHaveTextContent('Audit log')
+      expect(cards()[0]).toHaveTextContent('Audit log')
     })
   })
 
@@ -179,90 +274,164 @@ describe('UnassignedPool', () => {
       // filters hid it" — and only one of them has an action.
       renderPool({ unassigned: [] })
 
+      // Selected explicitly: with nothing unassigned the pool opens on the
+      // other tab (see the default-tab test below), and this case is about the
+      // copy an empty tab shows once you are looking at it.
+      fireEvent.click(
+        screen.getByRole('tab', { name: standupStrings.pool.tabUnassigned({ count: 0 }) })
+      )
+
       expect(screen.getByText(standupStrings.pool.emptyUnassigned())).toBeInTheDocument()
       expect(
         screen.queryByRole('button', { name: standupStrings.pool.clearFilters() })
       ).not.toBeInTheDocument()
     })
 
+    it('uses the other tab’s copy when it is the one that is empty', () => {
+      renderPool({ assignedNotPlanned: [] })
+
+      fireEvent.click(
+        screen.getByRole('tab', {
+          name: standupStrings.pool.tabAssignedNotPlanned({ count: 0 })
+        })
+      )
+
+      expect(
+        screen.getByText(standupStrings.pool.emptyAssignedNotPlanned())
+      ).toBeInTheDocument()
+    })
+
+    it('opens on the assigned tab when planning already gave every task an owner', () => {
+      // PC-8 makes an empty unassigned tab the normal day-one state, and
+      // opening on an empty tab reads as a broken panel rather than as
+      // "planning did its job".
+      renderPool({ unassigned: [] })
+
+      expect(
+        screen.getByRole('tab', {
+          name: standupStrings.pool.tabAssignedNotPlanned({ count: assignedNotPlanned.length })
+        })
+      ).toHaveAttribute('aria-selected', 'true')
+    })
+
+    it('still opens on the unassigned tab when there is unassigned work', () => {
+      renderPool()
+
+      expect(
+        screen.getByRole('tab', {
+          name: standupStrings.pool.tabUnassigned({ count: unassigned.length })
+        })
+      ).toHaveAttribute('aria-selected', 'true')
+    })
+
     it('offers to clear the filters when they are what emptied the list', () => {
       renderPool()
 
-      fireEvent.change(screen.getByLabelText(standupStrings.pool.searchLabel()), {
+      fireEvent.change(screen.getByLabelText('Search tasks'), {
         target: { value: 'nothing matches this' }
       })
 
-      expect(screen.getByText(standupStrings.pool.emptyFiltered())).toBeInTheDocument()
+      expect(screen.getByText('No task matches these filters.')).toBeInTheDocument()
 
-      fireEvent.click(
-        screen.getByRole('button', { name: standupStrings.pool.clearFilters() })
-      )
+      fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
 
-      expect(screen.getAllByTestId('pool-task')).toHaveLength(3)
-    })
-  })
-
-  describe('ALO-17 — the fits indicator', () => {
-    it('marks the task that closes the selected member’s day exactly', () => {
-      renderPool()
-
-      // 5h task against Kasun's 5h gap.
-      expect(
-        within(screen.getByTestId('pool-task-KAN-301')).getByText(
-          standupStrings.allocation.fitsExact()
-        )
-      ).toBeInTheDocument()
-    })
-
-    it('shows the overflow for a task that is too big', () => {
-      renderPool()
-
-      expect(
-        within(screen.getByTestId('pool-task-KAN-302')).getByText(
-          standupStrings.allocation.fitsOver({ minutes: m(180) })
-        )
-      ).toBeInTheDocument()
-    })
-
-    it('says which member the fits are measured against', () => {
-      renderPool()
-
-      expect(
-        screen.getByText(standupStrings.pool.fitsAgainst({ name: 'Kasun' }))
-      ).toBeInTheDocument()
-    })
-
-    it('asks for a member rather than showing a meaningless fit when none is selected', () => {
-      renderPool({ selectedMember: null })
-
-      expect(screen.getByText(standupStrings.pool.selectMemberFirst())).toBeInTheDocument()
-      expect(screen.queryByText(standupStrings.allocation.fitsExact())).not.toBeInTheDocument()
+      expect(cards()).toHaveLength(3)
     })
   })
 
   describe('ALO-16 — adding a task to a member', () => {
-    it('adds by keyboard, producing the same call a drop would', () => {
-      const onAdd = renderPool()
+    it('adds by keyboard, producing the same call a drop would', async () => {
+      const onAssign = renderPool()
 
-      const button = screen.getByRole('button', {
-        name: standupStrings.pool.addToMember({ task: 'KAN-301', name: 'Kasun' })
+      // Awaited: the split screen locks itself for the duration of the
+      // assignment, so the unlock is a state update this test owns.
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Assign Export CSV to'), {
+          target: { value: 'nimal' }
+        })
       })
-      button.focus()
-      fireEvent.click(button)
 
-      expect(onAdd).toHaveBeenCalledWith('kasun', expect.objectContaining({ taskId: 'KAN-301' }))
+      expect(onAssign).toHaveBeenCalledWith('nimal', 'KAN-301')
     })
 
-    it('offers no add control when no member is selected', () => {
-      renderPool({ selectedMember: null })
+    it('offers every member, not only one that has been selected first', () => {
+      renderPool()
 
-      expect(screen.queryByRole('button', { name: /Add KAN-301/ })).not.toBeInTheDocument()
+      const picker = screen.getByLabelText('Export CSV', { exact: false })
+      expect(within(picker).getByRole('option', { name: 'Kasun' })).toBeInTheDocument()
+      expect(within(picker).getByRole('option', { name: 'Nimal' })).toBeInTheDocument()
     })
 
-    it('offers no add control when the board is read-only (RUN-26)', () => {
+    it('locks the pickers when the board is read-only (RUN-26)', () => {
       renderPool({ readOnly: true })
 
-      expect(screen.queryByRole('button', { name: /Add KAN-301/ })).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Assign Export CSV to')).toBeDisabled()
+    })
+
+    it('drops onto a collapsed member card — the state most drops land on', async () => {
+      const onAssign = renderPool()
+
+      // Nothing was expanded, and nothing needs to be: the whole card is the
+      // drop target, not a list inside it.
+      expect(
+        screen.getByRole('button', { name: "Expand Nimal's details" })
+      ).toHaveAttribute('aria-expanded', 'false')
+
+      await act(async () => {
+        capturedOnDragEnd!(dropEvent('task-KAN-301', 'member-nimal'))
+      })
+
+      expect(onAssign).toHaveBeenCalledWith('nimal', 'KAN-301')
+    })
+
+    it('ignores a drop back onto the repository, because nothing in the pool is planned yet', async () => {
+      const onAssign = renderPool()
+
+      await act(async () => {
+        capturedOnDragEnd!(dropEvent('task-KAN-301', 'assignment-pool'))
+      })
+
+      expect(onAssign).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('the member cards', () => {
+    it('expands and collapses one member without touching the others', () => {
+      renderPool()
+
+      const toggle = screen.getByRole('button', { name: "Expand Kasun's details" })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+      fireEvent.click(toggle)
+
+      const expanded = screen.getByRole('button', { name: "Collapse Kasun's details" })
+      expect(expanded).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByText('Invoice model')).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: "Expand Nimal's details" })
+      ).toHaveAttribute('aria-expanded', 'false')
+
+      fireEvent.click(expanded)
+
+      expect(
+        screen.getByRole('button', { name: "Expand Kasun's details" })
+      ).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('renders whatever the run screen supplies through the render props', () => {
+      renderPool({
+        renderMemberAlways: (member) => <span>always-{member.id}</span>,
+        renderMemberExpanded: (member) => <span>expanded-{member.id}</span>
+      })
+
+      // The always-visible half is visible with nothing expanded; the other
+      // half is not.
+      expect(screen.getByText('always-kasun')).toBeInTheDocument()
+      expect(screen.queryByText('expanded-kasun')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: "Expand Kasun's details" }))
+
+      expect(screen.getByText('expanded-kasun')).toBeInTheDocument()
     })
   })
 
@@ -296,11 +465,17 @@ describe('UnassignedPool', () => {
     it('shows key, title, estimate and priority', () => {
       renderPool()
 
-      const card = screen.getByTestId('pool-task-KAN-301')
+      const card = cards().find((el) => el.textContent?.includes('Export CSV'))!
       expect(card).toHaveTextContent('KAN-301')
       expect(card).toHaveTextContent('Export CSV')
       expect(card).toHaveTextContent('5.0')
       expect(card).toHaveTextContent(/high/i)
+    })
+
+    it('names the sprint once, in the header, rather than on every card', () => {
+      renderPool({ sprintLabel: 'Sprint 12' })
+
+      expect(screen.getAllByText('Sprint 12')).toHaveLength(1)
     })
   })
 })
