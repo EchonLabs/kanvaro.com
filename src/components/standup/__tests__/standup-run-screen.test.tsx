@@ -1255,3 +1255,107 @@ describe('Panel 6 — blockers, the raise fix (Task 4 fix)', () => {
     )
   })
 })
+
+/**
+ * Panel 5's assignment, end to end through the shared split screen (Task 8 fix).
+ *
+ * Two things only this composition can be wrong about, and neither was covered
+ * when the rebuild landed:
+ *
+ *   1. The **lock**. `TaskAssignmentSplitScreen` disables its pickers and drop
+ *      targets for as long as its `onAssign` promise is pending, precisely so a
+ *      second assignment cannot race the first into a `STALE_STANDUP` conflict
+ *      (both would carry the same `expectedVersion`). That guard only works if
+ *      the real promise from `onAdd` is threaded back up through
+ *      `UnassignedPool`'s `onAssign` — a `void`-ed call releases the lock
+ *      instantly and the guard silently does nothing.
+ *   2. The **confirmation**. ALO-16's success toast is the only signal that the
+ *      server agreed; the drop animation plays either way.
+ */
+describe('Panel 5 — the pool assignment (Task 8 fix)', () => {
+  const poolTask = {
+    taskId: 'p1',
+    key: 'KAN-301',
+    title: 'Export CSV',
+    status: 'todo',
+    type: 'task',
+    priority: 'medium',
+    labels: [],
+    remainingEstimateMinutes: m(120),
+    position: 0,
+    assigneeIds: []
+  }
+
+  /** A board whose pool has one task and whose member has room for it. */
+  const withPool = (): Partial<RunScreenData> => ({
+    members: [
+      {
+        memberId: 'kasun',
+        name: 'Kasun',
+        attendance: 'present',
+        capacity: capacity({ allocatedMinutes: m(0), gapMinutes: m(480), status: 'under' }),
+        allocations: []
+      }
+    ],
+    pool: { unassigned: [poolTask], assignedNotPlanned: [] },
+    poolTotal: 1
+  })
+
+  const picker = () => screen.getByLabelText('Assign Export CSV to')
+
+  it('confirms a successful assignment with a toast (ALO-16)', async () => {
+    const api = okApi()
+    // The reload after the add must keep the pool as it was, or the picker
+    // this test drove would be unmounted before the toast is asserted.
+    api.refresh = jest.fn().mockResolvedValue(data(withPool()))
+    renderScreen(withPool(), api)
+
+    await act(async () => {
+      fireEvent.change(picker(), { target: { value: 'kasun' } })
+    })
+
+    expect(api.addAllocation).toHaveBeenCalledWith(
+      expect.objectContaining({ memberId: 'kasun', taskId: 'p1' })
+    )
+    expect(
+      await screen.findByText(
+        standupStrings.run.allocationAdded({ task: 'KAN-301', name: 'Kasun' })
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('locks the surface until the server answers, so a second assignment cannot race the first', async () => {
+    let release: ((value: { standupVersion: number }) => void) | undefined
+    const api = okApi()
+    api.addAllocation = jest.fn(
+      () =>
+        new Promise<{ standupVersion: number }>((resolve) => {
+          release = resolve
+        })
+    )
+    api.refresh = jest.fn().mockResolvedValue(data(withPool()))
+    renderScreen(withPool(), api)
+
+    await act(async () => {
+      fireEvent.change(picker(), { target: { value: 'kasun' } })
+    })
+
+    // Still in flight, and the control a second assignment would travel
+    // through — the card's picker, which is also what `disabled` closes off the
+    // drag with — is locked. The shell can only have raised that lock because
+    // the real promise from `onAdd` was threaded back to it; the `void`-ed
+    // wiring released it in the same tick and left the picker live.
+    //
+    // Asserted on the controls rather than by firing a second change: jsdom
+    // dispatches a synthetic `change` at a disabled `<select>` regardless, so a
+    // second `fireEvent` would prove nothing about what a user can reach.
+    expect(api.addAllocation).toHaveBeenCalledTimes(1)
+    expect(picker()).toBeDisabled()
+
+    await act(async () => {
+      release!({ standupVersion: 4 })
+    })
+
+    await waitFor(() => expect(picker()).not.toBeDisabled())
+  })
+})
