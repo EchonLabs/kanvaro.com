@@ -39,6 +39,23 @@ export function taskIdFromDraggableId(draggableId: string): string | null {
 }
 
 /**
+ * The id for a *read-only* copy of a task — the rows `ExpandableMemberCard`
+ * shows for work a member already holds.
+ *
+ * These still call `useDraggable` (hooks cannot be conditional) and dnd-kit's
+ * `disabled` option does not unregister the node from `DndContext`'s
+ * id-keyed registry. So a task that is both in the left panel and inside an
+ * expanded member card would register the same id twice, and the second mount
+ * would overwrite the first's node ref — corrupting the real card's drag rect.
+ * A separate namespace keeps the two apart; it deliberately does not start
+ * with `task-`, so `taskIdFromDraggableId` rejects it and no drop can ever
+ * resolve through one of these rows.
+ */
+export function readOnlyTaskDraggableId(scopeId: string, taskId: string): string {
+  return `readonly-${scopeId}-${taskId}`
+}
+
+/**
  * Apple-theme tones for priority.
  *
  * The brief pointed at `UnassignedPool`'s `PoolCard` for an existing mapping,
@@ -71,6 +88,12 @@ export interface TaskCardProps {
    * those are shown, not re-dragged from inside the card they landed in.
    */
   draggable?: boolean
+  /**
+   * Overrides the dnd-kit draggable id. Callers that render a second copy of
+   * a task already shown elsewhere (`ExpandableMemberCard`) must pass a
+   * namespaced id — see `readOnlyTaskDraggableId` for why.
+   */
+  dragId?: string
   /** Tighter row used inside an expanded member card. */
   compact?: boolean
   disabled?: boolean
@@ -84,11 +107,13 @@ export function TaskCard({
   onAssignVia,
   assignOptions,
   draggable = true,
+  dragId,
   compact = false,
   disabled = false,
   locale,
   className
 }: TaskCardProps) {
+  const draggableId = dragId ?? taskDraggableId(task.id)
   const {
     attributes,
     listeners,
@@ -96,7 +121,7 @@ export function TaskCard({
     transform,
     isDragging: dragActive
   } = useDraggable({
-    id: taskDraggableId(task.id),
+    id: draggableId,
     data: { task },
     disabled: !draggable || disabled
   })
@@ -108,6 +133,7 @@ export function TaskCard({
     <div
       ref={setNodeRef}
       data-testid="task-card"
+      data-drag-id={draggableId}
       style={{
         transform: transform ? CSS.Translate.toString(transform) : undefined,
         touchAction: draggable ? 'none' : undefined
