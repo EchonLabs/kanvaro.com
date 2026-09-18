@@ -1,0 +1,226 @@
+import {
+  fromAssignableMember,
+  fromBoardMemberView,
+  fromPoolTask,
+  fromScopeTask,
+  type AssignableTaskView
+} from '../AssignableTask'
+import type { AssignableMember, ScopeTask } from '../../planning/types'
+import type { PoolTask } from '@/lib/standup/allocation'
+import type { BoardAllocationView, BoardMemberView } from '../../run/CapacityBoard'
+import type { CapacityBreakdown } from '@/lib/standup/capacity'
+import { minutes } from '@/lib/standup/minutes'
+
+describe('fromScopeTask', () => {
+  it('maps every field when present, deriving assigneeId from assignedTo[0].user', () => {
+    const task: ScopeTask = {
+      _id: 'task-1',
+      displayId: 'KAN-1',
+      title: 'Build the thing',
+      originalEstimateMinutes: 120,
+      assignedTo: [{ user: { _id: 'user-1', firstName: 'Ada' } }]
+    }
+
+    expect(fromScopeTask(task)).toEqual<AssignableTaskView>({
+      id: 'task-1',
+      displayId: 'KAN-1',
+      title: 'Build the thing',
+      estimateMinutes: 120,
+      assigneeId: 'user-1'
+    })
+  })
+
+  it('falls back to estimatedHours * 60 when originalEstimateMinutes is absent', () => {
+    const task: ScopeTask = { _id: 'task-2', title: 'No minutes field', estimatedHours: 2 }
+
+    const result = fromScopeTask(task)
+
+    expect(result.estimateMinutes).toBe(120)
+  })
+
+  it('omits optional fields when absent, leaving priority/skills undefined and assigneeId null', () => {
+    const task: ScopeTask = { _id: 'task-3', title: 'Bare task' }
+
+    expect(fromScopeTask(task)).toEqual<AssignableTaskView>({
+      id: 'task-3',
+      displayId: undefined,
+      title: 'Bare task',
+      estimateMinutes: undefined,
+      assigneeId: null
+    })
+  })
+
+  it('resolves an assignee given as a bare string id, matching assigneeIdOf', () => {
+    const task: ScopeTask = {
+      _id: 'task-4',
+      title: 'String assignee',
+      assignedTo: [{ user: 'user-9' }]
+    }
+
+    expect(fromScopeTask(task).assigneeId).toBe('user-9')
+  })
+})
+
+describe('fromPoolTask', () => {
+  const base: PoolTask = {
+    taskId: 'pool-1',
+    key: 'KAN-2',
+    title: 'Pool task',
+    status: 'todo',
+    type: 'task',
+    priority: 'high',
+    labels: ['backend', 'urgent'],
+    remainingEstimateMinutes: minutes(90),
+    position: 1,
+    assigneeIds: ['user-5']
+  }
+
+  it('maps every field when present', () => {
+    expect(fromPoolTask(base)).toEqual<AssignableTaskView>({
+      id: 'pool-1',
+      displayId: 'KAN-2',
+      title: 'Pool task',
+      priority: 'high',
+      estimateMinutes: 90,
+      skills: ['backend', 'urgent'],
+      assigneeId: 'user-5'
+    })
+  })
+
+  it('omits optional fields when absent: no key, no assignees', () => {
+    const task: PoolTask = {
+      ...base,
+      key: undefined,
+      labels: ['solo-label'],
+      assigneeIds: []
+    }
+
+    const result = fromPoolTask(task)
+
+    expect(result.displayId).toBeUndefined()
+    expect(result.assigneeId).toBeNull()
+  })
+
+  it('maps an empty labels array to undefined skills, not an empty array', () => {
+    const task: PoolTask = { ...base, labels: [] }
+
+    expect(fromPoolTask(task).skills).toBeUndefined()
+  })
+})
+
+describe('fromAssignableMember', () => {
+  it('copies fields directly and carries the supplied tasks through, with all optional fields present', () => {
+    const member: AssignableMember = {
+      memberId: 'member-1',
+      name: 'Grace Hopper',
+      onSprintTeam: true,
+      role: 'developer',
+      assignedMinutes: 240,
+      capacityMinutes: 480
+    }
+    const tasks: AssignableTaskView[] = [{ id: 'task-1', title: 'Something', assigneeId: 'member-1' }]
+
+    const result = fromAssignableMember(member, tasks)
+
+    expect(result).toEqual({
+      id: 'member-1',
+      name: 'Grace Hopper',
+      role: 'developer',
+      assignedMinutes: 240,
+      capacityMinutes: 480,
+      tasks
+    })
+    expect(result.avatarUrl).toBeUndefined()
+    expect(result.capacityBreakdown).toBeUndefined()
+  })
+
+  it('omits optional fields when absent', () => {
+    const member: AssignableMember = {
+      memberId: 'member-2',
+      name: 'Alan Turing',
+      onSprintTeam: false
+    }
+
+    const result = fromAssignableMember(member, [])
+
+    expect(result).toEqual({
+      id: 'member-2',
+      name: 'Alan Turing',
+      role: undefined,
+      assignedMinutes: undefined,
+      capacityMinutes: undefined,
+      tasks: []
+    })
+  })
+})
+
+describe('fromBoardMemberView', () => {
+  const capacity: CapacityBreakdown = {
+    memberId: 'member-3',
+    date: '2026-09-18',
+    nominalMinutes: minutes(480),
+    adjustments: [],
+    adjustedMinutes: minutes(480),
+    outstandingDebtMinutes: minutes(0),
+    overrunPolicy: 'absorb',
+    effectiveMinutes: minutes(480),
+    allocatedMinutes: minutes(300),
+    gapMinutes: minutes(180),
+    status: 'under',
+    isUnavailable: false,
+    strandedMinutes: minutes(0)
+  }
+
+  const allocation: BoardAllocationView = {
+    allocationId: 'alloc-1',
+    taskId: 'task-9',
+    taskKey: 'KAN-9',
+    title: 'Ship the feature',
+    plannedMinutes: minutes(120),
+    remainingEstimateMinutes: minutes(60),
+    source: 'assigned_in_standup',
+    isBlocked: false,
+    excludedFromCapacity: false,
+    pairedDeliberately: false
+  }
+
+  it('maps id/name/capacity fields and allocations to tasks, with all optional fields present', () => {
+    const member: BoardMemberView = {
+      memberId: 'member-3',
+      name: 'Margaret Hamilton',
+      capacity,
+      allocations: [allocation]
+    }
+
+    const result = fromBoardMemberView(member)
+
+    expect(result.id).toBe('member-3')
+    expect(result.name).toBe('Margaret Hamilton')
+    expect(result.assignedMinutes).toBe(300)
+    expect(result.capacityMinutes).toBe(480)
+    expect(result.capacityBreakdown).toBe(capacity)
+    expect(result.tasks).toEqual<AssignableTaskView[]>([
+      {
+        id: 'task-9',
+        displayId: 'KAN-9',
+        title: 'Ship the feature',
+        estimateMinutes: 60,
+        assigneeId: 'member-3'
+      }
+    ])
+  })
+
+  it('produces an empty tasks array when there are no allocations', () => {
+    const member: BoardMemberView = {
+      memberId: 'member-4',
+      name: 'No Allocations',
+      capacity: { ...capacity, memberId: 'member-4', allocatedMinutes: minutes(0), gapMinutes: minutes(480) },
+      allocations: []
+    }
+
+    const result = fromBoardMemberView(member)
+
+    expect(result.tasks).toEqual([])
+    expect(result.assignedMinutes).toBe(0)
+  })
+})
