@@ -108,6 +108,9 @@ export const standupStrings = {
     pc7NoWorkingDays: () => 'This sprint contains no working days.',
     pc7BadRange: () => 'The sprint start date must be on or before its end date.',
 
+    pc8: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task has', 'tasks have')} no assignee. Assign every task before running planning poker.`,
+
     pa1: ({ overBy }: { overBy: string }) =>
       `Scope is ${overBy} over capacity. You are planning to fail unless you cut scope.`,
     pa2: ({ percent }: { percent: number }) =>
@@ -120,6 +123,21 @@ export const standupStrings = {
       `${name} is pre-assigned ${assigned} against ${capacity} of capacity.`,
     pa6: ({ name }: { name: string }) =>
       `${name} has nothing assigned. That is fine if you intend to assign at day one stand-up.`,
+
+    /**
+     * Reasons the planning screen's step gates are open or shut (UI-6).
+     *
+     * A blocked control states its reason on screen permanently rather than
+     * only in a tooltip: a disabled button gets no pointer events, so a
+     * tooltip on one is a reason nobody can read.
+     */
+    stepNoSession: () => 'Start a planning session first.',
+    stepScopeEmpty: () => 'Add at least one task to the sprint before assigning it.',
+    pokerReady: () => 'Every task has an assignee. Ready to estimate.',
+    pokerNothingToEstimate: () => 'Every task has already been through planning poker.',
+    completeReady: () => 'Every check passed. Completing takes this sprint to Planned.',
+    startBlockedNotPlanned: () =>
+      'This sprint cannot start until planning is complete. Open Plan Sprint and finish the checklist.',
 
     /** PLN-19's carve-out, refused under every circumstance. */
     waiverCannotCoverEstimates: () =>
