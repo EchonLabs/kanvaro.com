@@ -193,10 +193,11 @@ export async function GET(request: NextRequest) {
     const createdAtFrom = searchParams.get('createdAtFrom') || '';
     const createdAtTo = searchParams.get('createdAtTo') || '';
     const minimal = searchParams.get('minimal') === 'true';
+    const category = searchParams.get('category') || ''
 
     console.log('[Tasks GET] Parameters parsed:', {
       page, limit, after, search, status, priority, type, project, story,
-      assignedTo, createdBy, dueDateFrom, dueDateTo, createdAtFrom, createdAtTo, minimal
+      assignedTo, createdBy, dueDateFrom, dueDateTo, createdAtFrom, createdAtTo, minimal, category
     });
 
     const useCursorPagination = !!after;
@@ -305,6 +306,7 @@ export async function GET(request: NextRequest) {
     if (type) filters.type = type;
     if (project) filters.project = project;
     if (story) filters.story = story;
+    if (category) filters.category = category
 
     console.log('[Tasks GET] Building date filters');
     // Date range filters
