@@ -58,6 +58,7 @@ export default function VirtualizedColumn({
   canDragTask
 }: VirtualizedColumnProps) {
    const parentRef = useRef<HTMLDivElement | null>(null)
+   const scrollRef = useRef<HTMLDivElement | null>(null)
    const { hasPermission, permissions } = usePermissions()
    const isAdmin = typeof permissions?.userRole === 'string' && ['admin', 'super_admin', 'superadmin'].includes(permissions.userRole.toLowerCase())
    
@@ -79,7 +80,7 @@ export default function VirtualizedColumn({
   
   const rowVirtualizer = useVirtualizer({
     count: tasks.length,
-    getScrollElement: () => parentRef.current,
+    getScrollElement: () => scrollRef.current,
     estimateSize: () => 220,
     overscan: 6,
     measureElement: (element) => element?.getBoundingClientRect().height || 0,
@@ -142,7 +143,7 @@ export default function VirtualizedColumn({
               className="absolute top-0 left-0 right-0 h-1 rounded-t-xl z-10"
               style={{ background: getColumnAccentColor(column.key) }} />
             <div
-              ref={parentRef}
+              ref={scrollRef}
               className="h-full overflow-auto overflow-x-hidden px-4 py-4 pt-5 space-y-3"
             >
               {tasks.length === 0 ? (
