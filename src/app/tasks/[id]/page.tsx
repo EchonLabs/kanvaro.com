@@ -47,6 +47,7 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { extractUserId } from '@/lib/auth/user-utils'
 import TaskActivityLog from '@/components/tasks/TaskActivityLog'
 import { StartTimerModal } from '@/components/time-tracking/StartTimerModal'
+import { CategoryBadge } from '@/components/tasks/TasksShared'
 
 interface Task {
   _id: string
@@ -56,6 +57,7 @@ interface Task {
   status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+  category?: string
   project: {
     _id: string
     name: string
@@ -250,6 +252,7 @@ export default function TaskDetailPage() {
   const measurementCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const [suggestionPosition, setSuggestionPosition] = useState<{ top: number; left: number; flip: boolean }>({ top: 0, left: 0, flip: false })
   const [composerScrollTop, setComposerScrollTop] = useState<{ comment: number; reply: number }>({ comment: 0, reply: 0 })
+  const [categoryMap, setCategoryMap] = useState<Record<string, string>>({})
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { hasPermission } = usePermissions()
 
@@ -273,6 +276,28 @@ export default function TaskDetailPage() {
     (storyDetails && storyDetails._id) ||
     (epicDetails && epicDetails._id)
   )
+
+  useEffect(() => {
+    if (!task?.project?._id) return
+    let cancelled = false
+
+    const loadCategories = async () => {
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(task.project._id)}/task-categories`)
+        const data = await res.json()
+        if (!cancelled && res.ok && data.success && Array.isArray(data.data)) {
+          const map: Record<string, string> = {}
+          data.data.forEach((c: any) => { map[c.key] = c.title })
+          setCategoryMap(map)
+        }
+      } catch {
+        // fallback: raw key
+      }
+    }
+
+    void loadCategories()
+    return () => { cancelled = true }
+  }, [task?.project?._id])
 
 
   // Auth initialization - trigger data loading
@@ -1456,6 +1481,11 @@ export default function TaskDetailPage() {
     }
   }
 
+  const getCategoryTitle = (categoryKey?: string): string | null => {
+    if (!categoryKey) return null
+    return categoryMap[categoryKey] || categoryKey
+  }
+
   if (loading) {
     return (
       <MainLayout>
@@ -1947,6 +1977,19 @@ export default function TaskDetailPage() {
                   <span className="text-[13px] text-[var(--apple-secondary-label)]">Type</span>
                   {renderStatusChip(TYPE_BADGE, task.type, formatToTitleCase(task.type))}
                 </div>
+                {/* Category */}
+                {task.category && (
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-[13px] text-[var(--apple-secondary-label)]">
+                      Category
+                    </span>
+
+                    <CategoryBadge
+                      category={task.category}
+                      title={getCategoryTitle(task.category)}
+                    />
+                  </div>
+                )}
                 {/* Project */}
                 <div className="flex items-center justify-between py-3">
                   <span className="text-[13px] text-[var(--apple-secondary-label)]">Project</span>
