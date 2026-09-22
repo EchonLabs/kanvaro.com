@@ -20,6 +20,7 @@ export interface ITask extends Document {
   priority: 'low' | 'medium' | 'high' | 'critical'
   isBillable?: boolean
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+  category: string
   organization: mongoose.Types.ObjectId
   project: mongoose.Types.ObjectId
   taskNumber: number
@@ -139,6 +140,12 @@ const TaskSchema = new Schema<ITask>({
     type: String,
     enum: ['bug', 'feature', 'improvement', 'task', 'subtask'],
     default: 'task'
+  },
+  category: {
+    type: String,
+    trim: true,
+    maxlength: 50
+    // "Required on create/edit" is enforced in the API layer.
   },
   organization: {
     type: Schema.Types.ObjectId,
@@ -289,6 +296,7 @@ TaskSchema.index({ priority: 1 })
 TaskSchema.index({ type: 1 })
 TaskSchema.index({ organization: 1, status: 1 })
 TaskSchema.index({ project: 1, status: 1 })
+TaskSchema.index({ project: 1, category: 1 })
 TaskSchema.index({ sprint: 1, status: 1 })
 TaskSchema.index({ assignedTo: 1, status: 1 })
 TaskSchema.index({ organization: 1, assignedTo: 1 })

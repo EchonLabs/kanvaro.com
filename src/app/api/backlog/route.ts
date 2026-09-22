@@ -330,6 +330,7 @@ export async function GET(request: NextRequest) {
     const createdAtTo = searchParams.get('createdAtTo') || ''
     const sortBy = searchParams.get('sortBy') || 'created'
     const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc'
+    const category = searchParams.get('category') || ''
 
     const searchFilter = search
       ? {
@@ -407,6 +408,10 @@ export async function GET(request: NextRequest) {
       taskFilter.priority = priority
       storyFilter.priority = priority
       epicFilter.priority = priority
+    }
+
+    if (category && category !== 'all') {
+      taskFilter.category = category
     }
 
     if (assignedTo && assignedTo !== 'all') {

@@ -58,6 +58,15 @@ export const TYPE_CONFIG: Record<string, {
   story:       { bg: 'bg-sky-50 dark:bg-sky-950/30',      text: 'text-sky-600 dark:text-sky-400',        border: 'border-sky-200 dark:border-sky-800',        icon: <BookOpen className="h-3 w-3" />,   label: 'Story' },
 }
 
+// ─── Category Config ───────────────────────────────────────────────────────────
+
+export const CATEGORY_CONFIG = {
+  bg: 'bg-indigo-50 dark:bg-indigo-950/30',
+  text: 'text-indigo-600 dark:text-indigo-400',
+  dot: 'bg-indigo-500',
+  border: 'border-indigo-200 dark:border-indigo-800',
+}
+
 // ─── StatusBadge ────────────────────────────────────────────────────────────────
 
 interface StatusBadgeProps {
@@ -137,6 +146,37 @@ export function TypeBadge({ type, size = 'sm', className }: TypeBadgeProps) {
     )}>
       {cfg.icon}
       {cfg.label}
+    </span>
+  )
+}
+
+// ─── CategoryBadge ─────────────────────────────────────────────────────────────
+
+interface CategoryBadgeProps {
+  category?: string | null
+  /** Resolved title for the category key. Falls back to the raw key when omitted. */
+  title?: string | null
+  size?: 'sm' | 'md'
+  className?: string
+}
+
+export function CategoryBadge({ category, title, size = 'sm', className }: CategoryBadgeProps) {
+  const display = title ?? category
+  if (!display) return null
+  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs'
+  const px = size === 'sm' ? 'px-2 py-0.5' : 'px-2.5 py-1'
+  const cfg = CATEGORY_CONFIG
+
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1.5 rounded-full border font-medium',
+      textSize, px,
+      cfg.bg, cfg.text, cfg.border,
+      'transition-all duration-200',
+      className
+    )}>
+      <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', cfg.dot)} />
+      {display}
     </span>
   )
 }

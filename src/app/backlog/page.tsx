@@ -48,7 +48,7 @@ import {
   X
 } from 'lucide-react'
 import {
-  StatusBadge, PriorityBadge, TypeBadge,
+  StatusBadge, PriorityBadge, TypeBadge, CategoryBadge,
   PageHeader, TasksEmptyState,
   PaginationBar, MetaChip, InlineLoader, FullPageLoader,
   cardShell, TASK_STATUS_CONFIG
@@ -87,6 +87,7 @@ interface BacklogItem {
   description: string
   type: 'epic' | 'story' | 'task'
   taskType?: string
+  category?: string
   priority: string
   status: string
   project?: ProjectSummary | null
@@ -143,6 +144,7 @@ function truncateText(value: string, maxLength = 20): string {
 const _backlogFilters = {
   searchQuery: '',
   typeFilter: 'all',
+  categoryFilter: 'all',
   priorityFilter: 'all',
   statusFilter: 'all',
   sortBy: 'created',
@@ -229,6 +231,9 @@ export default function BacklogPage() {
   const createdByFilterInputRef = useRef<HTMLInputElement | null>(null)
 
   const [typeFilter, setTypeFilter] = useState(_backlogFilters.typeFilter)
+  const [categoryFilter, setCategoryFilter] = useState(_backlogFilters.categoryFilter)
+  const [categoryFilterQuery, setCategoryFilterQuery] = useState('')
+  const [projectCategories, setProjectCategories] = useState<Record<string, Array<{ key: string; title: string; order: number }>>>({})
   const [priorityFilter, setPriorityFilter] = useState(_backlogFilters.priorityFilter)
   const [statusFilter, setStatusFilter] = useState(_backlogFilters.statusFilter)
   const [sortBy, setSortBy] = useState(_backlogFilters.sortBy)
@@ -293,9 +298,35 @@ export default function BacklogPage() {
     }
   }, [typeFilter, selectedProjectDetails])
 
+  const categoryOptions = useMemo(() => {
+      if (projectFilterValue !== 'all') {
+          const list = projectCategories[projectFilterValue]
+          if (!Array.isArray(list)) return [] as Array<{ key: string; title: string }>
+          return [...list]
+              .sort((a, b) => (a.order || 0) - (b.order || 0))
+              .map(c => ({ key: c.key, title: c.title }))
+      }
+      const merged = new Map<string, string>()
+      Object.values(projectCategories).forEach(list => {
+          list.forEach(c => {
+              if (!merged.has(c.key)) merged.set(c.key, c.title)
+          })
+      })
+      return Array.from(merged.entries())
+          .map(([key, title]) => ({ key, title }))
+          .sort((a, b) => a.title.localeCompare(b.title))
+  }, [projectFilterValue, projectCategories])
+
+  const filteredCategoryOptions = useMemo(() => {
+      const q = categoryFilterQuery.trim().toLowerCase()
+      if (!q) return categoryOptions
+      return categoryOptions.filter(c => c.title.toLowerCase().includes(q))
+  }, [categoryOptions, categoryFilterQuery])
+
   // Check if any filters are active
   const hasActiveFilters = searchQuery !== '' ||
     typeFilter !== 'all' ||
+    categoryFilter !== 'all' ||
     priorityFilter !== 'all' ||
     statusFilter !== 'all' ||
     projectFilterValue !== 'all' ||
@@ -311,6 +342,8 @@ export default function BacklogPage() {
     setSearchQuery('')
     setDebouncedSearchQuery('')
     setTypeFilter('all')
+    setCategoryFilter('all')
+    setCategoryFilterQuery('')
     setPriorityFilter('all')
     setStatusFilter('all')
     setProjectFilterValue('all')
@@ -330,6 +363,7 @@ export default function BacklogPage() {
   useEffect(() => {
     _backlogFilters.searchQuery = searchQuery
     _backlogFilters.typeFilter = typeFilter
+    _backlogFilters.categoryFilter = categoryFilter
     _backlogFilters.priorityFilter = priorityFilter
     _backlogFilters.statusFilter = statusFilter
     _backlogFilters.sortBy = sortBy
@@ -359,6 +393,14 @@ export default function BacklogPage() {
       setStatusFilter('all')
     }
   }, [availableStatusOptions, statusFilter])
+
+  useEffect(() => {
+      if (categoryFilter === 'all') return
+      if (!categoryOptions.some(c => c.key === categoryFilter)) {
+          setCategoryFilter('all')
+          setCategoryFilterQuery('')
+      }
+  }, [projectFilterValue, categoryOptions, categoryFilter])
 
   // Fetch project details when project filter changes
   useEffect(() => {
@@ -403,7 +445,7 @@ export default function BacklogPage() {
         setCurrentPage(1)
       }
     }
-  }, [debouncedSearchQuery, typeFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, createdByFilter, dateRangeFilter, createdDateRange, sortBy, sortOrder])
+  }, [debouncedSearchQuery, typeFilter, categoryFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, createdByFilter, dateRangeFilter, createdDateRange, sortBy, sortOrder])
 
   // Fetch when pagination changes
   useEffect(() => {
@@ -434,6 +476,7 @@ export default function BacklogPage() {
       // Add filters to API call - use debounced search query
       if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
       if (typeFilter !== 'all') params.set('type', typeFilter)
+      if (categoryFilter !== 'all') params.set('category', categoryFilter)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (projectFilterValue !== 'all') params.set('project', projectFilterValue)
@@ -570,6 +613,14 @@ export default function BacklogPage() {
               })
               // Use all projects from the API instead of just those in the current backlog results
               setProjectOptions(Array.from(allProjectsMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
+              const catMap: Record<string, Array<{ key: string; title: string; order: number }>> = {}
+              projectsData.data.forEach((p: any) => {
+                const cats = p.settings?.taskCategories
+                if (Array.isArray(cats)) {
+                  catMap[p._id] = cats
+                }
+              })
+              setProjectCategories(catMap)
             }
           }
         } catch (error) {
@@ -1833,6 +1884,38 @@ export default function BacklogPage() {
                 </SelectContent>
             </Select>
 
+            {/* Category */}
+            <Select
+              value={categoryFilter}
+              onValueChange={setCategoryFilter}
+              onOpenChange={(open) => { if (open) setCategoryFilterQuery('') }}
+            >
+              <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <Input
+                    value={categoryFilterQuery}
+                    onChange={(e) => setCategoryFilterQuery(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    placeholder="Search categories"
+                    className="mb-2 h-8 text-[13px]"
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {filteredCategoryOptions.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No categories</div>
+                    ) : (
+                      filteredCategoryOptions.map((c) => (
+                        <SelectItem key={c.key} value={c.key}>{c.title}</SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
+
             {/* 3. Assignees */}
             <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery('') }} onOpenChange={(open) => {
               if (open) focusSearchInput(assignedToFilterInputRef.current)
@@ -2009,6 +2092,14 @@ export default function BacklogPage() {
                             Type: {formatToTitleCase(typeFilter)}
                             <button onClick={() => setTypeFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
+                    )}
+                    {categoryFilter !== 'all' && (
+                      <Badge variant="secondary" className="...">
+                        Category: {categoryOptions.find(c => c.key === categoryFilter)?.title ?? categoryFilter}
+                        <button onClick={() => { setCategoryFilter('all'); setCategoryFilterQuery('') }} className="hover:opacity-70 ml-1">
+                          <X className="h-3 w-3" strokeWidth={1.5} />
+                        </button>
+                      </Badge>
                     )}
                     {statusFilter !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
@@ -2257,6 +2348,15 @@ export default function BacklogPage() {
                     <TypeBadge type={isTask ? (item.taskType || 'task') : item.type} size="sm" />
                     <StatusBadge status={item.status} size="sm" />
                     <PriorityBadge priority={item.priority} size="sm" />
+                    {isTask && item.category && (
+                      <CategoryBadge
+                        category={item.category}
+                        title={
+                          categoryOptions.find(c => c.key === item.category)?.title ?? item.category
+                        }
+                        size="sm"
+                      />
+                    )}
                   </div>
 
                   {/* Row 3: MetaChips */}
