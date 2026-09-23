@@ -15,6 +15,9 @@ const nextConfig = {
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
+  experimental: {
+    instrumentationHook: true,
+  },
   // Optimize CSS loading
   // experimental: {
   //   optimizeCss: true,
