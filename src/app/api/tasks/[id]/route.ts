@@ -957,11 +957,13 @@ export async function PUT(
           console.log('baseUrl from fallback logic:', baseUrl)
         }
 
-        if (assignedUsersChanged && newAssignedToIds.length > 0) {
-          // Find newly assigned users (users in newAssignedToIds but not in currentAssignedToIds)
-          const newlyAssignedUsers = newAssignedToIds.filter(id => !currentAssignedToIds.includes(id))
+        // Find newly assigned users (users in newAssignedToIds but not in currentAssignedToIds)
+        const newlyAssignedUsers = assignedUsersChanged
+          ? newAssignedToIds.filter(id => !currentAssignedToIds.includes(id))
+          : []
 
-          newlyAssignedUsers.forEach(userId => {
+        if (assignedUsersChanged) {
+          newlyAssignedUsers.forEach(newUserId => {
             console.log('Using baseUrl for assignment notification:', baseUrl)
             notificationPromises.push(
               Project.findById(taskProjectId).select('name').lean().then(projectResult => {
@@ -970,7 +972,7 @@ export async function PUT(
                 return notificationService.notifyTaskUpdate(
                   taskIdStr,
                   'assigned',
-                  userId,
+                  newUserId,
                   organizationId,
                   task.title,
                   project?.name,
@@ -980,6 +982,32 @@ export async function PUT(
                 console.error('Failed to send assignment notification:', error)
               })
             )
+          })
+
+          // Find removed users (users in currentAssignedToIds but not in newAssignedToIds)
+          const removedUsers = currentAssignedToIds.filter((id: string) => !newAssignedToIds.includes(id))
+
+          removedUsers.forEach((removedUserId: string) => {
+            if (removedUserId !== userId) {
+              console.log('Using baseUrl for unassignment notification:', baseUrl)
+              notificationPromises.push(
+                Project.findById(taskProjectId).select('name').lean().then(projectResult => {
+                  const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
+                  const project: LeanProject = projectResultTyped as LeanProject
+                  return notificationService.notifyTaskUpdate(
+                    taskIdStr,
+                    'unassigned',
+                    removedUserId,
+                    organizationId,
+                    task.title,
+                    project?.name,
+                    baseUrl
+                  )
+                }).catch(error => {
+                  console.error('Failed to send unassignment notification:', error)
+                })
+              )
+            }
           })
         }
 
@@ -1012,28 +1040,41 @@ export async function PUT(
           )
         }
 
-        // Notify assignees if task was updated (but not by them)
-        const currentAssignees = Array.isArray(currentTask.assignedTo)
-          ? currentTask.assignedTo.map((id: any) => id.toString())
-          : currentTask.assignedTo ? [currentTask.assignedTo.toString()] : []
-
+        // Notify remaining existing assignees if task was updated (exclude newly assigned users and the editor)
+        const currentAssignees = Object.prototype.hasOwnProperty.call(updateData, 'assignedTo') ? newAssignedToIds : currentAssignedToIds
+        const isStatusChanged = updateData.status && updateData.status !== currentTask.status
+        const formatStatus = (s?: string) => (s || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+        const oldStatusLabel = isStatusChanged ? formatStatus(currentTask.status) : ''
+        const newStatusLabel = isStatusChanged ? formatStatus(updateData.status) : ''
 
         currentAssignees.forEach((assigneeId: string) => {
-          if (assigneeId !== userId) {
+          if (assigneeId !== userId && !newlyAssignedUsers.includes(assigneeId)) {
             console.log('Using baseUrl for update notification:', baseUrl)
             notificationPromises.push(
               Project.findById(taskProjectId).select('name').lean().then(projectResult => {
                 const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
                 const project: LeanProject = projectResultTyped as LeanProject
-                return notificationService.notifyTaskUpdate(
-                  taskIdStr,
-                  'updated',
-                  assigneeId,
-                  organizationId,
-                  task.title,
-                  project?.name,
-                  baseUrl
-                )
+                const projectName = project?.name
+                const title = isStatusChanged ? 'Task Status Changed' : 'Task Updated'
+                const message = isStatusChanged
+                  ? `Task "${task.title}" ${oldStatusLabel} -> ${newStatusLabel}${projectName ? ` in project "${projectName}"` : ''}`
+                  : `Task "${task.title}" has been updated${projectName ? ` in project "${projectName}"` : ''}`
+
+                return notificationService.createNotification(assigneeId, organizationId, {
+                  type: 'task',
+                  title,
+                  message,
+                  data: {
+                    entityType: 'task',
+                    entityId: taskIdStr,
+                    action: 'updated',
+                    priority: 'medium',
+                    url: `${baseUrl}/tasks/${taskIdStr}`,
+                    projectName
+                  },
+                  sendEmail: true,
+                  sendPush: true
+                })
               }).catch(error => {
                 console.error('Failed to send update notification:', error)
               })
