@@ -11,7 +11,7 @@ export interface NotificationData {
   data?: {
     entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry'
     entityId?: string
-    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'completed' | 'overdue' | 'reminder'
+    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'unassigned' | 'completed' | 'overdue' | 'reminder'
     priority?: 'low' | 'medium' | 'high' | 'critical'
     url?: string
     projectName?: string
@@ -410,7 +410,7 @@ export class NotificationService {
    */
   async notifyTaskUpdate(
     taskId: string,
-    action: 'created' | 'updated' | 'assigned' | 'completed' | 'overdue',
+    action: 'created' | 'updated' | 'assigned' | 'unassigned' | 'completed' | 'overdue',
     assignedUserId: string,
     organizationId: string,
     taskTitle: string,
@@ -421,6 +421,7 @@ export class NotificationService {
       created: `A new task "${taskTitle}" has been created${projectName ? ` in project "${projectName}"` : ''}`,
       updated: `Task "${taskTitle}" has been updated${projectName ? ` in project "${projectName}"` : ''}`,
       assigned: `You have been assigned to task "${taskTitle}"${projectName ? ` in project "${projectName}"` : ''}`,
+      unassigned: `You have been removed from task "${taskTitle}"${projectName ? ` in project "${projectName}"` : ''}`,
       completed: `Task "${taskTitle}" has been completed${projectName ? ` in project "${projectName}"` : ''}`,
       overdue: `Task "${taskTitle}" is overdue${projectName ? ` in project "${projectName}"` : ''}`
     }
