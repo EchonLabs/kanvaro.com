@@ -1013,10 +1013,11 @@ export async function PUT(
         }
 
         // Notify assignees if task was updated (but not by them)
-        const currentAssignees = Array.isArray(currentTask.assignedTo)
-          ? currentTask.assignedTo.map((id: any) => id.toString())
-          : currentTask.assignedTo ? [currentTask.assignedTo.toString()] : []
-
+        const currentAssignees = currentAssignedToIds
+        const isStatusChanged = updateData.status && updateData.status !== currentTask.status
+        const formatStatus = (s?: string) => (s || '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+        const oldStatusLabel = isStatusChanged ? formatStatus(currentTask.status) : ''
+        const newStatusLabel = isStatusChanged ? formatStatus(updateData.status) : ''
 
         currentAssignees.forEach((assigneeId: string) => {
           if (assigneeId !== userId) {
@@ -1025,15 +1026,27 @@ export async function PUT(
               Project.findById(taskProjectId).select('name').lean().then(projectResult => {
                 const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
                 const project: LeanProject = projectResultTyped as LeanProject
-                return notificationService.notifyTaskUpdate(
-                  taskIdStr,
-                  'updated',
-                  assigneeId,
-                  organizationId,
-                  task.title,
-                  project?.name,
-                  baseUrl
-                )
+                const projectName = project?.name
+                const title = isStatusChanged ? 'Task Status Changed' : 'Task Updated'
+                const message = isStatusChanged
+                  ? `Task "${task.title}" ${oldStatusLabel} -> ${newStatusLabel}${projectName ? ` in project "${projectName}"` : ''}`
+                  : `Task "${task.title}" has been updated${projectName ? ` in project "${projectName}"` : ''}`
+
+                return notificationService.createNotification(assigneeId, organizationId, {
+                  type: 'task',
+                  title,
+                  message,
+                  data: {
+                    entityType: 'task',
+                    entityId: taskIdStr,
+                    action: 'updated',
+                    priority: 'medium',
+                    url: `${baseUrl}/tasks/${taskIdStr}`,
+                    projectName
+                  },
+                  sendEmail: true,
+                  sendPush: true
+                })
               }).catch(error => {
                 console.error('Failed to send update notification:', error)
               })
