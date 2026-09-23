@@ -443,6 +443,60 @@ export class NotificationService {
   }
 
   /**
+   * Create task deadline / approaching reminder notification
+   */
+  async notifyTaskDeadline(
+    taskId: string,
+    deadlineType: 'approaching' | 'overdue',
+    assignedUserId: string,
+    organizationId: string,
+    taskTitle: string,
+    dueDate: Date,
+    projectName?: string,
+    baseUrl?: string
+  ): Promise<INotification | null> {
+    const formattedDueDate = new Date(dueDate).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
+
+    const isApproaching = deadlineType === 'approaching'
+    const title = isApproaching
+      ? `Task Due Soon: ${taskTitle}`
+      : `Task Overdue: ${taskTitle}`
+
+    const message = isApproaching
+      ? `Task "${taskTitle}"${projectName ? ` in project "${projectName}"` : ''} is due tomorrow (${formattedDueDate}).`
+      : `Task "${taskTitle}"${projectName ? ` in project "${projectName}"` : ''} is overdue (due date: ${formattedDueDate}).`
+
+    const type: 'reminder' | 'deadline' = isApproaching ? 'reminder' : 'deadline'
+    const action: 'reminder' | 'overdue' = isApproaching ? 'reminder' : 'overdue'
+    const priority: 'high' | 'critical' = isApproaching ? 'high' : 'critical'
+
+    return await this.createNotification(assignedUserId, organizationId, {
+      type,
+      title,
+      message,
+      data: {
+        entityType: 'task',
+        entityId: taskId,
+        action,
+        priority,
+        url: baseUrl ? `${baseUrl}/tasks/${taskId}` : `/tasks/${taskId}`,
+        projectName,
+        metadata: {
+          dueDate,
+          formattedDueDate,
+          deadlineType
+        }
+      },
+      sendEmail: true,
+      sendPush: true
+    })
+  }
+
+  /**
    * Create project-related notifications
    */
   async notifyProjectUpdate(
