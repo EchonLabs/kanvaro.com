@@ -18,6 +18,10 @@ jest.mock('@/lib/notify', () => ({
   useNotify: () => ({ error: jest.fn(), info: jest.fn() })
 }))
 
+jest.mock('@/contexts/AuthContext', () => ({
+  useAuthContext: () => ({ user: { id: 'u1' } })
+}))
+
 function mockFetch() {
   return jest.fn((url: string) => {
     if (url.includes('/planning-session/checklist')) {
@@ -100,7 +104,10 @@ describe('PlanningWorkspace — persistent scope/backlog panes', () => {
       </TooltipProvider>
     )
 
-    expect(await screen.findByText('Already in sprint')).toBeInTheDocument()
+    // Twice, deliberately: once in the sprint-scope pane (where it is added
+    // and removed) and once in the assignment board's Unassigned lane (where
+    // it is given an owner). Two views of the same task, not a duplicate.
+    expect(await screen.findAllByText('Already in sprint')).toHaveLength(2)
   })
 
   it('shows the backlog pool alongside scope without needing a toggle click', async () => {
@@ -154,6 +161,98 @@ describe('PlanningWorkspace — persistent scope/backlog panes', () => {
   })
 })
 
+describe('PlanningWorkspace — starting planning poker', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('opens a poker session without forcing a unit — the fibonacci deck is abstract story points, converted via the project\'s pointsToHours factor', async () => {
+    const fetchMock = jest.fn((url: string, init?: RequestInit) => {
+      if (url.includes('/planning-session/checklist')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            data: {
+              checklist: {
+                // PC-8 passing is what opens the Estimate step: a round cannot
+                // start until every task has an owner.
+                items: [{ checkId: 'PC-8', kind: 'mandatory', passed: true }],
+                blockers: [],
+                canComplete: false,
+                totals: {
+                  taskCount: 1, estimatedTaskCount: 0, totalEstimatedMinutes: 0,
+                  totalCapacityMinutes: 480, netCapacityMinutes: 480
+                }
+              },
+              offendingTasks: [{ id: 'unestimated-1', displayId: '1.1', title: 'Needs a card', originalEstimateMinutes: 0 }],
+              offendingMembers: [],
+              members: []
+            }
+          })
+        })
+      }
+      if (url.endsWith('/planning-session')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ data: { session: { _id: 'sess-1', sprintGoal: 'Ship it' }, history: [] } })
+        })
+      }
+      if (url.includes('sprint=s1')) {
+        // The round is built from sprint scope now, not from the checklist's
+        // offending tasks: a task estimated by hand still has to go through
+        // poker to clear PC-9, and it would never appear in that list.
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            data: [{ _id: 'unestimated-1', displayId: '1.1', title: 'Needs a card' }]
+          })
+        })
+      }
+      if (url.includes('/poker-sessions')) {
+        if (init?.method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            status: 201,
+            json: async () => ({
+              data: {
+                session: { _id: 'poker-1', queue: [{ task: 'unestimated-1', status: 'voting' }], currentTask: 'unestimated-1' },
+                cards: [1, 2, 3, 5, 8, 13, 21, '?', 'coffee']
+              }
+            })
+          })
+        }
+        return Promise.resolve({ ok: true, json: async () => ({ data: { sessions: [] } }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ data: {} }) })
+    }) as unknown as typeof fetch
+    global.fetch = fetchMock
+
+    render(
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planning"
+          projectId="p1"
+        />
+      </TooltipProvider>
+    )
+
+    ;(await screen.findByRole('button', { name: /planning poker/i })).click()
+    ;(await screen.findByRole('button', { name: /start round/i })).click()
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/sprints/s1/poker-sessions',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.not.stringContaining('estimationUnit')
+        })
+      )
+    )
+  })
+})
+
 describe('PlanningWorkspace — team workload board', () => {
   afterEach(() => {
     jest.restoreAllMocks()
@@ -173,10 +272,11 @@ describe('PlanningWorkspace — team workload board', () => {
       </TooltipProvider>
     )
 
-    expect(await screen.findByText('Anessa')).toBeInTheDocument()
+    // Named twice: once on the workload board, once as her assignment lane.
+    expect(await screen.findAllByText('Anessa')).not.toHaveLength(0)
     // Fixture: 400 assigned / 480 capacity ≈ 83%, i.e. "Full" (>= 70%).
     expect(screen.getByText('Full')).toBeInTheDocument()
-    expect(screen.getByText('6.7h / 8.0h')).toBeInTheDocument()
+    expect(screen.getByText('6.7 / 8.0 h')).toBeInTheDocument()
   })
 
   it('labels an idle member with no assigned minutes', async () => {
@@ -279,10 +379,6 @@ describe('PlanningWorkspace — capacity gauge', () => {
   })
 
   it('shows the true, uncapped percentage (not a clamped "100%") when scope exceeds net capacity', async () => {
-    // GradientProgress itself clamps its bar fill + trailing label to
-    // [0, 100] — correct, and shared with other real callers elsewhere in
-    // the app. This asserts PlanningWorkspace's own over-capacity text next
-    // to the hours value carries the true, uncapped number instead.
     global.fetch = jest.fn((url: string) => {
       if (url.includes('/planning-session/checklist')) {
         return Promise.resolve({
@@ -334,9 +430,6 @@ describe('PlanningWorkspace — capacity gauge', () => {
     )
 
     expect(await screen.findByText('150%')).toBeInTheDocument()
-    // GradientProgress's own trailing label is clamped and would also render
-    // "100%" — assert it's present too, so this test fails loudly if the
-    // true-percentage text is ever accidentally removed rather than added.
-    expect(screen.getByText('100%')).toBeInTheDocument()
+    expect(screen.queryByText('100%')).not.toBeInTheDocument()
   })
 })

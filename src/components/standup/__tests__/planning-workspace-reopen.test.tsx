@@ -26,6 +26,10 @@ jest.mock('@/lib/notify', () => ({
   useNotify: () => ({ error: jest.fn(), info: jest.fn() })
 }))
 
+jest.mock('@/contexts/AuthContext', () => ({
+  useAuthContext: () => ({ user: { id: 'u1' } })
+}))
+
 function mockFetchFor({ history }: { history: any[] }) {
   return jest.fn((url: string) => {
     if (url.includes('/planning-session/checklist')) {

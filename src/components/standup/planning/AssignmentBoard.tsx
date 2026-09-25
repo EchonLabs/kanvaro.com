@@ -3,46 +3,44 @@
 /**
  * Step 2 of planning: give every sprint task exactly one owner (PC-8).
  *
- * This is where the double assignment stops. Ownership used to be guessed at
- * task creation and then decided again on the day-one stand-up board; it is
- * settled here instead, with each member's load against their own sprint
- * capacity visible while the PM does it.
+ * Scoped tasks are grouped into one column per owner plus an Unassigned
+ * column, so unowned work stays visible. Two equal ways to assign, not one and
+ * a fallback: dragging a card onto a column, and the card's "Move" picker. The
+ * picker is not a courtesy — this screen is a hard gate on starting the
+ * sprint, and a gate that can only be passed with a mouse is a gate some
+ * people cannot pass.
  *
- * The layout itself is no longer this file's business. The lanes/chips grid it
- * used to own became `TaskAssignmentSplitScreen` (Task 6), shared with the
- * stand-up run, so what is left here is the planning-specific part: the
- * `ScopeTask`/`AssignableMember` → canonical-view conversion, the "still needs
- * an assignee" gate line, and the one affordance the run screen has no
- * equivalent of — a QA who is not on the sprint team yet can be picked, and
- * the picker says that choosing them admits them to it.
- *
- * Two equal ways to assign, not one and a fallback: dragging a task onto a
- * member card, and the per-card picker. The picker is not a courtesy — this
- * screen is a hard gate on starting the sprint, and a gate that can only be
- * passed with a mouse is a gate some people cannot pass.
+ * A QA who is not on the sprint team yet can be picked, and the picker says
+ * that choosing them admits them to it.
  *
  * Confirmation toasts are deliberately not raised here: `PlanningWorkspace`'s
  * `assignTask` already notifies on success and failure, and it is the layer
  * that knows whether the server admitted anyone to the sprint team.
  */
-import { useMemo } from 'react'
-
+import { useMemo, useState } from 'react'
 import {
-  fromAssignableMember,
-  fromScopeTask,
-  type AssignableMemberView,
-  type AssignableTaskView
-} from '../shared/AssignableTask'
-import { TaskAssignmentSplitScreen } from '../shared/TaskAssignmentSplitScreen'
-import type { AssignOption } from '../shared/TaskCard'
+  closestCorners,
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent
+} from '@dnd-kit/core'
+
 import { cn } from '@/lib/utils'
 
 import {
   assigneeIdOf,
+  assigneeNamesOf,
   isQaRole,
   type AssignableMember,
   type ScopeTask
 } from './types'
+import { PlanCard, PlanTaskCard, planButtonClass } from './ui'
 
 const UNASSIGNED_LANE = 'unassigned'
 
@@ -75,84 +73,65 @@ export function resolveAssignmentDrop(
   return { assigneeId: target }
 }
 
+export function estimateLabel(task: ScopeTask): string {
+  const minutes = task.originalEstimateMinutes ?? (task.estimatedHours ? task.estimatedHours * 60 : 0)
+  return minutes > 0 ? `${(minutes / 60).toFixed(1)} h` : '-'
+}
+
+interface Lane {
+  id: string
+  name: string
+  tasks: ScopeTask[]
+}
+
 export function AssignmentBoard({ tasks, members, busy, onAssign }: AssignmentBoardProps) {
-  // The canonical view of the same data the lanes used to group by hand. A
-  // task whose assignee is not on the board is parked as unassigned: PC-8
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const [activeTask, setActiveTask] = useState<ScopeTask | null>(null)
+
+  // A task whose assignee is not on the board is parked as unassigned: PC-8
   // blocks on it either way, and hiding it in a lane nobody can see would
   // leave the PM with a blocking check and no row to fix it on.
-  //
-  // Deliberate divergence from the stand-up-run context: `taskViews` below is
-  // built from *every* scope task, assigned ones included, so the left-hand
-  // Task Repository lists the whole sprint scope. The run screen's
-  // `UnassignedPool` instead feeds the left panel only genuinely unassigned /
-  // not-yet-planned tasks. The reason is that planning is where assignments
-  // are *made and changed*: an already-assigned task has to stay draggable so
-  // the PM can move it to someone else, and a task that vanished from the left
-  // panel the moment it was assigned could never be reassigned by drag. The
-  // visible consequence — an assigned task appearing both in the left panel
-  // and inside its assignee's expanded member card at the same time — is
-  // intended, not a duplication bug. Do not "align" this with UnassignedPool
-  // in either direction without replacing the reassignment affordance first.
-  const { taskViews, memberViews, unassignedCount } = useMemo(() => {
-    const byAssignee = new Map<string, AssignableTaskView[]>()
+  const { lanes, unassignedCount, laneOf } = useMemo(() => {
+    const byAssignee = new Map<string, ScopeTask[]>()
     for (const member of members) byAssignee.set(member.memberId, [])
 
-    const views: AssignableTaskView[] = []
-    let unassigned = 0
+    const unassigned: ScopeTask[] = []
+    const lookup = new Map<string, string | null>()
 
     for (const task of tasks) {
-      const view = fromScopeTask(task)
-      const assigneeId = view.assigneeId
-      const lane = assigneeId && byAssignee.has(assigneeId) ? assigneeId : null
-      if (lane === null) {
-        unassigned += 1
-        // The picker's value has to match an option it actually offers, or the
-        // browser shows the first one instead and the row lies about its state.
-        views.push({ ...view, assigneeId: null })
+      const assigneeId = assigneeIdOf(task)
+      if (assigneeId && byAssignee.has(assigneeId)) {
+        byAssignee.get(assigneeId)!.push(task)
+        lookup.set(task._id, assigneeId)
       } else {
-        byAssignee.get(lane)!.push(view)
-        views.push(view)
+        unassigned.push(task)
+        lookup.set(task._id, null)
       }
     }
 
+    // The sprint team always gets a column; a QA off the team only once they
+    // own something, so the board doesn't fill with empty specialist lanes.
+    const memberLanes: Lane[] = members
+      .filter((member) => member.onSprintTeam || (byAssignee.get(member.memberId)?.length ?? 0) > 0)
+      .map((member) => ({
+        id: member.memberId,
+        name: member.name,
+        tasks: byAssignee.get(member.memberId) ?? []
+      }))
+
     return {
-      taskViews: views,
-      memberViews: members.map<AssignableMemberView>((member) =>
-        fromAssignableMember(member, byAssignee.get(member.memberId) ?? [])
-      ),
-      unassignedCount: unassigned
+      lanes: [...memberLanes, { id: UNASSIGNED_LANE, name: 'Unassigned', tasks: unassigned }],
+      unassignedCount: unassigned.length,
+      laneOf: lookup
     }
   }, [tasks, members])
 
-  // Everyone already on the sprint team, then the QA who are not: assigning to
-  // one of those admits them, so they are offered under a label that says so
-  // rather than sitting anonymously in the same list. Anybody else off the
-  // team is a drop target but not a picker option, exactly as before.
-  const assignOptions = useMemo<AssignOption[]>(
-    () => [
-      ...members
-        .filter((member) => member.onSprintTeam)
-        .map((member) => ({ id: member.memberId, name: member.name })),
-      ...members
-        .filter((member) => !member.onSprintTeam && isQaRole(member.role))
-        .map((member) => ({
-          id: member.memberId,
-          name: member.name,
-          group: QA_GROUP_LABEL
-        }))
-    ],
-    [members]
-  )
+  const teamOptions = members.filter((member) => member.onSprintTeam)
+  const qaOptions = members.filter((member) => !member.onSprintTeam && isQaRole(member.role))
 
   /**
-   * The split screen speaks `(taskId, memberId | null)`; this board's contract
-   * adds the member object, which is what makes the workspace send
-   * `addToSprintTeam` — an assignee missing from `Sprint.teamMembers` would
-   * have their minutes vanish from every capacity figure on this screen.
-   *
-   * The no-op guard that `resolveAssignmentDrop` enforces for drags lives in
-   * `resolveMemberDrop`/`TaskCard` for this path, and both are checked again
-   * here against the task's real assignee, so a task parked as unassigned
+   * Both the drop and the picker resolve through here. The no-op guard is
+   * checked against the task's real assignee, so a task parked as unassigned
    * because its owner left the board can still be reassigned to that owner.
    */
   const handleAssign = async (taskId: string, memberId: string | null) => {
@@ -169,37 +148,191 @@ export function AssignmentBoard({ tasks, members, busy, onAssign }: AssignmentBo
     )
   }
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveTask(tasks.find((task) => task._id === event.active.id) ?? null)
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveTask(null)
+    const overId = event.over?.id
+    const taskId = event.active.id
+    if (busy || typeof overId !== 'string' || typeof taskId !== 'string') return
+    handleAssign(taskId, overId === UNASSIGNED_LANE ? null : overId)
+  }
+
   return (
-    <section
-      className="space-y-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none"
+    <PlanCard
+      id="planning-assignment"
+      title="Assignment board"
+      description="Scoped tasks grouped by owner. Unassigned work stays visible."
       aria-label="Task assignment"
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="apple-section-label text-[var(--apple-secondary-label)]">
-          Assign the work
-        </h3>
+      aside={
         <p
           role="status"
           className={cn(
             'text-[12px]',
-            unassignedCount > 0
-              ? 'text-[var(--apple-system-orange)]'
-              : 'text-[var(--apple-secondary-label)]'
+            unassignedCount > 0 ? 'text-[var(--plan-warning)]' : 'text-[var(--plan-success)]'
           )}
         >
           {unassignedCount > 0
             ? `${unassignedCount} ${unassignedCount === 1 ? 'task still needs' : 'tasks still need'} an assignee`
             : 'Every task has an owner.'}
         </p>
-      </div>
+      }
+    >
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="grid w-full gap-3 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">
+          {lanes.map((lane) => (
+            <AssignmentLane key={lane.id} lane={lane}>
+              {lane.tasks.map((task) => (
+                <DraggableAssignmentCard
+                  key={task._id}
+                  task={task}
+                  busy={busy}
+                  picker={
+                    <MovePicker
+                      task={task}
+                      value={laneOf.get(task._id) ?? null}
+                      teamOptions={teamOptions}
+                      qaOptions={qaOptions}
+                      busy={busy}
+                      onChange={(memberId) => handleAssign(task._id, memberId)}
+                    />
+                  }
+                />
+              ))}
+            </AssignmentLane>
+          ))}
+        </div>
 
-      <TaskAssignmentSplitScreen
-        tasks={taskViews}
-        members={memberViews}
-        busy={busy}
-        assignOptions={assignOptions}
-        onAssign={handleAssign}
-      />
-    </section>
+        <DragOverlay>
+          {activeTask ? (
+            <PlanTaskCard
+              taskKey={activeTask.displayId}
+              title={activeTask.title}
+              meta={metaOf(activeTask)}
+              className="cursor-grabbing shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
+            />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </PlanCard>
+  )
+}
+
+function metaOf(task: ScopeTask): string {
+  return `${estimateLabel(task)} · ${assigneeNamesOf(task)[0] ?? 'Unassigned'}`
+}
+
+function AssignmentLane({ lane, children }: { lane: Lane; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: lane.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      aria-label={`${lane.name} column`}
+      className={cn(
+        'flex min-h-[180px] min-w-0 flex-col gap-[10px] rounded-[12px] bg-[var(--plan-raised)] p-3 ring-1 ring-transparent transition-shadow',
+        isOver && 'ring-[var(--plan-accent)]'
+      )}
+    >
+      <p className="truncate text-[12px] font-bold text-[var(--plan-text)]">{lane.name}</p>
+      {children}
+      <p className="mt-auto pt-1 text-center text-[10px] text-[var(--plan-muted)]">
+        Drop tasks here
+      </p>
+    </div>
+  )
+}
+
+function DraggableAssignmentCard({
+  task,
+  busy,
+  picker
+}: {
+  task: ScopeTask
+  busy: boolean
+  picker: React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task._id,
+    disabled: busy
+  })
+
+  return (
+    <PlanTaskCard
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      taskKey={task.displayId}
+      title={task.title}
+      meta={metaOf(task)}
+      dragging={isDragging}
+      className="cursor-grab"
+      action={picker}
+    />
+  )
+}
+
+/**
+ * The card's "Move" button is a native select dressed as the Figma button, so
+ * the keyboard path gets the platform picker for free and QA can be offered
+ * under a group label that says what choosing them does.
+ */
+function MovePicker({
+  task,
+  value,
+  teamOptions,
+  qaOptions,
+  busy,
+  onChange
+}: {
+  task: ScopeTask
+  value: string | null
+  teamOptions: AssignableMember[]
+  qaOptions: AssignableMember[]
+  busy: boolean
+  onChange: (memberId: string | null) => void
+}) {
+  return (
+    <label
+      className={planButtonClass(
+        'secondary',
+        'relative cursor-pointer focus-within:ring-2 focus-within:ring-[var(--plan-accent)]'
+      )}
+      // Stops the card's drag listener from claiming the pointer.
+      onPointerDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      <span aria-hidden>Move</span>
+      <select
+        aria-label={`Assign ${task.title} to`}
+        value={value ?? ''}
+        disabled={busy}
+        onChange={(event) => onChange(event.target.value || null)}
+        className="absolute inset-0 cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
+      >
+        <option value="">Unassigned</option>
+        {teamOptions.map((member) => (
+          <option key={member.memberId} value={member.memberId}>
+            {member.name}
+          </option>
+        ))}
+        {qaOptions.length > 0 && (
+          <optgroup label={QA_GROUP_LABEL}>
+            {qaOptions.map((member) => (
+              <option key={member.memberId} value={member.memberId}>
+                {member.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+    </label>
   )
 }

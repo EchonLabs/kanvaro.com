@@ -45,6 +45,14 @@ export interface HourStepperProps {
   disabled?: boolean
   locale?: string
   className?: string
+  /**
+   * `bare` renders the field alone — no ± buttons, no split helper — for
+   * surfaces (My Stand-up) whose design is a single hours box. The commit
+   * rules above are identical in both variants.
+   */
+  variant?: 'stepper' | 'bare'
+  /** Replaces the field's own styling; only meaningful with `variant="bare"`. */
+  inputClassName?: string
 }
 
 export function HourStepper({
@@ -54,7 +62,9 @@ export function HourStepper({
   onChange,
   disabled = false,
   locale,
-  className
+  className,
+  variant = 'stepper',
+  inputClassName
 }: HourStepperProps) {
   const [draft, setDraft] = useState(() => hoursText(valueMinutes, locale))
 
@@ -92,23 +102,27 @@ export function HourStepper({
     if (snapped !== valueMinutes) onChange(snapped)
   }
 
+  const bare = variant === 'bare'
+
   const split =
-    remainingEstimateMinutes === undefined
+    bare || remainingEstimateMinutes === undefined
       ? null
       : describeSplit(valueMinutes, remainingEstimateMinutes)
 
   return (
     <div className={cn('flex flex-col gap-1', className)}>
       <div className="flex items-center gap-1">
-        <button
-          type="button"
-          aria-label={standupStrings.allocation.stepperDecrease()}
-          disabled={disabled || atFloor}
-          onClick={() => step(-1)}
-          className="apple-transition h-7 w-7 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] text-[13px] leading-none text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
-        >
-          −
-        </button>
+        {!bare && (
+          <button
+            type="button"
+            aria-label={standupStrings.allocation.stepperDecrease()}
+            disabled={disabled || atFloor}
+            onClick={() => step(-1)}
+            className="apple-transition h-7 w-7 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] text-[13px] leading-none text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
+          >
+            −
+          </button>
+        )}
 
         <input
           type="number"
@@ -139,18 +153,24 @@ export function HourStepper({
               step(-1)
             }
           }}
-          className="font-apple-mono h-7 w-16 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-right text-[13px] tabular-nums disabled:opacity-40"
+          className={
+            bare && inputClassName
+              ? inputClassName
+              : 'font-apple-mono h-7 w-16 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-right text-[13px] tabular-nums disabled:opacity-40'
+          }
         />
 
-        <button
-          type="button"
-          aria-label={standupStrings.allocation.stepperIncrease()}
-          disabled={disabled}
-          onClick={() => step(1)}
-          className="apple-transition h-7 w-7 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] text-[13px] leading-none text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
-        >
-          +
-        </button>
+        {!bare && (
+          <button
+            type="button"
+            aria-label={standupStrings.allocation.stepperIncrease()}
+            disabled={disabled}
+            onClick={() => step(1)}
+            className="apple-transition h-7 w-7 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] text-[13px] leading-none text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
+          >
+            +
+          </button>
+        )}
       </div>
 
       {split && (

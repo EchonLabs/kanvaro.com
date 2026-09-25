@@ -12,7 +12,7 @@
  * The capacity and scope strip at the top is the number the spec tells PMs to
  * note before anything else: "Note that number. It is your ceiling."
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   closestCorners,
   DndContext,
@@ -25,39 +25,56 @@ import {
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
+import Link from 'next/link'
 import {
-  AlertTriangle,
+  ArrowLeft,
+  BarChart3,
   Check,
-  CircleDot,
+  Info,
   Loader2,
-  PlayCircle,
-  ShieldAlert,
-  Spade
+  Spade,
+  AlertTriangle,
+  Users
 } from 'lucide-react'
 
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
-import { GradientProgress } from '@/components/ui/GradientProgress'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
-import { Label } from '@/components/ui/label'
-// Lower-case path: the rest of the app imports it this way, and TypeScript
-// treats the two casings as different files on a case-insensitive filesystem.
-import { Textarea } from '@/components/ui/textarea'
+import { useAuthContext } from '@/contexts/AuthContext'
 import { useNotify } from '@/lib/notify'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { deckCards, type DeckType } from '@/lib/standup/poker'
+import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
 import {
   PlanningChecklist,
+  type ChecklistFixTarget,
   type ChecklistItemView,
   type OffendingMember,
   type OffendingTask
 } from './PlanningChecklist'
 import { PokerModal } from './PokerModal'
 import { PokerResultsModal, type PokerResultsQueueEntry } from './PokerResultsModal'
+import { AssignmentBoard, estimateLabel } from './planning/AssignmentBoard'
+import { completeGate, pokerGate, stepStates, type GateInput } from './planning/gates'
+import { GateButton, PlanningStepRail } from './planning/PlanningSteps'
+import {
+  assigneeNamesOf,
+  isQaRole,
+  unpokeredTasks,
+  type AssignableMember,
+  type ScopeTask
+} from './planning/types'
+import {
+  PlanBanner,
+  PlanButton,
+  PlanCard,
+  PlanPill,
+  PlanTaskCard,
+  scrollToSection
+} from './planning/ui'
 
 interface MemberLoad {
   id: string
@@ -90,38 +107,60 @@ interface ProjectMember {
   firstName?: string
   lastName?: string
   email?: string
+  /** Project role, so the assignment picker can group QA separately. */
+  role?: string | null
+  dailyCapacityMinutes?: number
 }
 
-interface BacklogTask {
-  _id: string
-  displayId?: string
-  title: string
-  originalEstimateMinutes?: number
-  estimatedHours?: number
-}
+/**
+ * Both panes and the assignment board speak the same shape now: the assign
+ * step needs each scope task's owner, and the poker queue needs it too so a
+ * round can name who the estimate is for.
+ */
+type BacklogTask = ScopeTask
 
 interface Props {
   sprintId: string
   sprintName: string
   sprintStatus: string
   projectId: string
+  /** Shown after the sprint name in the page header. */
+  sprintDescription?: string | null
   /** PLN-18 — shown persistently while a waiver is active. */
   waiverBanner?: string | null
   onCompleted?: () => void
 }
 
 const hours = (minutes: number) => (minutes / 60).toFixed(1)
+/** Whole hours read as "58 h", fractional ones keep a decimal: "7.5 h". */
+const hoursValue = (minutes: number) => hours(minutes).replace(/\.0$/, '')
+
+/**
+ * Task lists, defensively.
+ *
+ * `/api/tasks` answers under `data` on one path and `tasks` on another, and an
+ * error shape has neither. A non-array here used to reach straight into
+ * `.map`, which takes the whole planning screen down — and this screen is the
+ * gate on starting a sprint, so it failing closed and blank is the worst
+ * available outcome.
+ */
+function asTaskList(payload: any): ScopeTask[] {
+  const candidate = payload?.data ?? payload?.tasks
+  return Array.isArray(candidate) ? candidate : []
+}
 
 export function PlanningWorkspace({
   sprintId,
   sprintName,
   sprintStatus,
   projectId,
+  sprintDescription,
   waiverBanner,
   onCompleted
 }: Props) {
   const notify = useNotify()
   const { hasPermission } = usePermissions()
+  const { user } = useAuthContext()
 
   // Reveal and finalise are facilitator actions (SPRINT_UPDATE server side);
   // casting a vote only needs SPRINT_VIEW. A team member reaches this screen to
@@ -140,6 +179,10 @@ export function PlanningWorkspace({
   // otherwise only ever surfaces the `status === 'open'` session, discarding
   // a just-completed one the instant the round ends.
   const [lastCompletedPokerSession, setLastCompletedPokerSession] = useState<any>(null)
+  // PC-9's client mirror: which tasks a poker round has actually estimated.
+  // Derived from the session queues exactly as the server derives it, so the
+  // Estimate step and the checklist can never disagree about what is left.
+  const [pokerCoveredIds, setPokerCoveredIds] = useState<Set<string>>(new Set())
   const [viewingPokerResults, setViewingPokerResults] = useState(false)
   const [session, setSession] = useState<any>(null)
   const [goal, setGoal] = useState('')
@@ -195,6 +238,14 @@ export function PlanningWorkspace({
         setLastCompletedPokerSession(
           sessions.find((entry: any) => entry.status === 'completed') ?? null
         )
+
+        const covered = new Set<string>()
+        for (const entry of sessions) {
+          for (const item of entry.queue ?? []) {
+            if (item?.status === 'estimated' && item.task) covered.add(String(item.task))
+          }
+        }
+        setPokerCoveredIds(covered)
       }
 
       if (checklistResponse.ok) setData(checklistPayload.data)
@@ -221,7 +272,7 @@ export function PlanningWorkspace({
         `/api/tasks?project=${encodeURIComponent(projectId)}&noSprint=true&limit=100`
       )
       const payload = await response.json()
-      if (response.ok) setBacklog(payload.data ?? payload.tasks ?? [])
+      if (response.ok) setBacklog(asTaskList(payload))
     } catch {
       /* The backlog panel is additive; a failure here must not blank the gate. */
     }
@@ -233,10 +284,10 @@ export function PlanningWorkspace({
   const loadScope = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/tasks?sprint=${encodeURIComponent(sprintId)}&limit=100`
+        `/api/tasks?sprint=${encodeURIComponent(sprintId)}&limit=500`
       )
       const payload = await response.json()
-      if (response.ok) setScope(payload.data ?? payload.tasks ?? [])
+      if (response.ok) setScope(asTaskList(payload))
     } catch {
       /* Same reasoning as loadBacklog: additive, must not blank the gate. */
     }
@@ -273,16 +324,76 @@ export function PlanningWorkspace({
     }
   }
 
+  /**
+   * PC-8 — one owner per task, decided here rather than at task creation.
+   *
+   * Goes through the planning endpoint rather than a generic task update so
+   * the sprint roster rule is enforced, and so a QA can be pulled onto the
+   * sprint team in the same request: capacity and the workload board are read
+   * from `Sprint.teamMembers`, and an assignee missing from it would have
+   * their minutes vanish from every number on this screen.
+   */
+  const assignTask = async (
+    taskId: string,
+    assigneeId: string | null,
+    member?: AssignableMember
+  ) => {
+    setBusy(true)
+    try {
+      const response = await fetch(
+        `/api/sprints/${sprintId}/planning-session/assignments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assignments: [{ taskId, assigneeId }],
+            ...(member && !member.onSprintTeam ? { addToSprintTeam: true } : {})
+          })
+        }
+      )
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? 'Could not assign the task')
+      }
+
+      const task = payload.data?.tasks?.[0]
+      const label = task?.key ? `${task.key}` : 'Task'
+      notify.success({
+        title: assigneeId
+          ? `Assigned ${label} to ${member?.name ?? 'the assignee'}`
+          : `Unassigned ${label}`,
+        message: payload.data?.addedToSprintTeam?.length
+          ? 'They were added to the sprint team.'
+          : undefined
+      })
+
+      await Promise.all([refresh(), loadScope()])
+    } catch (error) {
+      notify.error({
+        title: 'Could not assign the task',
+        message: error instanceof Error ? error.message : undefined
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   useEffect(() => {
     refresh()
   }, [refresh])
 
+  // Scope and members load unconditionally, not only once a session is open:
+  // a voter arriving to join a round has no session in view but still needs
+  // the scope map to see task titles and assignees, and the assignment board
+  // needs the roster before the first drag.
   useEffect(() => {
-    if (session) {
-      loadBacklog()
-      loadScope()
-    }
-  }, [session, loadBacklog, loadScope])
+    loadScope()
+    loadMembers()
+  }, [loadScope, loadMembers])
+
+  useEffect(() => {
+    if (session) loadBacklog()
+  }, [session, loadBacklog])
 
   const openSession = async () => {
     setBusy(true)
@@ -337,49 +448,107 @@ export function PlanningWorkspace({
     await refresh()
   }
 
+  const scopeById = useMemo(
+    () => new Map(scope.map((task) => [task._id, task])),
+    [scope]
+  )
+
+  /**
+   * Who a sprint task may be assigned to.
+   *
+   * The sprint team first, carrying the live load figures the checklist
+   * already computes, then project QA who are not on the team yet — assigning
+   * to one of those is what pulls them onto it.
+   */
+  const assignableMembers = useMemo<AssignableMember[]>(() => {
+    const sprintTeam = (data?.members ?? []).map((member) => ({
+      memberId: member.id,
+      name: member.name,
+      onSprintTeam: true,
+      role: projectMembers.find((candidate) => candidate.memberId === member.id)?.role ?? null,
+      assignedMinutes: member.assignedMinutes,
+      capacityMinutes: member.capacityMinutes
+    }))
+
+    const onTeam = new Set(sprintTeam.map((member) => member.memberId))
+    const qa = projectMembers
+      .filter((member) => !onTeam.has(member.memberId) && isQaRole(member.role))
+      .map((member) => ({
+        memberId: member.memberId,
+        name:
+          [member.firstName, member.lastName].filter(Boolean).join(' ') ||
+          member.email ||
+          member.memberId,
+        onSprintTeam: false,
+        role: member.role ?? null
+      }))
+
+    return [...sprintTeam, ...qa]
+  }, [data?.members, projectMembers])
+
+  const unpokered = useMemo(
+    () => unpokeredTasks(scope, pokerCoveredIds),
+    [scope, pokerCoveredIds]
+  )
+
+  const gateInput = useMemo<GateInput>(
+    () => ({
+      hasSession: !!session,
+      scopeCount: scope.length,
+      items: data?.checklist.items ?? [],
+      blockers: data?.checklist.blockers ?? [],
+      unpokeredCount: unpokered.length
+    }),
+    [session, scope.length, data?.checklist.items, data?.checklist.blockers, unpokered.length]
+  )
+
   /**
    * Opens the modal on a round somebody else started.
    *
-   * The queue is rebuilt from the session document rather than the checklist,
-   * because a voter may not be able to see the same task list, and the deck is
-   * derived locally — `deckCards` is pure, so there is nothing to fetch.
+   * The queue is rebuilt from the session document against the sprint scope,
+   * and the deck is derived locally — `deckCards` is pure, so there is nothing
+   * to fetch. It used to resolve titles from the checklist's offending tasks,
+   * which only ever contains tasks that failed a check: anything already
+   * passing showed up in the round as the literal word "Task".
    */
   const joinPoker = () => {
     if (!openPokerSession) return
     setPoker({
       session: openPokerSession,
       cards: deckCards(openPokerSession.deckType as DeckType),
-      queue: (openPokerSession.queue ?? []).map((entry: any) => {
-        const task = data?.offendingTasks.find((candidate) => candidate.id === String(entry.task))
-        return {
-          taskId: String(entry.task),
-          key: task?.key ?? '',
-          title: task?.title ?? 'Task',
-          status: entry.status
-        }
-      })
+      queue: buildPokerQueue(openPokerSession.queue ?? [], scopeById)
     })
   }
 
   const startPoker = async () => {
-    const unestimated = data?.offendingTasks.filter(
-      (task) => !task.originalEstimateMinutes
-    )
-    if (!unestimated?.length) {
-      notify.info?.({ title: 'Every task already has an estimate' })
+    // Everything in scope that a round has not already estimated — not just
+    // the tasks with no estimate at all. A task estimated by hand still has
+    // to go through poker to clear PC-9, and `offendingTasks` would never
+    // have listed it.
+    if (!unpokered.length) {
+      notify.info?.({ title: standupStrings.planning.pokerNothingToEstimate() })
       return
     }
 
     setBusy(true)
     try {
+      // A deliberate opt-out is only meaningful if the facilitator was a
+      // selectable candidate in the picker to begin with — otherwise their
+      // absence from `voterIds` is just them never having been on the sprint
+      // team, which must still fall back to the lockout-safe default.
+      const facilitatorIsCandidate = projectMembers.some((member) => member.memberId === user?.id)
+      const excludeFacilitator =
+        facilitatorIsCandidate && voterIds !== null && !voterIds.includes(user!.id)
+
       const response = await fetch(`/api/sprints/${sprintId}/poker-sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          taskIds: unestimated.map((task) => task.id),
+          taskIds: unpokered.map((task) => task._id),
           // Omitted entirely when untouched, so the server keeps its sprint-team
           // default rather than receiving an empty list.
-          ...(voterIds?.length ? { participantIds: voterIds } : {})
+          ...(voterIds?.length ? { participantIds: voterIds } : {}),
+          ...(excludeFacilitator ? { excludeFacilitator: true } : {})
         })
       })
       const payload = await response.json()
@@ -388,15 +557,7 @@ export function PlanningWorkspace({
       setPoker({
         session: payload.data.session,
         cards: payload.data.cards,
-        queue: payload.data.session.queue.map((entry: any) => {
-          const task = unestimated.find((candidate) => candidate.id === entry.task)
-          return {
-            taskId: entry.task,
-            key: task?.key ?? '',
-            title: task?.title ?? '',
-            status: entry.status
-          }
-        })
+        queue: buildPokerQueue(payload.data.session.queue ?? [], scopeById)
       })
     } catch (error) {
       notify.error({
@@ -458,120 +619,153 @@ export function PlanningWorkspace({
     if (action === 'remove') moveTask(activeId, false)
   }
 
-  if (loading) return <PlanningSkeleton />
+  const header = (actions?: React.ReactNode) => (
+    <PlanningHeader
+      sprintId={sprintId}
+      sprintName={sprintName}
+      sprintStatus={sprintStatus}
+      sprintDescription={sprintDescription}
+      actions={actions}
+    />
+  )
+
+  if (loading) {
+    return (
+      <div className="flex w-full flex-col gap-5">
+        {header()}
+        <PlanningSkeleton />
+      </div>
+    )
+  }
 
   // UI-7 — the post-completion confirmation.
   if (completed) {
     return (
-      <div className="space-y-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-green)]/30 bg-[var(--apple-system-green)]/5 p-6 text-center">
-        <Check className="mx-auto h-8 w-8 text-[var(--apple-system-green)]" />
-        <h3 className="text-lg font-semibold text-[var(--apple-label)]">Planning complete</h3>
-        <p className="text-[13px] text-[var(--apple-secondary-label)]">{completed.message}</p>
-        <p className="text-[12px] text-[var(--apple-tertiary-label)]">
-          Stand-ups are generated when the scheduler runs for this sprint.
-        </p>
+      <div className="flex w-full flex-col gap-5">
+        {header()}
+        <div
+          role="status"
+          className="flex flex-col items-center gap-3 rounded-[16px] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-8 text-center"
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--plan-success-bg)]">
+            <Check className="h-5 w-5 text-[var(--plan-success)]" />
+          </span>
+          <h2 className="text-[16px] font-bold text-[var(--plan-text)]">Planning complete</h2>
+          <p className="text-[13px] text-[var(--plan-text)]">{completed.message}</p>
+          <p className="text-[12px] text-[var(--plan-muted)]">
+            Stand-ups are generated when the scheduler runs for this sprint.
+          </p>
+        </div>
       </div>
     )
   }
 
   const totals = data?.checklist.totals
-  const blockers = data?.checklist.blockers ?? []
-  const canComplete = !!data?.checklist.canComplete && !!session
+  const poke = pokerGate(gateInput)
+  const finish = completeGate(gateInput)
+  const steps = stepStates(gateInput)
+  const warnBlocked = (reason: string) => notify.warning({ title: reason })
+  const jumpTo = (target: ChecklistFixTarget) => scrollToSection(`planning-${target}`)
+
+  const headerActions = (
+    <>
+      {openPokerSession && (
+        <PlanButton onClick={joinPoker} disabled={busy}>
+          <Users />
+          Join planning poker
+        </PlanButton>
+      )}
+
+      {/* Server-side gating (SPRINT_UPDATE, same as `finalize`) is what
+          actually restricts who set these estimates — this button only
+          decides who sees a shortcut to look back at them. */}
+      {canFacilitate && lastCompletedPokerSession && (
+        <PlanButton onClick={() => setViewingPokerResults(true)} disabled={busy}>
+          <BarChart3 />
+          View poker results
+        </PlanButton>
+      )}
+
+      {/* UI-6 — the first blocking check, stated on screen rather than in a
+          `title` a disabled button can never surface. */}
+      {canFacilitate && (
+        <GateButton
+          id="complete-planning"
+          label="Complete planning"
+          reason={finish.reason}
+          enabled={finish.enabled}
+          busy={busy}
+          onClick={complete}
+          onBlockedClick={warnBlocked}
+          icon={busy ? <Loader2 className="animate-spin" /> : <Check />}
+        />
+      )}
+
+      {!openPokerSession && canFacilitate && (
+        <GateButton
+          id="planning-poker"
+          label="Planning poker"
+          tone="primary"
+          icon={<Spade />}
+          reason={poke.reason}
+          enabled={poke.enabled}
+          busy={busy}
+          onClick={() => setChoosingVoters(true)}
+          onBlockedClick={warnBlocked}
+        />
+      )}
+    </>
+  )
 
   return (
-    <div className="space-y-6">
-      {/* The page shell above (`planning/page.tsx`) owns the title and
-          sprint name/status now, matching every other redesigned page's
-          split between page chrome and the working panel below it — this
-          header is action buttons only. */}
-      <header className="flex flex-wrap items-center justify-end gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {openPokerSession ? (
-            <Button variant="outline" onClick={joinPoker} disabled={busy}>
-              <Spade className="mr-1.5 h-4 w-4" />
-              Join planning poker
-            </Button>
-          ) : (
-            canFacilitate && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  loadMembers()
-                  setChoosingVoters(true)
-                }}
-                disabled={busy || !session}
-              >
-                <Spade className="mr-1.5 h-4 w-4" />
-                Planning poker
-              </Button>
-            )
-          )}
-
-          {/* Server-side gating (SPRINT_UPDATE, same as `finalize`) is what
-              actually restricts who set these estimates — this button only
-              decides who sees a shortcut to look back at them. */}
-          {canFacilitate && lastCompletedPokerSession && (
-            <Button variant="outline" onClick={() => setViewingPokerResults(true)} disabled={busy}>
-              <Spade className="mr-1.5 h-4 w-4" />
-              View poker results
-            </Button>
-          )}
-
-          {/* UI-6 — disabled with a tooltip naming the first blocking item. */}
-          {canFacilitate && (
-            <span title={canComplete ? undefined : blockerTooltip(blockers, session)}>
-              <Button onClick={complete} disabled={!canComplete || busy}>
-                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Complete planning
-              </Button>
-            </span>
-          )}
-        </div>
-      </header>
+    <div className="flex w-full flex-col gap-5">
+      <div className="flex w-full flex-col gap-[18px]">
+        {header(headerActions)}
+        {/* Planning is an ordered flow, so it is shown as one: which step the
+            PM is on, and what the next one is waiting for. */}
+        <PlanningStepRail states={steps} />
+      </div>
 
       {/* PLN-18 — persistent while the waiver is active, naming the waived
           items and the expiry. Not dismissible: a waiver nobody can see is
           exactly what the requirement exists to prevent. */}
       {waiverBanner && (
-        <div
-          role="status"
-          className="flex items-start gap-2.5 rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-orange)]/40 bg-[var(--apple-system-orange)]/[0.07] p-3.5 text-[13px]"
+        <PlanBanner
+          tone="warning"
+          icon={<AlertTriangle />}
+          actions={
+            data && (
+              <PlanButton onClick={() => scrollToSection('planning-checklist')}>
+                Review waivers
+              </PlanButton>
+            )
+          }
         >
-          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--apple-system-orange)]" />
-          <div>
-            <p className="font-medium text-[var(--apple-label)]">{waiverBanner}</p>
-            <p className="mt-0.5 text-[12px] text-[var(--apple-secondary-label)]">
-              A waiver never allows an unestimated task to be allocated.
-            </p>
-          </div>
-        </div>
+          {waiverBanner} A waiver never allows an unestimated task to be allocated.
+        </PlanBanner>
       )}
 
       {!session && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] p-4">
-          <div>
-            <p className="text-[13px] font-medium text-[var(--apple-label)]">
-              {history.length > 0 ? 'This sprint has already been planned' : 'No planning session is open'}
-            </p>
-            <p className="text-[12px] text-[var(--apple-tertiary-label)]">
-              {history.length > 0
-                ? `Planning was completed ${history.length > 1 ? `${history.length} times` : 'once'} already. Reopening starts a new round and re-evaluates every check.`
-                : 'Stand-ups cannot run until this sprint has been planned.'}
-            </p>
-          </div>
-          {canFacilitate &&
+        <PlanBanner
+          tone="info"
+          icon={<Info />}
+          actions={
+            canFacilitate &&
             (history.length > 0 ? (
-              <Button variant="outline" onClick={() => setConfirmingReopen(true)} disabled={busy}>
-                <PlayCircle className="mr-1.5 h-4 w-4" />
+              <PlanButton onClick={() => setConfirmingReopen(true)} disabled={busy}>
                 Reopen planning
-              </Button>
+              </PlanButton>
             ) : (
-              <Button onClick={openSession} disabled={busy}>
-                <PlayCircle className="mr-1.5 h-4 w-4" />
+              <PlanButton tone="primary" onClick={openSession} disabled={busy}>
                 Start planning
-              </Button>
-            ))}
-        </div>
+              </PlanButton>
+            ))
+          }
+        >
+          {history.length > 0
+            ? `This sprint has already been planned ${history.length > 1 ? `${history.length} times` : 'once'}. Reopening starts a new round and re-evaluates every check.`
+            : 'No planning session is active. Start a session to scope, assign and estimate work — stand-ups cannot run until this sprint has been planned.'}
+        </PlanBanner>
       )}
 
       {/* E20 — reopening is legal but must be deliberate, not a side effect of
@@ -584,7 +778,7 @@ export function PlanningWorkspace({
           history.length > 0 && history[0]?.completedAt
             ? ` on ${new Date(history[0].completedAt).toLocaleDateString()}`
             : ''
-        }. Reopening starts a new planning session, re-runs every check, and can change the sprint's schedule and locked estimates once you complete it again.`}
+        }. Reopening starts a new planning session, re-runs every check, and can change the sprint's schedule and locked estimates once you complete it again. ${standupStrings.planning.reopenUnstartsSprint()}`}
       >
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setConfirmingReopen(false)} disabled={busy}>
@@ -603,99 +797,59 @@ export function PlanningWorkspace({
         </div>
       </ResponsiveDialog>
 
-      {totals && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Stat label="Net capacity" value={`${hours(totals.netCapacityMinutes)}h`} />
-          {(() => {
-            // The spec calls this number "your ceiling" — GradientProgress
-            // clamps its bar fill to [0, 100] (correct: that clamping is
-            // shared with other real callers, e.g. RecentProjects), but that
-            // means a genuinely over-capacity sprint (12h estimated against
-            // an 8h net capacity) would otherwise show a reassuring, wrong
-            // "100%" with no other signal beyond the bar turning orange. The
-            // true, uncapped percentage and the old Stat tile's tone="warning"
-            // treatment (icon + tint) are restored here, entirely in this
-            // component's own rendering — GradientProgress itself is untouched.
-            const overCapacity = totals.totalEstimatedMinutes > totals.netCapacityMinutes
-            const truePercent =
-              totals.netCapacityMinutes > 0
-                ? Math.round((totals.totalEstimatedMinutes / totals.netCapacityMinutes) * 100)
-                : 0
-
-            return (
-              <div
-                className={cn(
-                  'rounded-[var(--apple-radius-lg)] border p-3 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none',
-                  overCapacity
-                    ? 'border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/5'
-                    : 'border-[var(--apple-separator)] bg-card'
-                )}
-              >
-                <p className="apple-section-label text-[var(--apple-tertiary-label)]">Estimated scope</p>
-                <p className="font-apple-mono text-lg tabular-nums text-[var(--apple-label)]">
-                  {hours(totals.totalEstimatedMinutes)}h
-                  {overCapacity && (
-                    <span className="ml-1.5 inline-flex items-center gap-1 align-middle text-[13px] font-medium text-[var(--apple-system-orange)]">
-                      <AlertTriangle className="h-4 w-4" />
-                      {truePercent}%
-                    </span>
-                  )}
-                </p>
-                <GradientProgress
-                  value={truePercent}
-                  gradient={overCapacity ? 'var(--apple-system-orange)' : 'var(--apple-chart-gradient)'}
-                  glow={overCapacity ? 'var(--apple-system-orange)' : 'var(--apple-chart-glow)'}
-                />
-              </div>
-            )
-          })()}
-          <Stat
-            label="Tasks estimated"
-            value={`${totals.estimatedTaskCount} of ${totals.taskCount}`}
-            tone={totals.estimatedTaskCount < totals.taskCount ? 'warning' : 'default'}
-          />
-        </div>
-      )}
+      {totals && <PlanningOverview totals={totals} memberCount={data?.members?.length ?? 0} />}
 
       {/* The number a PM actually needs before committing scope: not "is the
           team, in aggregate, under the ceiling" but "is any specific person
-          about to be buried while someone else has nothing." PA-5/PA-6 catch
-          this too, but only as a name inside a collapsed checklist row once
-          it's already a problem — this shows everyone, live, as tasks move
-          between the panes below. */}
+          about to be buried while someone else has nothing." This shows
+          everyone, live, as tasks move between the panes below. */}
       {data && (data.members ?? []).length > 0 && <TeamWorkload members={data.members} />}
 
       {session && (
-        <div className="space-y-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
-          <Label htmlFor="sprint-goal">Sprint goal</Label>
-          <Textarea
+        <PlanCard
+          id="planning-goal"
+          title="Sprint goal"
+          description="Give the team one clear outcome to optimize for."
+        >
+          <textarea
             id="sprint-goal"
+            aria-label="Sprint goal"
             value={goal}
             onChange={(event) => setGoal(event.target.value)}
             onBlur={saveGoal}
-            rows={2}
-            maxLength={500}
+            maxLength={GOAL_MAX}
             placeholder="Ship the invoicing module end to end for pilot customers."
+            className="min-h-[88px] w-full resize-y rounded-[12px] border border-[var(--plan-border)] bg-[var(--plan-raised)] p-[14px] text-[13px] leading-[1.45] text-[var(--plan-text)] placeholder:text-[var(--plan-muted)] focus:border-[var(--plan-accent)] focus:outline-none"
           />
-          <p className="text-[12px] text-[var(--apple-tertiary-label)]">At least 10 characters.</p>
-        </div>
+          <p
+            className={cn(
+              'text-[10px]',
+              goal.trim().length < GOAL_MIN ? 'text-[var(--plan-warning)]' : 'text-[var(--plan-muted)]'
+            )}
+          >
+            {goal.length} / {GOAL_MAX} characters
+            {goal.trim().length < GOAL_MIN && ` · at least ${GOAL_MIN} needed`}
+          </p>
+        </PlanCard>
       )}
 
       {session && (
-        <section className="space-y-2">
-          <h3 className="apple-section-label text-[var(--apple-secondary-label)]">
-            Sprint scope
-          </h3>
+        <PlanCard
+          id="planning-scope"
+          title="Sprint scope"
+          description="Drag tasks between lists, or use Add and Remove for keyboard-friendly planning."
+        >
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid w-full gap-[14px] md:grid-cols-2">
               <TaskPane
                 id="backlog-pool"
-                title="Backlog"
+                title={`Backlog · ${backlog.length}`}
+                hint="↕ Drag to sprint"
                 emptyMessage="Nothing unassigned in the backlog for this project."
                 tasks={backlog}
                 actionLabel="Add"
@@ -704,7 +858,8 @@ export function PlanningWorkspace({
               />
               <TaskPane
                 id="sprint-scope"
-                title={`In this sprint (${scope.length})`}
+                title={`In this sprint · ${scope.length}`}
+                hint="↕ Drag to backlog"
                 emptyMessage="Nothing is in scope yet. Add tasks from the backlog, or drag one in."
                 tasks={scope}
                 actionLabel="Remove"
@@ -713,14 +868,31 @@ export function PlanningWorkspace({
               />
             </div>
 
-            {/* Portals outside the panes' overflow-y-auto (and thus
-                overflow-x: auto-clipped) tree, so the dragged row stays
-                visible the whole way across to the other pane. */}
+            {/* Portals outside the panes' scroll containers, so the dragged
+                card stays visible the whole way across to the other pane. */}
             <DragOverlay>
-              {activeTask ? <TaskRowOverlay task={activeTask} /> : null}
+              {activeTask ? (
+                <PlanTaskCard
+                  taskKey={activeTask.displayId}
+                  title={activeTask.title}
+                  meta={taskMeta(activeTask)}
+                  className="cursor-grabbing shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
+                />
+              ) : null}
             </DragOverlay>
           </DndContext>
-        </section>
+        </PlanCard>
+      )}
+
+      {/* Step 2. Below the scope panes because it operates on what they put
+          in scope, and above the checklist because PC-8 is what it clears. */}
+      {session && scope.length > 0 && assignableMembers.length > 0 && (
+        <AssignmentBoard
+          tasks={scope}
+          members={assignableMembers}
+          busy={busy}
+          onAssign={assignTask}
+        />
       )}
 
       {data && (
@@ -736,6 +908,7 @@ export function PlanningWorkspace({
           }
           onEstimateTask={estimateTask}
           onOpenTask={(taskId) => window.open(`/tasks/${taskId}`, '_blank')}
+          onJump={jumpTo}
           busy={busy}
         />
       )}
@@ -747,7 +920,7 @@ export function PlanningWorkspace({
         open={choosingVoters}
         onOpenChange={setChoosingVoters}
         title="Who is estimating?"
-        description="Everyone ticked can cast a vote. You can always run the round with the sprint team as it stands."
+        description="Select the teammates joining this round. You can always run it with the sprint team as it stands."
       >
         <div className="space-y-3">
           <div className="max-h-[280px] space-y-1 overflow-y-auto rounded-[10px] border border-[var(--apple-separator)] p-2">
@@ -811,6 +984,12 @@ export function PlanningWorkspace({
           // Reveal and finalise are SPRINT_UPDATE server side. Hardcoding this
           // to true showed a voter buttons the API would answer with 403.
           isFacilitator={canFacilitate}
+          // A viewer who isn't on the participant list (including a
+          // facilitator who deliberately opted out — PLN-11) gets a
+          // read-only version of the round instead of the card grid.
+          isParticipant={(poker.session.participants ?? []).some(
+            (id: any) => String(id) === user?.id
+          )}
           pointsToHours={poker.session.pointsToHours}
           estimationUnit={poker.session.estimationUnit}
           onEstimated={refresh}
@@ -825,7 +1004,7 @@ export function PlanningWorkspace({
           estimationUnit={lastCompletedPokerSession.estimationUnit}
           queue={(lastCompletedPokerSession.queue ?? []).map((entry: any): PokerResultsQueueEntry => {
             const taskId = String(entry.task)
-            const task = scope.find((candidate) => candidate._id === taskId)
+            const task = scopeById.get(taskId)
             return {
               taskId,
               key: task?.displayId,
@@ -842,11 +1021,30 @@ export function PlanningWorkspace({
   )
 }
 
-/** UI-6 — name the *first* blocker, not a count. */
-function blockerTooltip(blockers: ChecklistItemView[], session: unknown): string {
-  if (!session) return 'Start a planning session first.'
-  const first = blockers[0]
-  return first ? `${first.checkId}: ${first.message ?? 'This check must pass first.'}` : ''
+/**
+ * Builds the queue the poker modal walks, resolving each entry against the
+ * sprint scope.
+ *
+ * The assignee travels with the queue rather than being fetched inside the
+ * modal: the workspace already has it, and `PokerModal` polls on a timer, so
+ * every fetch added there is another request per round per viewer.
+ */
+export function buildPokerQueue(
+  sessionQueue: Array<{ task: unknown; status: string }>,
+  scopeById: Map<string, ScopeTask>
+): Array<{ taskId: string; key: string; title: string; status: string; assigneeName?: string }> {
+  return sessionQueue.map((entry) => {
+    const taskId = String(entry.task)
+    const task = scopeById.get(taskId)
+    const assigneeName = assigneeNamesOf(task).join(', ')
+    return {
+      taskId,
+      key: task?.displayId ?? '',
+      title: task?.title ?? 'Task',
+      status: entry.status,
+      ...(assigneeName ? { assigneeName } : {})
+    }
+  })
 }
 
 /**
@@ -869,31 +1067,138 @@ export function resolveDrop(
   return null
 }
 
-function Stat({
+const GOAL_MIN = 10
+const GOAL_MAX = 500
+
+function taskMeta(task: BacklogTask): string {
+  return `${estimateLabel(task)} · ${assigneeNamesOf(task)[0] ?? 'Unassigned'}`
+}
+
+const STATUS_COLORS: Record<string, { fg: string; bg: string }> = {
+  draft: { fg: 'var(--plan-muted)', bg: 'var(--plan-raised)' },
+  planning: { fg: 'var(--plan-success)', bg: 'var(--plan-success-bg)' },
+  planned: { fg: 'var(--plan-accent)', bg: 'var(--plan-info-bg)' },
+  active: { fg: 'var(--plan-success)', bg: 'var(--plan-success-bg)' },
+  completed: { fg: 'var(--plan-muted)', bg: 'var(--plan-raised)' },
+  cancelled: { fg: 'var(--plan-danger)', bg: 'var(--plan-danger-bg)' }
+}
+
+function PlanningHeader({
+  sprintId,
+  sprintName,
+  sprintStatus,
+  sprintDescription,
+  actions
+}: {
+  sprintId: string
+  sprintName: string
+  sprintStatus: string
+  sprintDescription?: string | null
+  actions?: React.ReactNode
+}) {
+  const status = STATUS_COLORS[sprintStatus?.toLowerCase()] ?? STATUS_COLORS.draft
+  const description = sprintDescription?.trim()
+
+  return (
+    <header className="flex w-full flex-wrap items-center justify-between gap-4">
+      <div className="flex min-w-0 flex-col gap-2">
+        <Link
+          href={`/sprints/${sprintId}`}
+          className="flex w-fit items-center gap-1.5 text-[12px] text-[var(--plan-muted)] transition-colors hover:text-[var(--plan-text)]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to {sprintName}
+        </Link>
+        <h1 className="text-[30px] leading-tight text-[var(--plan-text)]">Sprint planning</h1>
+        <div className="flex min-w-0 flex-col items-start gap-2">
+          <p className="max-w-[60ch] truncate text-[14px] text-[var(--plan-text)]">
+            {sprintName}
+            {description && ` · ${description}`}
+          </p>
+          {sprintStatus && (
+            <span
+              className="rounded-full px-2 py-1 text-[10px] font-bold uppercase leading-none"
+              style={{ color: status.fg, backgroundColor: status.bg }}
+            >
+              {sprintStatus}
+            </span>
+          )}
+        </div>
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </header>
+  )
+}
+
+function StatTile({
   label,
   value,
-  tone = 'default'
+  detail,
+  valueColor
 }: {
   label: string
-  value: string
-  tone?: 'default' | 'warning'
+  value: React.ReactNode
+  detail: React.ReactNode
+  valueColor?: string
 }) {
   return (
-    <div
-      className={cn(
-        'rounded-[var(--apple-radius-lg)] border p-3 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none',
-        tone === 'warning'
-          ? 'border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/5'
-          : 'border-[var(--apple-separator)] bg-card'
-      )}
-    >
-      <p className="apple-section-label text-[var(--apple-tertiary-label)]">{label}</p>
-      <p className="font-apple-mono text-lg tabular-nums text-[var(--apple-label)]">
+    <div className="flex min-w-0 flex-col gap-[7px] rounded-[16px] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-[18px]">
+      <p className="text-[11px] text-[var(--plan-muted)]">{label}</p>
+      <p className="text-[24px] leading-tight tabular-nums" style={{ color: valueColor ?? 'var(--plan-text)' }}>
         {value}
-        {tone === 'warning' && (
-          <AlertTriangle className="ml-1.5 inline h-4 w-4 text-[var(--apple-system-orange)]" />
-        )}
       </p>
+      <p className="text-[11px] text-[var(--plan-muted)]">{detail}</p>
+    </div>
+  )
+}
+
+/**
+ * Team capacity, scoped effort and what is still unestimated — the ceiling
+ * the spec tells the PM to note before anything else.
+ */
+function PlanningOverview({
+  totals,
+  memberCount
+}: {
+  totals: ChecklistPayload['checklist']['totals']
+  memberCount: number
+}) {
+  const overCapacity = totals.totalEstimatedMinutes > totals.netCapacityMinutes
+  // The true, uncapped ratio: an over-capacity sprint must read 150%, never a
+  // reassuring clamped 100%.
+  const percent =
+    totals.netCapacityMinutes > 0
+      ? Math.round((totals.totalEstimatedMinutes / totals.netCapacityMinutes) * 100)
+      : 0
+  const unestimated = Math.max(0, totals.taskCount - totals.estimatedTaskCount)
+
+  return (
+    <div className="grid w-full gap-[14px] sm:grid-cols-3">
+      <StatTile
+        label="Team capacity"
+        value={`${hoursValue(totals.netCapacityMinutes)} h`}
+        detail={`Across ${memberCount} ${memberCount === 1 ? 'member' : 'members'}`}
+      />
+      <StatTile
+        label="Scoped effort"
+        value={`${hoursValue(totals.totalEstimatedMinutes)} h`}
+        valueColor={overCapacity ? 'var(--plan-warning)' : undefined}
+        detail={
+          <>
+            {totals.taskCount} {totals.taskCount === 1 ? 'task' : 'tasks'} in sprint ·{' '}
+            <span className={cn(overCapacity && 'font-bold text-[var(--plan-warning)]')}>
+              {percent}%
+            </span>{' '}
+            of capacity
+          </>
+        }
+      />
+      <StatTile
+        label="Unestimated"
+        value={`${unestimated} ${unestimated === 1 ? 'task' : 'tasks'}`}
+        valueColor={unestimated > 0 ? 'var(--plan-danger)' : undefined}
+        detail={unestimated > 0 ? 'Blocking completion' : 'Every task has an estimate'}
+      />
     </div>
   )
 }
@@ -912,40 +1217,33 @@ function loadStateOf(assignedMinutes: number, capacityMinutes: number): LoadStat
 
 const LOAD_ORDER: Record<LoadState, number> = { over: 0, full: 1, room: 2, idle: 3 }
 
-/** NFR-A1 — a label and an icon, never colour alone. */
-const LOAD_CONFIG: Record<LoadState, { label: string; text: string; gradient: string; glow: string }> = {
-  over: {
-    label: 'Over',
-    text: 'text-[var(--apple-system-orange)]',
-    gradient: 'var(--apple-system-orange)',
-    glow: 'rgba(255,149,0,0.32)'
-  },
-  full: {
-    label: 'Full',
-    text: 'text-[var(--apple-system-green)]',
-    gradient: 'var(--apple-chart-gradient)',
-    glow: 'var(--apple-chart-glow)'
-  },
-  room: {
-    label: 'Room',
-    text: 'text-[var(--apple-secondary-label)]',
-    gradient: 'var(--apple-chart-gradient)',
-    glow: 'var(--apple-chart-glow)'
-  },
-  idle: {
-    label: 'Idle',
-    text: 'text-[var(--apple-tertiary-label)]',
-    gradient: '#8E8E93',
-    glow: 'rgba(142,142,147,0.24)'
-  }
+/** NFR-A1 — every state carries a text label, never colour alone. */
+const LOAD_CONFIG: Record<LoadState, { label: string; color: string }> = {
+  over: { label: 'Over', color: 'var(--plan-danger)' },
+  full: { label: 'Full', color: 'var(--plan-warning)' },
+  room: { label: 'Room', color: 'var(--plan-success)' },
+  idle: { label: 'Idle', color: 'var(--plan-idle)' }
+}
+
+const AVATAR_COLORS = ['#7A5AF8', '#3478F6', '#2F9D68', '#D88A15', '#D9467A', '#1B9AAA']
+
+function avatarColor(seed: string): string {
+  let hash = 0
+  for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) | 0
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
+}
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2)
+  return letters.toUpperCase()
 }
 
 /**
  * The workload board: every sprint member's pre-assigned load against their
  * own sprint capacity, sorted worst-first. Reads straight from the same
  * checklist payload `refresh()` already re-fetches after every add/remove, so
- * dragging a task between the panes below visibly moves its owner's bar with
- * no extra plumbing.
+ * moving a task visibly moves its owner's bar with no extra plumbing.
  */
 function TeamWorkload({ members }: { members: MemberLoad[] }) {
   const sorted = [...members].sort((a, b) => {
@@ -956,46 +1254,75 @@ function TeamWorkload({ members }: { members: MemberLoad[] }) {
   })
 
   return (
-    <section
-      className="space-y-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none"
+    <PlanCard
+      id="planning-workload"
+      title="Team workload"
+      description="Sorted by highest utilization so risks are visible first."
       aria-label="Team workload"
     >
-      <h3 className="apple-section-label text-[var(--apple-secondary-label)]">Team workload</h3>
-      <div className="space-y-2.5">
+      <ul className="flex w-full flex-col gap-2">
         {sorted.map((member) => {
           const state = loadStateOf(member.assignedMinutes, member.capacityMinutes)
           const config = LOAD_CONFIG[state]
           const pct =
             member.capacityMinutes > 0
-              ? Math.round((member.assignedMinutes / member.capacityMinutes) * 100)
-              : 0
+              ? Math.min(100, (member.assignedMinutes / member.capacityMinutes) * 100)
+              : member.assignedMinutes > 0
+                ? 100
+                : 0
 
           return (
-            <div key={member.id} className="flex items-center gap-3">
-              <span className="w-28 shrink-0 truncate text-[13px] text-[var(--apple-label)]" title={member.name}>
+            <li
+              key={member.id}
+              className="flex items-center gap-3 rounded-[12px] bg-[var(--plan-raised)] p-3 sm:gap-[14px]"
+            >
+              <span
+                aria-hidden
+                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                style={{ backgroundColor: avatarColor(member.id || member.name) }}
+              >
+                {initialsOf(member.name)}
+              </span>
+              <span
+                className="w-24 shrink-0 truncate text-[12px] text-[var(--plan-text)] sm:w-[180px]"
+                title={member.name}
+              >
                 {member.name}
               </span>
-              <div className="min-w-0 flex-1">
-                <GradientProgress value={pct} gradient={config.gradient} glow={config.glow} />
-              </div>
-              <span className="w-24 shrink-0 text-right font-apple-mono text-[12px] tabular-nums text-[var(--apple-tertiary-label)]">
-                {hours(member.assignedMinutes)}h / {hours(member.capacityMinutes)}h
+              <span
+                role="progressbar"
+                aria-label={`${member.name} utilization`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(pct)}
+                className="h-[6px] min-w-0 flex-1 overflow-hidden rounded-[3px] bg-[var(--plan-border)]"
+              >
+                <span
+                  className="block h-full rounded-[3px] transition-[width] duration-300"
+                  style={{
+                    width: state === 'idle' ? '8px' : `${pct}%`,
+                    backgroundColor: config.color
+                  }}
+                />
               </span>
-              <span className={cn('flex w-14 shrink-0 items-center justify-end gap-1 text-[12px] font-medium', config.text)}>
-                <CircleDot className="h-3 w-3" />
+              <span className="w-[76px] shrink-0 text-[11px] tabular-nums text-[var(--plan-muted)]">
+                {hours(member.assignedMinutes)} / {hours(member.capacityMinutes)} h
+              </span>
+              <PlanPill color={config.color} className="w-[52px] shrink-0">
                 {config.label}
-              </span>
-            </div>
+              </PlanPill>
+            </li>
           )
         })}
-      </div>
-    </section>
+      </ul>
+    </PlanCard>
   )
 }
 
 function TaskPane({
   id,
   title,
+  hint,
   emptyMessage,
   tasks,
   actionLabel,
@@ -1004,6 +1331,7 @@ function TaskPane({
 }: {
   id: string
   title: string
+  hint: string
   emptyMessage: string
   tasks: BacklogTask[]
   actionLabel: string
@@ -1013,20 +1341,31 @@ function TaskPane({
   const { setNodeRef, isOver } = useDroppable({ id })
 
   return (
-    <div className="space-y-2">
-      <p className="text-[13px] font-medium text-[var(--apple-label)]">{title}</p>
-      <div
-        ref={setNodeRef}
-        className={cn(
-          'max-h-[320px] space-y-1 overflow-y-auto rounded-[var(--apple-radius-md)] border bg-card p-2 shadow-[0_1px_4px_rgba(0,0,0,0.07)] apple-transition dark:shadow-none',
-          isOver ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/5' : 'border-[var(--apple-separator)]'
-        )}
-      >
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'flex min-w-0 flex-col gap-[10px] rounded-[12px] bg-[var(--plan-raised)] p-[14px] ring-1 ring-transparent transition-shadow',
+        isOver && 'ring-[var(--plan-accent)]'
+      )}
+    >
+      <div className="flex flex-col">
+        <p className="text-[13px] font-bold text-[var(--plan-text)]">{title}</p>
+        <p className="text-[10px] text-[var(--plan-muted)]">{hint}</p>
+      </div>
+      <div className="-mx-1 flex max-h-[360px] flex-col gap-[10px] overflow-y-auto px-1 py-0.5">
         {tasks.length === 0 ? (
-          <p className="px-2 py-3 text-[13px] text-[var(--apple-tertiary-label)]">{emptyMessage}</p>
+          <p className="rounded-[12px] border border-dashed border-[var(--plan-border)] p-4 text-center text-[12px] text-[var(--plan-muted)]">
+            {emptyMessage}
+          </p>
         ) : (
           tasks.map((task) => (
-            <DraggableTaskRow key={task._id} task={task} actionLabel={actionLabel} onAction={onAction} busy={busy} />
+            <DraggableTaskRow
+              key={task._id}
+              task={task}
+              actionLabel={actionLabel}
+              onAction={onAction}
+              busy={busy}
+            />
           ))
         )}
       </div>
@@ -1045,73 +1384,47 @@ function DraggableTaskRow({
   onAction: (taskId: string) => void
   busy: boolean
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task._id })
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task._id })
 
   return (
-    <div
+    <PlanTaskCard
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      style={
-        transform
-          ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 10 : undefined }
-          : undefined
+      taskKey={task.displayId}
+      title={task.title}
+      meta={taskMeta(task)}
+      dragging={isDragging}
+      className="cursor-grab"
+      action={
+        // NFR-A2 — every drag interaction needs a keyboard/click equivalent.
+        // This button is that equivalent, not a leftover.
+        <PlanButton
+          disabled={busy}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation()
+            onAction(task._id)
+          }}
+        >
+          {actionLabel}
+        </PlanButton>
       }
-      className={cn(
-        'flex cursor-grab items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-quaternary-fill)] apple-transition',
-        isDragging && 'opacity-50'
-      )}
-    >
-      <span className="font-apple-mono text-[12px] text-[var(--apple-system-blue)]">{task.displayId}</span>
-      <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--apple-label)]">{task.title}</span>
-      <span className="font-apple-mono text-[12px] tabular-nums text-[var(--apple-tertiary-label)]">
-        {task.originalEstimateMinutes ? `${hours(task.originalEstimateMinutes)}h` : '—'}
-      </span>
-      {/* NFR-A2 — every drag interaction needs a keyboard/click equivalent.
-          This button is that equivalent, not a leftover — it must keep
-          working exactly as it did before drag-and-drop existed. */}
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={busy}
-        onClick={(event) => {
-          event.stopPropagation()
-          onAction(task._id)
-        }}
-      >
-        {actionLabel}
-      </Button>
-    </div>
-  )
-}
-
-/**
- * The DragOverlay's content — a non-interactive visual copy of
- * `DraggableTaskRow`'s markup (no `useDraggable` wiring, no action button:
- * `DragOverlay` follows the pointer itself, and a button that can't be
- * clicked while riding along with the cursor would be misleading chrome).
- * Kept in sync by hand with `DraggableTaskRow` below.
- */
-function TaskRowOverlay({ task }: { task: BacklogTask }) {
-  return (
-    <div className="flex cursor-grabbing items-center gap-2.5 rounded-[6px] border border-[var(--apple-separator)] bg-[var(--apple-system-background)] px-2 py-1.5 shadow-lg">
-      <span className="font-apple-mono text-[12px] text-[var(--apple-system-blue)]">{task.displayId}</span>
-      <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--apple-label)]">{task.title}</span>
-      <span className="font-apple-mono text-[12px] tabular-nums text-[var(--apple-tertiary-label)]">
-        {task.originalEstimateMinutes ? `${hours(task.originalEstimateMinutes)}h` : '—'}
-      </span>
-    </div>
+    />
   )
 }
 
 function PlanningSkeleton() {
   return (
-    <div className="space-y-4" aria-busy>
-      {[0, 1, 2].map((index) => (
-        <div
-          key={index}
-          className="h-24 animate-pulse rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)]"
-        />
+    <div className="flex flex-col gap-5" aria-busy>
+      <div className="h-[92px] animate-pulse rounded-[16px] bg-[var(--plan-surface)]" />
+      <div className="grid gap-[14px] sm:grid-cols-3">
+        {[0, 1, 2].map((index) => (
+          <div key={index} className="h-[98px] animate-pulse rounded-[16px] bg-[var(--plan-surface)]" />
+        ))}
+      </div>
+      {[0, 1].map((index) => (
+        <div key={index} className="h-[200px] animate-pulse rounded-[16px] bg-[var(--plan-surface)]" />
       ))}
     </div>
   )

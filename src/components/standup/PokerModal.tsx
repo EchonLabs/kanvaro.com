@@ -8,8 +8,8 @@
  * votes in the client would still ship them to every participant's browser,
  * where the network tab makes "hidden" meaningless.
  */
-import { useCallback, useEffect, useState } from 'react'
-import { Eye, Loader2, RotateCcw } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, Eye, Loader2, RotateCcw } from 'lucide-react'
 
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -29,6 +29,15 @@ interface QueueEntry {
   key: string
   title: string
   status: string
+  /**
+   * Who the task is assigned to, resolved by the workspace and passed down.
+   *
+   * The round needs it because the same task is a different size for
+   * different people: an intern asking for more than a senior would is a
+   * legitimate estimate, not an outlier, and the room can only see that if it
+   * knows whose work is being sized.
+   */
+  assigneeName?: string
 }
 
 interface RevealedVote {
@@ -59,6 +68,12 @@ interface Props {
   queue: QueueEntry[]
   currentTaskId?: string
   isFacilitator: boolean
+  /**
+   * Whether the current user is on this round's participant list. Someone who
+   * isn't — including a facilitator who deliberately left themselves off it
+   * (PLN-11) — gets a read-only view: no card grid, no ability to vote.
+   */
+  isParticipant: boolean
   pointsToHours: number
   estimationUnit: 'story_points' | 'hours'
   /** Refetches the planning screen once an estimate lands. */
@@ -73,6 +88,7 @@ export function PokerModal({
   queue,
   currentTaskId,
   isFacilitator,
+  isParticipant,
   pointsToHours,
   estimationUnit,
   onEstimated
@@ -80,6 +96,14 @@ export function PokerModal({
   const notify = useNotify()
   const [taskId, setTaskId] = useState(currentTaskId ?? queue[0]?.taskId)
   const [selected, setSelected] = useState<string | number | null>(null)
+  // The card the fan is currently browsed to but hasn't been confirmed yet.
+  // `null` means "nothing picked since the last confirm/task change" — see
+  // `effectiveCandidate` below, which falls back to `selected` in that case.
+  const [candidate, setCandidate] = useState<string | number | null>(null)
+  // Back/Next paging is a local, read-only preview of another queued task —
+  // it never touches which task is authoritatively "current" server side.
+  // `null` means "show the live task."
+  const [previewTaskId, setPreviewTaskId] = useState<string | null>(null)
   const [progress, setProgress] = useState<{ voted: number; expected: number } | null>(null)
   const [reveal, setReveal] = useState<RevealState | null>(null)
   const [finalValue, setFinalValue] = useState('')
@@ -87,17 +111,51 @@ export function PokerModal({
   const [serverCurrentTask, setServerCurrentTask] = useState<string | null>(null)
   const [liveQueue, setLiveQueue] = useState<{ taskId: string; status: string }[]>([])
   const [sessionClosed, setSessionClosed] = useState(false)
+  // A facilitator who never votes has no vote() response to trigger auto-reveal
+  // from — the poll below does it instead. This guards against calling reveal
+  // twice for the same round once every poller notices it is ready.
+  const autoRevealedForRef = useRef<string | null>(null)
 
   const task = queue.find((entry) => entry.taskId === taskId)
   const position = queue.findIndex((entry) => entry.taskId === taskId) + 1
+  // Falls back to the already-cast vote when nothing new has been browsed to
+  // yet, so reopening on an already-voted task shows the existing pick.
+  const effectiveCandidate = candidate ?? selected
+
+  // What the "Task X of Y" header and Back/Next arrows show. This is
+  // deliberately separate from `task`/`taskId` above: those stay tied to the
+  // live task and keep driving voting, polling, and the reveal panel exactly
+  // as before. Paging with Back/Next only ever changes `previewTaskId`.
+  const isPreviewingOtherTask = previewTaskId !== null && previewTaskId !== taskId
+  const displayTaskId = previewTaskId ?? taskId
+  const displayTask = queue.find((entry) => entry.taskId === displayTaskId)
+  const displayPosition = queue.findIndex((entry) => entry.taskId === displayTaskId) + 1
+
+  const goToPreview = (direction: 'prev' | 'next') => {
+    const baseIndex = queue.findIndex((entry) => entry.taskId === displayTaskId)
+    const nextIndex = direction === 'prev' ? baseIndex - 1 : baseIndex + 1
+    if (nextIndex < 0 || nextIndex >= queue.length) return
+    const nextId = queue[nextIndex].taskId
+    setPreviewTaskId(nextId === taskId ? null : nextId)
+  }
 
   // Moving to a new task resets everything — a card left selected from the
   // previous round would be cast by accident.
   useEffect(() => {
     setSelected(null)
+    setCandidate(null)
     setReveal(null)
     setProgress(null)
     setFinalValue('')
+  }, [taskId])
+
+  // A Back/Next preview is only ever meaningful relative to the live task at
+  // the moment it was opened — if the facilitator advances the round (or
+  // `resolveVisibleTask`'s fallback moves `taskId` for any other reason)
+  // while someone is mid-preview, drop the preview rather than try to keep it
+  // pointed at a queue position that may no longer make sense.
+  useEffect(() => {
+    setPreviewTaskId(null)
   }, [taskId])
 
   // The facilitator advances the queue, but only their own finalize response
@@ -158,6 +216,30 @@ export function PokerModal({
             }
           }
         }
+
+        // A facilitator who opted out of voting (PLN-11) never calls vote()
+        // themselves, so they need the poll to learn how many have voted —
+        // without it their "Reveal" control never appears at all.
+        if (session.progress) {
+          const { voted, expected, round } = session.progress
+          setProgress((current) =>
+            current && current.voted === voted && current.expected === expected
+              ? current
+              : { voted, expected }
+          )
+
+          const revealKey = `${taskId}:${round}`
+          if (
+            voted >= expected &&
+            expected > 0 &&
+            isFacilitator &&
+            session.autoRevealOnAllVoted &&
+            autoRevealedForRef.current !== revealKey
+          ) {
+            autoRevealedForRef.current = revealKey
+            await doReveal()
+          }
+        }
       } catch {
         /* A dropped poll is not worth a toast; the next one recovers. */
       }
@@ -209,6 +291,7 @@ export function PokerModal({
     setBusy(true)
     try {
       const data = await post('vote', { card })
+      setCandidate(null)
       setProgress({ voted: data.voted, expected: data.expected })
       if (data.readyToReveal && data.autoReveal && isFacilitator) await doReveal()
     } catch (error) {
@@ -275,122 +358,244 @@ export function PokerModal({
   const derivedHours =
     estimationUnit === 'story_points' ? Number(finalValue) * pointsToHours : Number(finalValue)
 
+  // The quick-pick row only offers numeric deck values — '?' and 'coffee'
+  // aren't estimates, so they'd have nothing sensible to fill into the input.
+  const numericCards = cards.filter((card): card is number => typeof card === 'number')
+
   return (
     <ResponsiveDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Let's Plan Together"
+      title="Let's Poker-Through it!"
       description={task ? `${task.key} — ${task.title}` : 'No task selected'}
       className="sm:max-w-2xl lg:max-w-5xl"
       headerClassName="text-center"
       dismissible={false}
     >
       <div className="space-y-5">
-        <p className="text-[12px] text-[var(--apple-tertiary-label)]">
-          Task {position} of {queue.length}
-        </p>
+        <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label="Previous task"
+            onClick={() => goToPreview('prev')}
+            disabled={displayPosition <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+          </Button>
+          <p className="text-[12px] text-[var(--apple-tertiary-label)]">
+            Task {displayPosition} of {queue.length}
+            {isPreviewingOtherTask && ' (preview)'}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label="Next task"
+            onClick={() => goToPreview('next')}
+            disabled={displayPosition >= queue.length}
+          >
+            <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
+          </Button>
+        </div>
 
-        {/* --- Voting ------------------------------------------------------ */}
-        {!reveal && (
-          <div className="space-y-3">
-            <Label>Your card</Label>
-            <PokerCardCarousel cards={cards} selected={selected} disabled={busy} onSelect={vote} />
+        {displayTask?.assigneeName ? (
+          <p className="text-[13px] text-[var(--apple-secondary-label)]">
+            Assigned to {displayTask.assigneeName}
+          </p>
+        ) : null}
 
-            {progress && (
-              <div className="flex items-center justify-between rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-3 py-2">
-                <span className="text-[13px] text-[var(--apple-label)]">
-                  Voted {progress.voted} of {progress.expected}
-                </span>
-                {isFacilitator && (
-                  <Button size="sm" onClick={doReveal} disabled={busy || progress.voted === 0}>
-                    <Eye className="mr-1.5 h-3.5 w-3.5" />
-                    Reveal
-                  </Button>
+        {isPreviewingOtherTask ? (
+          // Back/Next is a read-only preview — it never changes which task is
+          // authoritatively "current," so voting stays off while browsing.
+          <div className="rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-3 py-4 text-center">
+            <p className="text-[13px] text-[var(--apple-secondary-label)]">
+              {displayTask ? `${displayTask.key} — ${displayTask.title}` : 'Task not found'}
+            </p>
+            <p className="mt-1 text-[12px] text-[var(--apple-tertiary-label)]">
+              Status: {displayTask?.status ?? 'unknown'}
+            </p>
+            <p className="mt-3 text-[12px] text-[var(--apple-tertiary-label)]">
+              This is a preview — voting happens on the current task.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* --- Voting -------------------------------------------------- */}
+            {!reveal && (
+              <div className="space-y-3">
+                {isParticipant ? (
+                  <>
+                    <Label>Your card</Label>
+                    <PokerCardCarousel
+                      cards={cards}
+                      selected={selected}
+                      disabled={busy}
+                      onPick={setCandidate}
+                    />
+                    <div className="flex justify-center">
+                      <Button
+                        onClick={() => vote(effectiveCandidate!)}
+                        disabled={busy || effectiveCandidate == null || effectiveCandidate === selected}
+                      >
+                        {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {selected != null ? 'Update vote' : 'Confirm'}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  // Anyone not on the participant list — including a facilitator
+                  // who opted out of voting — gets a read-only view: no card grid,
+                  // no way to cast a vote the server would refuse anyway.
+                  <p className="text-[13px] text-[var(--apple-tertiary-label)]">
+                    {isFacilitator
+                      ? "You're facilitating this round without voting yourself."
+                      : 'You are not part of this vote. Watching the round.'}
+                  </p>
+                )}
+
+                {progress && (isParticipant || isFacilitator) && (
+                  <div className="flex items-center justify-between rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-3 py-2">
+                    <span className="text-[13px] text-[var(--apple-label)]">
+                      Voted {progress.voted} of {progress.expected}
+                    </span>
+                    {isFacilitator && (
+                      <Button size="sm" onClick={doReveal} disabled={busy || progress.voted === 0}>
+                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                        Reveal
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* --- After the reveal -------------------------------------------- */}
-        {reveal && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Votes</Label>
-              <div className="flex flex-wrap gap-2">
-                {reveal.votes.map((entry, index) => (
-                  <div
-                    key={`${entry.voterId ?? 'anon'}-${index}`}
-                    className={cn(
-                      'rounded-[var(--apple-radius-sm)] border px-2.5 py-1.5 text-[13px]',
-                      entry.isOutlier
-                        ? 'border-[var(--apple-system-orange)] bg-[var(--apple-system-orange)]/10'
-                        : 'border-[var(--apple-separator)]'
-                    )}
-                  >
-                    <span className="font-apple-mono">{entry.card}</span>
-                    {entry.voterName && (
-                      <span className="ml-2 text-[var(--apple-secondary-label)]">
-                        {entry.voterName}
-                      </span>
-                    )}
-                    {entry.isOutlier && (
-                      <Badge variant="outline" className="ml-2 text-[10px]">
-                        outlier
-                      </Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <p className="text-[13px] text-[var(--apple-secondary-label)]">
-              {reveal.unanimous
-                ? 'Everyone agreed.'
-                : `Spread ${reveal.min} to ${reveal.max}. Discuss the outliers.`}
-              {reveal.abstainCount > 0 && ` ${reveal.abstainCount} did not vote a number.`}
-            </p>
-
-            {isFacilitator ? (
-              <div className="space-y-3 border-t border-[var(--apple-separator)] pt-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="poker-final">Final estimate</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="poker-final"
-                      type="number"
-                      min="0.25"
-                      step="0.25"
-                      value={finalValue}
-                      onChange={(event) => setFinalValue(event.target.value)}
-                      className="w-[110px]"
-                    />
-                    {/* Shown so the team sees the real hours, per §15.6. */}
-                    {Number.isFinite(derivedHours) && derivedHours > 0 && (
-                      <span className="font-apple-mono text-[13px] text-[var(--apple-secondary-label)]">
-                        = {derivedHours.toFixed(1)}h
-                      </span>
-                    )}
+            {/* --- After the reveal ---------------------------------------- */}
+            {reveal && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Votes</Label>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {reveal.votes.map((entry, index) => (
+                      <div
+                        key={`${entry.voterId ?? 'anon'}-${index}`}
+                        className={cn(
+                          'rounded-[var(--apple-radius-md)] border px-3 py-2.5 text-center',
+                          entry.isOutlier
+                            ? 'border-[var(--apple-system-orange)] bg-[var(--apple-system-orange)]/10'
+                            : 'border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)]'
+                        )}
+                      >
+                        <p className="font-apple-mono text-[19px] font-semibold text-[var(--apple-label)]">
+                          {entry.card}
+                        </p>
+                        <p className="mt-0.5 truncate text-[12px] text-[var(--apple-secondary-label)]">
+                          {entry.voterName ?? 'Anonymous'}
+                        </p>
+                        {entry.isOutlier && (
+                          <Badge variant="outline" className="mt-1 text-[10px]">
+                            outlier
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={revote} disabled={busy}>
-                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                    Revote
-                  </Button>
-                  <Button onClick={setEstimate} disabled={busy || !finalValue}>
-                    {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Set estimate
-                  </Button>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      ['min', 'Min', reveal.min],
+                      ['median', 'Median', reveal.median],
+                      ['max', 'Max', reveal.max]
+                    ] as const
+                  ).map(([key, label, value]) => (
+                    <div
+                      key={key}
+                      data-testid={`poker-stat-${key}`}
+                      className="rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] py-2 text-center"
+                    >
+                      <p className="font-apple-mono text-[17px] font-semibold tabular-nums text-[var(--apple-label)]">
+                        {value ?? '—'}
+                      </p>
+                      <p className="text-[11px] uppercase tracking-[0.06em] text-[var(--apple-tertiary-label)]">
+                        {label}
+                      </p>
+                    </div>
+                  ))}
                 </div>
+
+                <p className="text-[13px] text-[var(--apple-secondary-label)]">
+                  {reveal.unanimous
+                    ? 'Everyone agreed.'
+                    : `Spread ${reveal.min} to ${reveal.max}. Discuss the outliers.`}
+                  {reveal.abstainCount > 0 && ` ${reveal.abstainCount} did not vote a number.`}
+                </p>
+
+                {isFacilitator ? (
+                  <div className="space-y-3 border-t border-[var(--apple-separator)] pt-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="poker-final">Final estimate</Label>
+                      {numericCards.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick-pick estimate">
+                          {numericCards.map((card) => {
+                            const isActive = finalValue === String(card)
+                            return (
+                              <button
+                                key={card}
+                                type="button"
+                                aria-pressed={isActive}
+                                onClick={() => setFinalValue(String(card))}
+                                className={cn(
+                                  'apple-transition font-apple-mono rounded-full border px-3 py-1 text-[13px] tabular-nums',
+                                  isActive
+                                    ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)]'
+                                    : 'border-[var(--apple-separator)] text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
+                                )}
+                              >
+                                {card}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="poker-final"
+                          type="number"
+                          min="0.25"
+                          step="0.25"
+                          value={finalValue}
+                          onChange={(event) => setFinalValue(event.target.value)}
+                          className="w-[110px]"
+                        />
+                        {/* Shown so the team sees the real hours, per §15.6. */}
+                        {Number.isFinite(derivedHours) && derivedHours > 0 && (
+                          <span className="font-apple-mono text-[13px] text-[var(--apple-secondary-label)]">
+                            = {derivedHours.toFixed(1)}h
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={revote} disabled={busy}>
+                        <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                        Revote
+                      </Button>
+                      <Button onClick={setEstimate} disabled={busy || !finalValue}>
+                        {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Set estimate
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-[var(--apple-tertiary-label)]">
+                    Waiting for the facilitator to set the estimate.
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="text-[13px] text-[var(--apple-tertiary-label)]">
-                Waiting for the facilitator to set the estimate.
-              </p>
             )}
-          </div>
+          </>
         )}
       </div>
     </ResponsiveDialog>

@@ -8,19 +8,17 @@
  * **UI-4** — the checklist is live. Fixing a task updates it with no page
  * refresh, so the PM can work the list top to bottom instead of reloading.
  *
- * **UI-5** — each failing mandatory item expands into the *specific* offending
- * tasks, each with an inline fix control. "3 tasks have no estimate" without
- * saying which three is exactly the hunting the spec exists to eliminate, so a
- * failing row that cannot expand is a bug, not a styling choice.
+ * **UI-5** — each failing mandatory item names the *specific* offending tasks,
+ * each with an inline fix control. "3 tasks have no estimate" without saying
+ * which three is exactly the hunting the spec exists to eliminate, so a task
+ * check renders one row per offending task.
  */
 import { useState } from 'react'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react'
+import { Check, ChevronDown, AlertCircle, Loader2, AlertTriangle } from 'lucide-react'
 
-import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
-import { Checkbox } from '@/components/ui/Checkbox'
-import { Input } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
+
+import { PlanButton, PlanCard } from './planning/ui'
 
 export interface ChecklistItemView {
   checkId: string
@@ -45,6 +43,9 @@ export interface OffendingMember {
   name: string
 }
 
+/** Where on the planning screen a check is fixed. */
+export type ChecklistFixTarget = 'goal' | 'scope' | 'assignment'
+
 interface Props {
   items: ChecklistItemView[]
   offendingTasks: OffendingTask[]
@@ -55,10 +56,12 @@ interface Props {
   onEstimateTask: (taskId: string, hours: number) => Promise<void>
   /** Opens the task for the fixes an inline control cannot do (PC-4, PC-5). */
   onOpenTask: (taskId: string) => void
+  /** Scrolls to the section that fixes a check. */
+  onJump?: (target: ChecklistFixTarget) => void
   busy?: boolean
 }
 
-/** Human labels; the spec's own message carries the detail. */
+/** What a passing check guarantees. */
 const CHECK_LABELS: Record<string, string> = {
   'PC-1': 'Sprint goal set',
   'PC-2': 'Sprint has tasks',
@@ -67,12 +70,44 @@ const CHECK_LABELS: Record<string, string> = {
   'PC-5': 'Type and priority set',
   'PC-6': 'Team assigned',
   'PC-7': 'Sprint has working days',
+  'PC-8': 'Every task has an owner',
+  'PC-9': 'Every task went through poker',
   'PA-1': 'Scope within capacity',
   'PA-2': 'Scope uses the team',
   'PA-3': 'Tasks fit inside a day',
   'PA-4': 'Estimates were voted on',
   'PA-5': 'Nobody over-committed',
   'PA-6': 'Everybody has work'
+}
+
+/** What a failing check is, stated as the problem. */
+const ISSUE_TITLES: Record<string, string> = {
+  'PC-1': 'Sprint goal missing',
+  'PC-2': 'No tasks in scope',
+  'PC-3': 'Missing estimate',
+  'PC-4': 'Missing definition of done',
+  'PC-5': 'Missing type or priority',
+  'PC-6': 'No team assigned',
+  'PC-7': 'No working days',
+  'PC-8': 'Task without an owner',
+  'PC-9': 'Not estimated in poker',
+  'PA-1': 'Scope over capacity',
+  'PA-2': 'Scope under capacity',
+  'PA-3': 'Task larger than a day',
+  'PA-4': 'Estimated without a team vote',
+  'PA-5': 'Over capacity',
+  'PA-6': 'Idle capacity detected'
+}
+
+const FIX_TARGETS: Record<string, ChecklistFixTarget> = {
+  'PC-1': 'goal',
+  'PC-2': 'scope',
+  'PA-1': 'scope',
+  'PA-2': 'scope',
+  'PC-6': 'assignment',
+  'PC-8': 'assignment',
+  'PA-5': 'assignment',
+  'PA-6': 'assignment'
 }
 
 export function PlanningChecklist({
@@ -83,146 +118,113 @@ export function PlanningChecklist({
   onAcknowledge,
   onEstimateTask,
   onOpenTask,
+  onJump,
   busy
 }: Props) {
-  const mandatory = items.filter((item) => item.kind === 'mandatory')
-  const advisory = items.filter((item) => item.kind === 'advisory')
+  const [showPassed, setShowPassed] = useState(false)
+
+  const blocking = items.filter((item) => item.kind === 'mandatory' && !item.passed)
+  const advisory = items.filter((item) => item.kind === 'advisory' && !item.passed)
+  const passed = items.filter((item) => item.passed)
+
+  const rowProps = { offendingTasks, offendingMembers, onEstimateTask, onOpenTask, onJump }
 
   return (
-    <div className="space-y-5" aria-busy={busy}>
-      <Section
-        title="Must pass"
-        description="Planning cannot complete while any of these fails."
-        items={mandatory}
-        offendingTasks={offendingTasks}
-        offendingMembers={offendingMembers}
-        onEstimateTask={onEstimateTask}
-        onOpenTask={onOpenTask}
-      />
+    <PlanCard
+      id="planning-checklist"
+      title="Planning checklist"
+      description="Blocking issues must be fixed. Advisories may be acknowledged and waived."
+      aria-busy={busy}
+    >
+      <div className="flex w-full flex-col gap-[14px]">
+        {blocking.length > 0 && (
+          <ChecklistGroup label={`BLOCKING · ${blocking.length}`} tone="danger">
+            {blocking.map((item) => (
+              <CheckRows key={item.checkId} item={item} {...rowProps} />
+            ))}
+          </ChecklistGroup>
+        )}
 
-      <Section
-        title="Worth knowing"
-        description="These never block. Tick to confirm you have seen them."
-        items={advisory}
-        offendingTasks={offendingTasks}
-        offendingMembers={offendingMembers}
-        acknowledged={acknowledged}
-        onAcknowledge={onAcknowledge}
-        onEstimateTask={onEstimateTask}
-        onOpenTask={onOpenTask}
-      />
-    </div>
+        {advisory.length > 0 && (
+          <ChecklistGroup label={`ADVISORY · ${advisory.length}`} tone="warning">
+            {advisory.map((item) => (
+              <CheckRows
+                key={item.checkId}
+                item={item}
+                {...rowProps}
+                acknowledged={acknowledged.includes(item.checkId)}
+                onAcknowledge={onAcknowledge}
+              />
+            ))}
+          </ChecklistGroup>
+        )}
+
+        {blocking.length === 0 && advisory.length === 0 && items.length > 0 && (
+          <p className="flex items-center gap-3 rounded-[12px] bg-[var(--plan-success-bg)] p-3 text-[12px] font-bold text-[var(--plan-text)]">
+            <Check className="h-4 w-4 shrink-0 text-[var(--plan-success)]" />
+            All {items.length} {items.length === 1 ? 'check' : 'checks'} pass
+          </p>
+        )}
+
+        {passed.length > 0 && (blocking.length > 0 || advisory.length > 0) && (
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPassed((current) => !current)}
+              aria-expanded={showPassed}
+              className="flex items-center gap-1 self-start text-[12px] text-[var(--plan-muted)] transition-colors hover:text-[var(--plan-text)]"
+            >
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showPassed && 'rotate-180')} />
+              {showPassed ? 'Hide passed checks' : `Show ${passed.length} passed`}
+            </button>
+
+            {showPassed && (
+              <ul className="flex flex-col gap-2">
+                {passed.map((item) => (
+                  <li
+                    key={item.checkId}
+                    className="flex items-center gap-3 rounded-[12px] bg-[var(--plan-raised)] p-3"
+                  >
+                    <Check aria-label="Passed" className="h-4 w-4 shrink-0 text-[var(--plan-success)]" />
+                    <span className="text-[12px] text-[var(--plan-text)]">
+                      {CHECK_LABELS[item.checkId] ?? item.checkId}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+    </PlanCard>
   )
 }
 
-function Section({
-  title,
-  description,
-  items,
-  offendingTasks,
-  offendingMembers,
-  acknowledged,
-  onAcknowledge,
-  onEstimateTask,
-  onOpenTask
+function ChecklistGroup({
+  label,
+  tone,
+  children
 }: {
-  title: string
-  description: string
-  items: ChecklistItemView[]
-  offendingTasks: OffendingTask[]
-  offendingMembers: OffendingMember[]
-  acknowledged?: string[]
-  onAcknowledge?: (checkId: string, next: boolean) => void
-  onEstimateTask: (taskId: string, hours: number) => Promise<void>
-  onOpenTask: (taskId: string) => void
+  label: string
+  tone: 'danger' | 'warning'
+  children: React.ReactNode
 }) {
-  const [showPassed, setShowPassed] = useState(false)
-
-  if (items.length === 0) return null
-
-  // The wall-of-text problem this screen used to have: every check rendered
-  // in full regardless of whether there was anything to do about it. A
-  // passing check earns one word in a summary line, the same way
-  // `CompletionPanel` on the Run screen already collapses its own passed
-  // checks — only what still needs the PM's attention gets a full row.
-  const needsAttention = items.filter((item) => !item.passed)
-  const settled = items.filter((item) => item.passed)
-
   return (
-    <section className="space-y-2">
-      <div>
-        <h3 className="apple-section-label text-[var(--apple-secondary-label)]">{title}</h3>
-        <p className="text-[12px] text-[var(--apple-tertiary-label)]">{description}</p>
-      </div>
-
-      {needsAttention.length > 0 ? (
-        <ul className="divide-y divide-[var(--apple-separator)] overflow-hidden rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
-          {needsAttention.map((item) => (
-            <ChecklistRow
-              key={item.checkId}
-              item={item}
-              offendingTasks={offendingTasks}
-              offendingMembers={offendingMembers}
-              acknowledged={acknowledged?.includes(item.checkId)}
-              onAcknowledge={onAcknowledge}
-              onEstimateTask={onEstimateTask}
-              onOpenTask={onOpenTask}
-            />
-          ))}
-        </ul>
-      ) : (
-        <p className="flex items-center gap-1.5 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card px-3 py-2.5 text-[13px] text-[var(--apple-system-green)] shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
-          <Check className="h-4 w-4 shrink-0" />
-          All {items.length} {items.length === 1 ? 'check' : 'checks'} pass
-        </p>
-      )}
-
-      {/* Only worth a toggle when there's a mix — if everything already
-          passed, "All N checks pass" above already says it, and repeating
-          the same N items behind a second control would be noise. */}
-      {needsAttention.length > 0 && settled.length > 0 && (
-        <>
-          <button
-            type="button"
-            onClick={() => setShowPassed((current) => !current)}
-            aria-expanded={showPassed}
-            className="apple-transition flex items-center gap-1 px-1 py-1 text-[12px] font-medium text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
-          >
-            <ChevronDown className={cn('h-3 w-3 apple-transition', showPassed && 'rotate-180')} />
-            {showPassed ? 'Hide passed checks' : `Show ${settled.length} passed`}
-          </button>
-
-          {showPassed && (
-            <ul className="divide-y divide-[var(--apple-separator)] overflow-hidden rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
-              {settled.map((item) => (
-                <ChecklistRow
-                  key={item.checkId}
-                  item={item}
-                  offendingTasks={offendingTasks}
-                  offendingMembers={offendingMembers}
-                  acknowledged={acknowledged?.includes(item.checkId)}
-                  onAcknowledge={onAcknowledge}
-                  onEstimateTask={onEstimateTask}
-                  onOpenTask={onOpenTask}
-                />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
+    <section className="flex flex-col gap-2">
+      <h3
+        className={cn(
+          'text-[12px] font-bold',
+          tone === 'danger' ? 'text-[var(--plan-danger)]' : 'text-[var(--plan-warning)]'
+        )}
+      >
+        {label}
+      </h3>
+      <ul className="flex flex-col gap-2">{children}</ul>
     </section>
   )
 }
 
-function ChecklistRow({
-  item,
-  offendingTasks,
-  offendingMembers,
-  acknowledged,
-  onAcknowledge,
-  onEstimateTask,
-  onOpenTask
-}: {
+interface CheckRowsProps {
   item: ChecklistItemView
   offendingTasks: OffendingTask[]
   offendingMembers: OffendingMember[]
@@ -230,108 +232,140 @@ function ChecklistRow({
   onAcknowledge?: (checkId: string, next: boolean) => void
   onEstimateTask: (taskId: string, hours: number) => Promise<void>
   onOpenTask: (taskId: string) => void
-}) {
-  // Failing rows start open. The PM opened this screen to fix things, and a
-  // collapsed failure is one more click between them and the problem.
-  const [expanded, setExpanded] = useState(!item.passed)
+  onJump?: (target: ChecklistFixTarget) => void
+}
 
+/**
+ * The rows for one failing check: one per offending task when the check is
+ * about tasks, otherwise a single row carrying the check's own message.
+ */
+function CheckRows({
+  item,
+  offendingTasks,
+  offendingMembers,
+  acknowledged,
+  onAcknowledge,
+  onEstimateTask,
+  onOpenTask,
+  onJump
+}: CheckRowsProps) {
+  const title = ISSUE_TITLES[item.checkId] ?? CHECK_LABELS[item.checkId] ?? item.checkId
   const tasks = offendingTasks.filter((task) => item.offendingIds?.includes(task.id))
   const members = offendingMembers.filter((member) => item.offendingIds?.includes(member.id))
-  const canExpand = tasks.length > 0 || members.length > 0
+  const target = FIX_TARGETS[item.checkId]
+  const isAdvisory = item.kind === 'advisory'
+
+  // PLN-7 — an advisory needs an explicit acknowledgement, never a silent pass.
+  const acknowledge = isAdvisory && onAcknowledge && (
+    <PlanButton
+      aria-pressed={!!acknowledged}
+      onClick={() => onAcknowledge(item.checkId, !acknowledged)}
+      className={cn(acknowledged && 'border-[var(--plan-success)] text-[var(--plan-success)]')}
+    >
+      {acknowledged && <Check />}
+      {acknowledged ? 'Acknowledged' : 'Acknowledge & waive'}
+    </PlanButton>
+  )
+
+  if (tasks.length > 0) {
+    return (
+      <>
+        {tasks.map((task) => (
+          <IssueRow
+            key={task.id}
+            tone={isAdvisory ? 'warning' : 'danger'}
+            title={title}
+            detail={
+              <>
+                <button
+                  type="button"
+                  onClick={() => onOpenTask(task.id)}
+                  className="hover:text-[var(--plan-text)] hover:underline"
+                >
+                  {task.key}
+                </button>
+                {` · ${task.title}`}
+              </>
+            }
+            dimmed={acknowledged}
+          >
+            {item.checkId === 'PC-3' ? (
+              <EstimateEntry task={task} onEstimateTask={onEstimateTask} />
+            ) : (
+              <PlanButton onClick={() => onOpenTask(task.id)}>Fix</PlanButton>
+            )}
+            {acknowledge}
+          </IssueRow>
+        ))}
+      </>
+    )
+  }
+
+  const memberNames = members.map((member) => member.name).join(', ')
+  const detail = [memberNames, item.message].filter(Boolean).join(' · ')
 
   return (
-    <li className={cn('bg-card', !item.passed && 'bg-[var(--apple-system-orange)]/[0.03]')}>
-      <div className="flex items-start gap-3 p-3">
-        <StatusIcon passed={item.passed} kind={item.kind} />
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="font-apple-mono text-[11px]">
-              {item.checkId}
-            </Badge>
-            <span className="text-[13px] font-medium text-[var(--apple-label)]">
-              {CHECK_LABELS[item.checkId] ?? item.checkId}
-            </span>
-          </div>
-
-          {item.message && (
-            <p className="mt-1 text-[13px] text-[var(--apple-secondary-label)]">{item.message}</p>
-          )}
-
-          {canExpand && expanded && (
-            <div className="mt-2.5 space-y-1.5">
-              {tasks.map((task) => (
-                <OffendingTaskRow
-                  key={task.id}
-                  task={task}
-                  checkId={item.checkId}
-                  onEstimateTask={onEstimateTask}
-                  onOpenTask={onOpenTask}
-                />
-              ))}
-              {members.map((member) => (
-                <div
-                  key={member.id}
-                  className="rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1.5 text-[13px] text-[var(--apple-label)]"
-                >
-                  {member.name}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          {canExpand && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setExpanded((current) => !current)}
-              aria-expanded={expanded}
-            >
-              <ChevronRight
-                className={cn('h-4 w-4 apple-transition', expanded && 'rotate-90')}
-              />
-              <span className="sr-only">
-                {expanded ? 'Hide' : 'Show'} the items failing {item.checkId}
-              </span>
-            </Button>
-          )}
-
-          {/* PLN-7 — an advisory needs an explicit tick, never a silent pass. */}
-          {item.kind === 'advisory' && !item.passed && onAcknowledge && (
-            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[var(--apple-secondary-label)]">
-              <Checkbox
-                checked={!!acknowledged}
-                onCheckedChange={(checked) => onAcknowledge(item.checkId, checked === true)}
-              />
-              Seen
-            </label>
-          )}
-        </div>
-      </div>
-    </li>
+    <IssueRow
+      tone={isAdvisory ? 'warning' : 'danger'}
+      title={title}
+      detail={detail || undefined}
+      dimmed={acknowledged}
+    >
+      {target && onJump && (
+        <PlanButton onClick={() => onJump(target)}>
+          {members.length > 0 && !isAdvisory ? 'Reassign tasks' : 'Fix'}
+        </PlanButton>
+      )}
+      {acknowledge}
+    </IssueRow>
   )
 }
 
 /**
- * One offending task with the fix that check actually needs (UI-5).
- *
- * PC-3 gets an inline estimate field, because that is a single number and
- * bouncing to the task screen for it would be absurd. PC-4 and PC-5 need real
- * editing, so they link out rather than pretending a one-field control is
- * enough.
+ * NFR-A1 in spirit: state is carried by an icon and a label, never by colour
+ * alone. A blocking check and an advisory must not look identical in greyscale.
  */
-function OffendingTaskRow({
+function IssueRow({
+  tone,
+  title,
+  detail,
+  dimmed,
+  children
+}: {
+  tone: 'danger' | 'warning'
+  title: string
+  detail?: React.ReactNode
+  dimmed?: boolean
+  children?: React.ReactNode
+}) {
+  return (
+    <li
+      className={cn(
+        'flex flex-wrap items-center gap-3 rounded-[12px] p-3 sm:flex-nowrap',
+        tone === 'danger' ? 'bg-[var(--plan-danger-bg)]' : 'bg-[var(--plan-warning-bg)]'
+      )}
+    >
+      {tone === 'danger' ? (
+        <AlertCircle aria-label="Blocking" className="h-4 w-4 shrink-0 text-[var(--plan-danger)]" />
+      ) : (
+        <AlertTriangle aria-label="Advisory" className="h-4 w-4 shrink-0 text-[var(--plan-warning)]" />
+      )}
+      <div className={cn('flex min-w-0 flex-1 flex-col gap-[3px]', dimmed && 'opacity-60')}>
+        <span className="text-[12px] font-bold text-[var(--plan-text)]">{title}</span>
+        {detail && <span className="text-[11px] text-[var(--plan-muted)]">{detail}</span>}
+      </div>
+      {children && <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>}
+    </li>
+  )
+}
+
+/** PC-3's inline fix: an estimate is a single number, so it is entered here. */
+function EstimateEntry({
   task,
-  checkId,
-  onEstimateTask,
-  onOpenTask
+  onEstimateTask
 }: {
   task: OffendingTask
-  checkId: string
   onEstimateTask: (taskId: string, hours: number) => Promise<void>
-  onOpenTask: (taskId: string) => void
 }) {
   const [hours, setHours] = useState('')
   const [saving, setSaving] = useState(false)
@@ -355,84 +389,31 @@ function OffendingTaskRow({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-2.5 py-1.5">
-      <button
-        type="button"
-        onClick={() => onOpenTask(task.id)}
-        className="font-apple-mono text-[12px] text-[var(--apple-system-blue)] hover:underline"
-      >
-        {task.key}
-      </button>
-      <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--apple-label)]">
-        {task.title}
-      </span>
-
-      {checkId === 'PC-3' ? (
-        <div className="flex items-center gap-1.5">
-          <Input
-            type="number"
-            min="0.25"
-            step="0.25"
-            value={hours}
-            onChange={(event) => setHours(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') save()
-            }}
-            placeholder="hours"
-            aria-label={`Estimate for ${task.key} in hours`}
-            className="h-7 w-[86px] text-[13px]"
-          />
-          <Button size="sm" onClick={save} disabled={!valid || saving}>
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Set'}
-          </Button>
-        </div>
-      ) : (
-        <Button variant="outline" size="sm" onClick={() => onOpenTask(task.id)}>
-          Fix
-        </Button>
-      )}
-
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min="0.25"
+          step="0.25"
+          value={hours}
+          onChange={(event) => setHours(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') save()
+          }}
+          placeholder="Hours"
+          aria-label={`Estimate for ${task.key} in hours`}
+          className="w-[72px] rounded-[8px] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-2 text-[11px] text-[var(--plan-text)] placeholder:text-[var(--plan-muted)] focus:border-[var(--plan-accent)] focus:outline-none"
+        />
+        <PlanButton onClick={save} disabled={!valid || saving}>
+          {saving && <Loader2 className="animate-spin" />}
+          Enter estimate
+        </PlanButton>
+      </div>
       {error && (
-        <p className="w-full text-[12px] text-[var(--apple-system-red)]" role="alert">
+        <p className="text-[11px] text-[var(--plan-danger)]" role="alert">
           {error}
         </p>
       )}
     </div>
-  )
-}
-
-/**
- * NFR-A1 in spirit: state is carried by an icon and a label, never by colour
- * alone. A failing mandatory check and a failing advisory are different things
- * and must not look identical in greyscale.
- */
-function StatusIcon({ passed, kind }: { passed: boolean; kind: 'mandatory' | 'advisory' }) {
-  if (passed) {
-    return (
-      <span
-        className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--apple-system-green)]/15"
-        aria-label="Passed"
-      >
-        <Check className="h-3 w-3 text-[var(--apple-system-green)]" />
-      </span>
-    )
-  }
-
-  if (kind === 'advisory') {
-    return (
-      <AlertTriangle
-        className="mt-0.5 h-4 w-4 shrink-0 text-[var(--apple-system-orange)]"
-        aria-label="Warning"
-      />
-    )
-  }
-
-  return (
-    <span
-      className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--apple-system-red)]/15"
-      aria-label="Blocking"
-    >
-      <X className="h-3 w-3 text-[var(--apple-system-red)]" />
-    </span>
   )
 }

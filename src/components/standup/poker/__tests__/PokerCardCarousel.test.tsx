@@ -1,66 +1,113 @@
 /**
  * @jest-environment jsdom
  */
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 
 import { PokerCardCarousel } from '../PokerCardCarousel'
 
-const CARDS = [1, 2, 3, 4, 6, 8, 12, 14, 16]
+const CARDS = [1, 2, 3, 5, 8, 13, 21, '?', 'coffee']
 
-describe('PokerCardCarousel — two-step select', () => {
+describe('PokerCardCarousel — browse only, no implicit vote', () => {
   it('starts centered on the middle card when nothing is selected yet', () => {
-    render(<PokerCardCarousel cards={CARDS} selected={null} onSelect={jest.fn()} />)
+    render(<PokerCardCarousel cards={CARDS} selected={null} onPick={jest.fn()} />)
 
-    const middle = screen.getByRole('option', { name: 'Card 6' })
+    const middle = screen.getByRole('option', { name: 'Card 8' })
     expect(middle).toHaveAttribute('aria-current', 'true')
   })
 
   it('starts centered on the already-selected card', () => {
-    render(<PokerCardCarousel cards={CARDS} selected={12} onSelect={jest.fn()} />)
+    render(<PokerCardCarousel cards={CARDS} selected={13} onPick={jest.fn()} />)
 
-    expect(screen.getByRole('option', { name: 'Card 12' })).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByRole('option', { name: 'Card 13' })).toHaveAttribute('aria-current', 'true')
   })
 
-  it('clicking an off-center card only re-centers it — no vote yet', () => {
-    const onSelect = jest.fn()
-    render(<PokerCardCarousel cards={CARDS} selected={null} onSelect={onSelect} />)
+  it('clicking any off-center card centers it as the candidate, without voting', () => {
+    const onPick = jest.fn()
+    render(<PokerCardCarousel cards={CARDS} selected={null} onPick={onPick} />)
 
-    fireEvent.click(screen.getByRole('option', { name: 'Card 14' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Card 21' }))
 
-    expect(onSelect).not.toHaveBeenCalled()
-    expect(screen.getByRole('option', { name: 'Card 14' })).toHaveAttribute('aria-current', 'true')
+    // "Voting" happens outside this component — it only ever reports a
+    // candidate via onPick, never anything that submits by itself.
+    expect(onPick).toHaveBeenCalledWith(21)
+    expect(screen.getByRole('option', { name: 'Card 21' })).toHaveAttribute('aria-current', 'true')
   })
 
-  it('clicking the already-centered card confirms the vote', () => {
-    const onSelect = jest.fn()
-    render(<PokerCardCarousel cards={CARDS} selected={null} onSelect={onSelect} />)
+  it('clicking the already-centered card reports it as the candidate too', () => {
+    const onPick = jest.fn()
+    render(<PokerCardCarousel cards={CARDS} selected={null} onPick={onPick} />)
 
-    // First click brings 14 to center (per the test above); second click on
-    // the now-centered card is the confirm step.
-    fireEvent.click(screen.getByRole('option', { name: 'Card 14' }))
-    fireEvent.click(screen.getByRole('option', { name: 'Card 14' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Card 8' }))
 
-    expect(onSelect).toHaveBeenCalledWith(14)
+    expect(onPick).toHaveBeenCalledWith(8)
   })
 
   it('does nothing while disabled', () => {
-    const onSelect = jest.fn()
-    render(<PokerCardCarousel cards={CARDS} selected={null} disabled onSelect={onSelect} />)
+    const onPick = jest.fn()
+    render(<PokerCardCarousel cards={CARDS} selected={null} disabled onPick={onPick} />)
 
-    // Middle card (6) starts centered, so this click would otherwise confirm.
-    fireEvent.click(screen.getByRole('option', { name: 'Card 6' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Card 8' }))
 
-    expect(onSelect).not.toHaveBeenCalled()
+    expect(onPick).not.toHaveBeenCalled()
   })
 
-  it('clamps centering at both ends of the deck', () => {
-    const onSelect = jest.fn()
-    render(<PokerCardCarousel cards={CARDS} selected={null} onSelect={onSelect} />)
+  it('clamps centering at both ends of the deck, including the non-numeric cards', () => {
+    const onPick = jest.fn()
+    render(<PokerCardCarousel cards={CARDS} selected={null} onPick={onPick} />)
 
-    fireEvent.click(screen.getByRole('option', { name: 'Card 16' }))
-    expect(screen.getByRole('option', { name: 'Card 16' })).toHaveAttribute('aria-current', 'true')
+    fireEvent.click(screen.getByRole('option', { name: 'Coffee break card' }))
 
-    fireEvent.click(screen.getByRole('option', { name: 'Card 16' }))
-    expect(onSelect).toHaveBeenCalledWith(16)
+    expect(onPick).toHaveBeenCalledWith('coffee')
+    expect(screen.getByRole('option', { name: 'Coffee break card' })).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('treats "?" and "coffee" as ordinary cards to pick', () => {
+    const onPick = jest.fn()
+    render(<PokerCardCarousel cards={CARDS} selected={null} onPick={onPick} />)
+
+    fireEvent.click(screen.getByRole('option', { name: 'Unsure card' }))
+
+    expect(onPick).toHaveBeenCalledWith('?')
+  })
+
+  it('reports the settled card once a drag ends, not on every intermediate move', () => {
+    // jsdom's PointerEvent support doesn't carry `clientX` through
+    // fireEvent's init dict, so this drives the same `endDrag` path the real
+    // pointerup handler calls, rather than simulating clientX deltas.
+    const onPick = jest.fn()
+    render(<PokerCardCarousel cards={CARDS} selected={null} onPick={onPick} />)
+
+    const listbox = screen.getByRole('listbox')
+
+    fireEvent.pointerDown(listbox, { pointerId: 1 })
+    expect(onPick).not.toHaveBeenCalled()
+
+    fireEvent.pointerUp(listbox, { pointerId: 1 })
+
+    // No net movement — settles back on the still-centered middle card (8).
+    expect(onPick).toHaveBeenCalledTimes(1)
+    expect(onPick).toHaveBeenCalledWith(8)
+  })
+
+  it('reports the settled card once a wheel scroll settles', () => {
+    jest.useFakeTimers()
+    try {
+      const onPick = jest.fn()
+      render(<PokerCardCarousel cards={CARDS} selected={null} onPick={onPick} />)
+
+      const listbox = screen.getByRole('listbox')
+      fireEvent.wheel(listbox, { deltaY: 140 })
+      expect(onPick).not.toHaveBeenCalled()
+
+      act(() => {
+        jest.advanceTimersByTime(200)
+      })
+
+      // Started centered on 8 (index 4); one wheel unit moves focus to index 5 (13).
+      expect(onPick).toHaveBeenCalledTimes(1)
+      expect(onPick).toHaveBeenCalledWith(13)
+    } finally {
+      jest.useRealTimers()
+    }
   })
 })
