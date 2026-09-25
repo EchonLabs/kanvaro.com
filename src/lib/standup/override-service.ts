@@ -7,6 +7,8 @@
  * and — separately, from `detectChronicUnderAllocation` — raises N7 when a
  * member has been under-allocated on three consecutive stand-ups.
  */
+import mongoose from 'mongoose'
+
 import { StandupOverride, type OverrideType } from '@/models/StandupOverride'
 import { CarryForwardItem, OPEN_CARRY_FORWARD_STATUSES } from '@/models/CarryForwardItem'
 import { isOverridable, validateJustification, OVERRIDE_TABLE, type AnyOverrideType } from './override'
@@ -164,4 +166,26 @@ export async function detectChronicUnderAllocation(input: {
   })
 
   return true
+}
+
+/** The same threshold `detectChronicUnderAllocation` uses to fire N7. */
+const CHRONIC_UNDER_ALLOCATION_THRESHOLD = 3
+
+/**
+ * OVR-9, for the org-admin oversight rollup: how many distinct members in
+ * this sprint have reached chronic under-allocation (three or more
+ * `under_allocation` overrides), so the dashboard can flag it without
+ * re-deriving the definition `detectChronicUnderAllocation` already uses to
+ * fire N7. One aggregation rather than a query per member.
+ */
+export async function countChronicUnderAllocationMembers(sprintId: string): Promise<number> {
+  const rows = await StandupOverride.aggregate([
+    { $match: { sprint: new mongoose.Types.ObjectId(sprintId), type: 'under_allocation' } },
+    { $unwind: '$affectedMemberIds' },
+    { $group: { _id: '$affectedMemberIds', count: { $sum: 1 } } },
+    { $match: { count: { $gte: CHRONIC_UNDER_ALLOCATION_THRESHOLD } } },
+    { $count: 'chronicMembers' }
+  ])
+
+  return rows[0]?.chronicMembers ?? 0
 }

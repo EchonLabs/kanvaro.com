@@ -5,7 +5,7 @@
  * database, per this repo's rule that at least one test per service writes
  * through the real path rather than a pre-seeded row.
  */
-import { issueOverride, detectChronicUnderAllocation } from '../override-service'
+import { issueOverride, detectChronicUnderAllocation, countChronicUnderAllocationMembers } from '../override-service'
 import { StandupOverride } from '@/models/StandupOverride'
 import { CarryForwardItem } from '@/models/CarryForwardItem'
 import { ids, useMongo } from './helpers/mongo'
@@ -95,5 +95,54 @@ describe('detectChronicUnderAllocation', () => {
       standupId: String(ids.user)
     })
     expect(after).toBe(true)
+  })
+})
+
+describe('countChronicUnderAllocationMembers', () => {
+  it('counts a member with 3 or more under_allocation overrides in the sprint', async () => {
+    const memberId = String(ids.member)
+    for (let i = 0; i < 3; i++) {
+      await issueOverride(baseInput({ affectedMemberIds: [memberId] }))
+    }
+
+    const count = await countChronicUnderAllocationMembers(String(ids.sprint))
+    expect(count).toBe(1)
+  })
+
+  it('does not count a member with only 2 under_allocation overrides', async () => {
+    const memberId = String(ids.member)
+    for (let i = 0; i < 2; i++) {
+      await issueOverride(baseInput({ affectedMemberIds: [memberId] }))
+    }
+
+    const count = await countChronicUnderAllocationMembers(String(ids.sprint))
+    expect(count).toBe(0)
+  })
+
+  it('counts multiple chronic members independently, without double-counting one past the threshold', async () => {
+    const memberA = String(ids.member)
+    const memberB = String(ids.otherMember)
+    for (let i = 0; i < 5; i++) {
+      await issueOverride(baseInput({ affectedMemberIds: [memberA] }))
+    }
+    for (let i = 0; i < 3; i++) {
+      await issueOverride(baseInput({ affectedMemberIds: [memberB] }))
+    }
+
+    const count = await countChronicUnderAllocationMembers(String(ids.sprint))
+    expect(count).toBe(2)
+  })
+
+  it('ignores overrides of a different type and overrides from another sprint', async () => {
+    const memberId = String(ids.member)
+    for (let i = 0; i < 3; i++) {
+      await issueOverride(baseInput({ affectedMemberIds: [memberId], type: 'over_allocation', memberAcknowledged: true }))
+    }
+    for (let i = 0; i < 3; i++) {
+      await issueOverride(baseInput({ affectedMemberIds: [memberId], sprintId: String(ids.otherSprint) }))
+    }
+
+    const count = await countChronicUnderAllocationMembers(String(ids.sprint))
+    expect(count).toBe(0)
   })
 })
