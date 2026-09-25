@@ -41,6 +41,8 @@ interface MyStandupBoard {
   status: string
   date: string
   projectId: string
+  sprintId: string
+  projectName: string
   scheduledStartAt?: string
   durationMinutes?: number
   meetingUrl?: string
@@ -175,6 +177,8 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
             status: board.status,
             date: board.date,
             projectId: board.projectId,
+            sprintId: board.sprintId,
+            projectName: board.projectName,
             scheduledStartAt: board.scheduledStartAt,
             durationMinutes: board.durationMinutes,
             meetingUrl: board.meetingUrl,
@@ -237,6 +241,12 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
       )
       if (!response.ok) throw await asError(response)
       const payload = await response.json()
+      // A changed allocation moves the member's capacity (the ring, the gap
+      // sentence, and whether Pull More Work has anything left to offer),
+      // none of which live in this response — refetch the board the same
+      // way `addAllocation` and `raiseBlocker` already do, rather than
+      // leaving those figures stale until an unrelated action reloads them.
+      setReloadToken((token) => token + 1)
       return { standupVersion: payload.data.standupVersion }
     },
     // No `removeAllocation`: ALO-22's member surface is additions only, the
@@ -295,6 +305,8 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
             status={data.status}
             date={data.date}
             projectId={data.projectId}
+            sprintId={data.sprintId}
+            projectName={data.projectName}
             member={data.member}
             poolTasks={data.poolTasks}
             /* Deliberately unconditional. P11-6 makes the server the real gate:

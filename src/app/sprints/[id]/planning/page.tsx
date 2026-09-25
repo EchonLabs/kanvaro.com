@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CalendarRange, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
 import { MainLayout } from '@/components/layout/MainLayout'
@@ -110,29 +110,10 @@ export default function SprintPlanningPage() {
 
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
-      <div className="space-y-6 p-4 sm:p-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push(`/sprints/${sprintId}`)}
-          className="-ml-2"
-        >
-          <ArrowLeft className="mr-1.5 h-4 w-4" />
-          Back to {sprint.name}
-        </Button>
-
-        <div className="flex items-center gap-3">
-          <CalendarRange className="h-8 w-8 flex-shrink-0 text-[var(--apple-chart-to)]" strokeWidth={1.5} />
-          <div>
-            <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-[var(--apple-label)]">
-              Sprint planning
-            </h1>
-            <p className="text-[15px] text-[var(--apple-secondary-label)] mt-0.5">
-              {sprint.name} · <span className="capitalize">{sprint.status}</span>
-            </p>
-          </div>
-        </div>
-
+      {/* Bleeds through <main>'s padding so the planning canvas fills the
+          content area edge to edge; the sidebar and breadcrumbs are untouched.
+          The workspace owns the header so its actions share the title row. */}
+      <div className="-m-3 min-h-full bg-[var(--plan-canvas)] px-4 pb-12 pt-6 sm:-m-4 sm:px-6 lg:-m-6 lg:px-[34px] lg:pt-7">
         <PermissionGate
           permission={Permission.SPRINT_VIEW}
           projectId={sprint.project?._id ?? sprint.project}
@@ -141,6 +122,7 @@ export default function SprintPlanningPage() {
             sprintId={sprintId}
             sprintName={sprint.name}
             sprintStatus={sprint.status}
+            sprintDescription={sprint.description}
             projectId={sprint.project?._id ?? sprint.project}
             waiverBanner={waiverBanner}
             onCompleted={load}

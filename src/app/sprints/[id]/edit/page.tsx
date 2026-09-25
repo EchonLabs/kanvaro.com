@@ -13,11 +13,21 @@ import { Badge } from '@/components/ui/Badge'
 import { Loader2, ArrowLeft, Users, X, AlertTriangle } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
 import { validateSprintDates } from '@/lib/sprintDateValidation'
+import { canTransition, SPRINT_STATES, type SprintState } from '@/lib/standup/sprint-states'
+
+const STATUS_LABELS: Record<SprintState, string> = {
+  draft: 'Draft',
+  planning: 'Planning',
+  planned: 'Planned',
+  active: 'Active',
+  completed: 'Completed',
+  cancelled: 'Cancelled'
+}
 
 interface SprintForm {
   name: string
   description: string
-  status: 'planning' | 'active' | 'completed' | 'cancelled'
+  status: SprintState
   startDate: string
   endDate: string
   goal: string
@@ -653,12 +663,24 @@ export default function EditSprintPage() {
                 <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as SprintForm['status'] })}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="planning">Planning</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    {/* Only the transitions the state machine allows, and
+                        never `active`: starting a sprint goes through Start
+                        Sprint, which checks the sprint has been planned, has
+                        tasks, and stamps its actual start date. */}
+                    {SPRINT_STATES.filter(
+                      (candidate) =>
+                        candidate !== 'active' &&
+                        (candidate === form.status || canTransition(form.status, candidate))
+                    ).map((candidate) => (
+                      <SelectItem key={candidate} value={candidate}>
+                        {STATUS_LABELS[candidate]}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Use Start Sprint on the sprint page to move a planned sprint to Active.
+                </p>
               </div>
 
               {selectedProject?.startDate && selectedProject?.endDate && (
