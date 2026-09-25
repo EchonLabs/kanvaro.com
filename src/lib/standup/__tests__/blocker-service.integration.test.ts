@@ -5,7 +5,7 @@
  * repo's rule that at least one test per service writes through the real
  * path rather than a pre-seeded row.
  */
-import { loadBlockerPanel, raiseBlocker, updateBlocker } from '../blocker-service'
+import { loadBlockerPanel, loadBlockerRowsForSprints, raiseBlocker, updateBlocker } from '../blocker-service'
 import { StandupBlocker } from '@/models/StandupBlocker'
 import { CarryForwardItem } from '@/models/CarryForwardItem'
 import { Allocation } from '@/models/Allocation'
@@ -327,5 +327,81 @@ describe('loadBlockerPanel', () => {
 
     const rows = await loadBlockerPanel(String(standup._id))
     expect(rows[0].raisedById).toBe(String(ids.member))
+  })
+})
+
+describe('loadBlockerRowsForSprints', () => {
+  const seedStandupFor = async (sprintId: unknown, standupDate: string) =>
+    Standup.create({
+      project: ids.project,
+      sprint: sprintId,
+      organization: ids.organization,
+      standupDate,
+      scheduledStartAt: new Date(`${standupDate}T03:30:00.000Z`),
+      durationMinutes: 15,
+      sprintDayNumber: 1,
+      totalSprintDays: 5,
+      shape: 'day_one',
+      status: 'In_Progress',
+      facilitator: ids.user,
+      expectedAttendees: [ids.member],
+      version: 1
+    })
+
+  it('groups open blockers by sprint id', async () => {
+    const standupA = await seedStandupFor(ids.sprint, '2026-08-05')
+    const standupB = await seedStandupFor(ids.otherSprint, '2026-08-05')
+    await raiseBlocker(raiseInput({ standupId: String(standupA._id), sprintId: String(ids.sprint) }))
+    await raiseBlocker(
+      raiseInput({ standupId: String(standupB._id), sprintId: String(ids.otherSprint), description: 'Second sprint blocker, still open.' })
+    )
+
+    const rowsBySprint = await loadBlockerRowsForSprints([String(ids.sprint), String(ids.otherSprint)])
+    expect(rowsBySprint.get(String(ids.sprint))).toHaveLength(1)
+    expect(rowsBySprint.get(String(ids.otherSprint))).toHaveLength(1)
+  })
+
+  it('excludes resolved blockers by default', async () => {
+    const standup = await seedStandupFor(ids.sprint, '2026-08-05')
+    const blocker = await raiseBlocker(raiseInput({ standupId: String(standup._id) }))
+    await updateBlocker({
+      blockerId: String(blocker._id),
+      standupId: String(standup._id),
+      updatedBy: String(ids.user),
+      organizationId: String(ids.organization),
+      projectId: String(ids.project),
+      status: 'resolved',
+      resolutionNote: 'Vendor restored the sandbox environment this morning.'
+    })
+
+    const rowsBySprint = await loadBlockerRowsForSprints([String(ids.sprint)])
+    expect(rowsBySprint.get(String(ids.sprint)) ?? []).toHaveLength(0)
+  })
+
+  it("computes overdue from each blocker's own stand-up date, not a single shared reference date", async () => {
+    // Two stand-ups in the same sprint, different dates — a blocker raised on
+    // the earlier one must be judged overdue against ITS OWN date, not the
+    // later stand-up's date (which this function has no single one of).
+    const earlyStandup = await seedStandupFor(ids.sprint, '2026-08-05')
+    await seedStandupFor(ids.sprint, '2026-08-12')
+
+    const blocker = await raiseBlocker(raiseInput({ standupId: String(earlyStandup._id) }))
+    // Between the two stand-up dates: not yet due against the blocker's own
+    // (earlier) stand-up date, but would wrongly read as overdue if this
+    // function used the sprint's later stand-up date as a shared "today".
+    await StandupBlocker.updateOne(
+      { _id: blocker._id },
+      { $set: { targetResolutionDate: new Date('2026-08-08T00:00:00.000Z') } }
+    )
+
+    const rowsBySprint = await loadBlockerRowsForSprints([String(ids.sprint)])
+    const rows = rowsBySprint.get(String(ids.sprint)) ?? []
+    expect(rows).toHaveLength(1)
+    expect(rows[0].overdue).toBe(false)
+  })
+
+  it('returns an empty array for a sprint with no open blockers', async () => {
+    const rowsBySprint = await loadBlockerRowsForSprints([String(ids.sprint)])
+    expect(rowsBySprint.get(String(ids.sprint)) ?? []).toEqual([])
   })
 })

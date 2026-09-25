@@ -223,14 +223,19 @@ export interface BlockerPanelRow {
  *   characters, uppercased. No counter, no extra storage — every read derives
  *   the same label from the id that already uniquely identifies the row.
  */
-export async function loadBlockerPanel(standupId: string): Promise<BlockerPanelRow[]> {
-  const standup = (await Standup.findById(standupId).select('standupDate').lean()) as any
-  if (!standup) {
-    throw new StandupError('NOT_FOUND', 'That stand-up no longer exists.', { standupId })
-  }
-
-  const blockers = (await StandupBlocker.find({ standup: standup._id }).lean()) as any[]
-
+/**
+ * Shared by `loadBlockerPanel` (one stand-up, one reference date) and
+ * `loadBlockerRowsForSprints` (many stand-ups, one reference date per
+ * blocker) — batch-loads the related tasks/owners/allocations rather than
+ * one query per blocker, then maps. `referenceDateOf` resolves each
+ * blocker's own "today" for the overdue check (RUN-18): a single shared
+ * stand-up in `loadBlockerPanel`, or the blocker's own stand-up's date when
+ * blockers span more than one stand-up.
+ */
+async function mapBlockersToRows(
+  blockers: any[],
+  referenceDateOf: (blocker: any) => unknown
+): Promise<BlockerPanelRow[]> {
   const taskIds = Array.from(new Set(blockers.filter((b) => b.task).map((b) => String(b.task))))
   const ownerIds = Array.from(new Set(blockers.filter((b) => b.owner).map((b) => String(b.owner))))
   const allocationIds = Array.from(
@@ -279,9 +284,65 @@ export async function loadBlockerPanel(standupId: string): Promise<BlockerPanelR
       ...(blocker.owner ? { owner: ownerNameById.get(String(blocker.owner)) } : {}),
       raisedById: String(blocker.raisedBy),
       ...(targetResolutionDate ? { targetResolutionDate } : {}),
-      overdue: isOverdue(targetResolutionDate, standup.standupDate),
+      overdue: isOverdue(targetResolutionDate, referenceDateOf(blocker)),
       ...(allocation?.excludedFromCapacity ? { freedMinutes: allocation.plannedMinutes } : {}),
       blockerLabel: `BLK-${String(blocker._id).slice(-6).toUpperCase()}`
     }
   })
+}
+
+export async function loadBlockerPanel(standupId: string): Promise<BlockerPanelRow[]> {
+  const standup = (await Standup.findById(standupId).select('standupDate').lean()) as any
+  if (!standup) {
+    throw new StandupError('NOT_FOUND', 'That stand-up no longer exists.', { standupId })
+  }
+
+  const blockers = (await StandupBlocker.find({ standup: standup._id }).lean()) as any[]
+
+  return mapBlockersToRows(blockers, () => standup.standupDate)
+}
+
+/** Open/in-progress by default — the oversight use case only wants what still needs triage. */
+const OPEN_BLOCKER_STATUSES = ['open', 'in_progress']
+
+/**
+ * Every open blocker across a set of sprints, grouped by sprint — the
+ * sprint-wide analogue of `loadBlockerPanel`, for the admin oversight rollup
+ * (which otherwise only sees a count). Blockers here span many stand-ups, so
+ * each one's `overdue` check needs its own stand-up's date rather than one
+ * shared reference date: batch-loads the distinct `Standup` documents the
+ * blockers reference, same batching pattern as the task/owner/allocation
+ * loads above.
+ */
+export async function loadBlockerRowsForSprints(
+  sprintIds: string[],
+  options: { statuses?: string[] } = {}
+): Promise<Map<string, BlockerPanelRow[]>> {
+  const statuses = options.statuses ?? OPEN_BLOCKER_STATUSES
+  const result = new Map<string, BlockerPanelRow[]>()
+  if (sprintIds.length === 0) return result
+
+  const blockers = (await StandupBlocker.find({
+    sprint: { $in: sprintIds },
+    status: { $in: statuses }
+  }).lean()) as any[]
+
+  if (blockers.length === 0) return result
+
+  const standupIds = Array.from(new Set(blockers.map((b) => String(b.standup))))
+  const standups = (await Standup.find({ _id: { $in: standupIds } })
+    .select('standupDate')
+    .lean()) as any[]
+  const standupDateById = new Map(standups.map((s) => [String(s._id), s.standupDate]))
+
+  const rows = await mapBlockersToRows(blockers, (blocker) => standupDateById.get(String(blocker.standup)))
+
+  blockers.forEach((blocker, index) => {
+    const sprintId = String(blocker.sprint)
+    const bucket = result.get(sprintId) ?? []
+    bucket.push(rows[index])
+    result.set(sprintId, bucket)
+  })
+
+  return result
 }
