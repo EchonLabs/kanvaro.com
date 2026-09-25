@@ -67,6 +67,21 @@ interface AgeBands {
   chronic: number
 }
 
+/** A UI-shaped subset of `BlockerPanelRow` — no `freedMinutes`, not useful at this screen's altitude. */
+interface BlockerRow {
+  blockerId: string
+  taskKey?: string
+  description: string
+  blockerType: string
+  severity: string
+  status: string
+  owner?: string
+  raisedById: string
+  targetResolutionDate?: string
+  overdue: boolean
+  blockerLabel: string
+}
+
 interface SprintOversightRow {
   sprintId: string
   sprintName: string
@@ -82,6 +97,8 @@ interface SprintOversightRow {
   overridesCount: number
   overrideReasonCounts: Array<{ type: string; reasonCode: string; count: number }>
   openBlockersCount: number
+  openBlockers: BlockerRow[]
+  chronicUnderAllocationCount: number
   discipline: {
     completedDays: number
     missedDays: number
@@ -166,6 +183,10 @@ const balanceOf = (row: SprintOversightRow) =>
 function verdictOf(row: SprintOversightRow): string {
   const balance = balanceOf(row)
   if (row.capacityBalance.exceedsCapacity) return `${balance.toFixed(1)}h more work than capacity left`
+  if (row.chronicUnderAllocationCount > 0) {
+    const count = row.chronicUnderAllocationCount
+    return `${count} member${count === 1 ? '' : 's'} chronically under-allocated`
+  }
   if (row.consecutiveMissedDays >= 3) return `${row.consecutiveMissedDays} stand-ups missed in a row`
   if (row.carryForward.chronicCount > 0) {
     const count = row.carryForward.chronicCount
@@ -291,6 +312,16 @@ export function StandupOversightScreen() {
   // never pair an org-wide sentence with a per-project board.
   const view = useMemo(() => (data ? deriveOversightView(data, projectId) : null), [data, projectId])
 
+  // Optimistically splices a revoked waiver out of state rather than
+  // refetching the whole org rollup for one row — the waiver panel is the
+  // only thing this action can invalidate.
+  const revokeWaiver = async (sprintId: string) => {
+    await fetch(`/api/sprints/${sprintId}/planning-waiver`, { method: 'DELETE' })
+    setData((current) =>
+      current ? { ...current, waivers: current.waivers.filter((w) => w.sprintId !== sprintId) } : current
+    )
+  }
+
   if (error) {
     return (
       <p role="alert" className="p-6 text-[13px] text-[var(--apple-system-red)]">
@@ -344,7 +375,7 @@ export function StandupOversightScreen() {
         </>
       )}
 
-      {view.waivers.length > 0 && <WaiverPanel waivers={view.waivers} />}
+      {view.waivers.length > 0 && <WaiverPanel waivers={view.waivers} onRevoke={revokeWaiver} />}
     </div>
   )
 }
@@ -783,9 +814,14 @@ function SprintStrip({ row, scale }: { row: SprintOversightRow; scale: number })
 
         <dl className="grid grid-cols-2 gap-x-5 gap-y-1.5">
           <Figure value={row.carryForward.openCount} label="carried" />
-          <Figure value={row.openBlockersCount} label="blockers" />
+          {row.openBlockers.length > 0 ? (
+            <BlockerDisclosure blockers={row.openBlockers} />
+          ) : (
+            <Figure value={row.openBlockersCount} label="blockers" />
+          )}
           <Figure value={row.estimateDebtMinutes} label="debt" format={hoursLabel} />
           <Figure value={row.overridesCount} label="overrides" />
+          <Figure value={row.chronicUnderAllocationCount} label="under-allocated" />
         </dl>
 
         <ArrowUpRight
@@ -823,6 +859,59 @@ function Figure({
       <span aria-hidden className="truncate text-[12px] text-[var(--apple-tertiary-label)]">
         {label}
       </span>
+    </div>
+  )
+}
+
+const SEVERITY_CLASS: Record<string, string> = {
+  critical: 'text-[var(--viz-critical)]',
+  high: 'text-[var(--viz-critical)]'
+}
+
+/**
+ * The blockers figure, promoted from a count to a disclosure: an admin lands
+ * here to triage, and a count alone gives them nothing to act on. Expands
+ * in place rather than navigating away, so the sprint's other context stays
+ * on screen while they read it. `stopPropagation` plus `relative z-10` keep
+ * the click on this button rather than the row's own full-row link.
+ */
+function BlockerDisclosure({ blockers }: { blockers: BlockerRow[] }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative z-10 col-span-2 min-w-0 sm:col-span-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.stopPropagation()
+          setOpen((current) => !current)
+        }}
+        className="flex items-baseline gap-1.5 rounded-[var(--apple-radius-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]"
+      >
+        <span className="font-apple-mono text-[14px] font-semibold tabular-nums text-[var(--apple-label)]">
+          {blockers.length}
+        </span>
+        <span className="text-[12px] text-[var(--apple-secondary-label)] underline decoration-dotted underline-offset-2">
+          blockers
+        </span>
+      </button>
+
+      {open && (
+        <ul className="mt-2 flex flex-col gap-1.5 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-2.5">
+          {blockers.map((blocker) => (
+            <li key={blocker.blockerId} className="flex flex-wrap items-baseline gap-x-1.5 text-[12px] leading-relaxed text-[var(--apple-label)]">
+              <span className={cn('font-semibold', SEVERITY_CLASS[blocker.severity] ?? 'text-[var(--apple-secondary-label)]')}>
+                {blocker.severity}
+                {' —'}
+              </span>
+              <span>{blocker.description}</span>
+              {blocker.taskKey && <span className="text-[var(--apple-tertiary-label)]">{blocker.taskKey}</span>}
+              {blocker.overdue && <span className="text-[var(--viz-critical)]">overdue</span>}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -986,7 +1075,7 @@ function Empty({ text }: { text: string }) {
  * screen only an Org Admin can have issued (PLN-16) and the only one they can
  * revoke, so it gets its own panel rather than a row on the board.
  */
-function WaiverPanel({ waivers }: { waivers: WaiverRow[] }) {
+function WaiverPanel({ waivers, onRevoke }: { waivers: WaiverRow[]; onRevoke: (sprintId: string) => Promise<void> }) {
   return (
     <section className="rounded-[var(--apple-radius-lg)] border border-[var(--viz-critical)]/30 bg-card p-5">
       <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[var(--apple-label)]">
@@ -999,35 +1088,80 @@ function WaiverPanel({ waivers }: { waivers: WaiverRow[] }) {
       </p>
       <ul className="flex flex-col divide-y divide-[var(--apple-separator)]">
         {waivers.map((waiver) => (
-          <li
-            key={waiver.sprintId}
-            className="flex flex-col items-start justify-between gap-x-6 gap-y-2 py-3 first:pt-0 last:pb-0 sm:flex-row"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-medium text-[var(--apple-label)]">
-                {waiver.sprintName}
-                <span className="font-normal text-[var(--apple-tertiary-label)]"> in {waiver.projectName}</span>
-              </p>
-              <p className="mt-0.5 max-w-[62ch] text-[13px] leading-relaxed text-[var(--apple-secondary-label)]">
-                {waiver.justification}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-baseline gap-3 text-[12px]">
-              <span className="font-apple-mono tabular-nums text-[var(--apple-tertiary-label)]">
-                {waiver.waivedCheckIds.join(', ')}
-              </span>
-              <span
-                className={
-                  waiver.expired ? 'text-[var(--viz-critical)]' : 'text-[var(--apple-secondary-label)]'
-                }
-              >
-                {waiver.expired ? 'Expired' : `Until ${waiver.expiresAt.slice(0, 10)}`}
-              </span>
-            </div>
-          </li>
+          <WaiverRowItem key={waiver.sprintId} waiver={waiver} onRevoke={onRevoke} />
         ))}
       </ul>
     </section>
+  )
+}
+
+/**
+ * One waiver plus its revoke action. Inline confirm rather than a modal —
+ * a `DELETE` with no body needs nothing more than a yes/no, and every other
+ * confirmation on this screen (the blocker disclosure) is already inline.
+ */
+function WaiverRowItem({
+  waiver,
+  onRevoke
+}: {
+  waiver: WaiverRow
+  onRevoke: (sprintId: string) => Promise<void>
+}) {
+  const [confirming, setConfirming] = useState(false)
+  const [revoking, setRevoking] = useState(false)
+
+  return (
+    <li className="flex flex-col items-start justify-between gap-x-6 gap-y-2 py-3 first:pt-0 last:pb-0 sm:flex-row">
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-medium text-[var(--apple-label)]">
+          {waiver.sprintName}
+          <span className="font-normal text-[var(--apple-tertiary-label)]"> in {waiver.projectName}</span>
+        </p>
+        <p className="mt-0.5 max-w-[62ch] text-[13px] leading-relaxed text-[var(--apple-secondary-label)]">
+          {waiver.justification}
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-baseline gap-3 text-[12px]">
+        <span className="font-apple-mono tabular-nums text-[var(--apple-tertiary-label)]">
+          {waiver.waivedCheckIds.join(', ')}
+        </span>
+        <span className={waiver.expired ? 'text-[var(--viz-critical)]' : 'text-[var(--apple-secondary-label)]'}>
+          {waiver.expired ? 'Expired' : `Until ${waiver.expiresAt.slice(0, 10)}`}
+        </span>
+        {confirming ? (
+          <span className="flex items-center gap-2">
+            <span className="text-[var(--apple-secondary-label)]">Revoke this waiver?</span>
+            <button
+              type="button"
+              disabled={revoking}
+              onClick={async () => {
+                setRevoking(true)
+                await onRevoke(waiver.sprintId)
+              }}
+              className="font-semibold text-[var(--viz-critical)] hover:underline disabled:opacity-50"
+            >
+              Confirm
+            </button>
+            <button
+              type="button"
+              disabled={revoking}
+              onClick={() => setConfirming(false)}
+              className="text-[var(--apple-secondary-label)] hover:underline disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="font-semibold text-[var(--viz-critical)] hover:underline"
+          >
+            Revoke
+          </button>
+        )}
+      </div>
+    </li>
   )
 }
 

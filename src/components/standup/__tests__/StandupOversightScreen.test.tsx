@@ -11,7 +11,7 @@
  * without a separate table view. And each sprint row states the one thing
  * wrong with it, so triage does not depend on decoding a colour (NFR-A1).
  */
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react'
 
 import { StandupOversightScreen, deriveOversightView } from '../oversight/StandupOversightScreen'
 
@@ -36,6 +36,30 @@ const sprint = (overrides: Record<string, any> = {}) => ({
     { type: 'under_allocation', reasonCode: 'no_work_available', count: 1 }
   ],
   openBlockersCount: 2,
+  openBlockers: [
+    {
+      blockerId: 'b1',
+      taskKey: 'KAN-500',
+      description: 'Vendor sandbox is still down',
+      blockerType: 'external_party',
+      severity: 'high',
+      status: 'open',
+      raisedById: 'u1',
+      overdue: true,
+      blockerLabel: 'BLK-AAAAAA'
+    },
+    {
+      blockerId: 'b2',
+      description: 'Waiting on design sign-off',
+      blockerType: 'dependency',
+      severity: 'medium',
+      status: 'open',
+      raisedById: 'u2',
+      overdue: false,
+      blockerLabel: 'BLK-BBBBBB'
+    }
+  ],
+  chronicUnderAllocationCount: 0,
   discipline: { completedDays: 5, missedDays: 2, remainingDays: 3, totalWorkingDays: 10 },
   cadence: cadence(['ran', 'ran', 'ran', 'ran', 'ran', 'missed', 'missed', 'ahead', 'ahead', 'ahead']),
   capacityBalance: {
@@ -65,6 +89,8 @@ const secondSprint = () =>
     overridesCount: 0,
     overrideReasonCounts: [],
     openBlockersCount: 0,
+    openBlockers: [],
+    chronicUnderAllocationCount: 0,
     discipline: { completedDays: 4, missedDays: 0, remainingDays: 6, totalWorkingDays: 10 },
     cadence: cadence(['ran', 'ran', 'ran', 'ran', 'ahead', 'ahead', 'ahead', 'ahead', 'ahead', 'ahead']),
     capacityBalance: {
@@ -264,5 +290,104 @@ describe('StandupOversightScreen', () => {
     expect(await screen.findByText(/planning waivers in force/i)).toBeInTheDocument()
     expect(screen.getByText('PC-4')).toBeInTheDocument()
     expect(screen.getByText(/until 2026-09-20/i)).toBeInTheDocument()
+  })
+
+  it('expands a sprint row to show blocker detail instead of only a count', async () => {
+    mockFetch(mockPayload())
+    render(<StandupOversightScreen />)
+
+    const board = await screen.findByRole('region', { name: /active sprints/i })
+    const flagged = within(board).getByText('Sprint 2').closest('li')!
+
+    expect(within(flagged).queryByText('Vendor sandbox is still down')).not.toBeInTheDocument()
+
+    fireEvent.click(within(flagged).getByRole('button', { name: /2 blockers/i }))
+
+    expect(within(flagged).getByText('Vendor sandbox is still down')).toBeInTheDocument()
+    expect(within(flagged).getByText('Waiting on design sign-off')).toBeInTheDocument()
+    expect(within(flagged).getByText('KAN-500')).toBeInTheDocument()
+  })
+
+  it('surfaces chronic under-allocation as its own figure and, when it is the worst thing true, in the verdict (OVR-9)', async () => {
+    mockFetch(
+      mockPayload({
+        sprints: [
+          sprint({
+            capacityBalance: {
+              remainingEstimateMinutes: 2400,
+              remainingCapacityMinutes: 4800,
+              overageMinutes: 0,
+              exceedsCapacity: false
+            },
+            consecutiveMissedDays: 0,
+            carryForward: {
+              openCount: 0,
+              oldestAgeInStandups: 0,
+              chronicCount: 0,
+              ageBands: { normal: 0, noteRequired: 0, escalated: 0, chronic: 0 }
+            },
+            openBlockersCount: 0,
+            openBlockers: [],
+            chronicUnderAllocationCount: 2,
+            discipline: { completedDays: 5, missedDays: 0, remainingDays: 5, totalWorkingDays: 10 },
+            flags: ['chronic_under_allocation']
+          }),
+          secondSprint()
+        ]
+      })
+    )
+    render(<StandupOversightScreen />)
+
+    expect(
+      await screen.findByText(/start with sprint 2 in kanvaro: 2 members chronically under-allocated/i)
+    ).toBeInTheDocument()
+
+    const board = await screen.findByRole('region', { name: /active sprints/i })
+    const row = within(board).getByText('Sprint 2').closest('li')!
+    expect(within(row).getByText('2')).toBeInTheDocument()
+    expect(within(row).getAllByText(/under-allocated/i).length).toBeGreaterThan(0)
+  })
+
+  it('revokes a planning waiver inline and removes it from the panel', async () => {
+    global.fetch = jest.fn((url: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') {
+        return Promise.resolve({ ok: true, json: async () => ({ data: { revokedAt: '2026-08-20T00:00:00.000Z' } }) })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          data: mockPayload({
+            waivers: [
+              {
+                sprintId: 's1',
+                sprintName: 'Sprint 2',
+                projectId: 'p1',
+                projectName: 'Kanvaro',
+                waivedCheckIds: ['PC-4'],
+                justification: 'Pilot deadline agreed with the delivery lead.',
+                expiresAt: '2026-09-20T00:00:00.000Z',
+                expired: false
+              }
+            ]
+          })
+        })
+      })
+    }) as unknown as typeof fetch
+
+    render(<StandupOversightScreen />)
+
+    expect(await screen.findByText(/planning waivers in force/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /revoke/i }))
+    fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/sprints/s1/planning-waiver',
+        expect.objectContaining({ method: 'DELETE' })
+      )
+    })
+    await waitFor(() => {
+      expect(screen.queryByText(/planning waivers in force/i)).not.toBeInTheDocument()
+    })
   })
 })
