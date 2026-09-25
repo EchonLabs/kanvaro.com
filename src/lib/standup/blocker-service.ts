@@ -234,7 +234,7 @@ export interface BlockerPanelRow {
  */
 async function mapBlockersToRows(
   blockers: any[],
-  referenceDateOf: (blocker: any) => unknown
+  referenceDateOf: (blocker: any) => string
 ): Promise<BlockerPanelRow[]> {
   const taskIds = Array.from(new Set(blockers.filter((b) => b.task).map((b) => String(b.task))))
   const ownerIds = Array.from(new Set(blockers.filter((b) => b.owner).map((b) => String(b.owner))))

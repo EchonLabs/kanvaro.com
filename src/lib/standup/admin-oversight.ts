@@ -27,8 +27,10 @@ import { Standup } from '@/models/Standup'
 import { StandupBlocker } from '@/models/StandupBlocker'
 import { StandupOverride } from '@/models/StandupOverride'
 
+import { type BlockerPanelRow, loadBlockerRowsForSprints } from './blocker-service'
 import { loadSprintHealthTotals } from './jobs/sprint-health'
 import { minutes, type Minutes } from './minutes'
+import { countChronicUnderAllocationMembers } from './override-service'
 import { computeSprintHealth } from './sprint-health'
 
 /** SCH-15: three consecutive misses is the threshold that escalates to the admin. */
@@ -93,6 +95,7 @@ export type OversightFlag =
   | 'chronic_carry_forward'
   | 'consecutive_misses'
   | 'open_blockers'
+  | 'chronic_under_allocation'
 
 export interface SprintOversightRow {
   sprintId: string
@@ -114,6 +117,10 @@ export interface SprintOversightRow {
    */
   overrideReasonCounts: Array<{ type: string; reasonCode: string; count: number }>
   openBlockersCount: number
+  /** Full row detail behind `openBlockersCount` (OVR/RUN-14..18), for triage without a second screen. */
+  openBlockers: BlockerPanelRow[]
+  /** OVR-9 — members under-allocated on 3+ overrides in this sprint, regardless of each day's own justification. */
+  chronicUnderAllocationCount: number
   /**
    * G1's "a stand-up exists for every working day" made measurable: how many of
    * this sprint's stand-ups actually ran, how many were missed, and how many are
@@ -169,6 +176,7 @@ export interface OrgStandupOversight {
     openBlockers: number
     overridesIssued: number
     outstandingDebtMinutes: Minutes
+    chronicUnderAllocationMembers: number
   }
 }
 
@@ -191,20 +199,31 @@ type BuiltRow = SprintOversightRow & {
   overrideReasonRows: Array<{ type: string; reasonCode: string }>
 }
 
-async function buildOversightRow(sprint: any, projectNameById: Map<string, string>): Promise<BuiltRow> {
+async function buildOversightRow(
+  sprint: any,
+  projectNameById: Map<string, string>,
+  openBlockers: BlockerPanelRow[]
+): Promise<BuiltRow> {
   const sprintId = String(sprint._id)
   const sprintObjectId = new mongoose.Types.ObjectId(sprintId)
   const projectId = String(sprint.project)
 
-  const [debtSummaries, cfwItems, overrideRows, openBlockersCount, standups] = await Promise.all([
-    MemberSprintDebtSummary.find({ sprint: sprintObjectId }).select('outstandingMinutes').lean() as Promise<any[]>,
-    CarryForwardItem.find({ sprint: sprintObjectId, status: { $in: OPEN_CARRY_FORWARD_STATUSES } })
-      .select('ageInStandups tags')
-      .lean() as Promise<any[]>,
-    StandupOverride.find({ sprint: sprintObjectId }).select('type reasonCode').lean() as Promise<any[]>,
-    StandupBlocker.countDocuments({ sprint: sprintObjectId, status: 'open' }),
-    Standup.find({ sprint: sprintObjectId }).sort({ standupDate: 1 }).select('status standupDate').lean() as Promise<any[]>
-  ])
+  const [debtSummaries, cfwItems, overrideRows, openBlockersCount, standups, chronicUnderAllocationCount] =
+    await Promise.all([
+      MemberSprintDebtSummary.find({ sprint: sprintObjectId }).select('outstandingMinutes').lean() as Promise<
+        any[]
+      >,
+      CarryForwardItem.find({ sprint: sprintObjectId, status: { $in: OPEN_CARRY_FORWARD_STATUSES } })
+        .select('ageInStandups tags')
+        .lean() as Promise<any[]>,
+      StandupOverride.find({ sprint: sprintObjectId }).select('type reasonCode').lean() as Promise<any[]>,
+      StandupBlocker.countDocuments({ sprint: sprintObjectId, status: 'open' }),
+      Standup.find({ sprint: sprintObjectId })
+        .sort({ standupDate: 1 })
+        .select('status standupDate')
+        .lean() as Promise<any[]>,
+      countChronicUnderAllocationMembers(sprintId)
+    ])
 
   const estimateDebtMinutes = debtSummaries.reduce(
     (total, row) => total + Math.max(0, row.outstandingMinutes ?? 0),
@@ -276,6 +295,7 @@ async function buildOversightRow(sprint: any, projectNameById: Map<string, strin
   if (chronicCount > 0) flags.push('chronic_carry_forward')
   if (consecutiveMissedDays >= CONSECUTIVE_MISS_ESCALATION_THRESHOLD) flags.push('consecutive_misses')
   if (openBlockersCount > 0) flags.push('open_blockers')
+  if (chronicUnderAllocationCount > 0) flags.push('chronic_under_allocation')
 
   return {
     sprintId,
@@ -287,6 +307,8 @@ async function buildOversightRow(sprint: any, projectNameById: Map<string, strin
     overridesCount,
     overrideReasonCounts: Array.from(reasonCountsForSprint.values()),
     openBlockersCount,
+    openBlockers,
+    chronicUnderAllocationCount,
     discipline: {
       completedDays,
       missedDays,
@@ -321,7 +343,13 @@ export async function getOrgStandupOversight(organizationId: string): Promise<Or
     .select('name project endDate planningWaiver')
     .lean() as any[]
 
-  const built = await Promise.all(sprints.map((sprint) => buildOversightRow(sprint, projectNameById)))
+  const blockersBySprintId = await loadBlockerRowsForSprints(sprints.map((sprint) => String(sprint._id)))
+
+  const built = await Promise.all(
+    sprints.map((sprint) =>
+      buildOversightRow(sprint, projectNameById, blockersBySprintId.get(String(sprint._id)) ?? [])
+    )
+  )
 
   built.sort((a, b) => {
     if (a.flags.length !== b.flags.length) return b.flags.length - a.flags.length
@@ -372,7 +400,8 @@ export async function getOrgStandupOversight(organizationId: string): Promise<Or
       chronicCarryForwardItems: acc.chronicCarryForwardItems + row.carryForward.chronicCount,
       openBlockers: acc.openBlockers + row.openBlockersCount,
       overridesIssued: acc.overridesIssued + row.overridesCount,
-      outstandingDebtMinutes: minutes(acc.outstandingDebtMinutes + row.estimateDebtMinutes)
+      outstandingDebtMinutes: minutes(acc.outstandingDebtMinutes + row.estimateDebtMinutes),
+      chronicUnderAllocationMembers: acc.chronicUnderAllocationMembers + row.chronicUnderAllocationCount
     }),
     {
       activeSprints: 0,
@@ -381,7 +410,8 @@ export async function getOrgStandupOversight(organizationId: string): Promise<Or
       chronicCarryForwardItems: 0,
       openBlockers: 0,
       overridesIssued: 0,
-      outstandingDebtMinutes: minutes(0)
+      outstandingDebtMinutes: minutes(0),
+      chronicUnderAllocationMembers: 0
     }
   )
 

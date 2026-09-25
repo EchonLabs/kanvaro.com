@@ -126,6 +126,86 @@ describe('getOrgStandupOversight', () => {
     expect(result.totals.openBlockers).toBe(1)
   })
 
+  it('surfaces full blocker detail, not just a count, for the oversight board', async () => {
+    await seedProject(project, 'Kanvaro')
+    const sprintId = new mongoose.Types.ObjectId()
+    await seedSprint(sprintId, project)
+    const standup = await seedStandup(sprintId, project, '2026-08-17', 'Completed')
+
+    await StandupBlocker.create({
+      standup: standup._id,
+      sprint: sprintId,
+      project,
+      organization,
+      raisedBy: member,
+      description: 'Vendor sandbox is still down',
+      blockerType: 'external_party',
+      severity: 'high'
+    })
+
+    const result = await getOrgStandupOversight(String(organization))
+    expect(result.sprints[0].openBlockers).toHaveLength(1)
+    expect(result.sprints[0].openBlockers[0]).toMatchObject({
+      description: 'Vendor sandbox is still down',
+      severity: 'high',
+      status: 'open'
+    })
+  })
+
+  it('flags chronic under-allocation (OVR-9) once a member has 3+ under-allocation overrides in the sprint', async () => {
+    await seedProject(project, 'Kanvaro')
+    const sprintId = new mongoose.Types.ObjectId()
+    await seedSprint(sprintId, project)
+    const standup = await seedStandup(sprintId, project, '2026-08-17', 'Completed')
+
+    for (let i = 0; i < 3; i++) {
+      await StandupOverride.create({
+        standup: standup._id,
+        sprint: sprintId,
+        project,
+        organization,
+        type: 'under_allocation',
+        affectedMemberIds: [member],
+        affectedTaskIds: [],
+        reasonCode: 'blocked_capacity',
+        justification: 'Blocked on the vendor sandbox all day, proceeding under capacity.',
+        gapMinutes: 480,
+        issuedBy: user
+      })
+    }
+
+    const result = await getOrgStandupOversight(String(organization))
+    expect(result.sprints[0].chronicUnderAllocationCount).toBe(1)
+    expect(result.sprints[0].flags).toContain('chronic_under_allocation')
+  })
+
+  it('does not flag chronic under-allocation with only 2 overrides', async () => {
+    await seedProject(project, 'Kanvaro')
+    const sprintId = new mongoose.Types.ObjectId()
+    await seedSprint(sprintId, project)
+    const standup = await seedStandup(sprintId, project, '2026-08-17', 'Completed')
+
+    for (let i = 0; i < 2; i++) {
+      await StandupOverride.create({
+        standup: standup._id,
+        sprint: sprintId,
+        project,
+        organization,
+        type: 'under_allocation',
+        affectedMemberIds: [member],
+        affectedTaskIds: [],
+        reasonCode: 'blocked_capacity',
+        justification: 'Blocked on the vendor sandbox all day, proceeding under capacity.',
+        gapMinutes: 480,
+        issuedBy: user
+      })
+    }
+
+    const result = await getOrgStandupOversight(String(organization))
+    expect(result.sprints[0].chronicUnderAllocationCount).toBe(0)
+    expect(result.sprints[0].flags).not.toContain('chronic_under_allocation')
+  })
+
   it('flags a carry-forward item that has aged into the chronic band', async () => {
     await seedProject(project, 'Kanvaro')
     const sprintId = new mongoose.Types.ObjectId()
