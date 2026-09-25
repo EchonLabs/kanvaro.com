@@ -1,17 +1,15 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CalendarDays, Info, Lock, Zap } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Lock } from 'lucide-react'
 
-import { Button } from '@/components/ui/Button'
-import { PageHeader } from '@/components/tasks/TasksShared'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { isOwnRowReadOnly, isSelfSelectDisabled } from '@/lib/standup/own-row'
 import { standupStrings } from '@/lib/standup/strings'
-import { IconChip } from './shared/IconChip'
-import { minutes, type Minutes } from '@/lib/standup/minutes'
+import type { Minutes } from '@/lib/standup/minutes'
 import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
 import type { BoardAllocationView } from '@/components/standup/run/CapacityBoard'
 import type { YesterdayPanelData } from '@/lib/standup/yesterday-service'
@@ -29,12 +27,15 @@ import { TodaysPlanSection } from './sections/TodaysPlanSection'
 import { MyPositionSection } from './sections/MyPositionSection'
 import { BlockersSection } from './sections/BlockersSection'
 import { PullMoreWorkSection } from './sections/PullMoreWorkSection'
+import { JourneyStep } from './shared/JourneyStep'
 
 export interface MyStandupPoolTask {
   taskId: string
   key?: string
   title: string
   remainingEstimateMinutes: Minutes
+  /** The board's pool rows carry it (`PoolTask.priority`); shown on the pull-work card when present. */
+  priority?: string
 }
 
 export interface MyStandupMember {
@@ -71,10 +72,14 @@ export interface MyStandupScreenProps {
   standupVersion: number
   status: string
   date: string
-  /** Lets a PM jump to this stand-up's project schedule hub without leaving
-   *  their own stand-up screen to go find it. Omitted entirely when the
-   *  caller could not resolve a project (nothing renders in that case). */
+  /** Lets a PM jump straight from their own stand-up screen to this exact
+   *  sprint's stand-up run screen. Paired with `sprintId`; the button is
+   *  omitted entirely when either could not be resolved. */
   projectId?: string
+  sprintId?: string
+  /** Shown in the header's breadcrumb so a member on more than one project's
+   *  sprint team can tell at a glance which stand-up this is. */
+  projectName?: string
   member: MyStandupMember
   poolTasks: readonly MyStandupPoolTask[]
   allowSelfSelect: boolean
@@ -94,11 +99,18 @@ export interface MyStandupScreenProps {
   blockers?: BlockerPanelRow[]
 }
 
+/**
+ * UI-12's member view, laid out as the Figma "My Stand-up page redesign": a
+ * header, a stack of status banners, then a four-step guided journey —
+ * review yesterday, confirm today, my position, raise blockers.
+ */
 export function MyStandupScreen({
   standupId,
   standupVersion,
   status,
   projectId,
+  sprintId,
+  projectName,
   member,
   poolTasks,
   allowSelfSelect,
@@ -118,16 +130,18 @@ export function MyStandupScreen({
   blockers
 }: MyStandupScreenProps) {
   const [version, setVersion] = useState(standupVersion)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(null)
   const router = useRouter()
   const { hasPermission } = usePermissions()
 
-  // A PM lands here to run their own stand-up, but often also wants the
-  // schedule hub for the same project — today that means leaving to hunt for
-  // it via the project. Gated the same way `PlanningWorkspace`'s facilitator
+  // A PM lands here to run their own stand-up, but often also wants the full
+  // run screen for the same sprint — today that means leaving to hunt for it
+  // via the project. Gated the same way `PlanningWorkspace`'s facilitator
   // controls are, so the button only ever appears for someone who could
-  // actually use the destination.
-  const canViewSchedule = Boolean(projectId) && hasPermission(Permission.SPRINT_UPDATE, projectId)
+  // actually use the destination, and only once there is a concrete sprint
+  // stand-up to link to.
+  const canViewSchedule =
+    Boolean(projectId) && Boolean(sprintId) && hasPermission(Permission.SPRINT_UPDATE, projectId)
 
   const readOnly = isOwnRowReadOnly({ status, canAllocateOthers: false })
   const selfSelectDisabled = isSelfSelectDisabled({ status, canAllocateOthers: false, allowSelfSelect })
@@ -138,8 +152,8 @@ export function MyStandupScreen({
       try {
         const result = await api.changeHours({ allocationId, plannedMinutes, expectedVersion: version })
         setVersion(result.standupVersion)
-      } catch {
-        setNotice(standupStrings.my.editRejected())
+      } catch (error) {
+        setNotice(noticeFor(error, standupStrings.my.editRejected()))
       }
     },
     [api, version]
@@ -156,8 +170,8 @@ export function MyStandupScreen({
           expectedVersion: version
         })
         setVersion(result.standupVersion)
-      } catch {
-        setNotice(standupStrings.my.addRejected())
+      } catch (error) {
+        setNotice(noticeFor(error, standupStrings.my.addRejected()))
       }
     },
     [api, member.memberId, version]
@@ -168,108 +182,181 @@ export function MyStandupScreen({
       setNotice(null)
       try {
         await api.raiseBlocker({ ...input, expectedVersion: version })
-      } catch {
-        setNotice(standupStrings.my.editRejected())
+      } catch (error) {
+        setNotice(noticeFor(error, standupStrings.my.editRejected()))
       }
     },
     [api, version]
   )
 
-  const hasGap = member.capacity.status === 'under' || member.capacity.status === 'zero'
-
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <PageHeader title="My Stand-up" icon={Zap} />
-
-      {canViewSchedule && (
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push(`/projects/${projectId}/standups`)}
-          >
-            <CalendarDays className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
-            View stand-up schedule
-          </Button>
+    // The negative margins cancel `MainLayout`'s `<main>` padding (the same
+    // move the sprint planning page makes), so the design's own 40px gutter is
+    // the only one.
+    <div className="my-standup -m-3 flex flex-col gap-6 bg-[var(--my-canvas)] px-4 py-6 sm:-m-4 sm:p-6 lg:-m-6 lg:p-10">
+      {/* `MainLayout` paints a pure-black backdrop behind every page; this one
+          sits over it so the design's canvas also fills the breadcrumb strip,
+          the space beside `max-w-7xl` on wide screens, and below short content. */}
+      <div aria-hidden className="fixed inset-0 -z-10 bg-[var(--my-canvas)]" />
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-[13px]">
+            <Link
+              href="/dashboard"
+              className="font-medium uppercase text-[var(--my-subtle)] hover:text-[var(--my-muted)]"
+            >
+              {standupStrings.my.breadcrumbRoot()}
+            </Link>
+            {projectName ? (
+              <>
+                <span aria-hidden className="text-[var(--my-subtle)]">
+                  /
+                </span>
+                <span className="truncate font-medium text-[var(--my-blue)]">{projectName}</span>
+              </>
+            ) : null}
+          </nav>
+          <h1 className="text-[28px] font-bold tracking-[-1px] text-[var(--my-text)] sm:text-[32px]">
+            {standupStrings.my.title()}
+          </h1>
         </div>
-      )}
+        {canViewSchedule ? (
+          <button
+            type="button"
+            onClick={() => router.push(`/projects/${projectId}/sprints/${sprintId}/standups/${standupId}`)}
+            className="flex items-center gap-2 rounded-lg bg-[var(--my-blue)] px-4 py-2.5 text-[14px] font-semibold text-white hover:opacity-90"
+          >
+            <ExternalLink className="h-4 w-4" strokeWidth={2} aria-hidden />
+            {standupStrings.my.openFullStandup()}
+          </button>
+        ) : null}
+      </header>
 
-      <AlsoTodayBanner candidates={otherStandupsToday} />
+      <div className="flex w-full flex-col gap-3">
+        <AlsoTodayBanner candidates={otherStandupsToday} />
 
-      <NextStandupStrip
-        status={status}
-        scheduledStartAt={scheduledStartAt}
-        durationMinutes={durationMinutes}
-        meetingUrl={meetingUrl}
-        sprintDayNumber={sprintDayNumber}
-        totalSprintDays={totalSprintDays}
-        viewerTimeZone={viewerTimeZone}
-        projectTimeZone={projectTimeZone}
-      />
+        {notice ? (
+          <p
+            role="status"
+            className="flex w-full items-center gap-3 rounded-lg border border-[var(--my-amber)] bg-[var(--my-amber-tint)] px-4 py-3 text-[14px] text-[var(--my-text)]"
+          >
+            <AlertTriangle
+              className="h-[18px] w-[18px] shrink-0 text-[var(--my-amber)]"
+              strokeWidth={2}
+              aria-hidden
+            />
+            <span className="min-w-0 flex-1">
+              <strong className="font-semibold">{notice.title}</strong> {notice.message}
+            </span>
+          </p>
+        ) : null}
 
-      {notice ? (
-        <p
-          role="status"
-          className="flex items-center gap-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] p-2.5 text-[13px] text-[var(--apple-label)]"
+        <NextStandupStrip
+          status={status}
+          scheduledStartAt={scheduledStartAt}
+          durationMinutes={durationMinutes}
+          meetingUrl={meetingUrl}
+          sprintDayNumber={sprintDayNumber}
+          totalSprintDays={totalSprintDays}
+          viewerTimeZone={viewerTimeZone}
+          projectTimeZone={projectTimeZone}
+          locale={locale}
+        />
+
+        {readOnly ? (
+          <p className="flex w-full items-center gap-2.5 rounded-lg bg-[var(--my-raised)] px-4 py-2.5 text-[13px] text-[var(--my-muted)]">
+            <Lock className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+            {standupStrings.my.readOnlyBanner({ status })}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex w-full flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <p className="text-[13px] font-semibold uppercase text-[var(--my-subtle)]">
+            {standupStrings.my.journeyEyebrow()}
+          </p>
+          <h2 className="text-[24px] font-bold tracking-[-1px] text-[var(--my-text)] sm:text-[28px]">
+            {standupStrings.my.journeyTitle()}
+          </h2>
+          <p className="text-[14px] leading-5 text-[var(--my-muted)]">{standupStrings.my.journeyBody()}</p>
+        </div>
+
+        <YesterdaySection
+          standupId={standupId}
+          memberId={member.memberId}
+          panel={yesterday}
+          varianceRows={variance?.rows}
+          readOnly={status !== 'Ready'}
+          api={{ updateYesterdayRow: api.updateYesterdayRow }}
+          expectedVersion={version}
+          onVersionChange={setVersion}
+          locale={locale}
+        />
+
+        <JourneyStep
+          step={2}
+          title={standupStrings.my.todayStepTitle()}
+          subtitle={standupStrings.my.todayStepSubtitle()}
+          state={
+            readOnly
+              ? { label: standupStrings.my.stateLocked(), tone: 'neutral' }
+              : { label: standupStrings.my.stateInProgress(), tone: 'blue' }
+          }
         >
-          <IconChip icon={<Info strokeWidth={1.75} />} size="sm" />
-          {notice}
-        </p>
-      ) : null}
+          <CapacitySection
+            capacity={member.capacity}
+            allocationCount={member.allocations.length}
+            debt={variance?.members.find((row) => row.memberId === member.memberId)}
+            locale={locale}
+          />
+          <TodaysPlanSection
+            allocations={member.allocations}
+            capacity={member.capacity}
+            readOnly={readOnly}
+            onChangeHours={onChangeHours}
+            locale={locale}
+          >
+            <PullMoreWorkSection
+              poolTasks={poolTasks}
+              allowSelfSelect={allowSelfSelect}
+              gapMinutes={member.capacity.gapMinutes}
+              disabled={selfSelectDisabled}
+              onAdd={onAdd}
+              locale={locale}
+            />
+          </TodaysPlanSection>
+        </JourneyStep>
 
-      {readOnly ? (
-        <p className="flex items-center gap-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] p-2.5 text-[13px] text-[var(--apple-secondary-label)]">
-          <IconChip icon={<Lock strokeWidth={1.75} />} size="sm" />
-          {standupStrings.my.readOnlyBanner()}
-        </p>
-      ) : null}
+        <MyPositionSection memberId={member.memberId} carryForward={carryForward} locale={locale} />
 
-      <CapacitySection
-        capacity={member.capacity}
-        allocationCount={member.allocations.length}
-        debt={
-          variance?.members.find((row) => row.memberId === member.memberId)
-        }
-        locale={locale}
-      />
-
-      <YesterdaySection
-        standupId={standupId}
-        memberId={member.memberId}
-        panel={yesterday}
-        varianceRows={variance?.rows}
-        readOnly={status !== 'Ready'}
-        api={{ updateYesterdayRow: api.updateYesterdayRow }}
-        expectedVersion={version}
-        onVersionChange={setVersion}
-        locale={locale}
-      />
-
-      <TodaysPlanSection
-        allocations={member.allocations}
-        readOnly={readOnly}
-        onChangeHours={onChangeHours}
-        locale={locale}
-      />
-
-      <MyPositionSection memberId={member.memberId} carryForward={carryForward} locale={locale} />
-
-      <BlockersSection
-        memberId={member.memberId}
-        blockers={blockers}
-        allocations={member.allocations}
-        onRaise={onRaiseBlocker}
-        locale={locale}
-      />
-
-      <PullMoreWorkSection
-        poolTasks={poolTasks}
-        allowSelfSelect={allowSelfSelect}
-        hasGap={hasGap}
-        disabled={selfSelectDisabled}
-        onAdd={onAdd}
-        locale={locale}
-      />
+        <BlockersSection
+          memberId={member.memberId}
+          blockers={blockers}
+          onRaise={onRaiseBlocker}
+          locale={locale}
+        />
+      </div>
     </div>
   )
+}
+
+interface Notice {
+  title: string
+  message: string
+}
+
+/**
+ * Every refusal here is a server decision the screen cannot predict. A version
+ * clash (RUN-23's `STALE_STANDUP`) gets the design's "server edit conflict"
+ * lead-in and says how to recover; anything else keeps its own message.
+ */
+function noticeFor(error: unknown, message: string): Notice {
+  if ((error as { code?: string } | null)?.code === 'STALE_STANDUP') {
+    return {
+      title: standupStrings.my.conflictTitle(),
+      message: `${message} ${standupStrings.my.conflictDetail()}`
+    }
+  }
+  return { title: standupStrings.my.refusedTitle(), message }
 }

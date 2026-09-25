@@ -1,12 +1,12 @@
 'use client'
 
-import { ClipboardCheck, CornerDownRight, Hand, ListChecks, UserCheck, Wand2 } from 'lucide-react'
-import { HoursValue } from '../shared/HoursValue'
-import { IconChip } from '../shared/IconChip'
-import { SectionCard } from '../shared/SectionCard'
-import { StatusPill } from '../shared/StatusPill'
-import { formatMinutesAsHours, sumMinutes, type Minutes } from '@/lib/standup/minutes'
+import { CheckSquare, Square } from 'lucide-react'
+import { HourStepper } from '@/components/standup/primitives/HourStepper'
+import { Tag } from '../shared/Tag'
+import { TaskTitle } from '../shared/TaskTitle'
+import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
+import type { CapacityBreakdown } from '@/lib/standup/capacity'
 import type { BoardAllocationView } from '@/components/standup/run/CapacityBoard'
 
 const SOURCE_LABEL: Record<string, () => string> = {
@@ -17,81 +17,119 @@ const SOURCE_LABEL: Record<string, () => string> = {
   auto_prefilled: standupStrings.my.sourceAutoPrefilled
 }
 
-/** A shape per source, not a colour — where a task came from is a fact, not a state of alarm, so every icon stays neutral-toned. */
-const SOURCE_ICON: Record<string, React.ReactNode> = {
-  carried_forward: <CornerDownRight strokeWidth={1.75} />,
-  pre_assigned: <ClipboardCheck strokeWidth={1.75} />,
-  assigned_in_standup: <UserCheck strokeWidth={1.75} />,
-  self_selected: <Hand strokeWidth={1.75} />,
-  auto_prefilled: <Wand2 strokeWidth={1.75} />
-}
-
 export interface TodaysPlanSectionProps {
   allocations: readonly BoardAllocationView[]
+  /** Drives the "N tasks planned • Xh surplus available" line. */
+  capacity: Pick<CapacityBreakdown, 'gapMinutes'>
   readOnly: boolean
   onChangeHours: (allocationId: string, plannedMinutes: Minutes) => void
   locale?: string
+  /** The pull-more-work card, which the design nests at the foot of the plan. */
+  children?: React.ReactNode
 }
 
-/** Design §4.5 — Today's plan upgraded with a live total (R1), each row's source, and a stated lock reason instead of a silent disable. */
-export function TodaysPlanSection({ allocations, readOnly, onChangeHours, locale }: TodaysPlanSectionProps) {
-  const total = sumMinutes(allocations, (row) => row.plannedMinutes)
+function summaryFor(count: number, gapMinutes: number, locale?: string): string {
+  const hours = (m: number) => formatMinutesAsHours(m as any, { locale })
+  const tail =
+    gapMinutes > 0
+      ? standupStrings.my.gapAvailable({ hours: hours(gapMinutes) })
+      : gapMinutes < 0
+        ? standupStrings.my.overCapacity({ hours: hours(Math.abs(gapMinutes)) })
+        : standupStrings.my.fullyPlanned()
+  return `${standupStrings.my.tasksPlanned({ count })} • ${tail}`
+}
 
+/**
+ * Step 2's "Today's Plan" card — each allocation with where it came from and
+ * its planned hours, editable while the stand-up is Ready and with the lock
+ * reason stated (not a silent disable) once it is not.
+ */
+export function TodaysPlanSection({
+  allocations,
+  capacity,
+  readOnly,
+  onChangeHours,
+  locale,
+  children
+}: TodaysPlanSectionProps) {
   return (
-    <SectionCard
-      title={standupStrings.my.todayHeader()}
-      icon={<ListChecks strokeWidth={1.75} />}
-      summary={standupStrings.my.todayPlanned({ hours: formatMinutesAsHours(total, { locale }) })}
-    >
+    <div className="flex w-full flex-col gap-4 rounded-xl border border-[var(--my-border)] bg-[var(--my-canvas)] p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h3 className="text-[16px] font-semibold text-[var(--my-text)]">
+            {standupStrings.my.todayPlanTitle()}
+          </h3>
+          <p className="text-[13px] text-[var(--my-muted)]">
+            {summaryFor(allocations.length, capacity.gapMinutes, locale)}
+          </p>
+        </div>
+        {readOnly ? (
+          <Tag tone="neutral">{standupStrings.my.stateLocked()}</Tag>
+        ) : (
+          <Tag tone="blue">{standupStrings.my.stateEditing()}</Tag>
+        )}
+      </div>
+
+      {readOnly && allocations.length > 0 ? (
+        <p className="text-[13px] text-[var(--my-muted)]">{standupStrings.my.lockedReason()}</p>
+      ) : null}
+
       {allocations.length === 0 ? (
-        <p className="text-[15px] text-[var(--apple-secondary-label)]">{standupStrings.my.todayEmpty()}</p>
+        <p className="text-[14px] text-[var(--my-muted)]">{standupStrings.my.todayEmpty()}</p>
       ) : (
-        <>
-          {readOnly ? (
-            <p className="text-[13px] text-[var(--apple-secondary-label)]">
-              {standupStrings.my.lockedReason()}
-            </p>
-          ) : null}
-          <ul className="flex flex-col gap-2">
-            {allocations.map((row) => (
+        <ul className="flex flex-col gap-4">
+          {allocations.map((row) => {
+            const detail = [SOURCE_LABEL[row.source]?.(), row.note].filter(Boolean).join(' • ')
+            return (
               <li
                 key={row.allocationId}
-                className="flex flex-wrap items-center gap-3 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card p-3"
+                className="group flex flex-wrap items-center gap-4 rounded-lg border border-[var(--my-border)] bg-[var(--my-canvas)] p-4 focus-within:border-[var(--my-blue)] sm:flex-nowrap"
               >
-                <IconChip icon={SOURCE_ICON[row.source] ?? SOURCE_ICON.assigned_in_standup} />
+                {/* The row being edited is the one the design ticks and outlines in blue. */}
+                <Square
+                  className="h-4 w-4 shrink-0 text-[var(--my-subtle)] group-focus-within:hidden"
+                  strokeWidth={2}
+                  aria-hidden
+                />
+                <CheckSquare
+                  className="hidden h-4 w-4 shrink-0 text-[var(--my-blue)] group-focus-within:block"
+                  strokeWidth={2}
+                  aria-hidden
+                />
 
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-[15px] font-medium text-[var(--apple-label)]">
-                      {row.title}
-                    </span>
-                    {SOURCE_LABEL[row.source] ? (
-                      <StatusPill tone="neutral">{SOURCE_LABEL[row.source]()}</StatusPill>
-                    ) : null}
-                  </div>
-                  <span className="font-apple-mono text-[13px] text-[var(--apple-tertiary-label)]">
-                    {row.taskKey}
-                  </span>
+                <div className="flex min-w-[12rem] flex-1 flex-col gap-0.5">
+                  <TaskTitle taskKey={row.taskKey} title={row.title} className="whitespace-normal" />
+                  {detail ? (
+                    <p className="text-[12px] text-[var(--my-muted)] first-letter:uppercase">{detail}</p>
+                  ) : null}
                 </div>
-                <label className="flex shrink-0 items-center gap-1.5 text-[13px]">
-                  <span className="sr-only">{`Hours for ${row.title}`}</span>
-                  <input
-                    aria-label={`Hours for ${row.title}`}
-                    type="number"
-                    step={15}
-                    min={0}
-                    disabled={readOnly}
-                    defaultValue={row.plannedMinutes}
-                    onBlur={(event) => onChangeHours(row.allocationId, Number(event.target.value) as Minutes)}
-                    className="w-16 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-2 py-1 text-[13px] text-[var(--apple-label)] disabled:opacity-40"
-                  />
-                  <HoursValue minutes={row.plannedMinutes} locale={locale} />
-                </label>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-[13px] text-[var(--my-subtle)] group-focus-within:text-[var(--my-muted)]">
+                    {standupStrings.my.allocatedLabel()}
+                  </span>
+                  <label className="flex items-center rounded-[4px] border border-[var(--my-border)] bg-[var(--my-inset)] px-2.5 py-1.5 group-focus-within:border-[var(--my-blue)]">
+                    <HourStepper
+                      variant="bare"
+                      taskLabel={row.title}
+                      valueMinutes={row.plannedMinutes}
+                      onChange={(next) => onChangeHours(row.allocationId, next)}
+                      disabled={readOnly}
+                      locale={locale}
+                      inputClassName="my-mono w-10 bg-transparent text-right text-[13px] text-[var(--my-muted)] outline-none [appearance:textfield] focus:font-bold focus:text-[var(--my-blue)] disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                    <span className="my-mono text-[13px] text-[var(--my-muted)] group-focus-within:font-bold group-focus-within:text-[var(--my-blue)]">
+                      h
+                    </span>
+                  </label>
+                </div>
               </li>
-            ))}
-          </ul>
-        </>
+            )
+          })}
+        </ul>
       )}
-    </SectionCard>
+
+      {children}
+    </div>
   )
 }

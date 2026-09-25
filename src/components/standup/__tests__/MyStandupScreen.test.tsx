@@ -107,6 +107,25 @@ describe('MyStandupScreen', () => {
     setup({ status: 'In_Progress' })
     expect(screen.getByLabelText(/hours for Fix the thing/i)).toBeDisabled()
     expect(screen.getByText(/read-only/i)).toBeInTheDocument()
+    expect(screen.getByText(/the stand-up has started/i)).toBeInTheDocument()
+  })
+
+  /**
+   * This route is reachable for every stand-up status — the "other
+   * stand-ups today" banner links straight to `Scheduled` ones — so the
+   * read-only banner must not claim the stand-up "has started" when it has
+   * not. Each status that locks editing gets its own accurate wording.
+   */
+  it('never claims the stand-up "has started" for a status where it has not', () => {
+    setup({ status: 'Scheduled' })
+    expect(screen.queryByText(/has started/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/hasn't started yet/i)).toBeInTheDocument()
+  })
+
+  it('describes a completed stand-up as complete, not as having "started"', () => {
+    setup({ status: 'Completed' })
+    expect(screen.queryByText(/has started/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/this stand-up is complete/i)).toBeInTheDocument()
   })
 
   it('calls addAllocation with selfSelect: true when self-selecting a pool task', () => {
@@ -163,9 +182,10 @@ describe('MyStandupScreen', () => {
    * strip and the Yesterday/Today sections, which each carry their own dates
    * in context), so this assertion now targets the real fallback.
    */
-  it('falls back to the plain status when the dual-timezone fields are absent (NFR-20)', () => {
+  it('shows the stand-up state as a badge, and no times when none are known (NFR-20)', () => {
     setup()
-    expect(screen.getByText('Ready')).toBeInTheDocument()
+    expect(screen.getByText(standupStrings.schedule.status.Ready)).toBeInTheDocument()
+    expect(screen.queryByText(/^local:/i)).not.toBeInTheDocument()
   })
 
   it('renders the dual-timezone string once all three fields are present (NFR-20)', () => {
@@ -174,8 +194,8 @@ describe('MyStandupScreen', () => {
       viewerTimeZone: 'America/New_York',
       projectTimeZone: 'Asia/Colombo'
     })
-    expect(screen.getByText(/05:00.*project time.*14:30/i)).toBeInTheDocument()
-    expect(screen.queryByText('Ready')).not.toBeInTheDocument()
+    expect(screen.getByText(/^local: 05:00/i)).toBeInTheDocument()
+    expect(screen.getByText(/^project .+: 02:30/i)).toBeInTheDocument()
   })
 
   it('shows a read-only leave line from the capacity breakdown, never an edit control', () => {
@@ -203,9 +223,9 @@ describe('MyStandupScreen', () => {
       const api = setup()
       api.changeHours.mockRejectedValue(new Error('refused'))
 
-      fireEvent.blur(screen.getByLabelText(/hours for Fix the thing/i), {
-        target: { value: '180' }
-      })
+      const input = screen.getByLabelText(/hours for Fix the thing/i)
+      fireEvent.change(input, { target: { value: '3' } })
+      fireEvent.blur(input)
 
       expect(await screen.findByRole('status')).toHaveTextContent(
         standupStrings.my.editRejected()
@@ -225,6 +245,19 @@ describe('MyStandupScreen', () => {
       expect(await screen.findByRole('status')).toHaveTextContent(
         standupStrings.my.addRejected()
       )
+    })
+
+    it('names a version clash as a server edit conflict and says how to recover (RUN-23)', async () => {
+      const api = setup()
+      api.changeHours.mockRejectedValue(Object.assign(new Error('stale'), { code: 'STALE_STANDUP' }))
+
+      const input = screen.getByLabelText(/hours for Fix the thing/i)
+      fireEvent.change(input, { target: { value: '3' } })
+      fireEvent.blur(input)
+
+      const notice = await screen.findByRole('status')
+      expect(notice).toHaveTextContent(standupStrings.my.conflictTitle())
+      expect(notice).toHaveTextContent(standupStrings.my.conflictDetail())
     })
 
     it('shows nothing until something actually fails', () => {
@@ -251,32 +284,52 @@ describe('MyStandupScreen', () => {
         }
       ]
     })
-    expect(screen.getByRole('button', { name: 'View Standups' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View Stand-ups' })).toBeInTheDocument()
   })
 
-  describe('the schedule-hub button', () => {
+  describe('the "open full stand-up" button', () => {
     afterEach(() => {
       mockHasPermission.mockReturnValue(false)
       mockPush.mockClear()
     })
 
     it('is absent for a viewer without SPRINT_UPDATE on the project', () => {
-      setup({ projectId: 'p1' })
-      expect(screen.queryByRole('button', { name: /view stand-up schedule/i })).not.toBeInTheDocument()
+      setup({ projectId: 'p1', sprintId: 'sp1' })
+      expect(screen.queryByRole('button', { name: /open full stand-up/i })).not.toBeInTheDocument()
     })
 
     it('is absent when no project could be resolved, even for a PM', () => {
       mockHasPermission.mockReturnValue(true)
-      setup({ projectId: undefined })
-      expect(screen.queryByRole('button', { name: /view stand-up schedule/i })).not.toBeInTheDocument()
+      setup({ projectId: undefined, sprintId: 'sp1' })
+      expect(screen.queryByRole('button', { name: /open full stand-up/i })).not.toBeInTheDocument()
     })
 
-    it('navigates to the project schedule hub for a PM', () => {
+    it('is absent when no sprint could be resolved, even for a PM', () => {
       mockHasPermission.mockReturnValue(true)
-      setup({ projectId: 'p1' })
+      setup({ projectId: 'p1', sprintId: undefined })
+      expect(screen.queryByRole('button', { name: /open full stand-up/i })).not.toBeInTheDocument()
+    })
 
-      fireEvent.click(screen.getByRole('button', { name: /view stand-up schedule/i }))
-      expect(mockPush).toHaveBeenCalledWith('/projects/p1/standups')
+    /**
+     * The old destination was the project-wide schedule hub
+     * (`/projects/:id/standups`) — a PM landing here still had to find today's
+     * stand-up in a list. Linking straight to this sprint's stand-up run
+     * screen (`standupId` is this screen's own `standupId` prop, "s1" in
+     * `setup()`) takes them to the exact meeting instead.
+     */
+    it('navigates straight to this sprint’s stand-up for a PM', () => {
+      mockHasPermission.mockReturnValue(true)
+      setup({ projectId: 'p1', sprintId: 'sp1' })
+
+      fireEvent.click(screen.getByRole('button', { name: /open full stand-up/i }))
+      expect(mockPush).toHaveBeenCalledWith('/projects/p1/sprints/sp1/standups/s1')
+    })
+  })
+
+  describe('the project-name subtitle (a member on more than one project needs to tell them apart)', () => {
+    it('shows the project name in the page header when known', () => {
+      setup({ projectName: 'Acme Redesign' })
+      expect(screen.getByText('Acme Redesign')).toBeInTheDocument()
     })
   })
 })

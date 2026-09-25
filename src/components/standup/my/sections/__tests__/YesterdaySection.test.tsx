@@ -108,8 +108,8 @@ describe('YesterdaySection', () => {
         onVersionChange={jest.fn()}
       />
     )
-    expect(screen.getByText(/yesterday/i)).toBeInTheDocument()
-    expect(screen.getByText(/1 of 2 done/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /review yesterday/i })).toBeInTheDocument()
+    expect(screen.getByText('Done:').closest('p')).toHaveTextContent('Done: 1')
   })
 
   it('only shows rows belonging to this member', () => {
@@ -177,6 +177,53 @@ describe('YesterdaySection', () => {
     expect(onVersionChange).toHaveBeenCalledWith(2)
   })
 
+  /**
+   * The logged-hours box used to show and accept raw minutes (e.g. "240")
+   * with no unit, right next to the "Planned" figure a few pixels away
+   * rendered properly as "3.0h" — nothing said which one it was. It must now
+   * speak hours throughout, converting to minutes only at the API boundary.
+   */
+  it('shows the logged-hours field in hours, not raw minutes', () => {
+    render(
+      <YesterdaySection
+        standupId="s1"
+        memberId="u1"
+        panel={panel()}
+        readOnly={false}
+        api={{ updateYesterdayRow: jest.fn() }}
+        expectedVersion={1}
+        onVersionChange={jest.fn()}
+      />
+    )
+    const input = screen.getByLabelText(/logged hours for KAN-2/i) as HTMLInputElement
+    expect(input.value).toBe('4')
+  })
+
+  it('converts a typed hours value to minutes when the logged field is committed', async () => {
+    const updateYesterdayRow = jest.fn().mockResolvedValue({ standupVersion: 2, panel: panel() })
+    const onVersionChange = jest.fn()
+    render(
+      <YesterdaySection
+        standupId="s1"
+        memberId="u1"
+        panel={panel()}
+        readOnly={false}
+        api={{ updateYesterdayRow }}
+        expectedVersion={1}
+        onVersionChange={onVersionChange}
+      />
+    )
+    const input = screen.getByLabelText(/logged hours for KAN-2/i)
+    fireEvent.change(input, { target: { value: '3' } })
+    fireEvent.blur(input)
+    await waitFor(() =>
+      expect(updateYesterdayRow).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: 't2', loggedMinutes: 180, expectedVersion: 1 })
+      )
+    )
+    expect(onVersionChange).toHaveBeenCalledWith(2)
+  })
+
   it('disables every control when readOnly', () => {
     render(
       <YesterdaySection
@@ -208,7 +255,7 @@ describe('YesterdaySection', () => {
     expect(screen.getByText(/you logged 4\.0h against a 3\.0h plan/i)).toBeInTheDocument()
   })
 
-  it('shows a chronic-spill badge for a task carried 3 or more stand-ups', () => {
+  it('shows a carry badge with the chain length for a task carried across stand-ups', () => {
     render(
       <YesterdaySection
         standupId="s1"
@@ -221,7 +268,7 @@ describe('YesterdaySection', () => {
         onVersionChange={jest.fn()}
       />
     )
-    expect(screen.getByText(/carried 3 stand-ups/i)).toBeInTheDocument()
+    expect(screen.getByText('Carry x3')).toBeInTheDocument()
   })
 
   it('says so plainly when there is no previous stand-up', () => {

@@ -1,10 +1,7 @@
 'use client'
 
-import { Gauge } from 'lucide-react'
-import { HoursValue } from '../shared/HoursValue'
-import { RingGauge } from '../shared/RingGauge'
-import { SectionCard } from '../shared/SectionCard'
-import { StatusPill } from '../shared/StatusPill'
+import { Tag, type TagTone } from '../shared/Tag'
+import { Emphasize } from '../shared/Emphasize'
 import { formatMinutesAsHours } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import type { CapacityBreakdown } from '@/lib/standup/capacity'
@@ -23,12 +20,21 @@ export interface CapacitySectionProps {
   locale?: string
 }
 
-const STATUS_TONE: Record<string, 'green' | 'orange' | 'red' | 'neutral'> = {
+const STATUS_TONE: Record<string, TagTone> = {
   full: 'green',
-  under: 'orange',
+  under: 'amber',
   over: 'red',
   zero: 'neutral',
   unavailable: 'neutral'
+}
+
+/** The ring's arc colour — the design's blue while the day is sound, the status colour once it is not. */
+const RING_COLOUR: Record<string, string> = {
+  full: 'var(--my-blue)',
+  under: 'var(--my-blue)',
+  over: 'var(--my-red)',
+  zero: 'var(--my-subtle)',
+  unavailable: 'var(--my-subtle)'
 }
 
 function headlineFor(capacity: CapacityBreakdown, allocationCount: number, locale?: string): string {
@@ -47,92 +53,106 @@ function headlineFor(capacity: CapacityBreakdown, allocationCount: number, local
   })
 }
 
-/** Design §4.3 — R2's computed headline sentence plus the real capacity breakdown, replacing the old single-line "adjustments only" render. */
+const RING_SIZE = 110
+const RING_STROKE = 4
+
+/**
+ * Step 2's capacity row — the allocation ring, the day's state, the real
+ * breakdown (UI-14: nominal, adjustments, effective, allocated), and R2's
+ * computed sentence with the VAR-10 debt wording.
+ */
 export function CapacitySection({ capacity, allocationCount, debt, locale }: CapacitySectionProps) {
   const percentage =
     capacity.effectiveMinutes > 0
       ? Math.round((capacity.allocatedMinutes / capacity.effectiveMinutes) * 100)
       : 0
-  const tone = STATUS_TONE[capacity.status] ?? 'neutral'
+  const hours = (m: number) => formatMinutesAsHours(m as any, { locale })
+  const spelled = (m: number) => `${formatMinutesAsHours(m as any, { locale, withUnit: false })} hours`
+
+  const radius = (RING_SIZE - RING_STROKE) / 2
+  const circumference = 2 * Math.PI * radius
+  const arc = Math.min(percentage, 100) / 100
 
   return (
-    <SectionCard
-      title={standupStrings.my.capacityHeader()}
-      icon={<Gauge strokeWidth={1.75} />}
-      tone={tone}
-      summary={<StatusPill tone={tone}>{capacity.status.toUpperCase()}</StatusPill>}
-    >
-      {/* The ring is the one hero visual on the whole screen — today's
-          headline number, at a glance, before anything has to be read. */}
-      <div className="flex items-center gap-4">
-        <RingGauge percentage={percentage} tone={tone}>
-          <span className="font-apple-mono text-[17px] font-semibold tabular-nums text-[var(--apple-label)]">
-            {percentage}%
+    <div className="flex w-full flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
+      <div className="relative h-[110px] w-[110px] shrink-0">
+        <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`} aria-hidden className="-rotate-90">
+          <circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={radius} fill="var(--my-blue-tint)" stroke="var(--my-border)" strokeWidth={RING_STROKE} />
+          <circle
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={radius}
+            fill="none"
+            stroke={RING_COLOUR[capacity.status] ?? 'var(--my-blue)'}
+            strokeWidth={RING_STROKE}
+            strokeLinecap="round"
+            strokeDasharray={`${circumference * arc} ${circumference}`}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[22px] font-bold text-[var(--my-text)]">{percentage}%</span>
+          <span className="text-[10px] uppercase text-[var(--my-muted)]">
+            {standupStrings.my.capacityAllocated()}
           </span>
-        </RingGauge>
-
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <p className="text-[17px] font-semibold leading-snug text-[var(--apple-label)]">
-            {headlineFor(capacity, allocationCount, locale)}
-          </p>
-
-          {/* VAR-10's exact wording spells out "hours", unlike every other
-              figure on this screen — `withUnit: false` drops HoursValue's
-              usual "h" suffix so the word can be spelled out instead
-              ("2.0 hours"). */}
-          {debt && debt.outstandingDebtMinutes > 0 ? (
-            <p className="text-[13px] text-[var(--apple-secondary-label)]">
-              {standupStrings.my.debtSentence({
-                hours: `${formatMinutesAsHours(debt.outstandingDebtMinutes as any, { locale, withUnit: false })} hours`
-              })}
-            </p>
-          ) : null}
-          {debt && debt.outstandingDebtMinutes === 0 && debt.surplusMinutes > 0 ? (
-            <p className="text-[13px] text-[var(--apple-secondary-label)]">
-              {standupStrings.my.surplusSentence({
-                hours: `${formatMinutesAsHours(debt.surplusMinutes as any, { locale, withUnit: false })} hours`
-              })}
-            </p>
-          ) : null}
-          {capacity.strandedMinutes > 0 ? (
-            <p className="text-[13px] text-[var(--apple-system-orange)]">
-              {standupStrings.my.strandedSentence({
-                hours: formatMinutesAsHours(capacity.strandedMinutes, { locale })
-              })}
-            </p>
-          ) : null}
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'Nominal', minutes: capacity.nominalMinutes },
-          { label: 'Effective', minutes: capacity.effectiveMinutes },
-          { label: 'Allocated', minutes: capacity.allocatedMinutes }
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="flex flex-col items-center gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-quaternary-fill)] py-2"
-          >
-            <span className="apple-section-label text-[var(--apple-tertiary-label)]">{stat.label}</span>
-            <HoursValue minutes={stat.minutes} locale={locale} />
-          </div>
-        ))}
-      </div>
-
-      {capacity.adjustments.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-[var(--apple-separator)] overflow-hidden rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)]">
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <div className="flex flex-wrap gap-2">
+          <Tag tone={STATUS_TONE[capacity.status] ?? 'neutral'} shape="square">
+            {standupStrings.my.capacityState[capacity.status] ?? capacity.status}
+          </Tag>
+          <Tag tone="neutral" shape="square" className="my-mono font-normal">
+            {standupStrings.my.plannedVsCapacity({
+              planned: hours(capacity.allocatedMinutes),
+              capacity: hours(capacity.effectiveMinutes)
+            })}
+          </Tag>
+          {capacity.nominalMinutes !== capacity.effectiveMinutes ? (
+            <Tag tone="neutral" shape="square" className="my-mono font-normal">
+              {standupStrings.my.nominalCapacity({ hours: hours(capacity.nominalMinutes) })}
+            </Tag>
+          ) : null}
           {capacity.adjustments.map((adjustment, index) => (
-            <li
-              key={`${adjustment.type}-${index}`}
-              className="flex items-center justify-between gap-2 bg-card px-3 py-2 text-[13px]"
-            >
-              <span className="text-[var(--apple-secondary-label)]">{adjustment.label}</span>
-              <HoursValue minutes={adjustment.minutes} locale={locale} />
-            </li>
+            <Tag key={`${adjustment.type}-${index}`} tone="neutral" shape="square" className="font-normal">
+              {standupStrings.my.adjustmentLine({ label: adjustment.label, hours: hours(adjustment.minutes) })}
+            </Tag>
           ))}
-        </ul>
-      ) : null}
-    </SectionCard>
+        </div>
+
+        <p data-testid="capacity-summary" className="text-[14px] leading-5 text-[var(--my-muted)]">
+          {headlineFor(capacity, allocationCount, locale)}
+          {/* VAR-10's exact wording spells out "hours" ("2.0 hours"), unlike every other figure here. */}
+          {debt && debt.outstandingDebtMinutes > 0 ? (
+            <>
+              {' '}
+              <Emphasize
+                text={standupStrings.my.debtSentence({ hours: spelled(debt.outstandingDebtMinutes) })}
+                phrase={spelled(debt.outstandingDebtMinutes)}
+                className="font-semibold text-[var(--my-text)]"
+              />
+            </>
+          ) : null}
+          {debt && debt.outstandingDebtMinutes === 0 && debt.surplusMinutes > 0 ? (
+            <>
+              {' '}
+              <Emphasize
+                text={standupStrings.my.surplusSentence({ hours: spelled(debt.surplusMinutes) })}
+                phrase={spelled(debt.surplusMinutes)}
+                className="font-semibold text-[var(--my-text)]"
+              />
+            </>
+          ) : null}
+          {capacity.strandedMinutes > 0 ? (
+            <>
+              {' '}
+              <span className="text-[var(--my-amber)]">
+                {standupStrings.my.strandedSentence({ hours: hours(capacity.strandedMinutes) })}
+              </span>
+            </>
+          ) : null}
+        </p>
+      </div>
+    </div>
   )
 }

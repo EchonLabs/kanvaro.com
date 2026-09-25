@@ -3,9 +3,7 @@
  */
 import { fireEvent, render, screen } from '@testing-library/react'
 import { BlockersSection } from '../BlockersSection'
-import { minutes } from '@/lib/standup/minutes'
 import type { BlockerPanelRow } from '@/lib/standup/blocker-service'
-import type { BoardAllocationView } from '@/components/standup/run/CapacityBoard'
 
 function blocker(overrides: Partial<BlockerPanelRow> = {}): BlockerPanelRow {
   return {
@@ -28,7 +26,6 @@ describe('BlockersSection', () => {
       <BlockersSection
         memberId="u1"
         blockers={[blocker(), blocker({ blockerId: 'b2', raisedById: 'u2', taskKey: 'KAN-2', description: 'Someone else’s blocker' })]}
-        allocations={[]}
         onRaise={jest.fn()}
       />
     )
@@ -44,7 +41,6 @@ describe('BlockersSection', () => {
           blocker({ blockerId: 'b1', description: 'Normal one', overdue: false }),
           blocker({ blockerId: 'b2', description: 'Overdue one', overdue: true })
         ]}
-        allocations={[]}
         onRaise={jest.fn()}
       />
     )
@@ -52,36 +48,45 @@ describe('BlockersSection', () => {
     expect(descriptions[0]).toHaveTextContent('Overdue one')
   })
 
-  it('opens the raise-blocker modal and forwards its submit', () => {
+  it('files a roadblock from the inline form, as a medium general blocker by default', () => {
     const onRaise = jest.fn()
-    const allocation: BoardAllocationView = {
-      allocationId: 'a1',
-      taskId: 't1',
-      taskKey: 'KAN-1',
-      title: 'Fix the thing',
-      plannedMinutes: minutes(60),
-      remainingEstimateMinutes: minutes(60),
-      source: 'assigned_in_standup',
-      isBlocked: false,
-      excludedFromCapacity: false,
-      pairedDeliberately: false
-    }
-    render(<BlockersSection memberId="u1" blockers={[]} allocations={[allocation]} onRaise={onRaise} />)
+    render(<BlockersSection memberId="u1" blockers={[]} onRaise={onRaise} />)
 
-    fireEvent.click(screen.getByRole('button', { name: /report a blocker/i }))
-    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: 'Blocked on something real' } })
-    fireEvent.click(screen.getByRole('button', { name: /^raise a blocker$/i }))
+    const submit = screen.getByRole('button', { name: /file roadblock/i })
+    expect(submit).toBeDisabled()
 
-    expect(onRaise).toHaveBeenCalledWith(expect.objectContaining({ description: 'Blocked on something real' }))
+    fireEvent.change(screen.getByLabelText(/raise new roadblock/i), {
+      target: { value: 'Blocked on something real' }
+    })
+    fireEvent.click(submit)
+
+    expect(onRaise).toHaveBeenCalledWith({
+      description: 'Blocked on something real',
+      blockerType: 'other',
+      severity: 'medium'
+    })
+  })
+
+  it('files an urgent roadblock as critical', () => {
+    const onRaise = jest.fn()
+    render(<BlockersSection memberId="u1" blockers={[]} onRaise={onRaise} />)
+
+    fireEvent.click(screen.getByRole('switch', { name: /mark as urgent/i }))
+    fireEvent.change(screen.getByLabelText(/raise new roadblock/i), {
+      target: { value: 'Production is down for us' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /file roadblock/i }))
+
+    expect(onRaise).toHaveBeenCalledWith(expect.objectContaining({ severity: 'critical' }))
   })
 
   it('says nothing is blocked when there are none', () => {
-    render(<BlockersSection memberId="u1" blockers={[]} allocations={[]} onRaise={jest.fn()} />)
+    render(<BlockersSection memberId="u1" blockers={[]} onRaise={jest.fn()} />)
     expect(screen.getByText(/no open blockers/i)).toBeInTheDocument()
   })
 
   it('renders its own failure state without throwing when blockers is undefined', () => {
-    render(<BlockersSection memberId="u1" blockers={undefined} allocations={[]} onRaise={jest.fn()} />)
+    render(<BlockersSection memberId="u1" blockers={undefined} onRaise={jest.fn()} />)
     expect(screen.getByText(/could not load this section/i)).toBeInTheDocument()
   })
 })

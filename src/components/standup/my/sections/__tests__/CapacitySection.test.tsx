@@ -81,9 +81,9 @@ describe('CapacitySection', () => {
         debt={{ outstandingDebtMinutes: minutes(120), surplusMinutes: minutes(0) }}
       />
     )
-    expect(
-      screen.getByText(/you are 2\.0 hours over estimate on this sprint's completed and in-flight work/i)
-    ).toBeInTheDocument()
+    expect(screen.getByTestId('capacity-summary')).toHaveTextContent(
+      /you are 2\.0 hours over estimate on this sprint's completed and in-flight work/i
+    )
   })
 
   it('shows the surplus sentence, never negative debt', () => {
@@ -94,8 +94,9 @@ describe('CapacitySection', () => {
         debt={{ outstandingDebtMinutes: minutes(0), surplusMinutes: minutes(90) }}
       />
     )
-    expect(screen.getByText(/1\.5 hours ahead of estimate/i)).toBeInTheDocument()
-    expect(screen.queryByText(/-1\.5/)).not.toBeInTheDocument()
+    const summary = screen.getByTestId('capacity-summary')
+    expect(summary).toHaveTextContent(/1\.5 hours ahead of estimate/i)
+    expect(summary).not.toHaveTextContent(/-1\.5/)
   })
 
   it('shows the stranded sentence when hours are stranded on an unavailable day', () => {

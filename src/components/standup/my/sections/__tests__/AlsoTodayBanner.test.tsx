@@ -10,7 +10,7 @@ describe('AlsoTodayBanner', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows a "View Standups" button instead of listing stand-ups up front', () => {
+  it('shows a "View Stand-ups" button instead of listing stand-ups up front', () => {
     render(
       <AlsoTodayBanner
         candidates={[
@@ -24,7 +24,7 @@ describe('AlsoTodayBanner', () => {
         ]}
       />
     )
-    expect(screen.getByRole('button', { name: 'View Standups' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View Stand-ups' })).toBeInTheDocument()
     expect(screen.queryByText(/project beta/i)).not.toBeInTheDocument()
   })
 
@@ -43,7 +43,7 @@ describe('AlsoTodayBanner', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'View Standups' }))
+    fireEvent.click(screen.getByRole('button', { name: 'View Stand-ups' }))
 
     expect(screen.getByText(/project beta/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /project beta/i })).toHaveAttribute(
