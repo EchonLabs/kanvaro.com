@@ -1,7 +1,7 @@
 /**
  * The planning completion checklist (spec §8.3, AC-6).
  *
- * All twelve checks, each proven to fail for its own reason and to name the
+ * All fifteen checks, each proven to fail for its own reason and to name the
  * offending entities — UI-5 turns `offendingIds` into the inline fix list, so a
  * check that fails without them is only half implemented.
  */
@@ -21,6 +21,7 @@ const task = (partial: Partial<ChecklistTaskInput> = {}): ChecklistTaskInput => 
   description: 'Build the invoice model end to end.',
   originalEstimateMinutes: 360,
   estimateMethod: 'poker',
+  pokerCovered: true,
   assigneeIds: ['kasun'],
   ...partial
 })
@@ -63,11 +64,11 @@ describe('a well-planned sprint', () => {
     expect(result.items.every((entry) => entry.passed)).toBe(true)
   })
 
-  it('produces exactly the twelve spec checks', () => {
+  it('produces exactly the fifteen spec checks', () => {
     const result = evaluatePlanningChecklist(input())
 
     expect(result.items.map((entry) => entry.checkId)).toEqual([
-      'PC-1', 'PC-2', 'PC-3', 'PC-4', 'PC-5', 'PC-6', 'PC-7',
+      'PC-1', 'PC-2', 'PC-3', 'PC-4', 'PC-5', 'PC-6', 'PC-7', 'PC-8', 'PC-9',
       'PA-1', 'PA-2', 'PA-3', 'PA-4', 'PA-5', 'PA-6'
     ])
   })
@@ -217,6 +218,119 @@ describe('PC-7 — a usable date range', () => {
   })
 })
 
+describe('PC-8 — every task owned by exactly one sprint member', () => {
+  it('blocks on an unassigned task and names it', () => {
+    const result = evaluatePlanningChecklist(
+      input({ tasks: [task({ id: 'a', assigneeIds: [] }), task({ id: 'b' })] })
+    )
+
+    expect(item(result, 'PC-8').passed).toBe(false)
+    expect(item(result, 'PC-8').offendingIds).toEqual(['a'])
+    expect(item(result, 'PC-8').message).toContain('no assignee')
+    expect(result.canComplete).toBe(false)
+  })
+
+  it('blocks on a task shared between two people', () => {
+    // Shared ownership makes the poker round ambiguous — the same task is a
+    // different size for each of them — and doubles the minutes counted
+    // against capacity.
+    const result = evaluatePlanningChecklist(
+      input({ tasks: [task({ id: 'a', assigneeIds: ['kasun', 'amal'] })] })
+    )
+
+    expect(item(result, 'PC-8').passed).toBe(false)
+    expect(item(result, 'PC-8').offendingIds).toEqual(['a'])
+    expect(item(result, 'PC-8').message).toContain('more than one person')
+  })
+
+  it('blocks on an assignee who is not on the sprint team', () => {
+    const result = evaluatePlanningChecklist(
+      input({ tasks: [task({ id: 'a', assigneeIds: ['nimal'] })] })
+    )
+
+    expect(item(result, 'PC-8').passed).toBe(false)
+    expect(item(result, 'PC-8').offendingIds).toEqual(['a'])
+    expect(item(result, 'PC-8').message).toContain("not on this sprint's team")
+  })
+
+  it('passes when every task has exactly one on-team owner', () => {
+    expect(item(evaluatePlanningChecklist(input()), 'PC-8').passed).toBe(true)
+  })
+
+  it('does not double-report an empty sprint — PC-2 owns that', () => {
+    const result = evaluatePlanningChecklist(input({ tasks: [] }))
+
+    expect(item(result, 'PC-2').passed).toBe(false)
+    expect(item(result, 'PC-8').passed).toBe(true)
+  })
+})
+
+describe('PC-9 — every estimate came from planning poker', () => {
+  it('blocks on an estimate that never went through a round', () => {
+    const result = evaluatePlanningChecklist(
+      input({ tasks: [task({ id: 'a', estimateMethod: 'manual', pokerCovered: false })] })
+    )
+
+    expect(item(result, 'PC-9').passed).toBe(false)
+    expect(item(result, 'PC-9').offendingIds).toEqual(['a'])
+    expect(result.canComplete).toBe(false)
+  })
+
+  it('passes a poker estimate the facilitator later corrected by hand', () => {
+    // The decision PC-9 encodes: the round is what is required, not the
+    // number surviving it untouched. PA-4 keeps the correction visible.
+    const result = evaluatePlanningChecklist(
+      input({ tasks: [task({ id: 'a', estimateMethod: 'manual', pokerCovered: true })] })
+    )
+
+    expect(item(result, 'PC-9').passed).toBe(true)
+    expect(item(result, 'PA-4').passed).toBe(false)
+  })
+
+  it('exempts an estimate frozen by an earlier planning round (DAT-6)', () => {
+    // Without this carve-out a sprint planned before PC-9 existed could never
+    // re-complete planning: reopening fails PC-9, the poker session route
+    // excludes locked tasks, and finalize refuses them — so the check would
+    // demand a round that cannot be run, and the sprint could never start.
+    const result = evaluatePlanningChecklist(
+      input({
+        tasks: [
+          task({
+            id: 'a',
+            estimateMethod: 'manual',
+            pokerCovered: false,
+            estimateLockedAt: '2026-08-20T00:00:00.000Z'
+          })
+        ]
+      })
+    )
+
+    expect(item(result, 'PC-9').passed).toBe(true)
+    expect(result.canComplete).toBe(true)
+  })
+
+  it('ignores an unestimated task — PC-3 owns that failure', () => {
+    const result = evaluatePlanningChecklist(
+      input({
+        tasks: [task({ id: 'a', originalEstimateMinutes: 0, pokerCovered: false })]
+      })
+    )
+
+    expect(item(result, 'PC-3').passed).toBe(false)
+    expect(item(result, 'PC-9').passed).toBe(true)
+  })
+
+  it('accepts a round that ended without consensus (E16)', () => {
+    // PC-9 tests provenance, not agreement: a facilitator is allowed to set a
+    // value nobody agreed on, and that round still counts.
+    const result = evaluatePlanningChecklist(
+      input({ tasks: [task({ id: 'a', estimateMethod: 'poker', pokerCovered: true })] })
+    )
+
+    expect(item(result, 'PC-9').passed).toBe(true)
+  })
+})
+
 describe('PA-1 — scope over capacity', () => {
   it('E19 — states the overage in hours', () => {
     // Capacity 9600 minutes; scope 10800.
@@ -317,7 +431,10 @@ describe('PA-3 — tasks larger than a day', () => {
 })
 
 describe('PA-4 — estimated without a vote', () => {
-  it('E16 — flags manually estimated tasks but allows them', () => {
+  it('E16 — flags a poker estimate corrected by hand but allows it', () => {
+    // `pokerCovered` stays true: the round happened, and the PM then revised
+    // the number. PC-9 tests that the round happened; PA-4 is what keeps the
+    // revision visible.
     const result = evaluatePlanningChecklist(
       input({
         tasks: [task({ id: 'a', estimateMethod: 'manual' }), task({ id: 'b', assigneeIds: ['amal'] })]
@@ -374,7 +491,10 @@ describe('PA-5 / PA-6 — per-member pre-assignment', () => {
     expect(item(result, 'PA-5').passed).toBe(true)
   })
 
-  it('treats an unassigned task as day-one pool, not a failure', () => {
+  it('leaves an unassigned task to PC-8, and still counts both members as busy', () => {
+    // Assignment used to be deferred to the day-one stand-up, which made an
+    // unassigned task unremarkable here. PC-8 now blocks on it instead, and
+    // PA-6 stays quiet because neither member is idle.
     const result = evaluatePlanningChecklist(
       input({
         tasks: [
@@ -384,8 +504,9 @@ describe('PA-5 / PA-6 — per-member pre-assignment', () => {
         ]
       })
     )
-    expect(result.canComplete).toBe(true)
     expect(item(result, 'PA-6').passed).toBe(true)
+    expect(item(result, 'PC-8').passed).toBe(false)
+    expect(result.canComplete).toBe(false)
   })
 })
 

@@ -3,11 +3,12 @@
  *
  * The loader half of the split the module uses throughout: `planning-checklist`
  * owns the rules, this owns the queries that feed them. Keeping them apart is
- * what let the twelve checks be tested exhaustively without a database.
+ * what let the fifteen checks be tested exhaustively without a database.
  */
 import mongoose from 'mongoose'
 
 import { MemberCapacity } from '@/models/MemberCapacity'
+import { PokerSession } from '@/models/PokerSession'
 import { Sprint } from '@/models/Sprint'
 import { SprintPlanningSession } from '@/models/SprintPlanningSession'
 import { Task } from '@/models/Task'
@@ -48,19 +49,33 @@ export async function evaluateSprintChecklist(
   const startDate = isoOf((sprint as any).startDate)
   const endDate = isoOf((sprint as any).endDate)
 
-  const [tasks, resolutions, capacities] = await Promise.all([
+  const [tasks, resolutions, capacities, pokerSessions] = await Promise.all([
     Task.find({ sprint: sprintId, archived: { $ne: true } })
       .select(
-        'displayId title type priority description originalEstimateMinutes estimateMethod assignedTo'
+        'displayId title type priority description originalEstimateMinutes estimateMethod estimateLockedAt assignedTo'
       )
       .lean(),
     startDate <= endDate
       ? resolveWorkingDays(projectId, startDate as any, endDate as any)
       : Promise.resolve([]),
-    MemberCapacity.find({ project: projectId, isActive: true }).lean()
+    MemberCapacity.find({ project: projectId, isActive: true }).lean(),
+    // PC-9. Every round this sprint has ever run, open or closed: a session
+    // left open because some of its tasks were later dropped from scope still
+    // proves the tasks it *did* finish went through poker. Session status is
+    // the wrong signal; the per-task queue outcome is the fact.
+    PokerSession.find({ sprint: sprintId }).select('queue').lean()
   ])
 
   const workingDayCount = resolutions.filter((day) => day.isWorkingDay).length
+
+  const pokerCoveredTaskIds = new Set<string>()
+  for (const session of pokerSessions as any[]) {
+    for (const entry of session.queue ?? []) {
+      if (entry?.status === 'estimated' && entry.task) {
+        pokerCoveredTaskIds.add(entry.task.toString())
+      }
+    }
+  }
 
   const capacityByMember = new Map<string, number>()
   for (const record of capacities as any[]) {
@@ -86,6 +101,8 @@ export async function evaluateSprintChecklist(
     description: task.description,
     originalEstimateMinutes: task.originalEstimateMinutes,
     estimateMethod: task.estimateMethod,
+    estimateLockedAt: task.estimateLockedAt ?? null,
+    pokerCovered: pokerCoveredTaskIds.has(task._id.toString()),
     assigneeIds: (task.assignedTo ?? [])
       .map((entry: any) => entry?.user?.toString())
       .filter(Boolean)

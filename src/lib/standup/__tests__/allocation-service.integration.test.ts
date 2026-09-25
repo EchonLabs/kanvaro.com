@@ -19,6 +19,7 @@ import mongoose from 'mongoose'
 import { Allocation } from '@/models/Allocation'
 import { ActivityLog } from '@/models/ActivityLog'
 import { MemberCapacity } from '@/models/MemberCapacity'
+import { Project } from '@/models/Project'
 import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
@@ -89,6 +90,15 @@ async function seed({
       isActive: true
     })
   }
+
+  await Project.create({
+    _id: project,
+    name: 'Invoicing Revamp',
+    organization,
+    createdBy: user,
+    projectNumber: 1,
+    startDate: new Date('2026-01-01T00:00:00.000Z')
+  })
 
   await Sprint.create({
     _id: sprint,
@@ -496,6 +506,19 @@ describe('loadAllocationBoard', () => {
   it('carries the stand-up version so the client can send it back (RUN-23)', async () => {
     const board = await loadAllocationBoard(standupId)
     expect(board.standupVersion).toBe(3)
+  })
+
+  /**
+   * UI-12's My Stand-up screen needs these to link straight to this exact
+   * sprint's stand-up run screen, rather than the project-wide schedule hub —
+   * and to show which project a member on more than one is looking at.
+   */
+  it('carries projectId, sprintId and the project name', async () => {
+    const board = await loadAllocationBoard(standupId)
+
+    expect(board.projectId).toBe(String(project))
+    expect(board.sprintId).toBe(String(sprint))
+    expect(board.projectName).toBe('Invoicing Revamp')
   })
 
   it('carries DN-6’s flag so the board can explain undeducted ceremonies (OB-10)', async () => {

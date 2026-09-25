@@ -17,6 +17,7 @@ import { WorkingCalendar } from '@/models/WorkingCalendar'
 
 import { completePlanning } from '../planning-service'
 import { ids, syncIndexes, useMongo } from './helpers/mongo'
+import { coverSprintTasks } from './helpers/poker-coverage'
 
 const { organization, project, member, otherMember, user } = ids
 
@@ -81,6 +82,9 @@ async function seedPlannableSprint(overrides: Record<string, unknown> = {}) {
       assignedTo: [{ user: assignees[i], assignedAt: new Date() }]
     })
   }
+
+  // PC-9 reads poker coverage off the session queue, not off `estimateMethod`.
+  await coverSprintTasks({ organization, project, sprint: sprint._id, facilitator: user })
 
   const session = await SprintPlanningSession.create({
     sprint: sprint._id,

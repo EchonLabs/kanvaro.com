@@ -21,6 +21,7 @@
  * case, and a lost update here is a member's day silently rewritten.
  */
 import { Allocation, type IAllocation } from '@/models/Allocation'
+import { Project } from '@/models/Project'
 import { Standup } from '@/models/Standup'
 import { Task } from '@/models/Task'
 import { User } from '@/models/User'
@@ -430,6 +431,11 @@ export interface BoardMember {
 
 export interface AllocationBoard {
   standupId: string
+  /** UI-12's My Stand-up screen links straight to this sprint's stand-up run screen with these, rather than to the project-wide schedule hub. */
+  projectId: string
+  sprintId: string
+  /** So a member on more than one project's sprint team can tell which one this is. Empty string if the project record could not be found. */
+  projectName: string
   date: string
   shape: string
   /** Working-day ordinal, never a calendar count (§15.8.2). */
@@ -479,7 +485,7 @@ export interface AllocationBoard {
 export async function loadAllocationBoard(standupId: string): Promise<AllocationBoard> {
   const context = await loadCapacityContext(standupId)
 
-  const [allocations, tasks, people] = await Promise.all([
+  const [allocations, tasks, people, project] = await Promise.all([
     Allocation.find({ standup: standupId }).sort({ createdAt: 1 }).lean() as Promise<any[]>,
     Task.find({ sprint: context.sprintId, archived: { $ne: true } })
       .select(
@@ -491,7 +497,8 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
       _id: { $in: [...context.memberIds, context.standup.facilitator] }
     })
       .select('firstName lastName email')
-      .lean() as Promise<any[]>
+      .lean() as Promise<any[]>,
+    Project.findById(context.projectId).select('name').lean() as Promise<any>
   ])
 
   const nameById = new Map(people.map((person) => [String(person._id), displayName(person)]))
@@ -579,6 +586,9 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
 
   return {
     standupId: context.standupId,
+    projectId: context.projectId,
+    sprintId: context.sprintId,
+    projectName: project?.name ?? '',
     date: context.date,
     shape: context.standup.shape,
     sprintDayNumber: context.standup.sprintDayNumber ?? 0,

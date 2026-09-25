@@ -143,5 +143,13 @@ export function isLiveSprint(status: string | null | undefined): boolean {
   return !!status && (LIVE_SPRINT_STATES as string[]).includes(status)
 }
 
-/** States a sprint can be started from (SPRINT_START). */
-export const STARTABLE_SPRINT_STATES: SprintState[] = ['planning', 'planned']
+/**
+ * States a sprint can be started from (SPRINT_START).
+ *
+ * `planned` only. A sprint in `planning` is by definition unfinished: nothing
+ * has run the completion checklist, no estimate has been frozen (DAT-6) and no
+ * stand-ups exist, because generation happens inside `completePlanning`.
+ * Starting from `planning` produced an Active sprint that could never remind
+ * anybody of anything, so it is refused — finish planning first.
+ */
+export const STARTABLE_SPRINT_STATES: SprintState[] = ['planned']

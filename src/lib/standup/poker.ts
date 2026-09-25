@@ -38,8 +38,13 @@ export const TSHIRT_POINTS: Record<string, number> = {
   XL: 8
 }
 
-const NUMERIC_DECKS: Record<Exclude<DeckType, 'tshirt'>, number[]> = {
-  fibonacci: [1, 2, 3, 4, 6, 8, 12, 14, 16],
+const NUMERIC_DECKS: Record<Exclude<DeckType, 'tshirt'>, Array<number | string>> = {
+  // Classic Fibonacci (PLN-10), plus the two non-numeric cards the spec's own
+  // wireframe shows (§15.6): '?' for unsure, 'coffee' for "let's take a
+  // break". `cardValue` already falls through to `Number(card)` for these,
+  // which is `NaN` and so reads as `null` — the "no numeric weight" case the
+  // reveal/variance logic already treats as an abstention.
+  fibonacci: [1, 2, 3, 5, 8, 13, 21, '?', 'coffee'],
   modified_fibonacci: [0.5, 1, 2, 3, 5, 8, 12, 14, 16, 40, 100],
   hours: [0.5, 1, 2, 4, 8, 16, 24, 40],
   powers_of_two: [1, 2, 4, 8, 16, 32, 64]
@@ -271,18 +276,27 @@ const round2 = (value: number) => Math.round(value * 100) / 100
  *   - anyone the facilitator names explicitly — QA and specialists who estimate
  *     the work without being assigned it.
  *
- * The facilitator is always included, even against an explicit list, because a
- * session whose own facilitator cannot vote is never what was meant.
+ * The facilitator is included by default, even against an explicit list,
+ * because a session whose own facilitator cannot vote is usually not what was
+ * meant. `excludeFacilitator` overrides that: a facilitator who deliberately
+ * takes themselves off the voter picker is only ever facilitating this round
+ * (see PokerModal's viewer mode), not casting a vote.
  */
 export function resolveParticipants(
   requested: string[] | undefined,
   teamMembers: any[] | undefined,
-  facilitatorId: string
+  facilitatorId: string,
+  options?: { excludeFacilitator?: boolean }
 ): string[] {
   const base = requested?.length ? requested : teamMembers ?? []
   const ids = base.map((entry: any) => entry?.toString()).filter(Boolean)
-  ids.push(facilitatorId.toString())
+  const fid = facilitatorId.toString()
 
+  if (options?.excludeFacilitator) {
+    return Array.from(new Set(ids.filter((id) => id !== fid)))
+  }
+
+  ids.push(fid)
   return Array.from(new Set(ids))
 }
 

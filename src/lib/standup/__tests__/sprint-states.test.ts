@@ -167,12 +167,15 @@ describe('STARTABLE_SPRINT_STATES', () => {
     expect(STARTABLE_SPRINT_STATES).toContain('planned')
   })
 
-  it('keeps planning startable, preserving existing behaviour', () => {
-    expect(STARTABLE_SPRINT_STATES).toContain('planning')
+  it('refuses to start a sprint still in planning', () => {
+    // Planning is by definition unfinished: no completion checklist has run,
+    // no estimate is frozen, and generation happens inside `completePlanning`,
+    // so a sprint started from here would have no stand-ups at all.
+    expect(STARTABLE_SPRINT_STATES).not.toContain('planning')
   })
 
   it('excludes everything else', () => {
-    expect(STARTABLE_SPRINT_STATES.sort()).toEqual(['planned', 'planning'])
+    expect(STARTABLE_SPRINT_STATES).toEqual(['planned'])
   })
 })
 

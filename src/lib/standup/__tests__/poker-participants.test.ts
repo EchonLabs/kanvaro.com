@@ -45,4 +45,14 @@ describe('resolveParticipants', () => {
     const asObjectId = { toString: () => dev }
     expect(resolveParticipants(undefined, [asObjectId], pm)).toEqual([dev, pm])
   })
+
+  it('drops the facilitator when they deliberately opt out', () => {
+    const result = resolveParticipants([dev, qa], [dev], pm, { excludeFacilitator: true })
+    expect(result).toEqual(expect.arrayContaining([dev, qa]))
+    expect(result).not.toContain(pm)
+  })
+
+  it('strips the facilitator from the sprint-team default too when excluded', () => {
+    expect(resolveParticipants(undefined, [dev, pm], pm, { excludeFacilitator: true })).toEqual([dev])
+  })
 })

@@ -2,7 +2,7 @@
  * The planning completion checklist (spec §8.3 — PC-1..7, PA-1..6).
  *
  * Pure: it is handed everything it needs and reaches nothing. That is what
- * makes the twelve checks exhaustively testable, and it keeps the gate honest —
+ * makes the fifteen checks exhaustively testable, and it keeps the gate honest —
  * a check that quietly queried the database could pass or fail depending on
  * timing.
  *
@@ -43,8 +43,23 @@ export interface ChecklistTaskInput {
   /** Absent or zero means unestimated (PC-3). */
   originalEstimateMinutes?: number | null
   estimateMethod?: 'poker' | 'manual' | null
-  /** Members this task is pre-assigned to. Empty is valid — it becomes day-one pool. */
+  /**
+   * The member this task is assigned to. PC-8 requires exactly one: planning
+   * is where ownership is decided now, so an empty or shared list is a gap to
+   * close before the sprint starts, not day-one pool.
+   */
   assigneeIds?: string[]
+  /**
+   * DAT-6. Set means an earlier planning round already froze this estimate,
+   * which puts it out of poker's reach and so exempts it from PC-9.
+   */
+  estimateLockedAt?: string | Date | null
+  /**
+   * A planning poker round estimated this task. Derived by `planning-service`
+   * from the poker session queue rather than from `estimateMethod`, so a
+   * manual correction after the round still counts as covered.
+   */
+  pokerCovered?: boolean
 }
 
 export interface ChecklistMemberInput {
@@ -104,7 +119,7 @@ const estimateOf = (task: ChecklistTaskInput) => task.originalEstimateMinutes ??
 const isEstimated = (task: ChecklistTaskInput) => estimateOf(task) > 0
 
 /**
- * Runs all twelve checks.
+ * Runs all fifteen checks.
  *
  * Order matters only for display; each check is independent, and one failing
  * never suppresses another. The PM should see every problem at once rather than
@@ -242,7 +257,64 @@ function mandatoryChecks(
       : { message: planning.pc7BadRange() })
   }
 
-  return [pc1, pc2, pc3, pc4, pc5, pc6, pc7]
+  // PC-8 — every task owned by exactly one member of this sprint's team.
+  //
+  // Three separate mistakes with three messages, following PC-7's precedent:
+  // "5 tasks are wrong" is the hunting this checklist exists to eliminate.
+  // Off-team assignment matters because capacity, the workload board and
+  // PA-5/PA-6 are all built from the sprint roster — work parked on somebody
+  // outside it silently vanishes from every capacity number.
+  const memberIds = new Set(members.map((member) => member.memberId))
+  const unassigned = tasks.filter((task) => (task.assigneeIds ?? []).length === 0)
+  const multiAssigned = tasks.filter((task) => (task.assigneeIds ?? []).length > 1)
+  const offTeam = tasks.filter((task) =>
+    (task.assigneeIds ?? []).some((memberId) => !memberIds.has(memberId))
+  )
+  const pc8Offenders = Array.from(
+    new Set([...unassigned, ...multiAssigned, ...offTeam].map((task) => task.id))
+  )
+  const pc8: ChecklistItem = {
+    checkId: 'PC-8',
+    kind: 'mandatory',
+    passed: pc8Offenders.length === 0,
+    ...(pc8Offenders.length
+      ? {
+          message: unassigned.length
+            ? planning.pc8({ count: unassigned.length })
+            : multiAssigned.length
+              ? planning.pc8Multi({ count: multiAssigned.length })
+              : planning.pc8OffTeam({ count: offTeam.length }),
+          offendingIds: pc8Offenders
+        }
+      : {})
+  }
+
+  // PC-9 — every estimate came out of a planning poker round.
+  //
+  // Provenance, not agreement: E16 lets a facilitator set a value nobody
+  // agreed on, and that round still counts. A task poker estimated and then
+  // manually corrected also still counts — PA-4 is what keeps the correction
+  // visible. Two carve-outs:
+  //   - unestimated tasks belong to PC-3, and reporting them twice is noise;
+  //   - a frozen estimate (DAT-6) cannot be re-pokered at all, because the
+  //     session route excludes locked tasks and `finalize` refuses them.
+  //     Demanding poker provenance there would deadlock every sprint planned
+  //     before this check existed.
+  const pokerCandidates = tasks.filter((task) => isEstimated(task) && !task.estimateLockedAt)
+  const notPokered = pokerCandidates.filter((task) => !task.pokerCovered)
+  const pc9: ChecklistItem = {
+    checkId: 'PC-9',
+    kind: 'mandatory',
+    passed: notPokered.length === 0,
+    ...(notPokered.length
+      ? {
+          message: planning.pc9({ count: notPokered.length }),
+          offendingIds: notPokered.map((task) => task.id)
+        }
+      : {})
+  }
+
+  return [pc1, pc2, pc3, pc4, pc5, pc6, pc7, pc8, pc9]
 }
 
 function advisoryChecks(

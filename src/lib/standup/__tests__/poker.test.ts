@@ -31,7 +31,7 @@ describe('decks — PLN-10', () => {
   })
 
   it('deals the fibonacci deck the spec names', () => {
-    expect(deckCards('fibonacci')).toEqual([1, 2, 3, 4, 6, 8, 12, 14, 16])
+    expect(deckCards('fibonacci')).toEqual([1, 2, 3, 5, 8, 13, 21, '?', 'coffee'])
   })
 
   it('deals t-shirt sizes from XS to XL', () => {
@@ -39,15 +39,22 @@ describe('decks — PLN-10', () => {
   })
 
   it('validates cards against their own deck', () => {
-    expect(isValidCard('fibonacci', 12)).toBe(true)
-    expect(isValidCard('fibonacci', 5)).toBe(false)
+    expect(isValidCard('fibonacci', 13)).toBe(true)
+    expect(isValidCard('fibonacci', 4)).toBe(false)
+    expect(isValidCard('fibonacci', '?')).toBe(true)
+    expect(isValidCard('fibonacci', 'coffee')).toBe(true)
     expect(isValidCard('tshirt', 'M')).toBe(true)
     expect(isValidCard('tshirt', 3)).toBe(false)
   })
 
   it('rejects an off-deck vote by name', () => {
-    expect(() => assertValidVote('fibonacci', 5)).toThrow(/not a card in the fibonacci deck/)
+    expect(() => assertValidVote('fibonacci', 4)).toThrow(/not a card in the fibonacci deck/)
     expect(() => assertValidVote('fibonacci', 8)).not.toThrow()
+  })
+
+  it('accepts the unsure and coffee-break cards, with no numeric weight', () => {
+    expect(cardValue('fibonacci', '?')).toBeNull()
+    expect(cardValue('fibonacci', 'coffee')).toBeNull()
   })
 })
 

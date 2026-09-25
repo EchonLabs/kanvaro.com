@@ -110,6 +110,12 @@ export const standupStrings = {
 
     pc8: ({ count }: { count: number }) =>
       `${count} ${plural(count, 'task has', 'tasks have')} no assignee. Assign every task before running planning poker.`,
+    pc8Multi: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task is', 'tasks are')} assigned to more than one person. Each task needs a single owner.`,
+    pc8OffTeam: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task is', 'tasks are')} assigned to somebody who is not on this sprint's team.`,
+    pc9: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task has', 'tasks have')} not been through planning poker. Run a round over ${plural(count, 'it', 'them')} before completing planning.`,
 
     pa1: ({ overBy }: { overBy: string }) =>
       `Scope is ${overBy} over capacity. You are planning to fail unless you cut scope.`,
@@ -122,7 +128,7 @@ export const standupStrings = {
     pa5: ({ name, assigned, capacity }: { name: string; assigned: string; capacity: string }) =>
       `${name} is pre-assigned ${assigned} against ${capacity} of capacity.`,
     pa6: ({ name }: { name: string }) =>
-      `${name} has nothing assigned. That is fine if you intend to assign at day one stand-up.`,
+      `${name} has nothing assigned in this sprint.`,
 
     /**
      * Reasons the planning screen's step gates are open or shut (UI-6).
@@ -138,6 +144,9 @@ export const standupStrings = {
     completeReady: () => 'Every check passed. Completing takes this sprint to Planned.',
     startBlockedNotPlanned: () =>
       'This sprint cannot start until planning is complete. Open Plan Sprint and finish the checklist.',
+    startUseStartSprint: () => 'Use Start Sprint to start a sprint.',
+    reopenUnstartsSprint: () =>
+      'Reopening planning returns this sprint to Planning, and it cannot be started until planning completes again.',
 
     /** PLN-19's carve-out, refused under every circumstance. */
     waiverCannotCoverEstimates: () =>
@@ -590,7 +599,34 @@ export const standupStrings = {
     noStandupHint: () =>
       'Your current sprint may still be in planning — stand-ups are only scheduled once planning is complete. Check with your PM, or view your projects.',
     noStandupProjectsLink: () => 'View your projects',
-    readOnlyBanner: () => 'The stand-up has started. Your day is now read-only.',
+    /**
+     * This route is reachable for every stand-up status — including
+     * `Scheduled`, which the "other stand-ups today" banner links to
+     * directly — so a single "has started" sentence used to be shown even
+     * when it plainly had not. Each status gets its own accurate lead
+     * clause; only `In_Progress` keeps the original "has started" wording,
+     * because that is the one status it is actually true for.
+     */
+    readOnlyBanner: ({ status }: { status: string }) => {
+      const tail = "Yesterday's records and capacity allocation are read-only."
+      switch (status) {
+        case 'In_Progress':
+          return `The stand-up has started. ${tail}`
+        case 'Completed':
+          return `This stand-up is complete. ${tail}`
+        case 'Reopened':
+          return `This stand-up has been reopened by your PM. ${tail}`
+        case 'Missed':
+          return `This stand-up was missed. ${tail}`
+        case 'Skipped_Holiday':
+          return `This date was not a working day, so no stand-up ran. ${tail}`
+        case 'Cancelled':
+          return `This stand-up was cancelled. ${tail}`
+        case 'Scheduled':
+        default:
+          return "This stand-up hasn't started yet. Yesterday's records and capacity allocation will open once it does."
+      }
+    },
     hoursFor: ({ title }: { title: string }) => `Hours for ${title}`,
     addTask: ({ key }: { key: string }) => `Add ${key}`,
     selfSelectHint: () => 'Adding this notifies your PM.',
@@ -604,10 +640,111 @@ export const standupStrings = {
     /** A read-tolerant section (Yesterday, My position, Blockers) shown when its own fetch failed — the rest of the screen still renders. */
     sectionLoadFailed: () => 'Could not load this section.',
     otherStandupsToday: ({ count }: { count: number }) =>
-      count === 1 ? 'You have another stand-up today' : `You have ${count} other stand-ups today`,
-    viewStandups: () => 'View Standups',
+      `You have ${standupStrings.my.otherStandupsPhrase({ count })} scheduled for today.`,
+    /** The highlighted part of `otherStandupsToday` — always a substring of it. */
+    otherStandupsPhrase: ({ count }: { count: number }) =>
+      count === 1 ? 'another project stand-up' : `${count} other project stand-ups`,
+    viewStandups: () => 'View Stand-ups',
     dayOf: ({ day, total }: { day: number; total: number }) => `Day ${day} of ${total}`,
-    joinCall: () => 'Join',
+    joinCall: () => 'Join call',
+    breadcrumbRoot: () => 'Dashboard',
+    localTime: ({ time }: { time: string }) => `Local: ${time}`,
+    projectTime: ({ zone, time }: { zone: string; time: string }) => `Project ${zone}: ${time}`,
+    duration: ({ minutes }: { minutes: number }) => `${minutes} mins`,
+    /** Bold lead-ins for the save-refused banner: a version clash (RUN-23) reads differently from any other refusal. */
+    conflictTitle: () => 'Server edit conflict:',
+    refusedTitle: () => 'Not saved:',
+    conflictDetail: () => 'Someone else updated this stand-up. Reload to see the latest.',
+
+    journeyEyebrow: () => 'Guided journey',
+    journeyTitle: () => 'Complete each area in order before the stand-up starts.',
+    journeyBody: () =>
+      'Start with yesterday, confirm today, review carry-forward items, and finish with blockers. Every section is designed to keep the next action unmistakable.',
+    stateCompleted: () => 'Completed',
+    stateInProgress: () => 'In Progress',
+    stateLocked: () => 'Locked',
+    stateEditing: () => 'Editing',
+    stateReview: () => 'Review',
+    stateOptional: () => 'Optional',
+    stateAllClear: () => 'All clear',
+    stateOverdue: () => 'Overdue',
+    stateNothingToReview: () => 'Nothing to review',
+
+    yesterdayStepTitle: () => 'Review yesterday',
+    yesterdayStepSubtitle: () => 'Confirm logged hours and close out the previous day.',
+    yesterdayDone: () => 'Done:',
+    yesterdayLogged: () => 'Logged Total:',
+    loggedHours: ({ hours }: { hours: string }) => `${hours} hrs`,
+    yesterdayLockedNote: () =>
+      'Yesterday is read-only because the stand-up has started. Use this view to confirm the previous day before moving into today.',
+    yesterdayEditableNote: () =>
+      'Correct any status or logged hours now, so the stand-up does not have to spend time on it.',
+    columnTask: () => 'Task Details',
+    columnPlannedVsLogged: () => 'Planned vs Logged',
+    columnLogged: () => 'Logged Hours',
+    columnStatus: () => 'Status',
+    varianceAmount: ({ hours }: { hours: string }) => `${hours} variance`,
+    perfectMatch: () => 'Perfect match',
+    carryBadge: ({ count }: { count: number }) => `Carry x${count}`,
+    taskStatus: {
+      todo: 'To Do',
+      in_progress: 'In Progress',
+      blocked: 'Blocked',
+      done: 'Completed'
+    } as Record<string, string>,
+
+    todayStepTitle: () => 'Confirm today',
+    todayStepSubtitle: () => "Review capacity, today's plan, and the next available task.",
+    capacityAllocated: () => 'Allocated',
+    capacityState: {
+      full: 'Optimized State (Full)',
+      under: 'Under Capacity',
+      over: 'Over Capacity',
+      zero: 'Nothing Planned',
+      unavailable: 'Unavailable'
+    } as Record<string, string>,
+    plannedVsCapacity: ({ planned, capacity }: { planned: string; capacity: string }) =>
+      `Planned: ${planned} / Capacity: ${capacity}`,
+    nominalCapacity: ({ hours }: { hours: string }) => `Nominal: ${hours}`,
+    adjustmentLine: ({ label, hours }: { label: string; hours: string }) => `${label}: −${hours}`,
+    todayPlanTitle: () => "Today's Plan",
+    tasksPlanned: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? 'task' : 'tasks'} planned`,
+    gapAvailable: ({ hours }: { hours: string }) => `${hours} surplus available`,
+    overCapacity: ({ hours }: { hours: string }) => `${hours} over capacity`,
+    fullyPlanned: () => 'fully planned',
+    allocatedLabel: () => 'Allocated:',
+    spareCapacity: ({ hours }: { hours: string }) =>
+      `You have ${standupStrings.my.spareCapacityPhrase({ hours })} today. You can select one small task to pull.`,
+    spareCapacityPhrase: ({ hours }: { hours: string }) => `${hours} spare capacity`,
+    pullTask: () => 'Pull task',
+    overLimit: () => 'Over Limit',
+    estimated: ({ hours }: { hours: string }) => `Estimated: ${hours}`,
+    priority: ({ priority }: { priority: string }) => `Priority: ${priority}`,
+
+    positionStepSubtitle: () =>
+      'Acknowledge the oldest and most escalated items before the stand-up.',
+    positionEyebrow: () => 'Read-only carry forward (sorted oldest & most escalated)',
+    ageBand: {
+      normal: 'Stable Age',
+      note_required: 'Note Required',
+      escalated: 'Escalated Priority',
+      chronic: 'Chronic'
+    } as Record<string, string>,
+    ageBadge: ({ count }: { count: number }) =>
+      `Age: ${count} ${count === 1 ? 'stand-up' : 'stand-ups'}`,
+    originallyPlanned: ({ date }: { date: string }) => `Originally planned ${date}.`,
+
+    blockersStepTitle: () => 'Raise blockers',
+    blockersStepSubtitle: () => 'Capture anything blocking your progress before the stand-up starts.',
+    activeRoadblocks: () => 'Active roadblocks',
+    raiseRoadblock: () => 'Raise New Roadblock',
+    roadblockPlaceholder: () => "Describe what's keeping you from completing your work today...",
+    markUrgent: () => 'Mark as Urgent',
+    fileRoadblock: () => 'File Roadblock',
+    ownedBy: ({ owner }: { owner: string }) => `Owned by: ${owner}`,
+    noOwnerYet: () => 'No owner yet',
+    targetDate: ({ date }: { date: string }) => `Target ${date}`,
     capacityFull: ({ hours, taskCount }: { hours: string; taskCount: number }) =>
       `You're planned to ${hours} today across ${taskCount} ${taskCount === 1 ? 'task' : 'tasks'}.`,
     capacityUnder: ({ hours }: { hours: string }) => `You have ${hours} unplanned today.`,
@@ -620,17 +757,16 @@ export const standupStrings = {
       `You're ${hours} ahead of estimate on this sprint's work.`,
     strandedSentence: ({ hours }: { hours: string }) =>
       `${hours} is still assigned to you for a day you're not available.`,
-    capacityHeader: () => "Today's Capacity",
-    yesterdayHeader: () => 'Yesterday',
-    yesterdayCount: ({ done, total }: { done: number; total: number }) => `${done} of ${total} done`,
-    yesterdayLoggedTotal: ({ hours }: { hours: string }) => `, ${hours} logged`,
     yesterdayEmpty: () => "Nothing to review yet — your previous stand-up hasn't closed.",
-    chronicSpill: ({ count }: { count: number }) => `carried ${count} stand-ups`,
     statusFor: ({ key }: { key: string }) => `Status for ${key}`,
-    todayHeader: () => 'Today',
-    todayPlanned: ({ hours }: { hours: string }) => `${hours} planned`,
     todayEmpty: () => 'Nothing planned for you yet — your PM assigns work at the stand-up.',
-    lockedReason: () => 'The stand-up has started; your day is locked.',
+    /**
+     * Deliberately status-agnostic — this row-level card is shown whatever
+     * the stand-up's status is (Scheduled, Completed, Missed, …), and "the
+     * stand-up has started" is false for most of those. Kept true in every
+     * case instead of threading `status` through for a sentence this short.
+     */
+    lockedReason: () => 'Editing is locked for this stand-up.',
     sourceCarried: () => 'carried',
     sourcePreAssigned: () => 'pre-assigned',
     sourceAssignedInStandup: () => 'assigned',
@@ -638,13 +774,10 @@ export const standupStrings = {
     sourceAutoPrefilled: () => 'auto',
     positionHeader: () => 'My position',
     positionEmpty: () => 'Nothing blocked. Nothing carried.',
-    positionCount: ({ count }: { count: number }) => `${count} carried over`,
     pmOwesNote: () => 'Your PM owes a note on this today.',
-    carriedAge: ({ count }: { count: number }) => `carried ${count} ${count === 1 ? 'stand-up' : 'stand-ups'}`,
-    blockersHeader: () => 'Blockers',
     blockersEmpty: () => 'No open blockers.',
-    /** The section's own trigger button — distinct from `blocker.raise()`, the modal's internal submit button, so the two never collide as accessible names on the same screen. */
-    reportBlocker: () => 'Report a blocker'
+    /** Links a PM straight to this stand-up's own run screen — not the project's whole schedule hub, which they would then have to search. */
+    openFullStandup: () => 'Open full stand-up'
   },
 
   config: {

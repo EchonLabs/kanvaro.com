@@ -17,6 +17,7 @@ import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 
 import { startStandup } from '../start-service'
 import { ids, useMongo } from './helpers/mongo'
+import { seedPokerCoverage } from './helpers/poker-coverage'
 
 const { organization, project, user } = ids
 
@@ -50,7 +51,7 @@ async function seedSprintAndStandup(
   })
 
   taskCounter += 1
-  await Task.create({
+  const task = await Task.create({
     organization,
     project,
     sprint: sprint._id,
@@ -64,7 +65,19 @@ async function seedSprintAndStandup(
     type: 'task',
     originalEstimateMinutes: 240,
     estimateMethod: 'poker',
+    // PC-8 wants one owner from the sprint team; PC-9 wants the round that
+    // produced the estimate, which it reads from the session queue rather than
+    // from `estimateMethod`.
+    assignedTo: [{ user }],
     archived: false
+  })
+
+  await seedPokerCoverage({
+    organization,
+    project,
+    sprint: sprint._id,
+    facilitator: user,
+    taskIds: [task._id]
   })
 
   const standup = await Standup.create({

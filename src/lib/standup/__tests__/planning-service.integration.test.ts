@@ -13,6 +13,7 @@ import { Task } from '@/models/Task'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { completePlanning, evaluateSprintChecklist } from '../planning-service'
 import { ids, useMongo } from './helpers/mongo'
+import { seedPokerCoverage } from './helpers/poker-coverage'
 
 const { organization, project, user, member } = ids
 
@@ -46,9 +47,20 @@ async function seedSprint(overrides: Record<string, unknown> = {}) {
   })
 }
 
-async function seedTask(sprint: any, overrides: Record<string, unknown> = {}) {
+/**
+ * Seeds a task and, unless told otherwise, the poker round that estimated it.
+ *
+ * PC-9 reads coverage off the session queue, not off `estimateMethod`, so a
+ * task claiming `estimateMethod: 'poker'` with no session behind it is exactly
+ * the state the check exists to catch.
+ */
+async function seedTask(
+  sprint: any,
+  overrides: Record<string, unknown> = {},
+  options: { pokerCovered?: boolean } = {}
+) {
   taskCounter += 1
-  return Task.create({
+  const task = await Task.create({
     title: 'Invoice model',
     description: 'Build the invoice model end to end.',
     organization,
@@ -67,6 +79,18 @@ async function seedTask(sprint: any, overrides: Record<string, unknown> = {}) {
     assignedTo: [{ user }],
     ...overrides
   })
+
+  if (options.pokerCovered !== false && task.originalEstimateMinutes) {
+    await seedPokerCoverage({
+      organization,
+      project,
+      sprint: sprint._id,
+      facilitator: user,
+      taskIds: [task._id]
+    })
+  }
+
+  return task
 }
 
 const session = (sprint: any) =>
@@ -175,10 +199,12 @@ describe('completePlanning', () => {
     })
     await seedTask(sprint, { assignedTo: [{ user }] })
     await seedTask(sprint, { assignedTo: [{ user: member }] })
-    // Five more 480min tasks, left unassigned so PA-5/PA-6 stay unaffected,
-    // push total estimate to 3360min — well past the 2880min capacity.
+    // Five more 480min tasks push the total estimate to 3360min, well past the
+    // 2880min capacity. They are shared out between the two members because
+    // PC-8 now blocks on an unassigned task — and once scope exceeds total
+    // capacity, somebody is necessarily over their own, so PA-5 fires too.
     for (let i = 0; i < 5; i += 1) {
-      await seedTask(sprint, { assignedTo: [] })
+      await seedTask(sprint, { assignedTo: [{ user: i % 2 === 0 ? user : member }] })
     }
     const planning = await session(sprint)
     return {
@@ -239,7 +265,7 @@ describe('completePlanning', () => {
     const stored = await SprintPlanningSession.findById(planning._id).lean()
     expect((stored as any).status).toBe('completed')
     expect((stored as any).completedAt).toBeInstanceOf(Date)
-    expect((stored as any).checklistResults).toHaveLength(13)
+    expect((stored as any).checklistResults).toHaveLength(15)
 
     const pa2 = (stored as any).checklistResults.find((item: any) => item.checkId === 'PA-2')
     // Acknowledged only if it actually failed; either way the record is honest.
@@ -378,7 +404,10 @@ describe('completePlanning', () => {
       sprintId,
       sessionId,
       userId,
-      acknowledgedCheckIds: ['PA-1']
+      // PA-5 comes along for the ride: scope over total capacity means at
+      // least one person is over theirs. E19 is satisfied either way — a
+      // failing advisory needs an explicit tick before completion.
+      acknowledgedCheckIds: ['PA-1', 'PA-5']
     })
 
     expect(result.sprint.status).toBe('planned')
