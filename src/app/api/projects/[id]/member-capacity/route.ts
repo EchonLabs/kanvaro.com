@@ -37,9 +37,17 @@ export const GET = withStandupPermission(
     const projectStandardMinutes = (calendar as any)?.standardMinutesPerDay ?? 480
 
     const project = await Project.findById(projectId)
-      .select('teamMembers')
+      .select('teamMembers projectRoles')
       .populate('teamMembers.memberId', 'firstName lastName email')
       .lean()
+
+    // Sprint planning's assignment board groups QA separately, so it can offer
+    // to pull a QA onto the sprint team when work is assigned to them.
+    const roleByMember = new Map<string, string>()
+    for (const entry of ((project as any)?.projectRoles ?? []) as any[]) {
+      const memberId = (entry?.user?._id ?? entry?.user)?.toString()
+      if (memberId && entry?.role) roleByMember.set(memberId, entry.role)
+    }
 
     const records = await MemberCapacity.find({ project: projectId }).lean()
 
@@ -65,6 +73,7 @@ export const GET = withStandupPermission(
         email: entry.memberId?.email,
         dailyCapacityMinutes,
         dailyCapacityHours: minutesToHours(dailyCapacityMinutes),
+        role: roleByMember.get(memberId) ?? null,
         // Explicit, so the screen can show "inherited from project standard"
         // rather than implying someone set this deliberately.
         isDefault: !current,

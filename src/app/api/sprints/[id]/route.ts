@@ -13,6 +13,8 @@ import {
   type ReconcileTrigger
 } from '@/lib/standup/reconcile'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { assertTransition, type SprintState } from '@/lib/standup/sprint-states'
+import { standupStrings } from '@/lib/standup/strings'
 import { logActivity } from '@/lib/activity-logger'
 
 export async function GET(
@@ -293,6 +295,31 @@ export async function PUT(
     if (datesMoved) {
       try {
         await assertScheduleChangeAllowed(sprintId, { from: nextFrom, to: nextTo })
+      } catch (error) {
+        const { status, body } = toErrorResponse(error)
+        return NextResponse.json(body, { status })
+      }
+    }
+
+    // A generic PUT used to write `status` straight through, which made this
+    // route a way around every gate the sprint lifecycle has: the start
+    // endpoint's planned-only rule, its task-count check, and `actualStartDate`
+    // being stamped at all. Two guards close it.
+    if (updateData.status && updateData.status !== existingSprint.status) {
+      // `planned -> active` is a legal transition, so `assertTransition` alone
+      // would still let an edit form start a sprint by the back door.
+      if (updateData.status === 'active') {
+        return NextResponse.json(
+          { error: standupStrings.planning.startUseStartSprint() },
+          { status: 400 }
+        )
+      }
+
+      try {
+        assertTransition(
+          existingSprint.status as SprintState,
+          updateData.status as SprintState
+        )
       } catch (error) {
         const { status, body } = toErrorResponse(error)
         return NextResponse.json(body, { status })

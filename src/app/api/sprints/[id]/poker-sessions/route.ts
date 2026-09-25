@@ -39,6 +39,8 @@ interface CreateBody {
   estimationUnit?: EstimateUnit
   consensusRule?: ConsensusRule
   participantIds?: string[]
+  /** Facilitator deliberately left themselves off the voter picker (PLN-11). */
+  excludeFacilitator?: boolean
   hideVoterIdentity?: boolean
   allowRevote?: boolean
   autoRevealOnAllVoted?: boolean
@@ -114,7 +116,9 @@ export const POST = withSprintPermission(
       allowRevote: body.allowRevote !== false,
       autoRevealOnAllVoted: body.autoRevealOnAllVoted !== false,
       facilitator: userId,
-      participants: resolveParticipants(body.participantIds, sprint.teamMembers, userId),
+      participants: resolveParticipants(body.participantIds, sprint.teamMembers, userId, {
+        excludeFacilitator: body.excludeFacilitator === true
+      }),
       queue: (tasks as any[]).map((task) => ({ task: task._id, status: 'pending', roundCount: 0 })),
       currentTask: (tasks as any[])[0]._id,
       createdBy: userId

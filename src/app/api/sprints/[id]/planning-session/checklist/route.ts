@@ -49,7 +49,10 @@ export const GET = withSprintPermission(
 
     const tasks = offendingTaskIds.length
       ? await Task.find({ _id: { $in: offendingTaskIds } })
-          .select('displayId title type priority originalEstimateMinutes description')
+          .select(
+            'displayId title type priority originalEstimateMinutes description estimateMethod assignedTo'
+          )
+          .populate('assignedTo.user', 'firstName lastName email')
           .lean()
       : []
 
@@ -62,7 +65,17 @@ export const GET = withSprintPermission(
         type: task.type,
         priority: task.priority,
         originalEstimateMinutes: task.originalEstimateMinutes,
-        hasDescription: (task.description ?? '').trim().length >= 10
+        estimateMethod: task.estimateMethod ?? null,
+        hasDescription: (task.description ?? '').trim().length >= 10,
+        // PC-8's fix row names who the task is parked on, so the PM can see at
+        // a glance whether the problem is nobody, two people, or an outsider.
+        assigneeNames: (task.assignedTo ?? [])
+          .map((entry: any) => entry?.user)
+          .filter(Boolean)
+          .map(
+            (user: any) =>
+              [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email
+          )
       })),
       offendingMembers: Array.from(names.entries())
         .filter(([id]) =>
