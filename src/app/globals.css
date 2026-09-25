@@ -192,9 +192,9 @@
   animation: check-pop 0.32s cubic-bezier(0.34, 1.45, 0.64, 1) both;
 }
 
-/* Poker card select — the confirm-pop when a carousel card is voted.
-   Applied via an element keyed on the card's value (PokerCardCarousel.tsx),
-   so React remounts it and the animation replays on every new selection. */
+/* Poker card select — the confirm-pop played on a successful vote.
+   Applied to the Confirm button in PokerModal.tsx (not the carousel card
+   itself — the carousel only ever reports a candidate, it never votes). */
 @keyframes poker-card-select {
   0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(0, 122, 255, 0.55); }
   40%  { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(0, 122, 255, 0); }
@@ -821,4 +821,98 @@
 .rich-text-editor ul li::marker,
 .rich-text-editor ol li::marker {
   color: hsl(var(--foreground));
+}
+
+/* Sprint planning surface — the dark values are the Figma "Dark sprint
+   planning" palette verbatim; the light values are its daylight counterpart. */
+:root {
+  --plan-canvas: #F5F6F8;
+  --plan-surface: #FFFFFF;
+  --plan-raised: #F2F4F7;
+  --plan-border: #E1E5EB;
+  --plan-text: #14171C;
+  --plan-muted: #5F6875;
+  --plan-accent: #3478F6;
+  --plan-danger: #C93C3C;
+  --plan-warning: #B8720B;
+  --plan-success: #23855A;
+  --plan-idle: #8A93A1;
+  --plan-violet: #7A5AF8;
+  --plan-danger-bg: #FCECEC;
+  --plan-warning-bg: #FDF3E1;
+  --plan-info-bg: #EAF1FE;
+  --plan-success-bg: #E3F4EC;
+}
+
+.dark {
+  --plan-canvas: #0D0F12;
+  --plan-surface: #171A20;
+  --plan-raised: #1D2128;
+  --plan-border: #2A3039;
+  --plan-text: #F4F5F7;
+  --plan-muted: #9AA2AF;
+  --plan-accent: #3478F6;
+  --plan-danger: #D94C4C;
+  --plan-warning: #D88A15;
+  --plan-success: #2F9D68;
+  --plan-idle: #9AA2AF;
+  --plan-violet: #7A5AF8;
+  --plan-danger-bg: #321D21;
+  --plan-warning-bg: #352812;
+  --plan-info-bg: #17253D;
+  --plan-success-bg: #173627;
+}
+
+/* My Stand-up surface — the dark values are the Figma "My Stand-up page
+   redesign" palette verbatim; the light values are its daylight counterpart.
+   Tints are the design's 12% accent washes. */
+:root {
+  --my-canvas: #F8FAFC;
+  --my-surface: #FFFFFF;
+  --my-raised: #F1F5F9;
+  --my-inset: #F1F5F9;
+  --my-border: #E2E8F0;
+  --my-text: #0F172A;
+  --my-muted: #475569;
+  --my-subtle: #64748B;
+  --my-blue: #2563EB;
+  --my-green: #059669;
+  --my-amber: #D97706;
+  --my-red: #DC2626;
+  --my-violet: #7C3AED;
+  --my-blue-tint: rgba(37, 99, 235, 0.10);
+  --my-green-tint: rgba(5, 150, 105, 0.10);
+  --my-amber-tint: rgba(217, 119, 6, 0.10);
+  --my-red-tint: rgba(220, 38, 38, 0.10);
+  --my-violet-tint: rgba(124, 58, 237, 0.10);
+}
+
+.dark {
+  --my-canvas: #090A0F;
+  --my-surface: #141722;
+  --my-raised: #1C1F2E;
+  --my-inset: #0F1117;
+  --my-border: #222634;
+  --my-text: #F8FAFC;
+  --my-muted: #94A3B8;
+  --my-subtle: #64748B;
+  --my-blue: #3B82F6;
+  --my-green: #10B981;
+  --my-amber: #F59E0B;
+  --my-red: #EF4444;
+  --my-violet: #8B5CF6;
+  --my-blue-tint: rgba(59, 130, 246, 0.12);
+  --my-green-tint: rgba(16, 185, 129, 0.12);
+  --my-amber-tint: rgba(245, 158, 11, 0.12);
+  --my-red-tint: rgba(239, 68, 68, 0.12);
+  --my-violet-tint: rgba(139, 92, 246, 0.12);
+}
+
+.my-standup {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.my-standup .my-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }

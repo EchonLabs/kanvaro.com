@@ -19,7 +19,8 @@ import {
   Loader2,
   Trash2,
   Paperclip,
-  Check
+  Check,
+  Info
 } from 'lucide-react'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { AttachmentList } from '@/components/ui/AttachmentList'
@@ -513,13 +514,11 @@ export default function CreateTaskModal({
     // Validate required fields including subtasks titles
     const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
     const missingDueDate = !(formData.dueDate && formData.dueDate.trim().length > 0)
-    const missingAssignees = assignedTo.length === 0
     if (
       !formData.title ||
       !hasProjectSelected ||
       missingDueDate ||
-      missingSubtaskTitle ||
-      missingAssignees
+      missingSubtaskTitle
     ) {
       setLoading(false)
       if (missingSubtaskTitle) {
@@ -528,9 +527,6 @@ export default function CreateTaskModal({
       } else if (missingDueDate) {
         notifyError({ title: 'Validation Error', message: 'Due date is required' })
         setError('Due date is required')
-      } else if (missingAssignees) {
-        notifyError({ title: 'Validation Error', message: 'Please assign this task to at least one team member' })
-        setError('Please assign this task to at least one team member')
       } else {
         notifyError({ title: 'Validation Error', message: 'Please fill in all required fields' })
         setError('Please fill in all required fields')
@@ -963,7 +959,15 @@ export default function CreateTaskModal({
 
               {hasProjectSelected && (
                 <div className="md:col-span-2">
-                  <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Assigned To *</label>
+                  <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Assigned To</label>
+                  {/* Ownership is decided during sprint planning now, with the
+                      sprint's capacity in view. Demanding it here meant
+                      guessing an owner for work that had not been scoped or
+                      sized, and then deciding it again on the stand-up board. */}
+                  <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[var(--apple-tertiary-label)]">
+                    <Info className="h-3 w-3 shrink-0" />
+                    Optional — tasks are assigned during sprint planning.
+                  </p>
                   <div className="space-y-2 mt-1">
                     <Select
                       value=""
@@ -1294,7 +1298,6 @@ export default function CreateTaskModal({
             !(formData.title && formData.title.trim().length > 0) ||
             !(projectId || (selectedProjectId && selectedProjectId.trim().length > 0)) ||
             !(formData.dueDate && formData.dueDate.trim().length > 0) ||
-            assignedTo.length === 0 ||
             subtasks.some(st => !(st.title && st.title.trim().length > 0))
           }>
             {loading ? (

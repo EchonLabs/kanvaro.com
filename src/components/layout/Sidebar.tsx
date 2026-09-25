@@ -124,7 +124,29 @@ const navigationItems = [
         permission: Permission.STORY_READ
       },
       {
-        id: 'tasks-sprints',
+        id: 'tasks-epics',
+        label: 'Epics',
+        icon: Columns,
+        path: '/epics',
+        permission: Permission.EPIC_VIEW
+      },
+      {
+        id: 'tasks-sprint-events',
+        label: 'Sprint Events',
+        icon: Calendar,
+        path: '/sprint-events',
+        permission: Permission.SPRINT_EVENT_VIEW
+      },
+    ]
+  },
+  {
+    id: 'standup',
+    label: 'Standup',
+    icon: Rocket,
+    path: '/sprints',
+    children: [
+      {
+        id: 'standup-sprints',
         label: 'Sprints',
         icon: Zap,
         path: '/sprints',
@@ -141,25 +163,11 @@ const navigationItems = [
         // exact audience this screen is for. The destination page already
         // resolves per-user server-side and shows an explanatory empty state
         // when there is nothing to show, so no client-side gate is needed.
-        id: 'tasks-my-standup',
+        id: 'standup-my',
         label: 'My Stand-up',
         icon: Zap,
         path: '/my/standup'
-      },
-      {
-        id: 'tasks-epics',
-        label: 'Epics',
-        icon: Columns,
-        path: '/epics',
-        permission: Permission.EPIC_VIEW
-      },
-      {
-        id: 'tasks-sprint-events',
-        label: 'Sprint Events',
-        icon: Calendar,
-        path: '/sprint-events',
-        permission: Permission.SPRINT_EVENT_VIEW
-      },
+      }
     ]
   },
   {
@@ -568,8 +576,7 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
 
   // For collapsed sidebar with children, show popover
   if (collapsed && hasChildren) {
-    return (
-      <PermissionGate permission={item.permission}>
+    const popover = (
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -590,16 +597,17 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
                 {item.label}
               </div>
               {item.children.map((child: any) => {
+                const isChildActive = isNavPathActive(pathname, child.path)
                 const link = (
                   <Button
                     variant="ghost"
                     className={cn(
                       'w-full justify-start text-[14px] h-8 rounded-[10px] apple-transition',
-                      pathname === child.path
+                      isChildActive
                         ? 'font-medium'
                         : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
                     )}
-                    style={pathname === child.path ? { color: 'var(--apple-card-gradient)', backgroundColor: 'color-mix(in srgb, var(--apple-card-gradient) 12%, transparent)' } : undefined}
+                    style={isChildActive ? { color: 'var(--apple-card-gradient)', backgroundColor: 'color-mix(in srgb, var(--apple-card-gradient) 12%, transparent)' } : undefined}
                     asChild
                   >
                     <Link href={child.path} prefetch onMouseEnter={() => router.prefetch(child.path)}>
@@ -622,13 +630,17 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
             </div>
           </PopoverContent>
         </Popover>
-      </PermissionGate>
     )
+    // Only gate when the item actually declares a permission — an
+    // unconditional PermissionGate with `permission={undefined}` hides the
+    // item for every role, same pitfall as the child items below.
+    return item.permission ? (
+      <PermissionGate permission={item.permission}>{popover}</PermissionGate>
+    ) : popover
   }
 
   // Regular navigation item (expanded sidebar or no children)
-  return (
-    <PermissionGate permission={item.permission}>
+  const content = (
       <div className="space-y-0.5">
         <Button
           variant="ghost"
@@ -721,6 +733,8 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
           </div>
         )}
       </div>
-    </PermissionGate>
   )
+  return item.permission ? (
+    <PermissionGate permission={item.permission}>{content}</PermissionGate>
+  ) : content
 }

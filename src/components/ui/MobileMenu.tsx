@@ -13,7 +13,7 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { usePermissions } from '@/lib/permissions/permission-context'
-import { 
+import {
   LayoutDashboard,
   FolderOpen,
   CheckSquare,
@@ -39,6 +39,17 @@ import {
   LogOut,
   Rocket
 } from 'lucide-react'
+
+/**
+ * Some nav items (e.g. `/my/standup`) point at a server redirector rather
+ * than a landable URL, so the browser's actual pathname is a nested route
+ * (`/my/standup/[standupId]`) that never strictly equals `child.path`.
+ * A prefix match keeps those items highlighted/expanded without affecting
+ * siblings whose paths are exact, landable routes.
+ */
+function isNavPathActive(pathname: string, itemPath: string): boolean {
+  return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
+}
 
 const navigationItems = [
   {
@@ -107,13 +118,6 @@ const navigationItems = [
         permission: Permission.STORY_READ
       },
       {
-        id: 'tasks-sprints',
-        label: 'Sprints',
-        icon: Zap,
-        path: '/sprints',
-        permission: Permission.SPRINT_VIEW
-      },
-      {
         id: 'tasks-epics',
         label: 'Epics',
         icon: Columns,
@@ -127,6 +131,31 @@ const navigationItems = [
         path: '/sprint-events',
         permission: Permission.SPRINT_MANAGE
       },
+    ]
+  },
+  {
+    id: 'standup',
+    label: 'Standup',
+    icon: Rocket,
+    path: '/sprints',
+    children: [
+      {
+        id: 'standup-sprints',
+        label: 'Sprints',
+        icon: Zap,
+        path: '/sprints',
+        permission: Permission.SPRINT_VIEW
+      },
+      {
+        // No `permission` gate: see the matching comment in Sidebar.tsx —
+        // STANDUP_VIEW is deliberately never granted org-wide, so gating
+        // this on it would hide it from every plain team member, the exact
+        // audience this screen is for.
+        id: 'standup-my',
+        label: 'My Stand-up',
+        icon: Zap,
+        path: '/my/standup'
+      }
     ]
   },
   {
@@ -302,6 +331,25 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
 
   useEffect(() => { setMounted(true) }, [])
 
+  // Auto-expand parent sections when child pages are active, so the
+  // currently visited page is visible without requiring a manual tap.
+  useEffect(() => {
+    const activeParentIds: string[] = []
+
+    navigationItems.forEach(item => {
+      if (item.children) {
+        const isChildActive = item.children.some(child => isNavPathActive(pathname, child.path))
+        if (isChildActive) {
+          activeParentIds.push(item.id)
+        }
+      }
+    })
+
+    if (activeParentIds.length > 0) {
+      setExpandedItems(prev => Array.from(new Set([...prev, ...activeParentIds])))
+    }
+  }, [pathname])
+
   const toggleExpanded = (itemId: string) => {
     setExpandedItems(prev => 
       prev.includes(itemId) 
@@ -382,10 +430,16 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
         <div className="px-2 py-3">
           <nav className="space-y-0.5">
             {navigationItems
-              .filter((item) => hasPermission(item.permission))
+              // A missing `permission` means "unrestricted", not "denied" —
+              // hasPermission(undefined) always resolves to false, so
+              // filtering unconditionally would hide items like My Stand-up
+              // (deliberately permission-less; see its definition above)
+              // from every role instead of just gating the ones that
+              // declare a permission.
+              .filter((item) => !item.permission || hasPermission(item.permission))
               .map((item) => ({
                 ...item,
-                children: item.children?.filter((child: any) => hasPermission(child.permission)) || []
+                children: item.children?.filter((child: any) => !child.permission || hasPermission(child.permission)) || []
               }))
               .map((item) => (
               <MobileNavigationItem
@@ -453,13 +507,12 @@ interface MobileNavigationItemProps {
 }
 
 function MobileNavigationItem({ item, pathname, expandedItems, onToggleExpanded, router }: MobileNavigationItemProps) {
-  const isActive = pathname === item.path
+  const isActive = isNavPathActive(pathname, item.path)
   const hasChildren = item.children && item.children.length > 0
   const isExpanded = expandedItems.includes(item.id)
   const Icon = item.icon
 
-  return (
-    <PermissionGate permission={item.permission}>
+  const content = (
       <div className="space-y-0.5">
         {hasChildren ? (
           <Button
@@ -504,28 +557,42 @@ function MobileNavigationItem({ item, pathname, expandedItems, onToggleExpanded,
         {/* Sub-navigation */}
         {hasChildren && isExpanded && (
           <div className="ml-3 space-y-0.5 border-l border-[var(--apple-separator)] pl-2">
-            {item.children.map((child: any) => (
-              <PermissionGate key={child.id} permission={child.permission}>
+            {item.children.map((child: any) => {
+              const isChildActive = isNavPathActive(pathname, child.path)
+              const link = (
                 <Button
                   variant="ghost"
                   className={cn(
                     'w-full justify-start text-sm h-8 px-2 rounded-[10px] apple-transition',
-                    pathname === child.path
+                    isChildActive
                       ? 'bg-[var(--apple-system-blue)]/12 text-[var(--apple-system-blue)] font-medium'
                       : 'text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]'
                   )}
                   asChild
                 >
                   <Link href={child.path} prefetch onMouseEnter={() => router.prefetch(child.path)}>
-                    <child.icon className={cn('mr-2 h-3.5 w-3.5', pathname === child.path ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-tertiary-label)]')} />
+                    <child.icon className={cn('mr-2 h-3.5 w-3.5', isChildActive ? 'text-[var(--apple-system-blue)]' : 'text-[var(--apple-tertiary-label)]')} />
                     {child.label}
                   </Link>
                 </Button>
-              </PermissionGate>
-            ))}
+              )
+              // Only gate when the child actually declares a permission —
+              // see the note on the top-level filter above.
+              return child.permission ? (
+                <PermissionGate key={child.id} permission={child.permission}>
+                  {link}
+                </PermissionGate>
+              ) : (
+                <div key={child.id}>{link}</div>
+              )
+            })}
           </div>
         )}
       </div>
-    </PermissionGate>
   )
+  // Only gate when the item actually declares a permission — see the note
+  // on the top-level filter above.
+  return item.permission ? (
+    <PermissionGate permission={item.permission}>{content}</PermissionGate>
+  ) : content
 }

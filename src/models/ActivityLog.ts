@@ -83,6 +83,8 @@ export const ACTIVITY_ACTIONS = [
   'planning_session_started',
   'planning_session_updated',
   'planning_session_completed',
+  // PC-8: task ownership is decided during planning, as one bundle per action.
+  'planning_tasks_assigned',
   'planning_waiver_issued',
   'planning_waiver_revoked',
   // Estimation (PLN-11..15, DAT-6/7). `estimate_revised` is declared above
