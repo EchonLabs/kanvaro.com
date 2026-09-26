@@ -445,6 +445,12 @@ export async function PUT(
       }
     }
 
+    if (Object.prototype.hasOwnProperty.call(updateData, 'module')) {
+      if (typeof updateData.module === 'string') {
+        updateData.module = updateData.module.trim()
+      }
+    }
+
     // Normalize sprint field - handle null, undefined, empty string
     if (Object.prototype.hasOwnProperty.call(updateData, 'sprint')) {
       if (updateData.sprint === null || updateData.sprint === undefined || updateData.sprint === '') {
@@ -548,6 +554,23 @@ export async function PUT(
         { position: 1 }
       ).sort({ position: -1 })
       updateData.position = maxPosition ? maxPosition.position + 1 : 0
+    }
+
+    // When changing status to 'backlog', remove task from any sprint and move to backlog
+    if (updateData.status === 'backlog') {
+      updateData.sprint = null
+      if (currentTask.sprint) {
+        const oldSprintId = (typeof currentTask.sprint === 'object' && currentTask.sprint !== null && '_id' in currentTask.sprint)
+          ? currentTask.sprint._id
+          : currentTask.sprint
+        updateData.movedFromSprint = oldSprintId
+
+        // Remove task immediately from the sprint's tasks array
+        await Sprint.findByIdAndUpdate(
+          oldSprintId,
+          { $pull: { tasks: taskId } }
+        ).exec().catch(err => console.error('Failed to pull backlog task from sprint:', err))
+      }
     }
 
     // When adding task to sprint, only change status to 'todo' if currently 'backlog'

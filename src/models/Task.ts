@@ -24,6 +24,7 @@ export interface ITask extends Document {
   project: mongoose.Types.ObjectId
   taskNumber: number
   displayId: string
+  module?: string
   story?: mongoose.Types.ObjectId
   epic?: mongoose.Types.ObjectId
   parentTask?: mongoose.Types.ObjectId
@@ -159,6 +160,10 @@ const TaskSchema = new Schema<ITask>({
     required: true,
     trim: true,
     maxlength: 50
+  },
+  module: {
+    type: String,
+    trim: true
   },
   story: {
     type: Schema.Types.ObjectId,

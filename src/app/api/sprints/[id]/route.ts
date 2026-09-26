@@ -3,6 +3,8 @@ import connectDB from '@/lib/db-config'
 import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
 import { Project } from '@/models/Project'
+import '@/models/Story'
+import '@/models/Epic'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -48,7 +50,7 @@ export async function GET(
     );
 
     const sprint = await Sprint.findOne({ _id: sprintId })
-      .populate('project', 'name')
+      .populate('project', 'name settings')
       .populate('createdBy', 'firstName lastName email')
       .populate('teamMembers', 'firstName lastName email')
 
@@ -90,14 +92,45 @@ export async function GET(
     const sprintTaskIds = sprint.tasks || []
     
 
-    const taskDocs = await Task.find({
+    // Clean up any tasks in sprint.tasks that are now in backlog or have no sprint
+    const backlogTasksInSprint = await Task.find({
       _id: { $in: sprintTaskIds },
-      organization: organizationId
+      organization: organizationId,
+      $or: [
+        { status: 'backlog' },
+        { sprint: null },
+        { sprint: { $exists: false } }
+      ]
+    }).select('_id')
+
+    if (backlogTasksInSprint.length > 0) {
+      const backlogIds = backlogTasksInSprint.map(t => t._id)
+      await Sprint.updateOne(
+        { _id: sprint._id },
+        { $pull: { tasks: { $in: backlogIds } } }
+      )
+      await Task.updateMany(
+        { _id: { $in: backlogIds }, status: 'backlog' },
+        { $set: { sprint: null } }
+      )
+    }
+
+    const validSprintTaskIds = sprintTaskIds.filter((id: any) =>
+      !backlogTasksInSprint.some((t: any) => t._id.toString() === id.toString())
+    )
+
+    const taskDocs = await Task.find({
+      _id: { $in: validSprintTaskIds },
+      organization: organizationId,
+      status: { $ne: 'backlog' }
     })
-      .select('title displayId status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint movedFromSprint')
+      .sort({ createdAt: -1, _id: -1 })
+      .select('title displayId status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint movedFromSprint story epic module startDate dueDate createdAt')
       .populate([
-        { path: 'assignedTo.user', select: '_id firstName lastName email' },
-        { path: 'sprint', select: 'name _id' }
+        { path: 'assignedTo.user', select: '_id firstName lastName email avatar' },
+        { path: 'sprint', select: 'name _id' },
+        { path: 'story', select: 'title' },
+        { path: 'epic', select: 'title' }
       ])
 
 
@@ -129,10 +162,14 @@ export async function GET(
         subtasks: Array.isArray(taskObj.subtasks) ? taskObj.subtasks : [],
         assignedTo: taskObj.assignedTo,
         movedToSprint, // Indicates if task was moved to another sprint
-        movedToBacklog: !taskObj.sprint && taskObj.movedFromSprint && taskObj.movedFromSprint.toString() === sprintId
+        movedToBacklog: !taskObj.sprint && taskObj.movedFromSprint && taskObj.movedFromSprint.toString() === sprintId,
+        story: taskObj.story ? { _id: taskObj.story._id, title: taskObj.story.title } : undefined,
+        epic: taskObj.epic ? { _id: taskObj.epic._id, title: taskObj.epic.title } : undefined,
+        module: taskObj.module || taskObj.story?.title || taskObj.epic?.title || '',
+        startDate: taskObj.startDate,
+        dueDate: taskObj.dueDate,
+        createdAt: taskObj.createdAt
       }
-
-     
 
       return processedTask
     })

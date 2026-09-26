@@ -34,6 +34,7 @@ interface CreateTaskModalProps {
   defaultStatus?: string
   availableStatuses?: Array<{ key: string; title: string }>
   stayOnCurrentPage?: boolean // If true, don't redirect after task creation
+  sprintId?: string
 }
 
 interface User {
@@ -134,7 +135,8 @@ export default function CreateTaskModal({
   onTaskCreated,
   defaultStatus: _defaultStatus,
   availableStatuses: _availableStatuses,
-  stayOnCurrentPage = false
+  stayOnCurrentPage = false,
+  sprintId
 }: CreateTaskModalProps) {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
 
@@ -591,6 +593,18 @@ export default function CreateTaskModal({
         notifyError({ title: 'Failed to Create Task', message: message })
         setLoading(false)
         return
+      }
+
+      if (sprintId && data.data?._id) {
+        try {
+          await fetch(`/api/tasks/${data.data._id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sprint: sprintId })
+          })
+        } catch (sprintErr) {
+          console.error('Failed to link task to sprint:', sprintErr)
+        }
       }
 
       notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
