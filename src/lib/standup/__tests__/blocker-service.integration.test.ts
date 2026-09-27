@@ -378,26 +378,24 @@ describe('loadBlockerRowsForSprints', () => {
     expect(rowsBySprint.get(String(ids.sprint)) ?? []).toHaveLength(0)
   })
 
-  it("computes overdue from each blocker's own stand-up date, not a single shared reference date", async () => {
-    // Two stand-ups in the same sprint, different dates — a blocker raised on
-    // the earlier one must be judged overdue against ITS OWN date, not the
-    // later stand-up's date (which this function has no single one of).
+  it('computes overdue against a real "today", not the stand-up the blocker happened to be raised on', async () => {
+    // Blockers raised across a sprint-wide query span many stand-ups, so
+    // there is no single stand-up date to treat as "today" the way
+    // loadBlockerPanel can. This must compare against the actual current
+    // date (an explicit referenceDate here, for a deterministic test) —
+    // never the (possibly long-past) stand-up the blocker was raised on.
     const earlyStandup = await seedStandupFor(ids.sprint, '2026-08-05')
-    await seedStandupFor(ids.sprint, '2026-08-12')
-
     const blocker = await raiseBlocker(raiseInput({ standupId: String(earlyStandup._id) }))
-    // Between the two stand-up dates: not yet due against the blocker's own
-    // (earlier) stand-up date, but would wrongly read as overdue if this
-    // function used the sprint's later stand-up date as a shared "today".
     await StandupBlocker.updateOne(
       { _id: blocker._id },
       { $set: { targetResolutionDate: new Date('2026-08-08T00:00:00.000Z') } }
     )
 
-    const rowsBySprint = await loadBlockerRowsForSprints([String(ids.sprint)])
-    const rows = rowsBySprint.get(String(ids.sprint)) ?? []
-    expect(rows).toHaveLength(1)
-    expect(rows[0].overdue).toBe(false)
+    const stillAhead = await loadBlockerRowsForSprints([String(ids.sprint)], { referenceDate: '2026-08-06' })
+    expect(stillAhead.get(String(ids.sprint))?.[0].overdue).toBe(false)
+
+    const overdue = await loadBlockerRowsForSprints([String(ids.sprint)], { referenceDate: '2026-08-09' })
+    expect(overdue.get(String(ids.sprint))?.[0].overdue).toBe(true)
   })
 
   it('returns an empty array for a sprint with no open blockers', async () => {

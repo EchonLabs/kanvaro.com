@@ -24,7 +24,6 @@ import { MemberSprintDebtSummary } from '@/models/MemberSprintDebtSummary'
 import { Project } from '@/models/Project'
 import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
-import { StandupBlocker } from '@/models/StandupBlocker'
 import { StandupOverride } from '@/models/StandupOverride'
 
 import { type BlockerPanelRow, loadBlockerRowsForSprints } from './blocker-service'
@@ -208,22 +207,25 @@ async function buildOversightRow(
   const sprintObjectId = new mongoose.Types.ObjectId(sprintId)
   const projectId = String(sprint.project)
 
-  const [debtSummaries, cfwItems, overrideRows, openBlockersCount, standups, chronicUnderAllocationCount] =
-    await Promise.all([
-      MemberSprintDebtSummary.find({ sprint: sprintObjectId }).select('outstandingMinutes').lean() as Promise<
-        any[]
-      >,
-      CarryForwardItem.find({ sprint: sprintObjectId, status: { $in: OPEN_CARRY_FORWARD_STATUSES } })
-        .select('ageInStandups tags')
-        .lean() as Promise<any[]>,
-      StandupOverride.find({ sprint: sprintObjectId }).select('type reasonCode').lean() as Promise<any[]>,
-      StandupBlocker.countDocuments({ sprint: sprintObjectId, status: 'open' }),
-      Standup.find({ sprint: sprintObjectId })
-        .sort({ standupDate: 1 })
-        .select('status standupDate')
-        .lean() as Promise<any[]>,
-      countChronicUnderAllocationMembers(sprintId)
-    ])
+  // openBlockersCount is derived from `openBlockers` (not a separate
+  // `countDocuments`) so the board figure and the disclosure it expands to
+  // can never disagree about how many blockers are open.
+  const [debtSummaries, cfwItems, overrideRows, standups, chronicUnderAllocationCount] = await Promise.all([
+    MemberSprintDebtSummary.find({ sprint: sprintObjectId }).select('outstandingMinutes').lean() as Promise<
+      any[]
+    >,
+    CarryForwardItem.find({ sprint: sprintObjectId, status: { $in: OPEN_CARRY_FORWARD_STATUSES } })
+      .select('ageInStandups tags')
+      .lean() as Promise<any[]>,
+    StandupOverride.find({ sprint: sprintObjectId }).select('type reasonCode').lean() as Promise<any[]>,
+    Standup.find({ sprint: sprintObjectId })
+      .sort({ standupDate: 1 })
+      .select('status standupDate')
+      .lean() as Promise<any[]>,
+    countChronicUnderAllocationMembers(sprintId)
+  ])
+
+  const openBlockersCount = openBlockers.length
 
   const estimateDebtMinutes = debtSummaries.reduce(
     (total, row) => total + Math.max(0, row.outstandingMinutes ?? 0),

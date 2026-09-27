@@ -390,4 +390,42 @@ describe('StandupOversightScreen', () => {
       expect(screen.queryByText(/planning waivers in force/i)).not.toBeInTheDocument()
     })
   })
+
+  it('shows an inline error and keeps the waiver when the revoke request fails', async () => {
+    global.fetch = jest.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') {
+        return Promise.resolve({ ok: false, status: 500, json: async () => ({ error: 'boom' }) })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          data: mockPayload({
+            waivers: [
+              {
+                sprintId: 's1',
+                sprintName: 'Sprint 2',
+                projectId: 'p1',
+                projectName: 'Kanvaro',
+                waivedCheckIds: ['PC-4'],
+                justification: 'Pilot deadline agreed with the delivery lead.',
+                expiresAt: '2026-09-20T00:00:00.000Z',
+                expired: false
+              }
+            ]
+          })
+        })
+      })
+    }) as unknown as typeof fetch
+
+    render(<StandupOversightScreen />)
+
+    expect(await screen.findByText(/planning waivers in force/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /revoke/i }))
+    fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
+
+    expect(await screen.findByText(/could not revoke/i)).toBeInTheDocument()
+    // The waiver is still there, and the confirm action is usable again.
+    expect(screen.getByText(/planning waivers in force/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /confirm/i })).not.toBeDisabled()
+  })
 })

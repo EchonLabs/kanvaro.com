@@ -312,11 +312,16 @@ export function StandupOversightScreen() {
   // never pair an org-wide sentence with a per-project board.
   const view = useMemo(() => (data ? deriveOversightView(data, projectId) : null), [data, projectId])
 
-  // Optimistically splices a revoked waiver out of state rather than
-  // refetching the whole org rollup for one row — the waiver panel is the
-  // only thing this action can invalidate.
+  // Splices a revoked waiver out of state rather than refetching the whole
+  // org rollup for one row — the waiver panel is the only thing this action
+  // can invalidate. Only on a real 2xx (or a 404, meaning it was already
+  // gone) — a failed request must leave the waiver in place and tell the
+  // caller, or the admin is left believing a still-active waiver is revoked.
   const revokeWaiver = async (sprintId: string) => {
-    await fetch(`/api/sprints/${sprintId}/planning-waiver`, { method: 'DELETE' })
+    const response = await fetch(`/api/sprints/${sprintId}/planning-waiver`, { method: 'DELETE' })
+    if (!response.ok && response.status !== 404) {
+      throw new Error('Could not revoke the waiver. Try again.')
+    }
     setData((current) =>
       current ? { ...current, waivers: current.waivers.filter((w) => w.sprintId !== sprintId) } : current
     )
@@ -1109,6 +1114,7 @@ function WaiverRowItem({
 }) {
   const [confirming, setConfirming] = useState(false)
   const [revoking, setRevoking] = useState(false)
+  const [revokeError, setRevokeError] = useState<string | null>(null)
 
   return (
     <li className="flex flex-col items-start justify-between gap-x-6 gap-y-2 py-3 first:pt-0 last:pb-0 sm:flex-row">
@@ -1129,14 +1135,21 @@ function WaiverRowItem({
           {waiver.expired ? 'Expired' : `Until ${waiver.expiresAt.slice(0, 10)}`}
         </span>
         {confirming ? (
-          <span className="flex items-center gap-2">
+          <span className="flex flex-wrap items-center gap-2">
             <span className="text-[var(--apple-secondary-label)]">Revoke this waiver?</span>
             <button
               type="button"
               disabled={revoking}
               onClick={async () => {
                 setRevoking(true)
-                await onRevoke(waiver.sprintId)
+                setRevokeError(null)
+                try {
+                  await onRevoke(waiver.sprintId)
+                } catch {
+                  setRevokeError('Could not revoke the waiver. Try again.')
+                } finally {
+                  setRevoking(false)
+                }
               }}
               className="font-semibold text-[var(--viz-critical)] hover:underline disabled:opacity-50"
             >
@@ -1145,11 +1158,15 @@ function WaiverRowItem({
             <button
               type="button"
               disabled={revoking}
-              onClick={() => setConfirming(false)}
+              onClick={() => {
+                setConfirming(false)
+                setRevokeError(null)
+              }}
               className="text-[var(--apple-secondary-label)] hover:underline disabled:opacity-50"
             >
               Cancel
             </button>
+            {revokeError && <span className="w-full text-[var(--viz-critical)]">{revokeError}</span>}
           </span>
         ) : (
           <button

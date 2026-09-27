@@ -126,6 +126,30 @@ describe('getOrgStandupOversight', () => {
     expect(result.totals.openBlockers).toBe(1)
   })
 
+  it('counts an in_progress blocker the same way it appears in the blocker detail (no count/detail disagreement)', async () => {
+    await seedProject(project, 'Kanvaro')
+    const sprintId = new mongoose.Types.ObjectId()
+    await seedSprint(sprintId, project)
+    const standup = await seedStandup(sprintId, project, '2026-08-17', 'Completed')
+
+    await StandupBlocker.create({
+      standup: standup._id,
+      sprint: sprintId,
+      project,
+      organization,
+      raisedBy: member,
+      description: 'Waiting on design sign-off',
+      blockerType: 'dependency',
+      severity: 'medium',
+      status: 'in_progress'
+    })
+
+    const result = await getOrgStandupOversight(String(organization))
+    expect(result.sprints[0].openBlockers).toHaveLength(1)
+    expect(result.sprints[0].openBlockersCount).toBe(1)
+    expect(result.sprints[0].flags).toContain('open_blockers')
+  })
+
   it('surfaces full blocker detail, not just a count, for the oversight board', async () => {
     await seedProject(project, 'Kanvaro')
     const sprintId = new mongoose.Types.ObjectId()

@@ -309,16 +309,18 @@ const OPEN_BLOCKER_STATUSES = ['open', 'in_progress']
  * Every open blocker across a set of sprints, grouped by sprint — the
  * sprint-wide analogue of `loadBlockerPanel`, for the admin oversight rollup
  * (which otherwise only sees a count). Blockers here span many stand-ups, so
- * each one's `overdue` check needs its own stand-up's date rather than one
- * shared reference date: batch-loads the distinct `Standup` documents the
- * blockers reference, same batching pattern as the task/owner/allocation
- * loads above.
+ * there is no single stand-up whose date can stand in for "today" the way
+ * `loadBlockerPanel` uses its one stand-up's date: `referenceDate` (default:
+ * the real current date) is used for every blocker's overdue check instead —
+ * using the stand-up the blocker happened to be *raised* on would be wrong,
+ * since that date never advances after the blocker is raised.
  */
 export async function loadBlockerRowsForSprints(
   sprintIds: string[],
-  options: { statuses?: string[] } = {}
+  options: { statuses?: string[]; referenceDate?: string } = {}
 ): Promise<Map<string, BlockerPanelRow[]>> {
   const statuses = options.statuses ?? OPEN_BLOCKER_STATUSES
+  const referenceDate = options.referenceDate ?? isoOfStoredDate(new Date())
   const result = new Map<string, BlockerPanelRow[]>()
   if (sprintIds.length === 0) return result
 
@@ -329,13 +331,7 @@ export async function loadBlockerRowsForSprints(
 
   if (blockers.length === 0) return result
 
-  const standupIds = Array.from(new Set(blockers.map((b) => String(b.standup))))
-  const standups = (await Standup.find({ _id: { $in: standupIds } })
-    .select('standupDate')
-    .lean()) as any[]
-  const standupDateById = new Map(standups.map((s) => [String(s._id), s.standupDate]))
-
-  const rows = await mapBlockersToRows(blockers, (blocker) => standupDateById.get(String(blocker.standup)))
+  const rows = await mapBlockersToRows(blockers, () => referenceDate)
 
   blockers.forEach((blocker, index) => {
     const sprintId = String(blocker.sprint)
