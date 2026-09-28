@@ -57,6 +57,11 @@ export interface IProject extends Document {
       color?: string
       order: number
     }>
+    taskCategories?: Array<{
+      key: string
+      title: string
+      order: number
+    }>
   }
   tags: string[]
   customFields: Record<string, any>
@@ -155,6 +160,11 @@ const ProjectSchema = new Schema<IProject>({
       key: { type: String, required: true },
       title: { type: String, required: true },
       color: String,
+      order: { type: Number, required: true }
+    }],
+    taskCategories: [{
+      key: { type: String, required: true, trim: true, maxlength: 50 },
+      title: { type: String, required: true, trim: true, maxlength: 50 },
       order: { type: Number, required: true }
     }]
   },

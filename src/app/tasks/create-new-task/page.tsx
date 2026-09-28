@@ -10,6 +10,9 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useNotify } from '@/lib/notify'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
+import TaskCategoryManagerModal from '@/components/tasks/TaskCategoryManagerModal'
 import {
   ArrowLeft,
   Save,
@@ -18,7 +21,8 @@ import {
   Plus,
   X,
   Trash2,
-  Paperclip
+  Paperclip,
+  Settings2
 } from 'lucide-react'
 import { AttachmentList } from '@/components/ui/AttachmentList'
 import { countWords, TASK_TITLE_MAX_WORDS, truncateToMaxWords } from '@/lib/text/word-limit'
@@ -145,8 +149,12 @@ export default function CreateTaskPage() {
   const [stories, setStories] = useState<Story[]>([])
   const [epics, setEpics] = useState<Epic[]>([])
   const [loadingEpics, setLoadingEpics] = useState(false)
+  const [categories, setCategories] = useState<Array<{ key: string; title: string; order: number }>>([])
+  const [loadingCategories, setLoadingCategories] = useState(false)
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false)
   const [storyQuery, setStoryQuery] = useState('')
   const [epicQuery, setEpicQuery] = useState('')
+  const [categoryQuery, setCategoryQuery] = useState('')
   const today = new Date().toISOString().split('T')[0]
   const [projectQuery, setProjectQuery] = useState("");
   const [assignedTo, setAssignedTo] = useState<string[]>([])
@@ -177,7 +185,8 @@ export default function CreateTaskPage() {
     dueDate: '',
     estimatedHours: '',
     labels: [] as string[],
-    isBillable: false
+    isBillable: false,
+    category: ''
   })
 
   const fetchProjects = useCallback(async () => {
@@ -248,6 +257,7 @@ export default function CreateTaskPage() {
     }
 
     setLoadingProjectMembers(true)
+    setLoadingCategories(true)
     try {
       const response = await fetch(`/api/projects/${projectId}`)
       const data = await response.json()
@@ -269,6 +279,11 @@ export default function CreateTaskPage() {
 
         setProjectMembers(populatedMembers)
 
+        const projectCategories = Array.isArray(data.data.settings?.taskCategories)
+          ? [...data.data.settings.taskCategories].sort((a, b) => a.order - b.order)
+          : []
+        setCategories(projectCategories)
+
         // Set billable default from project
         const billableDefault = typeof data.data.isBillableByDefault === 'boolean' ? data.data.isBillableByDefault : true
         setFormData(prev => ({ ...prev, isBillable: billableDefault }))
@@ -280,6 +295,7 @@ export default function CreateTaskPage() {
       setProjectMembers([])
     } finally {
       setLoadingProjectMembers(false)
+      setLoadingCategories(false)
     }
   }, [])
 
@@ -297,7 +313,7 @@ export default function CreateTaskPage() {
 
       // Validate required fields before submitting
       const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
-      if (!formData.title.trim() || !formData.project || !formData.dueDate) {
+      if (!formData.title.trim() || !formData.project || !formData.dueDate || !formData.category) {
         notifyError({ title: 'Validation Error', message: 'Please fill in all required fields' })
         setLoading(false)
         return
@@ -360,6 +376,7 @@ export default function CreateTaskPage() {
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
           labels: Array.isArray(formData.labels) ? formData.labels : [],
           isBillable: formData.isBillable,
+          category: formData.category || undefined,
           subtasks: preparedSubtasks,
           attachments: attachments.map(attachment => ({
             name: attachment.name,
@@ -415,10 +432,12 @@ export default function CreateTaskPage() {
         ...prev,
         story: '',
         epic: '',
+        category: '',
         isBillable: false // Reset to unchecked when project changes
       }))
       setStories([])
       setEpics([])
+      setCategories([])
       if (value) {
         fetchStories(value)
         fetchEpics(value)
@@ -561,6 +580,20 @@ export default function CreateTaskPage() {
     return projects.filter(p => p.name.toLowerCase().includes(q))
   }, [projects, projectQuery])
 
+  // Memoize filtered categories to avoid recalculating on every render
+  const filteredCategories = useMemo(() => {
+    if (!categoryQuery.trim()) return categories
+    const q = categoryQuery.toLowerCase()
+    return categories.filter(c => c.title.toLowerCase().includes(q))
+  }, [categories, categoryQuery])
+
+  const handleCategoriesUpdated = useCallback((updatedCategories: Array<{ key: string; title: string; order: number }>) => {
+    setCategories(updatedCategories)
+    setFormData(prev => updatedCategories.some(category => category.key === prev.category)
+      ? prev
+      : { ...prev, category: '' })
+  }, [])
+
   // Memoize filtered project members to avoid recalculating on every render
   const filteredProjectMembers = useMemo(() => {
     const activeMembers = projectMembers.filter(member => member.isActive !== false)
@@ -581,10 +614,11 @@ export default function CreateTaskPage() {
       !!formData.title.trim() &&
       !!formData.project &&
       !!formData.dueDate &&
+      !!formData.category &&
       assignedTo.length > 0 &&
       !subtasks.some(st => !(st.title && st.title.trim().length > 0))
     )
-  }, [formData.title, formData.project, formData.dueDate, assignedTo.length, subtasks])
+  }, [formData.title, formData.project, formData.dueDate, formData.category, assignedTo.length, subtasks])
 
   const attachmentListItems = useMemo(
     () =>
@@ -641,8 +675,8 @@ export default function CreateTaskPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-4">
+              <div className="space-y-4">
+                <div className="grid gap-6 md:grid-cols-2 items-start">
                   <div>
                     <label className="text-sm font-medium text-foreground">Project *</label>
                     <Select
@@ -682,6 +716,61 @@ export default function CreateTaskPage() {
                   </div>
 
                   <div>
+                    <label className="text-sm font-medium text-foreground">User Story</label>
+                    <Select
+                      value={formData.story}
+                      onValueChange={(value) => {
+                        const selectedStory = stories.find(s => s._id === value)
+                        setFormData(prev => ({
+                          ...prev,
+                          story: value,
+                          epic: selectedStory?.epic?._id || ''
+                        }))
+                      }}
+                      onOpenChange={(open) => { if (open) setStoryQuery('') }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a story" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={storyQuery}
+                            onChange={(e) => setStoryQuery(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder="Type to search stories"
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            {(() => {
+                              const q = storyQuery.toLowerCase().trim()
+                              const filtered = stories.filter(s =>
+                                !q || s.title.toLowerCase().includes(q)
+                              )
+
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">No matching stories</div>
+                                )
+                              }
+
+                              return filtered.map((story) => (
+                                <SelectItem key={story._id} value={story._id} title={story.title}>
+                                  <div className="truncate max-w-xs" title={story.title}>
+                                    {story.title}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2 items-start">
+                  <div>
                     <label className="text-sm font-medium text-foreground">Title *</label>
                     <Input
                       value={formData.title}
@@ -699,6 +788,79 @@ export default function CreateTaskPage() {
                     </div>
                   </div>
 
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Epic</label>
+                    <Select
+                      value={formData.epic}
+                      onValueChange={(value) => handleChange('epic', value)}
+                      disabled={loadingEpics}
+                      onOpenChange={(open) => { if (open) setEpicQuery('') }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={loadingEpics ? 'Loading epics...' : 'Select an epic'} />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={epicQuery}
+                            onChange={(e) => setEpicQuery(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder={loadingEpics ? 'Loading epics...' : 'Type to search epics'}
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            {loadingEpics ? (
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading epics...</span>
+                              </div>
+                            ) : (() => {
+                              const q = epicQuery.toLowerCase().trim()
+                              let availableEpics: Epic[] = []
+
+                              if (!formData.story) {
+                                // No story selected, show all epics
+                                availableEpics = epics
+                              } else {
+                                // Story selected, check if it has an epic
+                                const selectedStory = stories.find(s => s._id === formData.story)
+                                if (selectedStory?.epic) {
+                                  // Story has an epic, show only that epic
+                                  const epicExists = epics.find(e => e._id === selectedStory.epic!._id)
+                                  if (epicExists) {
+                                    availableEpics = [epicExists]
+                                  }
+                                } else {
+                                  // Story selected but no epic, show all epics
+                                  availableEpics = epics
+                                }
+                              }
+
+                              const filtered = availableEpics.filter(e =>
+                                !q || e.title.toLowerCase().includes(q)
+                              )
+
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">No matching epics</div>
+                                )
+                              }
+
+                              return filtered.map((epic) => (
+                                <SelectItem key={epic._id} value={epic._id} title={epic.title}>
+                                  <div className="truncate max-w-xs" title={epic.title}>
+                                    {epic.title}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                   {/* <div>
                     <label className="text-sm font-medium text-foreground">Task ID</label>
                     <Input
@@ -708,9 +870,12 @@ export default function CreateTaskPage() {
                     />
                   </div> */}
 
-                  {formData.project && (
+                {formData.project && (
+                  <div className="grid gap-6 md:grid-cols-2 items-start">
                     <div>
-                      <label className="text-sm font-medium text-foreground">Assigned To *</label>
+                      <div className="mb-1 flex items-center h-7">
+                        <label className="text-sm font-medium text-foreground">Assigned To *</label>
+                      </div>
                       <div className="space-y-2">
                         <Select
                           value=""
@@ -816,8 +981,74 @@ export default function CreateTaskPage() {
                         )}
                       </div>
                     </div>
-                  )}
 
+                    <div>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label className="text-sm font-medium text-foreground">Category *</label>
+                        <PermissionGate permission={Permission.PROJECT_UPDATE} projectId={formData.project}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsCategoryManagerOpen(true)}
+                            disabled={!formData.project}
+                            className="h-7 px-2 text-xs"
+                          >
+                            <Settings2 className="h-3.5 w-3.5" />
+                            Manage
+                          </Button>
+                        </PermissionGate>
+                      </div>
+                      <Select
+                        value={formData.category}
+                        onValueChange={(value) => handleChange('category', value)}
+                        disabled={loadingCategories || !formData.project}
+                        onOpenChange={(open) => { if (open) setCategoryQuery('') }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={
+                            !formData.project
+                              ? 'Select a project first'
+                              : loadingCategories
+                                ? 'Loading categories...'
+                                : 'Select a category'
+                          } />
+                        </SelectTrigger>
+                        <SelectContent className="z-[10050] p-0">
+                          <div className="p-2">
+                            <Input
+                              value={categoryQuery}
+                              onChange={(e) => setCategoryQuery(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              placeholder={loadingCategories ? 'Loading categories...' : 'Type to search categories'}
+                              className="mb-2"
+                            />
+                            <div className="max-h-56 overflow-y-auto">
+                              {loadingCategories ? (
+                                <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <span>Loading categories...</span>
+                                </div>
+                              ) : filteredCategories.length === 0 ? (
+                                <div className="px-2 py-1 text-sm text-muted-foreground">No categories found for this project</div>
+                              ) : (
+                                filteredCategories.map((category) => (
+                                  <SelectItem key={category.key} value={category.key} title={category.title}>
+                                    <div className="truncate max-w-xs" title={category.title}>
+                                      {category.title}
+                                    </div>
+                                  </SelectItem>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-6 md:grid-cols-2 items-start">
                   <div>
                     <label className="text-sm font-medium text-foreground">Type</label>
                     <Select value={formData.type} onValueChange={(value) => handleChange('type', value)}>
@@ -834,6 +1065,18 @@ export default function CreateTaskPage() {
                   </div>
 
                   <div>
+                    <label className="text-sm font-medium text-foreground">Due Date *</label>
+                    <Input
+                      type="date"
+                      value={formData.dueDate}
+                      min={today}
+                      onChange={(e) => handleChange('dueDate', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2 items-start">
+                  <div>
                     <label className="text-sm font-medium text-foreground">Priority</label>
                     <Select value={formData.priority} onValueChange={(value) => handleChange('priority', value)}>
                       <SelectTrigger>
@@ -847,143 +1090,6 @@ export default function CreateTaskPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-foreground">User Story</label>
-                    <Select
-                      value={formData.story}
-                      onValueChange={(value) => {
-                        const selectedStory = stories.find(s => s._id === value)
-                        setFormData(prev => ({
-                          ...prev,
-                          story: value,
-                          epic: selectedStory?.epic?._id || ''
-                        }))
-                      }}
-                      onOpenChange={(open) => { if (open) setStoryQuery('') }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a story" />
-                      </SelectTrigger>
-                      <SelectContent className="z-[10050] p-0">
-                        <div className="p-2">
-                          <Input
-                            value={storyQuery}
-                            onChange={(e) => setStoryQuery(e.target.value)}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            placeholder="Type to search stories"
-                            className="mb-2"
-                          />
-                          <div className="max-h-56 overflow-y-auto">
-                            {(() => {
-                              const q = storyQuery.toLowerCase().trim()
-                              const filtered = stories.filter(s =>
-                                !q || s.title.toLowerCase().includes(q)
-                              )
-
-                              if (filtered.length === 0) {
-                                return (
-                                  <div className="px-2 py-1 text-sm text-muted-foreground">No matching stories</div>
-                                )
-                              }
-
-                              return filtered.map((story) => (
-                                <SelectItem key={story._id} value={story._id} title={story.title}>
-                                  <div className="truncate max-w-xs" title={story.title}>
-                                    {story.title}
-                                  </div>
-                                </SelectItem>
-                              ))
-                            })()}
-                          </div>
-                        </div>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Epic</label>
-                    <Select
-                      value={formData.epic}
-                      onValueChange={(value) => handleChange('epic', value)}
-                      disabled={loadingEpics}
-                      onOpenChange={(open) => { if (open) setEpicQuery('') }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={loadingEpics ? 'Loading epics...' : 'Select an epic'} />
-                      </SelectTrigger>
-                      <SelectContent className="z-[10050] p-0">
-                        <div className="p-2">
-                          <Input
-                            value={epicQuery}
-                            onChange={(e) => setEpicQuery(e.target.value)}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            placeholder={loadingEpics ? 'Loading epics...' : 'Type to search epics'}
-                            className="mb-2"
-                          />
-                          <div className="max-h-56 overflow-y-auto">
-                            {loadingEpics ? (
-                              <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Loading epics...</span>
-                              </div>
-                            ) : (() => {
-                              const q = epicQuery.toLowerCase().trim()
-                              let availableEpics: Epic[] = []
-
-                              if (!formData.story) {
-                                // No story selected, show all epics
-                                availableEpics = epics
-                              } else {
-                                // Story selected, check if it has an epic
-                                const selectedStory = stories.find(s => s._id === formData.story)
-                                if (selectedStory?.epic) {
-                                  // Story has an epic, show only that epic
-                                  const epicExists = epics.find(e => e._id === selectedStory.epic!._id)
-                                  if (epicExists) {
-                                    availableEpics = [epicExists]
-                                  }
-                                } else {
-                                  // Story selected but no epic, show all epics
-                                  availableEpics = epics
-                                }
-                              }
-
-                              const filtered = availableEpics.filter(e =>
-                                !q || e.title.toLowerCase().includes(q)
-                              )
-
-                              if (filtered.length === 0) {
-                                return (
-                                  <div className="px-2 py-1 text-sm text-muted-foreground">No matching epics</div>
-                                )
-                              }
-
-                              return filtered.map((epic) => (
-                                <SelectItem key={epic._id} value={epic._id} title={epic.title}>
-                                  <div className="truncate max-w-xs" title={epic.title}>
-                                    {epic.title}
-                                  </div>
-                                </SelectItem>
-                              ))
-                            })()}
-                          </div>
-                        </div>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Due Date *</label>
-                    <Input
-                      type="date"
-                      value={formData.dueDate}
-                      min={today}
-                      onChange={(e) => handleChange('dueDate', e.target.value)}
-                    />
-                  </div>
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Estimated Hours</label>
@@ -994,19 +1100,18 @@ export default function CreateTaskPage() {
                       placeholder="Enter estimated hours"
                     />
                   </div>
+                </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-foreground">Billable</label>
-                      <p className="text-xs text-muted-foreground">Defaults from project; you can override per task.</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={formData.isBillable}
-                      onChange={(e) => setFormData(prev => ({ ...prev, isBillable: e.target.checked }))}
-                    />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Billable</label>
+                    <p className="text-xs text-muted-foreground">Defaults from project; you can override per task.</p>
                   </div>
-
+                  <input
+                    type="checkbox"
+                    checked={formData.isBillable}
+                    onChange={(e) => setFormData(prev => ({ ...prev, isBillable: e.target.checked }))}
+                  />
                 </div>
               </div>
 
@@ -1176,6 +1281,12 @@ export default function CreateTaskPage() {
           </CardContent>
         </Card>
       </div>
+      <TaskCategoryManagerModal
+        isOpen={isCategoryManagerOpen}
+        onClose={() => setIsCategoryManagerOpen(false)}
+        projectId={formData.project}
+        onCategoriesUpdated={handleCategoriesUpdated}
+      />
     </MainLayout>
   )
 }

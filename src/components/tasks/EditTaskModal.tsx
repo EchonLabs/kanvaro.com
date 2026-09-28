@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
@@ -19,9 +19,19 @@ import {
   Clock,
   Loader2,
   Plus,
-  Trash2
+  Trash2,
+  Settings2
 } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
+import TaskCategoryManagerModal from '@/components/tasks/TaskCategoryManagerModal'
+
+interface TaskCategory {
+  key: string
+  title: string
+  order: number
+}
 
 interface EditTaskModalProps {
   isOpen: boolean
@@ -76,6 +86,12 @@ const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
   { value: 'cancelled', label: 'Cancelled' }
 ]
 
+const getTaskProjectId = (task: any): string => {
+  if (!task) return ''
+  if (typeof task.project === 'string') return task.project
+  return typeof task.project?._id === 'string' ? task.project._id : ''
+}
+
 interface TaskFormData {
   title: string
   description: string
@@ -89,6 +105,7 @@ interface TaskFormData {
   story: string
   epic: string
   isBillable: boolean
+  category: string
 }
 
 export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: EditTaskModalProps) {
@@ -100,8 +117,12 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
   const [epics, setEpics] = useState<Epic[]>([])
   const [loadingStories, setLoadingStories] = useState(false)
   const [loadingEpics, setLoadingEpics] = useState(false)
+  const [loadingCategories, setLoadingCategories] = useState(false)
   const [storyQuery, setStoryQuery] = useState('')
   const [epicQuery, setEpicQuery] = useState('')
+  const [categoryQuery, setCategoryQuery] = useState('')
+  const [categories, setCategories] = useState<TaskCategory[]>([])
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false)
   const [assignedTo, setAssignedTo] = useState<Array<{
     _id: string
     firstName: string
@@ -123,12 +144,15 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
     labels: '',
     story: '',
     epic: '',
-    isBillable: true
+    isBillable: true,
+    category: ''
   })
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
   const [initialFormData, setInitialFormData] = useState<TaskFormData | null>(null)
   const [initialSubtasks, setInitialSubtasks] = useState<Subtask[]>([])
   const [availableStatuses, setAvailableStatuses] = useState<Array<{ value: SubtaskStatus; label: string }>>(SUBTASK_STATUS_OPTIONS)
+
+  const taskProjectId = getTaskProjectId(task)
 
   useEffect(() => {
     if (isOpen && task) {
@@ -145,7 +169,10 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
         labels: task.labels?.join(', ') || '',
         story: task.story?._id || task.story || '',
         epic: task.epic?._id || task.epic || '',
-        isBillable: typeof task.isBillable === 'boolean' ? task.isBillable : true
+        isBillable: typeof task.isBillable === 'boolean' ? task.isBillable : true,
+        category: typeof task.category === 'string'
+          ? task.category
+          : (task.category?._id || task.category?.key || '')
       }
       setFormData(initialData)
       setInitialFormData(initialData)
@@ -236,7 +263,8 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
             fetchUsers(projectId),
             fetchProjectStatuses(projectId),
             fetchStories(projectId),
-            fetchEpics(projectId)
+            fetchEpics(projectId),
+            fetchCategories(projectId)
           ]).catch((error) => {
             console.error('Error fetching task edit data:', error)
           })
@@ -244,12 +272,52 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
           setUsers([])
           setStories([])
           setEpics([])
+          setCategories([])
         }
       }
 
       getProjectId()
     }
   }, [isOpen, task])
+
+  const handleCategoriesUpdated = useCallback((updatedCategories: TaskCategory[]) => {
+    setCategories(updatedCategories)
+    setFormData(prev => updatedCategories.some(category => category.key === prev.category)
+      ? prev
+      : { ...prev, category: '' })
+  }, [])
+
+  const fetchCategories = useCallback(async (projectIdParam: string | undefined) => {
+    if (!projectIdParam) {
+      setCategories([])
+      setLoadingCategories(false)
+      return
+    }
+
+    setLoadingCategories(true)
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(projectIdParam)}/task-categories`)
+      const data = await response.json()
+
+      if (!response.ok || !data.success || !Array.isArray(data.data)) {
+        setCategories([])
+        setFormData(prev => ({ ...prev, category: '' }))
+        return
+      }
+
+      const sortedCategories = [...data.data].sort((a: TaskCategory, b: TaskCategory) => a.order - b.order)
+      setCategories(sortedCategories)
+      setFormData(prev => sortedCategories.some(category => category.key === prev.category)
+        ? prev
+        : { ...prev, category: '' })
+    } catch (err) {
+      console.error('Failed to fetch task categories:', err)
+      setCategories([])
+      setFormData(prev => ({ ...prev, category: '' }))
+    } finally {
+      setLoadingCategories(false)
+    }
+  }, [])
 
   const fetchProjectStatuses = async (projectId?: string) => {
     if (!projectId) {
@@ -371,6 +439,12 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
     // Validate required fields
     if (assignedTo.length === 0) {
       notifyError({ title: 'Validation Error', message: 'Please assign this task to at least one team member' })
+      setLoading(false)
+      return
+    }
+
+    if (!formData.category) {
+      notifyError({ title: 'Validation Error', message: 'Please select a task category' })
       setLoading(false)
       return
     }
@@ -529,7 +603,8 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       (formData.dueDate || '') !== (initialFormData.dueDate || '') ||
       normalizeString(formData.labels) !== normalizeString(initialFormData.labels) ||
       (formData.story || '') !== (initialFormData.story || '') ||
-      (formData.epic || '') !== (initialFormData.epic || '')
+      (formData.epic || '') !== (initialFormData.epic || '') ||
+      formData.category !== initialFormData.category
 
     if (formDataChanged) {
       return true
@@ -587,7 +662,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
   // Compute if there are changes and if button should be enabled
   const hasFormChanges = hasChanges()
-  const isButtonDisabled = loading || !formData.title.trim() || !initialFormData || !hasFormChanges || assignedTo.length === 0
+  const isButtonDisabled = loading || !formData.title.trim() || !initialFormData || !hasFormChanges || assignedTo.length === 0 || !formData.category
 
   if (!isOpen || !task) return null
 
@@ -682,6 +757,75 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                     </SelectContent>
                   </Select>
                 </div>
+
+                {taskProjectId && (
+                  <div>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <label className="text-sm font-medium text-foreground">Category *</label>
+                      <PermissionGate permission={Permission.PROJECT_UPDATE} projectId={taskProjectId}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsCategoryManagerOpen(true)}
+                          className="h-7 px-2 text-xs"
+                        >
+                          <Settings2 className="h-3.5 w-3.5" />
+                          Manage
+                        </Button>
+                      </PermissionGate>
+                    </div>
+                    <Select
+                      value={formData.category}
+                      onValueChange={(value) => setFormData({ ...formData, category: value })}
+                      disabled={!taskProjectId || loadingCategories}
+                      onOpenChange={(open) => { if (open) setCategoryQuery('') }}
+                    >
+                      <SelectTrigger className="mt-0 w-full">
+                        <SelectValue placeholder={
+                          !taskProjectId
+                            ? 'Select a project first'
+                            : loadingCategories
+                              ? 'Loading categories...'
+                              : 'Select a category'
+                        } />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={categoryQuery}
+                            onChange={(e) => setCategoryQuery(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder={loadingCategories ? 'Loading categories...' : 'Type to search categories'}
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            {loadingCategories ? (
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading categories...</span>
+                              </div>
+                            ) : (() => {
+                              const query = categoryQuery.toLowerCase().trim()
+                              const filteredCategories = categories.filter(category =>
+                                !query || category.title.toLowerCase().includes(query)
+                              )
+                              return filteredCategories.length === 0 ? (
+                                <div className="px-2 py-1 text-sm text-muted-foreground">No categories found for this project</div>
+                              ) : (
+                                filteredCategories.map((category) => (
+                                  <SelectItem key={category.key} value={category.key}>
+                                    <span className="truncate block">{category.title}</span>
+                                  </SelectItem>
+                                ))
+                              )
+                            })()}
+                          </div>
+                        </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {task?.project && (
                   <>
@@ -1172,6 +1316,12 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
           </div>
         </Card>
       </TooltipProvider>
+      <TaskCategoryManagerModal
+        isOpen={isCategoryManagerOpen}
+        onClose={() => setIsCategoryManagerOpen(false)}
+        projectId={taskProjectId}
+        onCategoriesUpdated={handleCategoriesUpdated}
+      />
     </div>
   )
 }

@@ -493,6 +493,29 @@ export async function PUT(
       )
     }
 
+    const hasCategoryUpdate = Object.prototype.hasOwnProperty.call(updateData, 'category')
+    if (hasCategoryUpdate || !currentTask.category) {
+      const categoryInput = hasCategoryUpdate && typeof updateData.category === 'string'
+        ? updateData.category.trim()
+        : ''
+      if (!categoryInput) {
+        return NextResponse.json({ error: 'Category is required' }, { status: 400 })
+      }
+
+      const categoryProjectId = updateData.project || currentTask.project.toString()
+      const categoryProject = await Project.findOne({ _id: categoryProjectId, organization: organizationId })
+        .select('settings.taskCategories')
+        .lean()
+      const categoryProjectData = Array.isArray(categoryProject) ? categoryProject[0] : categoryProject
+      const category = ((categoryProjectData as any)?.settings?.taskCategories || []).find((item: any) =>
+        item.key === categoryInput || item.title === categoryInput
+      )
+      if (!category) {
+        return NextResponse.json({ error: 'Select a valid task category for this project' }, { status: 400 })
+      }
+      updateData.category = category.key
+    }
+
     console.log('[Task PUT] Current task loaded', {
       taskId,
       currentStatus: currentTask.status,
