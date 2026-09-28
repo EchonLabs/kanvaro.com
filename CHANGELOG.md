@@ -1,3 +1,11 @@
+## [1.42.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.3...v1.42.4) (2026-09-28)
+
+
+### Bug Fixes
+
+* Kanban board functionality ([82aaa4c](https://github.com/EchonLabs/kanvaro.com/commit/82aaa4c538c8a5bbece6ca830f50d4eb35fa21a3))
+* virtualized task card spacing and height ([eaf724c](https://github.com/EchonLabs/kanvaro.com/commit/eaf724cdfd2343472147fa5d25427ec97017fe0b))
+
 ## [1.42.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.2...v1.42.3) (2026-09-10)
 
 
