@@ -1,3 +1,16 @@
+# [1.44.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.43.0...v1.44.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* assignee notifications and add status transition details ([9d8116e](https://github.com/EchonLabs/kanvaro.com/commit/9d8116e1633e84ad70d4a09c43704cd3fd2ace89))
+* handle unassignment and prevent duplicate task notifications ([96a1add](https://github.com/EchonLabs/kanvaro.com/commit/96a1add500ec9e4dd0c40bab160deafed3818430))
+
+
+### Features
+
+* [@mention](https://github.com/mention) notifications from general assignee alerts ([a0c9f40](https://github.com/EchonLabs/kanvaro.com/commit/a0c9f40a4606838c1aa326ab6a28b34f609fed14))
+
 # [1.43.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.4...v1.43.0) (2026-09-28)
 
 
