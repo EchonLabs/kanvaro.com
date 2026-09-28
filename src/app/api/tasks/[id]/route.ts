@@ -386,6 +386,10 @@ export async function PUT(
       } else {
         updateData.dueDate = new Date(value)
       }
+      updateData.remindersSent = {
+        dueSoon24h: false,
+        overdue: false
+      }
     }
 
     if (Object.prototype.hasOwnProperty.call(updateData, 'assignedTo')) {

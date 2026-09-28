@@ -22,6 +22,8 @@ const dateRangeOptions: { label: string; value: DateRangeKey }[] = [
 const typeOptions = [
   { label: 'All types', value: 'all' },
   { label: 'Task', value: 'task' },
+  { label: 'Deadline', value: 'deadline' },
+  { label: 'Reminder', value: 'reminder' },
   { label: 'Project', value: 'project' },
   { label: 'Team', value: 'team' },
   { label: 'Time Tracking', value: 'time_tracking' },
