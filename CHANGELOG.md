@@ -1,3 +1,18 @@
+# [1.45.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.44.0...v1.45.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* add node-cron background schedulers for all tasks ([0367a75](https://github.com/EchonLabs/kanvaro.com/commit/0367a759f04ddb3287b56ee995742607e97bf33d))
+* filter overdue task notifications by 7-day window ([36e377e](https://github.com/EchonLabs/kanvaro.com/commit/36e377eb61a572e2d47463ef10034d9c2af5dd0c))
+* kanban board ui ([c029167](https://github.com/EchonLabs/kanvaro.com/commit/c029167b1447653f3c5c24849141f3030a2a94dd))
+* update task schema for notifications ([500ea26](https://github.com/EchonLabs/kanvaro.com/commit/500ea2616240046b627357aabaf53395391e410f))
+
+
+### Features
+
+* add due-date reminder notifications ([21e16b1](https://github.com/EchonLabs/kanvaro.com/commit/21e16b178581bc0f4084409ed49cbb665fbb2b62))
+
 # [1.44.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.43.0...v1.44.0) (2026-09-28)
 
 
