@@ -1,3 +1,13 @@
+# [1.43.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.4...v1.43.0) (2026-09-28)
+
+
+### Features
+
+* implement task category filtering be ([de9ab34](https://github.com/EchonLabs/kanvaro.com/commit/de9ab347039b9e773dd704a45aa30db45c34cf62))
+* implement task category management ([5bab0d2](https://github.com/EchonLabs/kanvaro.com/commit/5bab0d26801e069353cf76d6e33c62e534fd12e7))
+* implement task category management FE ([7f08cf3](https://github.com/EchonLabs/kanvaro.com/commit/7f08cf3fc65ae14bfba23f1ea7bd9e2feb56063c))
+* interfact to create, rename, delete ([526c98a](https://github.com/EchonLabs/kanvaro.com/commit/526c98a83b505ca3572a1abf2f402c559131eb4c))
+
 ## [1.42.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.3...v1.42.4) (2026-09-28)
 
 
