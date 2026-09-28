@@ -9,7 +9,7 @@ export interface INotification extends Document {
   data?: {
     entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'sprint_event'
     entityId?: mongoose.Types.ObjectId
-    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'completed' | 'overdue' | 'reminder' | 'upcoming'
+    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'unassigned' | 'completed' | 'overdue' | 'reminder' | 'upcoming'
     priority?: 'low' | 'medium' | 'high' | 'critical'
     projectName?: string
     url?: string
@@ -46,7 +46,7 @@ const NotificationSchema = new Schema<INotification>({
     entityId: { type: Schema.Types.ObjectId },
     action: { 
       type: String, 
-      enum: ['created', 'updated', 'deleted', 'assigned', 'completed', 'overdue', 'reminder', 'upcoming']
+      enum: ['created', 'updated', 'deleted', 'assigned', 'unassigned', 'completed', 'overdue', 'reminder', 'upcoming']
     },
     priority: { 
       type: String, 
