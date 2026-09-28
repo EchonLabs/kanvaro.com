@@ -426,6 +426,23 @@ export const standupStrings = {
     complete: () => 'Complete stand-up',
     viewSummary: () => 'View summary',
 
+    /** The "Daily Standup Page Redesign" summary bar. */
+    summaryEyebrow: () => 'Daily Stand-up',
+    summaryAttendance: () => 'Attendance:',
+    summaryAttendanceValue: ({ present, total }: { present: number; total: number }) =>
+      `${present}/${total} Present`,
+    summaryPlan: () => 'Plan Status:',
+    summaryPlanValue: ({ percent }: { percent: number }) => `${percent}% Allocated`,
+    allocationSubtitle: () =>
+      "The open backlog beside each team member's bandwidth for today. Drag a task onto a member, or use a card's picker.",
+    allocationBacklogTitle: () => 'Unassigned Backlog',
+    allocationBoardTitle: () => 'Active Assignments & Capacity',
+    reviewTitle: () => "Yesterday's Review & Variance Log",
+    reviewSubtitle: () =>
+      'Analysis of planned versus completed work from the previous stand-up.',
+    noticeLead: () => 'Update:',
+    lockedLead: () => 'Read-only:',
+
     /** RUN-2/3, AC-5 (Task 1). The button that starts a `Ready` stand-up. */
     start: () => 'Start stand-up',
     startSuccess: () => 'Stand-up started.',
@@ -461,8 +478,8 @@ export const standupStrings = {
     panel2: () => 'Yesterday',
     panel3: () => 'Variance',
     panel4: () => 'Carry forward',
-    panel5: () => "Today's allocation",
-    panel6: () => 'Blockers',
+    panel5: () => "Today's Capacity Allocation & Board",
+    panel6: () => 'Open Blockers',
     panel7: () => 'Complete',
 
     /** §15.8.11's inserted panel — final day only. */
@@ -508,6 +525,23 @@ export const standupStrings = {
     lockedForMembers: () =>
       'The stand-up has started, so your own row is now read-only.',
 
+    /**
+     * The red counters beside each panel heading (`IssueCount` in `run/ui.tsx`).
+     * Text-only labels: the number itself is rendered visually and hidden from
+     * assistive tech, so these carry the whole meaning for a screen reader and
+     * must name *what* is being counted, not just repeat the digit.
+     */
+    attendanceIssueCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 member needs attention' : `${count} members need attention`,
+    yesterdayIssueCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 row needs a note or a revision' : `${count} rows need a note or a revision`,
+    varianceIssueCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 row needs a revision or a reason' : `${count} rows need a revision or a reason`,
+    failingCheckCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 check is failing' : `${count} checks are failing`,
+    sprintCloseIssueCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 task still open' : `${count} tasks still open`,
+
     /** Panel 1. */
     attendanceTitle: () => 'Attendance',
     attendanceFor: ({ name }: { name: string }) => `Attendance for ${name}`,
@@ -517,6 +551,12 @@ export const standupStrings = {
     stateAbsentPlanned: () => 'Absent (planned)',
     stateAbsentUnplanned: () => 'Absent (unplanned)',
     statePartial: () => 'Partial day',
+    attendanceFullCapacity: ({ hours }: { hours: string }) =>
+      `Full capacity available (${hours})`,
+    attendancePartialCapacity: ({ hours }: { hours: string }) =>
+      `Partial day (${hours} capacity)`,
+    attendanceOut: () => 'Out today, no capacity',
+    attendanceReassignRequired: () => 'Reassignment Required',
 
     /** RUN-7's prompt, and its bulk action. */
     reassignPrompt: ({ name, count }: { name: string; count: number }) =>
@@ -528,7 +568,7 @@ export const standupStrings = {
     reassignDismiss: () => 'Leave for now',
 
     /** Panel 7. */
-    completionTitle: () => 'Completion checks',
+    completionTitle: () => 'Validation & Completion',
     checkNotEvaluated: ({ phase }: { phase: string }) => `Not checked yet (${phase})`,
     completeBlockedBy: ({ message }: { message: string }) =>
       `Cannot complete: ${message}`,
@@ -1037,6 +1077,9 @@ export const standupStrings = {
     labelUnder: () => 'under',
     labelOnEstimate: () => 'on estimate',
     labelNotStarted: () => 'not started',
+    /** Blueprint's row badge — an outcome that cannot close without a revision. */
+    revisionRequiredBadge: () => 'Revision required',
+    reasonRequiredBadge: () => 'Reason required',
 
     /** §15.11, the revision modal. */
     reviseTitle: () => 'Revise remaining estimate',
@@ -1067,6 +1110,8 @@ export const standupStrings = {
    */
   yesterday: {
     title: () => 'Yesterday',
+    /** Trails the signed hours on the row's badge: "+0.5h variance". */
+    varianceBadge: () => 'variance',
     bucketCompleted: () => 'Completed since last stand-up',
     bucketInProgress: () => 'In progress',
     bucketNotStarted: () => 'Not started',
@@ -1348,9 +1393,10 @@ export const standupStrings = {
    * word.
    */
   carryForward: {
-    title: () => 'Carry forward',
+    title: () => 'Carry Forward Register',
     subtitle: () =>
       'Anything open that did not close. It keeps appearing until it is resolved.',
+    ownedBy: ({ name }: { name: string }) => `Owned by ${name}`,
     empty: () => 'Nothing carried forward. A clean board.',
 
     itemTypeLabel: (type: string) => {
@@ -1388,6 +1434,16 @@ export const standupStrings = {
     summaryNeedingNote: ({ count }: { count: number }) => `${count} need a note today`,
     summaryEscalated: ({ count }: { count: number }) => `${count} escalated`,
     summaryResolved: ({ count }: { count: number }) => `${count} resolved`,
+    /**
+     * The red counter beside the panel heading. Counts the two bands that
+     * actually need a PM today — a note owed, or an escalation — rather than
+     * every open item, since a normal-age item sitting in the register is not
+     * something anybody has to act on in this stand-up.
+     */
+    issueCount: ({ count }: { count: number }) =>
+      count === 1
+        ? '1 item needs a note or is escalated'
+        : `${count} items need a note or are escalated`,
 
     /** CFW-4's mandatory note, and its two rejections. */
     noteRequired: () =>
@@ -1527,6 +1583,13 @@ export const standupStrings = {
     resolve: () => 'Resolve',
     empty: () => 'No blockers right now.',
     general: () => 'General',
+    blockedTask: ({ task }: { task: string }) => `Blocked: ${task}`,
+    owner: ({ name }: { name: string }) => `Owner: ${name}`,
+    target: ({ date }: { date: string }) => `Target: ${date}`,
+    severity: ({ severity }: { severity: string }) => `${severity} severity`,
+    overdue: () => 'Overdue',
+    openCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 open blocker' : `${count} open blockers`,
     raiseFailed: () => 'That blocker could not be raised.',
     resolveFailed: () => 'That blocker could not be resolved.'
   },

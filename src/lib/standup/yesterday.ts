@@ -37,6 +37,13 @@ export interface YesterdayRow {
   title: string
   memberId: string
   memberName: string
+  /**
+   * The member's photo — their uploaded `User.avatar` if they have one, else
+   * their Gravatar — resolved server-side the same way the board's member rows
+   * resolve theirs. Absent when there is neither a photo nor an email to hash,
+   * and the row then draws initials.
+   */
+  avatarUrl?: string
   previousStatus: string
   currentStatus: string
   plannedMinutes: Minutes

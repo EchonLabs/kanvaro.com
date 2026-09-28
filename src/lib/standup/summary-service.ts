@@ -11,10 +11,103 @@
  * against a fixture the way `summary.ts`'s own tests are.
  */
 import { StandupSummary, type IStandupSummary } from '@/models/StandupSummary'
+import { User } from '@/models/User'
 import { StandupError } from './errors'
 import { standupStrings } from './strings'
 
 export type SummaryDocument = Awaited<ReturnType<typeof getSummary>>
+
+/**
+ * What the read path adds to a persisted row that names a member.
+ *
+ * Everything here is optional: a member who has since been deleted, or a row
+ * from an older document whose `memberId` no longer resolves, keeps whatever
+ * name it was written with and simply gains nothing — never disappears.
+ */
+export interface MemberIdentity {
+  name?: string
+  firstName?: string
+  lastName?: string
+  email?: string
+  avatar?: string
+}
+
+export type HydratedSummary = Omit<
+  IStandupSummary,
+  'attendance' | 'memberCommitments' | 'debtMovements'
+> & {
+  attendance: Array<IStandupSummary['attendance'][number] & MemberIdentity>
+  memberCommitments: Array<IStandupSummary['memberCommitments'][number] & MemberIdentity>
+  debtMovements: Array<Record<string, unknown> & MemberIdentity>
+}
+
+/**
+ * The persisted summary stores only `{ memberId, name, status }` per member —
+ * enough for the markdown export, not enough to draw a face. Rather than
+ * widening what the completion saga writes, the identity fields the screen
+ * needs are joined on read: a summary written last sprint then shows avatars
+ * the same as one written today, and a member who changes their photo is not
+ * frozen at the one they had on the day.
+ */
+async function hydrateMembers(summary: IStandupSummary): Promise<HydratedSummary> {
+  const rowsWithMembers = [
+    ...(summary.attendance ?? []),
+    ...(summary.memberCommitments ?? []),
+    ...((summary.debtMovements ?? []) as unknown as Record<string, unknown>[])
+  ]
+
+  const memberIds = Array.from(
+    new Set(
+      rowsWithMembers
+        .map((row) => (row as Record<string, unknown>).memberId)
+        .filter((id): id is NonNullable<typeof id> => id !== undefined && id !== null)
+        .map((id) => String(id))
+    )
+  )
+
+  if (memberIds.length === 0) return summary as HydratedSummary
+
+  const users = await User.find({ _id: { $in: memberIds } })
+    .select('firstName lastName email avatar')
+    .lean<Array<{ _id: unknown; firstName?: string; lastName?: string; email?: string; avatar?: string }>>()
+
+  const identityById = new Map<string, MemberIdentity>(
+    users.map((user) => [
+      String(user._id),
+      {
+        // Only the parts that exist: `toMatchObject`-visible `undefined` keys
+        // would override a row's own stored `name` with nothing.
+        ...(user.firstName || user.lastName
+          ? { name: [user.firstName, user.lastName].filter(Boolean).join(' ') }
+          : {}),
+        ...(user.firstName ? { firstName: user.firstName } : {}),
+        ...(user.lastName ? { lastName: user.lastName } : {}),
+        ...(user.email ? { email: user.email } : {}),
+        ...(user.avatar ? { avatar: user.avatar } : {})
+      }
+    ])
+  )
+
+  /**
+   * The stored `name` wins over the joined one where both exist: it is what
+   * the stand-up was actually run with, and a rename since then should not
+   * quietly rewrite the historical record. The join only fills gaps (the debt
+   * rows carry no name at all) and supplies the identity fields.
+   */
+  const merge = <T extends object>(row: T): T & MemberIdentity => {
+    const fields = row as Record<string, unknown>
+    const identity = identityById.get(String(fields.memberId))
+    if (!identity) return row
+    return { ...identity, ...row, name: (fields.name as string | undefined) ?? identity.name }
+  }
+
+  return {
+    ...summary,
+    attendance: (summary.attendance ?? []).map(merge),
+    memberCommitments: (summary.memberCommitments ?? []).map(merge),
+    debtMovements: ((summary.debtMovements ?? []) as unknown as Record<string, unknown>[]).map(merge)
+  } as HydratedSummary
+}
 
 /**
  * Reads a field off a row typed as `Record<string, unknown>` in the schema
@@ -44,13 +137,16 @@ function minutesToHours(value: unknown): string {
  * completed has no summary, and that is the caller's cue to show "not
  * completed yet" rather than a blank screen (`toErrorResponse` turns this
  * into the catalogued 404 envelope for both routes below).
+ *
+ * Rows naming a member come back hydrated with that member's identity — see
+ * `hydrateMembers` for why the join lives on the read side.
  */
-export async function getSummary(standupId: string): Promise<IStandupSummary> {
+export async function getSummary(standupId: string): Promise<HydratedSummary> {
   const summary = await StandupSummary.findOne({ standup: standupId }).lean<IStandupSummary>()
   if (!summary) {
     throw new StandupError('NOT_FOUND', 'This stand-up has no summary yet.')
   }
-  return summary
+  return hydrateMembers(summary)
 }
 
 /**

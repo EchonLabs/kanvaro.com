@@ -8,6 +8,7 @@
  * `summary.test.ts`'s own approach for `buildSummaryDocument`.
  */
 import { StandupSummary } from '@/models/StandupSummary'
+import { User } from '@/models/User'
 import { getSummary, renderSummaryMarkdown, type SummaryDocument } from '@/lib/standup/summary-service'
 import { isStandupError } from '@/lib/standup/errors'
 
@@ -194,5 +195,105 @@ describe('renderSummaryMarkdown', () => {
     expect(output).toContain('## Estimate debt movements')
     expect(output).toContain('## Blockers raised')
     expect(output).toContain('None.')
+  })
+})
+
+/**
+ * The persisted summary stores only `{ memberId, name, status }` per member —
+ * enough for the markdown export, not enough to draw a face. The summary
+ * screen shows each member's avatar, so `getSummary` joins the `User`
+ * collection on read rather than the completion saga widening what it writes:
+ * a summary written last sprint then gains an avatar the same as one written
+ * today, and a member who later changes their photo is not frozen at the one
+ * they had on the day.
+ */
+describe('getSummary member hydration', () => {
+  useMongo()
+
+  const seedUser = async (overrides: Record<string, unknown> = {}) =>
+    User.create({
+      _id: ids.member,
+      firstName: 'Kasun',
+      lastName: 'Perera',
+      email: 'kasun@example.test',
+      password: 'seeded-password-hash',
+      role: 'team_member',
+      organization: ids.organization,
+      isActive: true,
+      ...overrides
+    })
+
+  it('merges each attendance row with that member’s avatar and email', async () => {
+    await seedUser({ avatar: 'https://cdn.example.test/kasun.png' })
+    await StandupSummary.create(baseSummary())
+
+    const result = await getSummary(String(ids.user))
+
+    expect(result.attendance[0]).toMatchObject({
+      name: 'Kasun',
+      status: 'present',
+      firstName: 'Kasun',
+      lastName: 'Perera',
+      email: 'kasun@example.test',
+      avatar: 'https://cdn.example.test/kasun.png'
+    })
+  })
+
+  it('hydrates a member with no uploaded avatar with their email, so Gravatar still has an address', async () => {
+    await seedUser()
+    await StandupSummary.create(baseSummary())
+
+    const result = await getSummary(String(ids.user))
+
+    expect(result.attendance[0].email).toBe('kasun@example.test')
+    expect(result.attendance[0].avatar).toBeUndefined()
+  })
+
+  it('keeps a row whose member no longer exists, falling back to the stored name', async () => {
+    await StandupSummary.create(baseSummary())
+
+    const result = await getSummary(String(ids.user))
+
+    expect(result.attendance).toHaveLength(1)
+    expect(result.attendance[0].name).toBe('Kasun')
+    expect(result.attendance[0].email).toBeUndefined()
+  })
+
+  it('hydrates today’s commitments from the same lookup', async () => {
+    await seedUser({ avatar: 'https://cdn.example.test/kasun.png' })
+    await StandupSummary.create(
+      baseSummary({
+        memberCommitments: [
+          {
+            memberId: ids.member,
+            name: 'Kasun',
+            allocations: [{ taskId: String(anyId()), taskKey: 'KAN-2', plannedMinutes: 120 }]
+          }
+        ]
+      })
+    )
+
+    const result = await getSummary(String(ids.user))
+
+    expect(result.memberCommitments[0]).toMatchObject({
+      email: 'kasun@example.test',
+      avatar: 'https://cdn.example.test/kasun.png'
+    })
+  })
+
+  it('hydrates debt-movement rows, which store a memberId but no name', async () => {
+    await seedUser()
+    await StandupSummary.create(
+      baseSummary({
+        debtMovements: [{ memberId: ids.member, outstandingDebtMinutes: 60, surplusMinutes: 0 }]
+      })
+    )
+
+    const result = await getSummary(String(ids.user))
+
+    expect(result.debtMovements[0]).toMatchObject({
+      name: 'Kasun Perera',
+      email: 'kasun@example.test'
+    })
   })
 })

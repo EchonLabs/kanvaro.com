@@ -20,6 +20,7 @@
  * is not advisory: two PMs on the same board is the normal case, not the edge
  * case, and a lost update here is a member's day silently rewritten.
  */
+import { getAvatarData } from '@/lib/gravatar'
 import { Allocation, type IAllocation } from '@/models/Allocation'
 import { Project } from '@/models/Project'
 import { Standup } from '@/models/Standup'
@@ -415,6 +416,13 @@ export interface BoardMember {
   memberId: string
   /** Resolved here rather than by the client: a board of ids is unreadable. */
   name: string
+  /**
+   * The member's profile photo, resolved the way the rest of the app resolves
+   * one: their uploaded `User.avatar` if they have set one, otherwise their
+   * Gravatar. Absent only when there is neither a photo nor an email to hash,
+   * in which case the client draws initials.
+   */
+  avatarUrl?: string
   capacity: CapacityBreakdown
   allocations: BoardAllocationRow[]
   /**
@@ -496,12 +504,40 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
     User.find({
       _id: { $in: [...context.memberIds, context.standup.facilitator] }
     })
-      .select('firstName lastName email')
+      .select('firstName lastName email avatar')
       .lean() as Promise<any[]>,
     Project.findById(context.projectId).select('name').lean() as Promise<any>
   ])
 
   const nameById = new Map(people.map((person) => [String(person._id), displayName(person)]))
+
+  /**
+   * Resolved through `getAvatarData`, not read straight off `person.avatar`.
+   *
+   * `User.avatar` is only set for somebody who has uploaded a photo, which on
+   * most installs is nobody — so the board sent no `avatarUrl` at all and the
+   * run screen drew initials for the entire team, while every other screen in
+   * the app (the team reports, the shared member cards) showed real faces via
+   * Gravatar. The MD5 behind that is `node:crypto` and this is a server
+   * module, so the hashing belongs here rather than in the browser.
+   */
+  const avatarById = new Map(
+    people
+      .map(
+        (person) =>
+          [
+            String(person._id),
+            // `d=404` matters: Gravatar's default is to serve a generic grey
+            // silhouette for an email it has never seen, which would replace
+            // every member's initials — and the run screen's initials are
+            // tinted by attendance state, so they carry information a silhouette
+            // does not. A 404 fails the `<AvatarImage>` load instead, and Radix
+            // leaves the fallback in place.
+            getAvatarData(person, { size: 80, default: '404' }).avatarUrl
+          ] as const
+      )
+      .filter(([, url]) => Boolean(url))
+  )
   const taskById = new Map(tasks.map((task) => [String(task._id), task]))
 
   const byMember = new Map<string, any[]>()
@@ -534,9 +570,11 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
   const members: BoardMember[] = context.memberIds.map((memberId) => {
     const rows = byMember.get(memberId) ?? []
     const recorded = attendanceByMember.get(memberId)
+    const avatarUrl = avatarById.get(memberId)
     return {
       memberId,
       name: nameById.get(memberId) ?? memberId,
+      ...(avatarUrl ? { avatarUrl } : {}),
       capacity: context.computeFor(memberId, {
         allocatedMinutes: countableMinutes(rows),
         detachedMinutes: sumMinutes(

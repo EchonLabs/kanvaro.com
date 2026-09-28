@@ -14,6 +14,7 @@ import { Allocation } from '@/models/Allocation'
 import { Task } from '@/models/Task'
 import { TimeEntry } from '@/models/TimeEntry'
 import { User } from '@/models/User'
+import { getAvatarData } from '@/lib/gravatar'
 
 import { STANDUP_MANUAL_TIME_ENTRY_CATEGORY } from '@/lib/time-tracking-server'
 
@@ -112,7 +113,7 @@ export async function loadYesterdayPanel(standupId: string): Promise<YesterdayPa
       .select('displayId title status remainingEstimateMinutes standupSpillCount')
       .lean() as Promise<any[]>,
     User.find({ _id: { $in: memberIds } })
-      .select('firstName lastName email')
+      .select('firstName lastName email avatar')
       .lean() as Promise<any[]>
   ])
 
@@ -122,6 +123,25 @@ export async function loadYesterdayPanel(standupId: string): Promise<YesterdayPa
       String(person._id),
       [person.firstName, person.lastName].filter(Boolean).join(' ') || person.email
     ])
+  )
+
+  /**
+   * Resolved through `getAvatarData`, matching `allocation-service`'s board
+   * rows: `User.avatar` is only set for somebody who uploaded a photo, so
+   * reading it directly would leave almost every row on initials while the
+   * member cards above showed real faces.
+   *
+   * `d=404` for the same reason it matters there — Gravatar's default is a
+   * generic silhouette for an address it has never seen, and a 404 instead
+   * fails the `<AvatarImage>` load so Radix leaves the initials in place.
+   */
+  const avatarById = new Map(
+    people
+      .map(
+        (person) =>
+          [String(person._id), getAvatarData(person, { size: 80, default: '404' }).avatarUrl] as const
+      )
+      .filter(([, url]) => Boolean(url))
   )
 
   const planned = new Set(
@@ -142,6 +162,7 @@ export async function loadYesterdayPanel(standupId: string): Promise<YesterdayPa
       title: task?.title ?? '',
       memberId,
       memberName: nameById.get(memberId) ?? memberId,
+      ...(avatarById.has(memberId) ? { avatarUrl: avatarById.get(memberId)! } : {}),
       // Rows written before Phase 8 carry no stamp; the current status then
       // reads as unchanged, which is the conservative bucket.
       previousStatus: row.taskStatusAtAllocation ?? task?.status ?? 'unknown',
@@ -169,6 +190,9 @@ export async function loadYesterdayPanel(standupId: string): Promise<YesterdayPa
       title: task?.title ?? '',
       memberId: pair.memberId,
       memberName: nameById.get(pair.memberId) ?? pair.memberId,
+      ...(avatarById.has(pair.memberId)
+        ? { avatarUrl: avatarById.get(pair.memberId)! }
+        : {}),
       previousStatus: task?.status ?? 'unknown',
       currentStatus: task?.status ?? 'unknown',
       plannedMinutes: ZERO_MINUTES,
