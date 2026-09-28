@@ -16,41 +16,28 @@
  * The design follows from that question. A sprint is a run of days, and
  * discipline degrades in sequence — three misses scattered across a fortnight
  * and three in a row at the end are the same count and a completely different
- * situation (SCH-15). So the spine of the screen is one strip per sprint
+ * situation (SCH-15). So the spine of the screen is one card per sprint
  * carrying that sprint's own day sequence, worst first, rather than a grid of
  * charts that aggregates the sequence away. The two distributions that are
  * genuinely org-shaped — carry-forward age (E63) and override reasons
- * (OVR-8) — sit underneath as context, not as the headline, drawn as labelled
- * horizontal bars rather than the board's chrome-free marks: an aggregate
- * ranking benefits from an axis to anchor it, where a per-sprint sequence
- * would only be cluttered by one.
+ * (OVR-8) — sit underneath as context, not as the headline.
  *
- * Mark conventions, all on the validated `--viz-*` palette in globals.css:
- *  · board marks stay chrome-free — a rounded cell or a beam on a hairline
- *    track, no axis furniture, nothing that needs a legend to decode
+ * Layout and palette are the Figma "Admin Standup Insights Dashboard" frame,
+ * on the `--ovs-*` tokens in globals.css. Conventions carried over from the
+ * previous revision:
  *  · severity is structure: a sprint in trouble gets an edge rail and rises
  *    to the top of the board, it never gets a red background
- *  · colour never carries meaning alone (NFR-A1) — every ribbon, beam and bar
- *    has the same fact written beside it in words, which is also why UI-13's
- *    "no value is reachable only by hovering" holds without a separate table
- *    view
+ *  · colour never carries meaning alone (NFR-A1) — every ribbon, bar and dot
+ *    has the same fact written beside it or in its accessible name, which is
+ *    also why UI-13's "no value is reachable only by hovering" holds without
+ *    a separate table view
  *  · a zero renders as a muted dash, so only real numbers draw the eye
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowUpRight, Clock, RefreshCw, ShieldAlert } from 'lucide-react'
-import {
-  Bar,
-  BarChart,
-  Cell,
-  LabelList,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis
-} from 'recharts'
+import { ArrowUpRight, ChevronDown } from 'lucide-react'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { IconChip } from '@/components/standup/my/shared/IconChip'
 import { cn } from '@/lib/utils'
 
 type CadenceState = 'ran' | 'missed' | 'ahead' | 'off'
@@ -134,18 +121,20 @@ interface OrgStandupOversight {
 
 const ALL_PROJECTS = '__all__'
 
-/** The org cadence rail shows a fortnight — long enough to see a slide, short enough to stay legible. */
+/** The org cadence chart shows a fortnight — long enough to see a slide, short enough to stay legible. */
 const CADENCE_WINDOW = 14
 
 const hours = (mins: number) => mins / 60
-const hoursLabel = (mins: number) => `${(mins / 60).toFixed(1)}h`
+/** Whole hours stay whole ("16h"), anything else keeps one decimal ("2.5h"). */
+const hoursLabel = (mins: number) => `${Number((mins / 60).toFixed(1))}h`
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
-/** §13.3's bands, oldest last. The ramp is ordinal — older is always the stronger step. */
-const AGE_BANDS: Array<{ key: keyof AgeBands; label: string; swatch: string; color: string }> = [
-  { key: 'normal', label: '1–2 stand-ups', swatch: 'bg-[var(--viz-age-1)]', color: 'var(--viz-age-1)' },
-  { key: 'noteRequired', label: '3–4, note required', swatch: 'bg-[var(--viz-age-2)]', color: 'var(--viz-age-2)' },
-  { key: 'escalated', label: '5–7, escalated', swatch: 'bg-[var(--viz-age-3)]', color: 'var(--viz-age-3)' },
-  { key: 'chronic', label: '8 or more, chronic', swatch: 'bg-[var(--viz-age-4)]', color: 'var(--viz-age-4)' }
+/** §13.3's bands, youngest first, so the chronic tail sits last where the eye lands. */
+const AGE_BANDS: Array<{ key: keyof AgeBands; label: string; bar: string }> = [
+  { key: 'normal', label: '1–2 stand-ups', bar: 'bg-[var(--ovs-blue)]' },
+  { key: 'noteRequired', label: '3–4 stand-ups', bar: 'bg-[var(--ovs-blue)]' },
+  { key: 'escalated', label: '5–7 stand-ups', bar: 'bg-[var(--ovs-amber)]' },
+  { key: 'chronic', label: 'Chronic / 8+', bar: 'bg-[var(--ovs-red)]' }
 ]
 
 const REASON_LABEL: Record<string, string> = {
@@ -169,11 +158,45 @@ const REASON_LABEL: Record<string, string> = {
 
 const reasonLabel = (code: string) => REASON_LABEL[code] ?? code.replace(/_/g, ' ')
 
-const MONO_STACK = "'Nunito Sans', ui-monospace, monospace"
-
 /** Remaining estimate minus remaining capacity, in hours. Positive is the bad direction. */
 const balanceOf = (row: SprintOversightRow) =>
   hours(row.capacityBalance.remainingEstimateMinutes - row.capacityBalance.remainingCapacityMinutes)
+
+type Severity = 'critical' | 'warning' | 'clean'
+
+/**
+ * How loudly a sprint's rail speaks. Critical is anything that has already
+ * gone wrong and compounds if left — scope past capacity, chronic
+ * under-allocation, a run of misses, an item aged past a decision, an
+ * overdue blocker. Any other flag is a warning. Kept in step with
+ * `verdictOf`'s own priority order, so a sprint's worst true thing is never
+ * described in critical words while its rail reads as a mere warning.
+ */
+function severityOf(row: SprintOversightRow): Severity {
+  if (row.flags.length === 0) return 'clean'
+  if (
+    row.capacityBalance.exceedsCapacity ||
+    row.chronicUnderAllocationCount > 0 ||
+    row.consecutiveMissedDays >= 3 ||
+    row.carryForward.chronicCount > 0 ||
+    row.openBlockers.some((blocker) => blocker.overdue)
+  ) {
+    return 'critical'
+  }
+  return 'warning'
+}
+
+const SEVERITY_RAIL: Record<Severity, string> = {
+  critical: 'bg-[var(--ovs-red)]',
+  warning: 'bg-[var(--ovs-amber)]',
+  clean: 'bg-[var(--ovs-border)]'
+}
+
+const SEVERITY_TEXT: Record<Severity, string> = {
+  critical: 'text-[var(--ovs-red)]',
+  warning: 'text-[var(--ovs-amber)]',
+  clean: 'text-[var(--ovs-muted)]'
+}
 
 /**
  * The one line under a sprint's name: the single worst true thing about it, in
@@ -226,7 +249,7 @@ export function deriveOversightView(data: OrgStandupOversight, projectId: string
     }
   }
 
-  // One column per working day across every visible sprint, so the rail reads
+  // One column per working day across every visible sprint, so the chart reads
   // as organisation cadence rather than as any one sprint's calendar.
   const byDate = new Map<string, { ran: number; missed: number; ahead: number }>()
   for (const row of sprints) {
@@ -248,9 +271,6 @@ export function deriveOversightView(data: OrgStandupOversight, projectId: string
     sprints,
     ageBands,
     orgCadence,
-    // One shared scale across every beam on the board — without it a 1h
-    // overage and a 40h overage draw the same bar on different rows.
-    capacityScale: Math.max(1, ...sprints.map((row) => Math.abs(balanceOf(row)))),
     // The rows arrive worst-first, so the first flagged one is the sprint the
     // admin should open before anything else on the page.
     worst: flagged[0] ?? null,
@@ -312,6 +332,11 @@ export function StandupOversightScreen() {
   // never pair an org-wide sentence with a per-project board.
   const view = useMemo(() => (data ? deriveOversightView(data, projectId) : null), [data, projectId])
 
+  const scopeLabel =
+    projectId === ALL_PROJECTS
+      ? 'Organization-wide'
+      : (projects.find((project) => project.id === projectId)?.name ?? 'This project')
+
   // Splices a revoked waiver out of state rather than refetching the whole
   // org rollup for one row — the waiver panel is the only thing this action
   // can invalidate. Only on a real 2xx (or a 404, meaning it was already
@@ -327,131 +352,285 @@ export function StandupOversightScreen() {
     )
   }
 
-  if (error) {
-    return (
-      <p role="alert" className="p-6 text-[13px] text-[var(--apple-system-red)]">
-        {error}
-      </p>
-    )
-  }
-
-  if (!data || !view) return <OversightSkeleton />
-
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-[22px] font-semibold tracking-tight text-[var(--apple-label)]">
-          Stand-up oversight
-        </h1>
+    // The negative margins cancel `MainLayout`'s `<main>` padding (the same
+    // move My Stand-up and sprint planning make), so the design's own gutter
+    // is the only one.
+    <div className="standup-oversight -m-3 flex flex-col gap-6 bg-[var(--ovs-canvas)] px-4 pb-14 pt-6 text-[var(--ovs-text)] sm:-m-4 sm:px-6 lg:-m-6 lg:px-9 lg:pt-[34px]">
+      {/* `MainLayout` paints a pure-black backdrop behind every page; this one
+          sits over it so the design's canvas also fills the breadcrumb strip
+          and below short content. */}
+      <div aria-hidden className="fixed inset-0 -z-10 bg-[var(--ovs-canvas)]" />
 
-        {projects.length > 0 && (
-          <Select value={projectId} onValueChange={setProjectId}>
-            <SelectTrigger
-              aria-label="Project"
-              className="w-56 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] text-[13px]"
-            >
-              <SelectValue placeholder="All projects" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      </header>
-
-      {view.sprints.length === 0 ? (
-        <p className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card px-4 py-12 text-center text-[15px] text-[var(--apple-secondary-label)]">
-          No sprint is active right now, so there is nothing to watch.
+      {error ? (
+        <p role="alert" className="text-[13px] text-[var(--ovs-red)]">
+          {error}
         </p>
+      ) : !data || !view ? (
+        <OversightSkeleton />
       ) : (
         <>
-          <Verdict view={view} />
-          <Board sprints={view.sprints} scale={view.capacityScale} />
+          <div className="flex flex-col gap-[18px]">
+            <header className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex min-w-0 flex-col gap-[5px]">
+                <h1 className="text-[26px] font-bold leading-tight text-[var(--ovs-text)] sm:text-[30px]">
+                  Stand-up oversight
+                </h1>
+                <p className="text-[13px] text-[var(--ovs-muted)]">
+                  Organization health across active delivery cycles
+                </p>
+              </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <AgeingPanel bands={view.ageBands} />
-            <OverridesPanel reasons={view.reasons} />
+              {projects.length > 0 && (
+                <Select value={projectId} onValueChange={setProjectId}>
+                  <SelectTrigger
+                    aria-label="Project"
+                    className="h-auto w-auto gap-[18px] rounded-[8px] border-[var(--ovs-border)] bg-[var(--ovs-raised)] px-[14px] py-[9px] text-[12px] font-semibold text-[var(--ovs-text)] [&>svg:last-child]:hidden"
+                  >
+                    <SelectValue placeholder="All projects" />
+                    <ChevronDown aria-hidden className="h-3 w-3 shrink-0 text-[var(--ovs-muted)]" strokeWidth={2} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </header>
+
+            {view.sprints.length > 0 && <Verdict view={view} />}
+          </div>
+
+          {view.sprints.length === 0 ? (
+            <p className="rounded-[16px] bg-[var(--ovs-surface)] px-4 py-12 text-center text-[15px] text-[var(--ovs-muted)]">
+              No sprint is active right now, so there is nothing to watch.
+            </p>
+          ) : (
+            <Board sprints={view.sprints} />
+          )}
+
+          <div className="flex flex-col gap-[18px]">
+            {view.sprints.length > 0 && (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <AgeingPanel bands={view.ageBands} />
+                <OverridesPanel reasons={view.reasons} scope={scopeLabel} />
+              </div>
+            )}
+
+            {view.waivers.length > 0 && <WaiverPanel waivers={view.waivers} onRevoke={revokeWaiver} />}
           </div>
         </>
       )}
-
-      {view.waivers.length > 0 && <WaiverPanel waivers={view.waivers} onRevoke={revokeWaiver} />}
     </div>
   )
 }
 
-/* ------------------------------------------------------------------ chart plumbing */
+/* --------------------------------------------------------------- verdict */
 
 /**
- * Recharts' own `ResponsiveContainer` measures its host element and renders
- * nothing until it does — which is correct in a browser but means a 0×0
- * result in jsdom, where layout never runs (see jest.setup.ts). Tracking
- * width ourselves with a non-zero fallback keeps every chart's category
- * labels and bars real DOM/SVG nodes in tests, and still re-measures on
- * resize in a real browser.
+ * The screen's answer, as a sentence rather than as a scoreboard. The count is
+ * set large inside the sentence — grammatically part of it — and the line
+ * below names the one sprint to open first, so the page is useful before
+ * anything else on it has been read.
  */
-function useMeasuredWidth(fallback: number) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(fallback)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const observer = new ResizeObserver((entries) => {
-      const measured = entries[0]?.contentRect.width
-      if (measured && measured > 0) setWidth(measured)
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
-  return { ref, width }
-}
-
-/**
- * One tooltip style for every chart on the screen, built from the same card
- * tokens as everything else here rather than recharts' default box — a hover
- * card is a convenience on top of the words already on the page, not a
- * second design system.
- */
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  const rows = payload.filter((entry: any) => entry.value !== undefined && entry.value !== null)
-  if (rows.length === 0) return null
+function Verdict({ view }: { view: OversightView }) {
+  const { summary, worst } = view
+  const clean = summary.needingAttention === 0
+  const heroTone = clean
+    ? 'text-[var(--ovs-green)]'
+    : view.sprints.some((row) => severityOf(row) === 'critical')
+      ? 'text-[var(--ovs-red)]'
+      : 'text-[var(--ovs-amber)]'
 
   return (
-    <div className="rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card px-3 py-2 shadow-[0_4px_20px_rgba(0,0,0,0.14)]">
-      {label && <p className="text-[12px] font-medium text-[var(--apple-label)]">{label}</p>}
-      <dl className="mt-0.5 flex flex-col gap-0.5">
-        {rows.map((entry: any) => (
-          <div key={entry.dataKey} className="flex items-center gap-1.5 text-[12px]">
-            <span aria-hidden className="h-2 w-2 shrink-0 rounded-[2px]" style={{ backgroundColor: entry.color }} />
-            <dt className="text-[var(--apple-secondary-label)]">{entry.name}</dt>
-            <dd className="font-apple-mono tabular-nums text-[var(--apple-label)]">{entry.value}</dd>
-          </div>
-        ))}
-      </dl>
+    <section
+      aria-label="Organisation summary"
+      className="flex flex-col gap-7 rounded-[16px] bg-[var(--ovs-surface)] p-5 shadow-[var(--ovs-shadow)] sm:p-6 lg:flex-row lg:items-start"
+    >
+      <div className="flex min-w-0 flex-1 flex-col gap-5">
+        <div className="flex flex-col gap-[7px]">
+          <h2 className="flex flex-wrap items-baseline gap-x-2.5 text-[18px] font-semibold text-[var(--ovs-text)]">
+            <span
+              data-testid="oversight-hero-figure"
+              className={cn('text-[44px] font-bold leading-none tabular-nums', heroTone)}
+            >
+              {clean ? summary.activeSprints : summary.needingAttention}
+            </span>
+            <span>
+              {clean
+                ? `active ${summary.activeSprints === 1 ? 'sprint is' : 'sprints are'} on cadence`
+                : `of ${summary.activeSprints} active ${summary.activeSprints === 1 ? 'sprint needs' : 'sprints need'} attention`}
+            </span>
+          </h2>
+
+          <p className="max-w-[46ch] text-[13px] text-[var(--ovs-muted)]">
+            {worst ? (
+              <>
+                Open{' '}
+                <span className="font-semibold text-[var(--ovs-text)]">
+                  {worst.sprintName} · {worst.projectName}
+                </span>{' '}
+                first — {verdictOf(worst).toLowerCase()}.
+              </>
+            ) : (
+              'Nothing has missed a stand-up, gone over capacity, or aged past a decision.'
+            )}
+          </p>
+        </div>
+
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Tally value={summary.chronicItems} label="Chronic items" tone="text-[var(--ovs-amber)]" />
+          <Tally value={summary.openBlockers} label="Open blockers" tone="text-[var(--ovs-red)]" />
+          <Tally value={summary.missedDays} label="Missed stand-ups" tone="text-[var(--ovs-red)]" />
+          <Tally
+            value={summary.debtMinutes}
+            label="Estimate debt"
+            tone="text-[var(--ovs-blue)]"
+            format={hoursLabel}
+          />
+        </dl>
+      </div>
+
+      <OrgCadenceChart days={view.orgCadence} />
+    </section>
+  )
+}
+
+/** A summary tile. Zero drops to the subtle ink so only real numbers carry colour. */
+function Tally({
+  value,
+  label,
+  tone,
+  format
+}: {
+  value: number
+  label: string
+  tone: string
+  format?: (value: number) => string
+}) {
+  const zero = value === 0
+  return (
+    <div className="flex min-w-0 flex-col-reverse gap-[5px] rounded-[12px] bg-[var(--ovs-raised)] p-[14px]">
+      <dt className="text-[11px] text-[var(--ovs-muted)]">{label}</dt>
+      <dd className={cn('text-[22px] font-bold leading-none tabular-nums', zero ? 'text-[var(--ovs-subtle)]' : tone)}>
+        {format ? format(value) : value}
+      </dd>
     </div>
   )
 }
 
-/* ------------------------------------------------------------------ marks */
+const DAY_BAR_CLASS = {
+  ran: 'bg-[var(--ovs-green)]',
+  missed: 'bg-[var(--ovs-red)]',
+  ahead: 'bg-[var(--ovs-blue)]'
+} as const
+
+/** Tallest bar in the chart's 96px box, leaving room for the day label beneath. */
+const DAY_BAR_MAX = 76
 
 /**
- * Whole class strings rather than an inline `style`, so Tailwind's scanner can
- * see them — and so a non-working day reads as a narrow pause in the rhythm
- * rather than as an event of its own.
+ * Organisation cadence over the last fortnight: one bar per working day,
+ * height for how many sprint stand-ups fell on it, colour for how that day
+ * went — any miss turns it red, otherwise ran is green and still-to-come is
+ * blue. The headline percentage is completion over the days already due.
  */
-const CADENCE_CLASS: Record<CadenceState, string> = {
-  ran: 'flex-1 bg-[var(--viz-good)]',
-  missed: 'flex-1 bg-[var(--viz-critical)]',
-  ahead: 'flex-1 bg-[var(--apple-tertiary-fill)]',
-  off: 'flex-[0.35] bg-[var(--apple-quaternary-fill)]'
+function OrgCadenceChart({ days }: { days: Array<{ date: string; ran: number; missed: number; ahead: number }> }) {
+  if (days.length === 0) return null
+
+  const ran = days.reduce((total, day) => total + day.ran, 0)
+  const missed = days.reduce((total, day) => total + day.missed, 0)
+  const completion = ran + missed > 0 ? Math.round((ran / (ran + missed)) * 100) : null
+  const completionTone =
+    completion === null
+      ? 'text-[var(--ovs-subtle)]'
+      : completion >= 90
+        ? 'text-[var(--ovs-green)]'
+        : completion >= 70
+          ? 'text-[var(--ovs-amber)]'
+          : 'text-[var(--ovs-red)]'
+  const peak = Math.max(1, ...days.map((day) => day.ran + day.missed + day.ahead))
+
+  return (
+    <figure className="m-0 flex w-full shrink-0 flex-col gap-[14px] lg:w-[390px] lg:pl-2">
+      <figcaption className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-[3px]">
+          <span className="text-[13px] font-semibold text-[var(--ovs-text)]">{days.length}-working-day cadence</span>
+          <span className="text-[10px] text-[var(--ovs-subtle)]">
+            {missed > 0 ? `Stand-up completion · ${missed} missed` : 'Organization-wide stand-up completion'}
+          </span>
+        </div>
+        <span className={cn('text-[13px] font-semibold tabular-nums', completionTone)}>
+          {completion === null ? '–' : `${completion}%`}
+        </span>
+      </figcaption>
+
+      <div
+        role="img"
+        aria-label={`Last ${days.length} working days: ${ran} stand-ups ran, ${missed} missed`}
+        className="flex h-[96px] items-end gap-[7px]"
+      >
+        {days.map((day, index) => {
+          const total = day.ran + day.missed + day.ahead
+          const state = day.missed > 0 ? 'missed' : day.ran > 0 ? 'ran' : 'ahead'
+          return (
+            <div
+              key={day.date}
+              title={`${day.date} — ${day.ran} ran, ${day.missed} missed, ${day.ahead} still to come`}
+              className="flex min-w-0 max-w-[18px] flex-1 flex-col items-center gap-[5px]"
+            >
+              <span
+                className={cn('w-full rounded-b-[2px] rounded-t-[4px]', DAY_BAR_CLASS[state])}
+                style={{ height: Math.max(8, Math.round((total / peak) * DAY_BAR_MAX)) }}
+              />
+              <span className="text-[8px] leading-none text-[var(--ovs-subtle)]">{index + 1}</span>
+            </div>
+          )
+        })}
+      </div>
+    </figure>
+  )
+}
+
+/* ----------------------------------------------------------------- board */
+
+function Board({ sprints }: { sprints: SprintOversightRow[] }) {
+  return (
+    <section aria-label="Active sprints" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-[20px] font-bold text-[var(--ovs-text)]">Active sprints</h2>
+          <p className="text-[11px] text-[var(--ovs-subtle)]">Worst first · daily operating view</p>
+        </div>
+        <ul aria-label="Legend" className="flex items-center gap-3">
+          {(['ran', 'missed', 'ahead'] as const).map((state) => (
+            <li key={state} className="flex items-center gap-[5px]">
+              <span aria-hidden className={cn('h-1.5 w-1.5 rounded-[3px]', DAY_BAR_CLASS[state])} />
+              <span className="text-[9px] text-[var(--ovs-subtle)]">{LEGEND_WORD[state]}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <ul className="flex flex-col gap-3">
+        {sprints.map((row) => (
+          <SprintRow key={row.sprintId} row={row} />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+const LEGEND_WORD = { ran: 'Ran', missed: 'Missed', ahead: 'Ahead' } as const
+
+const CADENCE_CELL: Record<CadenceState, string> = {
+  ran: 'w-3 bg-[var(--ovs-green)]',
+  missed: 'w-3 bg-[var(--ovs-red)]',
+  ahead: 'w-3 bg-[var(--ovs-blue)]',
+  off: 'w-[5px] bg-[var(--ovs-border)]'
 }
 
 const CADENCE_WORD: Record<CadenceState, string> = {
@@ -462,457 +641,208 @@ const CADENCE_WORD: Record<CadenceState, string> = {
 }
 
 /**
- * A sprint's working days, left to right, one cell each. The signature mark on
- * this screen: it is the only thing here that keeps the *order* of what
- * happened, which is what turns "5 of 10" into a diagnosis. Non-working days
- * are drawn as an empty outline so it stays obvious they were never counted
- * against the sprint (G1).
+ * A sprint's working days, left to right, one cell each. It is the only thing
+ * on the board that keeps the *order* of what happened, which is what turns
+ * "5 of 10" into a diagnosis. Non-working days are a narrow neutral sliver so
+ * it stays obvious they were never counted against the sprint (G1).
  */
 function CadenceRibbon({ days, label }: { days: CadenceDay[]; label: string }) {
   if (days.length === 0) {
-    return (
-      <p className="flex h-5 items-center text-[12px] text-[var(--apple-tertiary-label)]">
-        No stand-ups scheduled yet
-      </p>
-    )
+    return <p className="text-[11px] text-[var(--ovs-subtle)]">No stand-ups scheduled yet</p>
   }
 
   return (
-    <div className="flex h-5 w-full items-stretch gap-[2px]" role="img" aria-label={label}>
+    <div className="flex h-[18px] flex-wrap gap-[3px]" role="img" aria-label={label}>
       {days.map((day) => (
         <span
           key={day.date}
           title={`${day.date} — ${CADENCE_WORD[day.state]}`}
-          className={cn('min-w-[4px] max-w-[14px] rounded-[2px]', CADENCE_CLASS[day.state])}
+          className={cn('h-[18px] rounded-[3px]', CADENCE_CELL[day.state])}
         />
       ))}
     </div>
   )
 }
 
-/**
- * CC-11 / N12 as a beam either side of a centre line: left is headroom, right
- * is scope the sprint cannot absorb. Every beam on the board shares one scale,
- * so row-to-row length is comparable.
- */
-function BalanceBeam({ balance, scale }: { balance: number; scale: number }) {
-  const over = balance > 0
-  const extent = Math.min(1, Math.abs(balance) / scale) * 50
-
-  return (
-    <div className="relative h-2 w-full rounded-full bg-[var(--apple-quaternary-fill)]">
-      <span
-        aria-hidden
-        className="absolute inset-y-[-3px] left-1/2 w-px -translate-x-1/2 bg-[var(--apple-separator)]"
-      />
-      {Math.abs(balance) > 0.05 && (
-        <span
-          aria-hidden
-          className={cn(
-            'absolute inset-y-0',
-            over ? 'left-1/2 rounded-r-full bg-[var(--viz-critical)]' : 'right-1/2 rounded-l-full bg-[var(--viz-accent)]'
-          )}
-          style={{ width: `${extent}%` }}
-        />
-      )}
-    </div>
-  )
-}
-
-/* --------------------------------------------------------------- sections */
-
-/**
- * The screen's answer, as a sentence rather than as a scoreboard. The count is
- * set large inside the sentence — grammatically part of it, not a tile with a
- * caption underneath — and the line below names the one sprint to open first,
- * so the page is useful before anything else on it has been read.
- */
-function Verdict({ view }: { view: OversightView }) {
-  const { summary, worst } = view
-  const clean = summary.needingAttention === 0
-
-  return (
-    <section
-      aria-label="Organisation summary"
-      className="grid gap-x-10 gap-y-6 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] dark:shadow-none sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto]"
-    >
-      <div className="min-w-0">
-        <h2 className="flex flex-wrap items-baseline gap-x-2.5 text-[19px] font-medium leading-tight text-[var(--apple-label)]">
-          <span
-            data-testid="oversight-hero-figure"
-            className={cn(
-              'font-apple-mono text-[40px] font-semibold leading-none tabular-nums',
-              clean ? 'text-[var(--viz-good)]' : 'text-[var(--viz-critical)]'
-            )}
-          >
-            {clean ? summary.activeSprints : summary.needingAttention}
-          </span>
-          <span className="max-w-[26rem]">
-            {clean
-              ? `active ${summary.activeSprints === 1 ? 'sprint is' : 'sprints are'} on cadence`
-              : `of ${summary.activeSprints} active ${summary.activeSprints === 1 ? 'sprint needs' : 'sprints need'} you today`}
-          </span>
-        </h2>
-
-        <p className="mt-2 max-w-[62ch] text-[14px] leading-relaxed text-[var(--apple-secondary-label)]">
-          {worst
-            ? `Start with ${worst.sprintName} in ${worst.projectName}: ${verdictOf(worst).toLowerCase()}.`
-            : 'Nothing has missed a stand-up, gone over capacity, or aged past a decision.'}
-        </p>
-
-        <dl className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2.5">
-          <Tally value={summary.chronicItems} label="chronic items" />
-          <Tally value={summary.openBlockers} label="open blockers" />
-          <Tally value={summary.missedDays} label="missed stand-ups" />
-          <Tally value={summary.debtMinutes} label="estimate debt" format={hoursLabel} />
-        </dl>
-      </div>
-
-      <div className="lg:border-l lg:border-[var(--apple-separator)] lg:pl-8">
-        <OrgCadenceRail days={view.orgCadence} />
-      </div>
-    </section>
-  )
-}
-
-/**
- * A figure and its noun on one line. Zero drops to grey so only real numbers
- * carry ink — red is spent on the board's rails and verdicts, not here, or
- * four alarming red numbers would sit in a row saying nothing about which one
- * to act on.
- */
-function Tally({
-  value,
-  label,
-  format
-}: {
-  value: number
-  label: string
-  format?: (value: number) => string
-}) {
-  const zero = value === 0
-  return (
-    <div className="flex items-baseline gap-1.5">
-      <dt className="sr-only">{label}</dt>
-      <dd
-        className={cn(
-          'font-apple-mono text-[15px] font-semibold tabular-nums',
-          zero ? 'text-[var(--apple-quaternary-label)]' : 'text-[var(--apple-label)]'
-        )}
-      >
-        {format ? format(value) : value}
-      </dd>
-      <span
-        aria-hidden
-        className={cn(
-          'text-[13px]',
-          zero ? 'text-[var(--apple-tertiary-label)]' : 'text-[var(--apple-secondary-label)]'
-        )}
-      >
-        {label}
-      </span>
-    </div>
-  )
-}
-
-/**
- * Organisation cadence over the last fortnight: one column per working day,
- * stand-ups that were missed stacked over the ones that ran. Not a
- * fully-chromed line chart — the question it answers is "are we sliding?",
- * which is a shape — but a real (Recharts) bar chart now, so the day scale
- * reads as an axis and a hover gives the exact split without losing the
- * always-visible totals below.
- */
-function OrgCadenceRail({
-  days
-}: {
-  days: Array<{ date: string; ran: number; missed: number; ahead: number }>
-}) {
-  const { ref, width } = useMeasuredWidth(300)
-
-  if (days.length === 0) return null
-
-  const missedTotal = days.reduce((total, day) => total + day.missed, 0)
-
-  // A day nobody has reached yet gets a neutral stub of its own rather than an
-  // empty column, so the fortnight still reads as a fortnight — full height
-  // for that column would read as attendance nobody earned.
-  const chartData = days.map((day) => ({
-    ...day,
-    label: day.date.slice(5).replace('-', '/'),
-    pending: day.ran + day.missed === 0 ? 1 : 0
-  }))
-
-  return (
-    <figure className="m-0 w-full lg:w-[300px]">
-      <div ref={ref} className="w-full">
-        <BarChart
-          width={width}
-          height={112}
-          data={chartData}
-          margin={{ top: 4, right: 2, left: 2, bottom: 0 }}
-          barCategoryGap={2}
-        >
-          <XAxis
-            dataKey="label"
-            tick={{ fontSize: 10, fill: 'var(--apple-tertiary-label)' }}
-            axisLine={{ stroke: 'var(--apple-separator)' }}
-            tickLine={false}
-            interval="preserveStartEnd"
-          />
-          <YAxis hide domain={[0, 'dataMax']} />
-          <RechartsTooltip
-            content={<ChartTooltip />}
-            cursor={{ fill: 'var(--apple-quaternary-fill)' }}
-            labelFormatter={(value, entries) => entries?.[0]?.payload?.date ?? value}
-          />
-          <Bar
-            dataKey="ran"
-            name="Ran"
-            stackId="cadence"
-            fill="var(--viz-good)"
-            stroke="var(--viz-surface)"
-            strokeWidth={2}
-            maxBarSize={16}
-          />
-          <Bar
-            dataKey="missed"
-            name="Missed"
-            stackId="cadence"
-            fill="var(--viz-critical)"
-            stroke="var(--viz-surface)"
-            strokeWidth={2}
-            radius={[2, 2, 0, 0]}
-            maxBarSize={16}
-          />
-          <Bar
-            dataKey="pending"
-            name="Not yet run"
-            stackId="cadence"
-            fill="var(--apple-tertiary-fill)"
-            radius={[2, 2, 0, 0]}
-            maxBarSize={16}
-            isAnimationActive={false}
-          />
-        </BarChart>
-      </div>
-
-      <div className="mt-2 flex items-center gap-4 text-[11px] text-[var(--apple-tertiary-label)]">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-2 w-2 rounded-[2px] bg-[var(--viz-good)]" />
-          Ran
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-2 w-2 rounded-[2px] bg-[var(--viz-critical)]" />
-          Missed
-        </span>
-      </div>
-      <figcaption className="mt-1.5 flex items-baseline justify-between gap-3 border-t border-[var(--apple-separator)] pt-1.5 text-[12px] text-[var(--apple-tertiary-label)]">
-        <span>Organisation cadence, last {days.length} working days</span>
-        <span className={missedTotal > 0 ? 'text-[var(--viz-critical)]' : undefined}>
-          {missedTotal > 0 ? `${missedTotal} missed` : 'none missed'}
-        </span>
-      </figcaption>
-    </figure>
-  )
-}
-
-/**
- * The board. Rows on one surface rather than a card each — cards would give
- * eleven sprints eleven equal-weight frames, and the whole point is that they
- * are not equal. Every row shares one grid, so the figures line up as columns
- * down the page while each row still carries its own sequence. A header row
- * names those columns once instead of leaving them to be inferred per row.
- */
-function Board({ sprints, scale }: { sprints: SprintOversightRow[]; scale: number }) {
-  return (
-    <section
-      aria-label="Active sprints"
-      className="overflow-hidden rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card"
-    >
-      <div className="hidden gap-x-6 border-b border-[var(--apple-separator)] px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--apple-tertiary-label)] lg:grid lg:grid-cols-[minmax(0,17rem)_minmax(0,15rem)_minmax(0,1fr)_auto_auto] lg:items-center">
-        <span>Sprint</span>
-        <span>Cadence</span>
-        <span>Capacity balance</span>
-        <span>Backlog</span>
-        <span aria-hidden />
-      </div>
-      <ul className="divide-y divide-[var(--apple-separator)]">
-        {sprints.map((row) => (
-          <SprintStrip key={row.sprintId} row={row} scale={scale} />
-        ))}
-      </ul>
-    </section>
-  )
-}
-
-function SprintStrip({ row, scale }: { row: SprintOversightRow; scale: number }) {
-  const needsAttention = row.flags.length > 0
-  const balance = balanceOf(row)
+function SprintRow({ row }: { row: SprintOversightRow }) {
+  const severity = severityOf(row)
   const { completedDays, missedDays, totalWorkingDays } = row.discipline
 
   return (
-    <li className="group relative transition-colors hover:bg-[var(--apple-quaternary-fill)]">
+    <li className="flex overflow-hidden rounded-[12px] bg-[var(--ovs-raised)]">
       {/* Severity as structure: a rail on the edge, never a tinted row. */}
-      <span
-        aria-hidden
-        className={cn('absolute inset-y-0 left-0 w-[3px]', needsAttention && 'bg-[var(--viz-critical)]')}
-      />
+      <span aria-hidden className={cn('w-1 shrink-0 self-stretch', SEVERITY_RAIL[severity])} />
 
-      <div className="grid gap-x-6 gap-y-4 py-4 pl-5 pr-4 lg:grid-cols-[minmax(0,17rem)_minmax(0,15rem)_minmax(0,1fr)_auto_auto] lg:items-center">
-        <div className="min-w-0">
-          <h3 className="truncate text-[15px] font-semibold text-[var(--apple-label)]">
-            <Link
-              href={`/projects/${row.projectId}/standups`}
-              className="rounded-[var(--apple-radius-sm)] after:absolute after:inset-0 after:content-[''] group-hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]"
-            >
-              {row.sprintName}
-            </Link>
-          </h3>
-          <p className="truncate text-[13px] text-[var(--apple-tertiary-label)]">{row.projectName}</p>
-          <p
-            className={cn(
-              'mt-1 text-[13px]',
-              needsAttention ? 'text-[var(--viz-critical)]' : 'text-[var(--apple-secondary-label)]'
-            )}
-          >
-            {verdictOf(row)}
-          </p>
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex h-5 items-center">
-            <CadenceRibbon
-              days={row.cadence ?? []}
-              label={`${row.sprintName}: ${completedDays} of ${totalWorkingDays} stand-ups ran, ${missedDays} missed`}
-            />
+      <div className="flex min-w-0 flex-1 flex-col gap-4 p-[18px]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h3 className="min-w-0">
+              <Link
+                href={`/projects/${row.projectId}/standups`}
+                className="group inline-flex max-w-full items-center gap-[7px] rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ovs-blue)]"
+              >
+                <span className="truncate text-[16px] font-bold text-[var(--ovs-blue)] group-hover:underline">
+                  {row.sprintName}
+                </span>
+                <span aria-hidden className="text-[12px] text-[var(--ovs-subtle)]">
+                  /
+                </span>
+                <span className="truncate text-[13px] font-semibold text-[var(--ovs-text)]">{row.projectName}</span>
+                <ArrowUpRight aria-hidden className="h-[11px] w-[11px] shrink-0 text-[var(--ovs-blue)]" strokeWidth={2} />
+              </Link>
+            </h3>
+            <p className={cn('text-[11px]', SEVERITY_TEXT[severity])}>{verdictOf(row)}</p>
           </div>
-          <p className="mt-1.5 text-[12px] text-[var(--apple-tertiary-label)]">
-              <span className="font-apple-mono tabular-nums text-[var(--apple-secondary-label)]">
-                {completedDays}/{totalWorkingDays}
-              </span>{' '}
-              stand-ups ran
-              {missedDays > 0 && (
-                <>
-                  {', '}
-                  <span className="font-apple-mono tabular-nums text-[var(--viz-critical)]">
-                    {missedDays}
-                  </span>{' '}
-                  missed
-                </>
-              )}
-          </p>
+
+          <CadenceRibbon
+            days={row.cadence ?? []}
+            label={`${row.sprintName}: ${completedDays} of ${totalWorkingDays} stand-ups ran, ${missedDays} missed`}
+          />
         </div>
 
-        <div className="min-w-0">
-          <div className="flex h-5 items-center">
-            <BalanceBeam balance={balance} scale={scale} />
-          </div>
-          <p className="mt-1.5 text-[12px] text-[var(--apple-tertiary-label)]">
-              {Math.abs(balance) < 0.05
-                ? 'Scope matches remaining capacity'
-                : balance > 0
-                  ? `${balance.toFixed(1)}h over remaining capacity`
-                : `${Math.abs(balance).toFixed(1)}h of headroom left`}
-          </p>
-        </div>
-
-        <dl className="grid grid-cols-2 gap-x-5 gap-y-1.5">
-          <Figure value={row.carryForward.openCount} label="carried" />
-          {row.openBlockers.length > 0 ? (
-            <BlockerDisclosure blockers={row.openBlockers} />
-          ) : (
-            <Figure value={row.openBlockersCount} label="blockers" />
-          )}
-          <Figure value={row.estimateDebtMinutes} label="debt" format={hoursLabel} />
-          <Figure value={row.overridesCount} label="overrides" />
-          <Figure value={row.chronicUnderAllocationCount} label="under-allocated" />
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 md:flex md:items-start md:gap-6">
+          <CapacityBalance row={row} />
+          <Metric label="Carried forward" value={row.carryForward.openCount} format={(n) => plural(n, 'item', 'items')} />
+          <Metric label="Estimate debt" value={row.estimateDebtMinutes} format={hoursLabel} />
+          <Metric label="Overrides" value={row.overridesCount} />
+          <Metric
+            label="Chronic under-allocation"
+            value={row.chronicUnderAllocationCount}
+            format={(n) => plural(n, 'person', 'people')}
+            tone="text-[var(--ovs-amber)]"
+          />
         </dl>
 
-        <ArrowUpRight
-          aria-hidden
-          className="h-4 w-4 self-center justify-self-end text-[var(--apple-tertiary-label)] transition-colors group-hover:text-[var(--apple-system-blue)]"
-          strokeWidth={2}
-        />
+        <BlockerDisclosure blockers={row.openBlockers} />
       </div>
     </li>
   )
 }
 
-/** A board figure. Zeros collapse to a dash, so a clean row reads as quiet rather than as four more numbers. */
-function Figure({
-  value,
-  label,
-  format
-}: {
-  value: number
-  label: string
-  format?: (value: number) => string
-}) {
-  const zero = value === 0
+const METRIC_LABEL = 'text-[9px] font-bold uppercase tracking-[0.04em] text-[var(--ovs-subtle)]'
+
+/**
+ * CC-11 / N12: remaining estimate against remaining capacity, both written
+ * out, with the fill showing how much of the capacity the estimate consumes.
+ * Past 100% the bar is full and red; from 85% it warns.
+ */
+function CapacityBalance({ row }: { row: SprintOversightRow }) {
+  const estimate = row.capacityBalance.remainingEstimateMinutes
+  const capacity = row.capacityBalance.remainingCapacityMinutes
+  const ratio = capacity > 0 ? estimate / capacity : estimate > 0 ? Infinity : 0
+  const fill = row.capacityBalance.exceedsCapacity || ratio > 1
+    ? 'bg-[var(--ovs-red)]'
+    : ratio >= 0.85
+      ? 'bg-[var(--ovs-amber)]'
+      : 'bg-[var(--ovs-green)]'
+
   return (
-    <div className="flex min-w-0 items-baseline gap-1.5">
-      <dt className="sr-only">{label}</dt>
-      <dd
-        className={cn(
-          'font-apple-mono text-[14px] font-semibold tabular-nums',
-          zero ? 'text-[var(--apple-quaternary-label)]' : 'text-[var(--apple-label)]'
-        )}
-      >
-        {zero ? '–' : format ? format(value) : value}
+    <div className="col-span-2 flex min-w-0 flex-col gap-[7px] md:w-[185px] md:shrink-0">
+      <dt className={METRIC_LABEL}>Capacity balance</dt>
+      <dd className="flex flex-col gap-[7px]">
+        <span className="flex items-start justify-between gap-2 text-[12px]">
+          <span className="text-[var(--ovs-text)]">Estimate {hoursLabel(estimate)}</span>
+          <span className="text-[var(--ovs-muted)]">
+            <span className="sr-only">of capacity </span>
+            {hoursLabel(capacity)}
+          </span>
+        </span>
+        <span aria-hidden className="h-[5px] w-full overflow-hidden rounded-[3px] bg-[var(--ovs-border)]">
+          <span
+            className={cn('block h-full rounded-[3px]', fill)}
+            style={{ width: `${Math.min(1, ratio) * 100}%` }}
+          />
+        </span>
       </dd>
-      <span aria-hidden className="truncate text-[12px] text-[var(--apple-tertiary-label)]">
-        {label}
-      </span>
     </div>
   )
 }
 
-const SEVERITY_CLASS: Record<string, string> = {
-  critical: 'text-[var(--viz-critical)]',
-  high: 'text-[var(--viz-critical)]'
+/** A board figure. Zeros collapse to a dash, so a clean row reads as quiet rather than as four more numbers. */
+function Metric({
+  value,
+  label,
+  format,
+  tone = 'text-[var(--ovs-text)]'
+}: {
+  value: number
+  label: string
+  format?: (value: number) => string
+  tone?: string
+}) {
+  const zero = value === 0
+  return (
+    <div className="flex min-w-0 flex-col gap-[7px] md:flex-1">
+      <dt className={cn(METRIC_LABEL, 'truncate')}>{label}</dt>
+      <dd className={cn('text-[15px] font-semibold tabular-nums', zero ? 'text-[var(--ovs-subtle)]' : tone)}>
+        {zero ? '–' : format ? format(value) : value}
+      </dd>
+    </div>
+  )
+}
+
+const SEVERITY_DOT: Record<string, string> = {
+  critical: 'bg-[var(--ovs-red)]',
+  high: 'bg-[var(--ovs-red)]'
 }
 
 /**
- * The blockers figure, promoted from a count to a disclosure: an admin lands
- * here to triage, and a count alone gives them nothing to act on. Expands
- * in place rather than navigating away, so the sprint's other context stays
- * on screen while they read it. `stopPropagation` plus `relative z-10` keep
- * the click on this button rather than the row's own full-row link.
+ * The blockers strip, promoted from a count to a disclosure: an admin lands
+ * here to triage, and a count alone gives them nothing to act on. Expands in
+ * place rather than navigating away, so the sprint's other context stays on
+ * screen while they read it.
  */
 function BlockerDisclosure({ blockers }: { blockers: BlockerRow[] }) {
   const [open, setOpen] = useState(false)
 
+  if (blockers.length === 0) {
+    return (
+      <div className="flex items-start justify-between rounded-[8px] bg-[var(--ovs-inset)] px-3 py-2.5">
+        <p className="text-[11px] font-semibold text-[var(--ovs-text)]">Open blockers · 0</p>
+        <p className="text-[10px] text-[var(--ovs-subtle)]">None open</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="relative z-10 col-span-2 min-w-0 sm:col-span-1">
+    <div className="flex flex-col gap-2 rounded-[8px] bg-[var(--ovs-inset)] px-3 py-2.5">
       <button
         type="button"
         aria-expanded={open}
-        onClick={(event) => {
-          event.stopPropagation()
-          setOpen((current) => !current)
-        }}
-        className="flex items-baseline gap-1.5 rounded-[var(--apple-radius-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]"
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-start justify-between gap-3 rounded-[4px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ovs-blue)]"
       >
-        <span className="font-apple-mono text-[14px] font-semibold tabular-nums text-[var(--apple-label)]">
-          {blockers.length}
-        </span>
-        <span className="text-[12px] text-[var(--apple-secondary-label)] underline decoration-dotted underline-offset-2">
-          blockers
-        </span>
+        <span className="text-[11px] font-semibold text-[var(--ovs-text)]">Open blockers · {blockers.length}</span>
+        <span className="text-[10px] text-[var(--ovs-subtle)]">{open ? 'Expanded' : 'Collapsed'} ⌄</span>
       </button>
 
       {open && (
-        <ul className="mt-2 flex flex-col gap-1.5 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-2.5">
+        <ul className="grid gap-x-5 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
           {blockers.map((blocker) => (
-            <li key={blocker.blockerId} className="flex flex-wrap items-baseline gap-x-1.5 text-[12px] leading-relaxed text-[var(--apple-label)]">
-              <span className={cn('font-semibold', SEVERITY_CLASS[blocker.severity] ?? 'text-[var(--apple-secondary-label)]')}>
-                {blocker.severity}
-                {' —'}
+            <li key={blocker.blockerId} className="flex min-w-0 items-baseline gap-[7px] text-[10px] text-[var(--ovs-muted)]">
+              <span
+                aria-hidden
+                className={cn(
+                  'h-[5px] w-[5px] shrink-0 -translate-y-px rounded-[3px]',
+                  SEVERITY_DOT[blocker.severity] ?? 'bg-[var(--ovs-amber)]'
+                )}
+              />
+              <span className="min-w-0">
+                <span className="sr-only">{blocker.severity} — </span>
+                <span>{blocker.description}</span>
+                {blocker.taskKey && (
+                  <>
+                    {' · '}
+                    <span className="text-[var(--ovs-subtle)]">{blocker.taskKey}</span>
+                  </>
+                )}
+                {blocker.overdue && (
+                  <>
+                    {' · '}
+                    <span className="text-[var(--ovs-red)]">overdue</span>
+                  </>
+                )}
               </span>
-              <span>{blocker.description}</span>
-              {blocker.taskKey && <span className="text-[var(--apple-tertiary-label)]">{blocker.taskKey}</span>}
-              {blocker.overdue && <span className="text-[var(--viz-critical)]">overdue</span>}
             </li>
           ))}
         </ul>
@@ -921,158 +851,121 @@ function BlockerDisclosure({ blockers }: { blockers: BlockerRow[] }) {
   )
 }
 
+/* -------------------------------------------------------------- insights */
+
 function Panel({
   title,
   caption,
-  icon,
   children
 }: {
   title: string
   caption: string
-  icon: React.ReactNode
   children: React.ReactNode
 }) {
   return (
-    <section className="flex flex-col rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-5">
-      <div className="flex items-center gap-2.5">
-        <IconChip icon={icon} tone="neutral" size="sm" />
-        <h2 className="text-[15px] font-semibold text-[var(--apple-label)]">{title}</h2>
+    <section className="flex min-h-[250px] flex-col gap-[18px] rounded-[16px] bg-[var(--ovs-surface)] p-5">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-[16px] font-bold text-[var(--ovs-text)]">{title}</h2>
+        <p className="text-[10px] text-[var(--ovs-subtle)]">{caption}</p>
       </div>
-      <p className="mb-4 mt-1.5 max-w-[52ch] text-[13px] leading-relaxed text-[var(--apple-tertiary-label)]">
-        {caption}
-      </p>
       {children}
     </section>
   )
 }
 
+/** A bar's length against the longest in its panel; a zero draws nothing. */
+const barWidth = (count: number, max: number) => `${max > 0 ? (count / max) * 100 : 0}%`
+
 /**
- * §15.15's carry-forward ageing, "with the chronic band highlighted". Drawn as
- * a labelled horizontal bar per band, worst (chronic) first — this is the one
- * place on the screen where an aggregate ranking benefits from an axis, since
- * the question is which bands the backlog has actually reached, not a single
- * sprint's sequence.
+ * §15.15's carry-forward ageing, "with the chronic band highlighted": one
+ * labelled bar per band, youngest first, the chronic tail in red.
  */
-function AgeingPanel({
-  bands
-}: {
-  bands: Array<{ key: keyof AgeBands; label: string; swatch: string; color: string; count: number }>
-}) {
+function AgeingPanel({ bands }: { bands: Array<{ key: keyof AgeBands; label: string; bar: string; count: number }> }) {
   const total = bands.reduce((sum, band) => sum + band.count, 0)
-  const chronic = bands.find((band) => band.key === 'chronic')?.count ?? 0
-  const chartData = [...bands].reverse()
-  const { ref, width } = useMeasuredWidth(340)
+  const max = Math.max(0, ...bands.map((band) => band.count))
 
   return (
-    <Panel
-      title="Carry-forward ageing"
-      icon={<Clock strokeWidth={1.75} />}
-      caption={
-        chronic > 0
-          ? `${chronic} ${chronic === 1 ? 'item needs' : 'items need'} a documented decision at eight stand-ups or older: continue, descope or split.`
-          : 'Open items by how many stand-ups they have survived. Nothing has reached the chronic band.'
-      }
-    >
+    <Panel title="Carry-forward ageing" caption={`Open items by age band · ${total} total`}>
       {total === 0 ? (
         <Empty text="Nothing is carried over. Clean slate." />
       ) : (
-        <div ref={ref} className="w-full" role="img" aria-label={`${total} open carry-forward items by age`}>
-          <BarChart
-            width={width}
-            height={chartData.length * 34 + 8}
-            data={chartData}
-            layout="vertical"
-            margin={{ top: 0, right: 28, left: 0, bottom: 0 }}
-            barCategoryGap={10}
-          >
-            <XAxis type="number" hide domain={[0, 'dataMax']} />
-            <YAxis
-              type="category"
-              dataKey="label"
-              width={132}
-              tick={{ fontSize: 12, fill: 'var(--apple-secondary-label)' }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <RechartsTooltip content={<ChartTooltip />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-            <Bar dataKey="count" name="Items" radius={[0, 4, 4, 0]} barSize={14} isAnimationActive={false}>
-              {chartData.map((band) => (
-                <Cell key={band.key} fill={band.count === 0 ? 'var(--apple-tertiary-fill)' : band.color} />
-              ))}
-              <LabelList
-                dataKey="count"
-                position="right"
-                formatter={(value: number) => (value === 0 ? '–' : String(value))}
-                style={{ fill: 'var(--apple-label)', fontSize: 12, fontWeight: 600, fontFamily: MONO_STACK }}
-              />
-            </Bar>
-          </BarChart>
-        </div>
+        <ul className="flex flex-col gap-3">
+          {bands.map((band) => (
+            <li key={band.key} className="flex items-center gap-3">
+              <span className="w-[82px] shrink-0 text-[10px] text-[var(--ovs-muted)]">{band.label}</span>
+              <span aria-hidden className="h-[9px] min-w-0 flex-1 overflow-hidden rounded-[5px] bg-[var(--ovs-track)]">
+                <span className={cn('block h-full rounded-[5px]', band.bar)} style={{ width: barWidth(band.count, max) }} />
+              </span>
+              <span
+                className={cn(
+                  'w-[18px] shrink-0 text-right text-[10px] font-semibold tabular-nums',
+                  band.count === 0 ? 'text-[var(--ovs-subtle)]' : 'text-[var(--ovs-text)]'
+                )}
+              >
+                {band.count === 0 ? '–' : band.count}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </Panel>
   )
 }
 
 /**
- * OVR-8's reason ranking. A nominal list, so every bar wears one hue —
- * colouring each by its own value would spend the identity channel
- * re-encoding what bar length already says. Counts sit at the end of each bar
- * as a direct label, so nothing here needs a hover to be read.
+ * OVR-8's reason ranking. The leading reason is set apart in violet; the rest
+ * share one hue so bar length alone carries the ranking.
  */
-function OverridesPanel({ reasons }: { reasons: Array<{ reasonCode: string; label: string; count: number }> }) {
-  const { ref, width } = useMeasuredWidth(340)
+function OverridesPanel({
+  reasons,
+  scope
+}: {
+  reasons: Array<{ reasonCode: string; label: string; count: number }>
+  scope: string
+}) {
+  const max = reasons[0]?.count ?? 0
 
   return (
-    <Panel
-      title="Why capacity was overridden"
-      icon={<RefreshCw strokeWidth={1.75} />}
-      caption="Every override issued on an active sprint, ranked by reason. A pattern here is a resourcing signal, not a rounding error."
-    >
+    <Panel title="Why capacity was overridden" caption={`${scope} · ranked reason codes`}>
       {reasons.length === 0 ? (
         <Empty text="No overrides have been issued." />
       ) : (
-        <div ref={ref} className="w-full">
-          <BarChart
-            width={width}
-            height={reasons.length * 34 + 8}
-            data={reasons}
-            layout="vertical"
-            margin={{ top: 0, right: 28, left: 0, bottom: 0 }}
-            barCategoryGap={10}
-          >
-            <XAxis type="number" hide domain={[0, 'dataMax']} />
-            <YAxis
-              type="category"
-              dataKey="label"
-              width={140}
-              tick={{ fontSize: 12, fill: 'var(--apple-secondary-label)' }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <RechartsTooltip content={<ChartTooltip />} cursor={{ fill: 'var(--apple-quaternary-fill)' }} />
-            <Bar
-              dataKey="count"
-              name="Overrides"
-              fill="var(--viz-accent)"
-              radius={[0, 4, 4, 0]}
-              barSize={14}
-              isAnimationActive={false}
-            >
-              <LabelList
-                dataKey="count"
-                position="right"
-                style={{ fill: 'var(--apple-label)', fontSize: 12, fontWeight: 600, fontFamily: MONO_STACK }}
-              />
-            </Bar>
-          </BarChart>
-        </div>
+        <ul className="flex flex-col gap-[11px]">
+          {reasons.map((reason, index) => (
+            <li key={reason.reasonCode} className="flex flex-col gap-[5px]">
+              <span className="flex items-start justify-between gap-3 text-[10px]">
+                <span className="text-[var(--ovs-muted)]">{reason.label}</span>
+                <span className="font-semibold tabular-nums text-[var(--ovs-text)]">{reason.count}</span>
+              </span>
+              <span aria-hidden className="h-[7px] w-full overflow-hidden rounded-[4px] bg-[var(--ovs-track)]">
+                <span
+                  className={cn(
+                    'block h-full rounded-[4px]',
+                    index === 0 ? 'bg-[var(--ovs-violet)]' : 'bg-[var(--ovs-blue)]'
+                  )}
+                  style={{ width: barWidth(reason.count, max) }}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </Panel>
   )
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="flex min-h-[96px] items-center text-[13px] text-[var(--apple-tertiary-label)]">{text}</p>
+  return <p className="flex min-h-[96px] items-center text-[13px] text-[var(--ovs-subtle)]">{text}</p>
+}
+
+/* --------------------------------------------------------------- waivers */
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** "30 Sep 2026", by hand — newer ICU data renders en-GB September as "Sept". */
+const formatExpiry = (iso: string) => {
+  const date = new Date(iso)
+  return `${String(date.getUTCDate()).padStart(2, '0')} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
 }
 
 /**
@@ -1081,17 +974,23 @@ function Empty({ text }: { text: string }) {
  * revoke, so it gets its own panel rather than a row on the board.
  */
 function WaiverPanel({ waivers, onRevoke }: { waivers: WaiverRow[]; onRevoke: (sprintId: string) => Promise<void> }) {
+  const active = waivers.filter((waiver) => !waiver.expired).length
+
   return (
-    <section className="rounded-[var(--apple-radius-lg)] border border-[var(--viz-critical)]/30 bg-card p-5">
-      <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[var(--apple-label)]">
-        <ShieldAlert className="h-4 w-4 shrink-0 text-[var(--viz-critical)]" strokeWidth={1.75} />
-        Planning waivers in force
-      </h2>
-      <p className="mb-4 mt-1 max-w-[62ch] text-[13px] leading-relaxed text-[var(--apple-tertiary-label)]">
-        A waiver lets stand-ups run on a sprint that failed its planning gate. Only an org admin can issue or
-        revoke one.
-      </p>
-      <ul className="flex flex-col divide-y divide-[var(--apple-separator)]">
+    <section className="flex flex-col gap-4 rounded-[16px] bg-[var(--ovs-surface)] p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-[16px] font-bold text-[var(--ovs-text)]">Planning waivers in force</h2>
+          <p className="text-[10px] text-[var(--ovs-subtle)]">
+            {plural(active, 'active exception', 'active exceptions')} requiring periodic review
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-[var(--ovs-amber-tint)] px-[9px] py-[5px] text-[10px] font-semibold text-[var(--ovs-amber)]">
+          {active} active
+        </span>
+      </div>
+
+      <ul className="flex flex-col gap-2">
         {waivers.map((waiver) => (
           <WaiverRowItem key={waiver.sprintId} waiver={waiver} onRevoke={onRevoke} />
         ))}
@@ -1102,8 +1001,8 @@ function WaiverPanel({ waivers, onRevoke }: { waivers: WaiverRow[]; onRevoke: (s
 
 /**
  * One waiver plus its revoke action. Inline confirm rather than a modal —
- * a `DELETE` with no body needs nothing more than a yes/no, and every other
- * confirmation on this screen (the blocker disclosure) is already inline.
+ * a `DELETE` with no body needs nothing more than a yes/no, and the blocker
+ * disclosure is already inline too.
  */
 function WaiverRowItem({
   waiver,
@@ -1117,26 +1016,34 @@ function WaiverRowItem({
   const [revokeError, setRevokeError] = useState<string | null>(null)
 
   return (
-    <li className="flex flex-col items-start justify-between gap-x-6 gap-y-2 py-3 first:pt-0 last:pb-0 sm:flex-row">
-      <div className="min-w-0 flex-1">
-        <p className="text-[14px] font-medium text-[var(--apple-label)]">
-          {waiver.sprintName}
-          <span className="font-normal text-[var(--apple-tertiary-label)]"> in {waiver.projectName}</span>
-        </p>
-        <p className="mt-0.5 max-w-[62ch] text-[13px] leading-relaxed text-[var(--apple-secondary-label)]">
-          {waiver.justification}
-        </p>
-      </div>
-      <div className="flex shrink-0 flex-wrap items-baseline gap-3 text-[12px]">
-        <span className="font-apple-mono tabular-nums text-[var(--apple-tertiary-label)]">
-          {waiver.waivedCheckIds.join(', ')}
-        </span>
-        <span className={waiver.expired ? 'text-[var(--viz-critical)]' : 'text-[var(--apple-secondary-label)]'}>
-          {waiver.expired ? 'Expired' : `Until ${waiver.expiresAt.slice(0, 10)}`}
-        </span>
+    <li className="flex flex-col gap-2 rounded-[12px] bg-[var(--ovs-raised)] p-[14px]">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-[18px]">
+        <div className="flex min-w-0 flex-col gap-[3px] md:w-[145px] md:shrink-0">
+          <p className="truncate text-[12px] font-bold text-[var(--ovs-blue)]">
+            {waiver.sprintName} / {waiver.projectName}
+          </p>
+          <p className="text-[9px] text-[var(--ovs-subtle)]">Planning gate waived</p>
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+          <p className={METRIC_LABEL}>Justification</p>
+          <p className="text-[10px] text-[var(--ovs-muted)]">{waiver.justification}</p>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-[3px] md:w-[180px] md:shrink-0">
+          <p className={METRIC_LABEL}>Waived checks</p>
+          <p className="text-[10px] text-[var(--ovs-text)]">{waiver.waivedCheckIds.join(' · ')}</p>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-[3px] md:w-[95px] md:shrink-0">
+          <p className={METRIC_LABEL}>Expires</p>
+          <p className={cn('text-[10px]', waiver.expired ? 'text-[var(--ovs-red)]' : 'text-[var(--ovs-amber)]')}>
+            {waiver.expired ? 'Expired' : formatExpiry(waiver.expiresAt)}
+          </p>
+        </div>
+
         {confirming ? (
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="text-[var(--apple-secondary-label)]">Revoke this waiver?</span>
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               disabled={revoking}
@@ -1151,7 +1058,7 @@ function WaiverRowItem({
                   setRevoking(false)
                 }
               }}
-              className="font-semibold text-[var(--viz-critical)] hover:underline disabled:opacity-50"
+              className="rounded-[8px] bg-[var(--ovs-red)] px-3 py-[7px] text-[10px] font-semibold text-white disabled:opacity-50"
             >
               Confirm
             </button>
@@ -1162,38 +1069,36 @@ function WaiverRowItem({
                 setConfirming(false)
                 setRevokeError(null)
               }}
-              className="text-[var(--apple-secondary-label)] hover:underline disabled:opacity-50"
+              className="rounded-[8px] border border-[var(--ovs-border)] px-3 py-[7px] text-[10px] font-semibold text-[var(--ovs-muted)] disabled:opacity-50"
             >
               Cancel
             </button>
-            {revokeError && <span className="w-full text-[var(--viz-critical)]">{revokeError}</span>}
-          </span>
+          </div>
         ) : (
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            className="font-semibold text-[var(--viz-critical)] hover:underline"
+            className="shrink-0 self-start rounded-[8px] border border-[var(--ovs-red)] px-3 py-[7px] text-[10px] font-semibold text-[var(--ovs-red)] transition-colors hover:bg-[var(--ovs-red)] hover:text-white md:self-auto"
           >
             Revoke
           </button>
         )}
       </div>
+
+      {revokeError && <p className="text-[10px] text-[var(--ovs-red)]">{revokeError}</p>}
     </li>
   )
 }
 
 function OversightSkeleton() {
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6" aria-busy>
-      <div className="h-8 w-56 animate-pulse rounded bg-[var(--apple-tertiary-fill)]" />
-      <div className="h-28 animate-pulse rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)]" />
-      <div className="h-72 animate-pulse rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)]" />
+    <div className="flex flex-col gap-6" aria-busy>
+      <div className="h-9 w-64 animate-pulse rounded-[8px] bg-[var(--ovs-raised)]" />
+      <div className="h-44 animate-pulse rounded-[16px] bg-[var(--ovs-surface)]" />
+      <div className="h-48 animate-pulse rounded-[12px] bg-[var(--ovs-raised)]" />
       <div className="grid gap-4 lg:grid-cols-2">
         {[0, 1].map((index) => (
-          <div
-            key={index}
-            className="h-48 animate-pulse rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)]"
-          />
+          <div key={index} className="h-[250px] animate-pulse rounded-[16px] bg-[var(--ovs-surface)]" />
         ))}
       </div>
     </div>

@@ -15,6 +15,10 @@ import { render, screen, within, fireEvent, waitFor } from '@testing-library/rea
 
 import { StandupOversightScreen, deriveOversightView } from '../oversight/StandupOversightScreen'
 
+/** The verdict line splits the sprint name into its own emphasis, so match on the paragraph's whole text. */
+const verdictLine = (pattern: RegExp) => (_: string, element: Element | null) =>
+  element?.tagName === 'P' && pattern.test(element.textContent ?? '')
+
 const cadence = (states: string[], from = 17) =>
   states.map((state, index) => ({ date: `2026-08-${from + index}`, state }))
 
@@ -125,7 +129,7 @@ describe('StandupOversightScreen', () => {
     // One of the two fixtures carries flags, the other is clean. Scoped to the
     // headline figure: "1" also appears as a chronic count further down.
     expect(await screen.findByTestId('oversight-hero-figure')).toHaveTextContent('1')
-    expect(screen.getByText(/of 2 active sprints need you today/i)).toBeInTheDocument()
+    expect(screen.getByText(/of 2 active sprints need attention/i)).toBeInTheDocument()
   })
 
   it('names the sprint to open first rather than leaving the admin to rank them', async () => {
@@ -133,7 +137,7 @@ describe('StandupOversightScreen', () => {
     render(<StandupOversightScreen />)
 
     expect(
-      await screen.findByText(/start with sprint 2 in kanvaro: 20\.0h more work than capacity left/i)
+      await screen.findByText(verdictLine(/open sprint 2 · kanvaro first — 20\.0h more work than capacity left/i))
     ).toBeInTheDocument()
   })
 
@@ -148,12 +152,14 @@ describe('StandupOversightScreen', () => {
     const board = await screen.findByRole('region', { name: /active sprints/i })
     const flagged = within(board).getByText('Sprint 2').closest('li')!
 
-    expect(within(flagged).getByText('5/10')).toBeInTheDocument()
-    expect(within(flagged).getByText(/20\.0h over remaining capacity/i)).toBeInTheDocument()
-    expect(within(flagged).getByText('3.0h')).toBeInTheDocument()
+    // Capacity balance: remaining estimate against remaining capacity, both in words.
+    expect(within(flagged).getByText('Estimate 100h')).toBeInTheDocument()
+    expect(within(flagged).getByText('80h')).toBeInTheDocument()
+    expect(within(flagged).getByText('3h')).toBeInTheDocument()
+    expect(within(flagged).getByText('4 items')).toBeInTheDocument()
     // The sprint's own name is the way in — one unique link per row rather than
     // the same blue phrase repeated down the board.
-    expect(within(flagged).getByRole('link', { name: 'Sprint 2' })).toHaveAttribute(
+    expect(within(flagged).getByRole('link', { name: /sprint 2/i })).toHaveAttribute(
       'href',
       '/projects/p1/standups'
     )
@@ -172,9 +178,8 @@ describe('StandupOversightScreen', () => {
     mockFetch(mockPayload())
     render(<StandupOversightScreen />)
 
-    expect(
-      await screen.findByText(/1 item needs a documented decision at eight stand-ups or older/i)
-    ).toBeInTheDocument()
+    expect(await screen.findByText('Chronic / 8+')).toBeInTheDocument()
+    expect(screen.getByText(/open items by age band · 4 total/i)).toBeInTheDocument()
   })
 
   it('renders both org-shaped distributions', async () => {
@@ -289,7 +294,7 @@ describe('StandupOversightScreen', () => {
 
     expect(await screen.findByText(/planning waivers in force/i)).toBeInTheDocument()
     expect(screen.getByText('PC-4')).toBeInTheDocument()
-    expect(screen.getByText(/until 2026-09-20/i)).toBeInTheDocument()
+    expect(screen.getByText('20 Sep 2026')).toBeInTheDocument()
   })
 
   it('expands a sprint row to show blocker detail instead of only a count', async () => {
@@ -301,7 +306,7 @@ describe('StandupOversightScreen', () => {
 
     expect(within(flagged).queryByText('Vendor sandbox is still down')).not.toBeInTheDocument()
 
-    fireEvent.click(within(flagged).getByRole('button', { name: /2 blockers/i }))
+    fireEvent.click(within(flagged).getByRole('button', { name: /open blockers · 2/i }))
 
     expect(within(flagged).getByText('Vendor sandbox is still down')).toBeInTheDocument()
     expect(within(flagged).getByText('Waiting on design sign-off')).toBeInTheDocument()
@@ -339,13 +344,13 @@ describe('StandupOversightScreen', () => {
     render(<StandupOversightScreen />)
 
     expect(
-      await screen.findByText(/start with sprint 2 in kanvaro: 2 members chronically under-allocated/i)
+      await screen.findByText(verdictLine(/open sprint 2 · kanvaro first — 2 members chronically under-allocated/i))
     ).toBeInTheDocument()
 
     const board = await screen.findByRole('region', { name: /active sprints/i })
     const row = within(board).getByText('Sprint 2').closest('li')!
-    expect(within(row).getByText('2')).toBeInTheDocument()
-    expect(within(row).getAllByText(/under-allocated/i).length).toBeGreaterThan(0)
+    expect(within(row).getByText('2 people')).toBeInTheDocument()
+    expect(within(row).getByText(/chronic under-allocation/i)).toBeInTheDocument()
   })
 
   it('revokes a planning waiver inline and removes it from the panel', async () => {
