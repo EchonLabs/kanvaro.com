@@ -46,7 +46,7 @@ describe('BlockerPanel (Panel 6)', () => {
 
     const rows = screen.getAllByTestId('blocker-row')
     expect(rows).toHaveLength(1)
-    expect(rows[0].className).toContain('apple-system-red')
+    expect(rows[0].className).toContain('sur-red')
   })
 
   it('does not mark a non-overdue row as destructive', () => {
@@ -55,7 +55,7 @@ describe('BlockerPanel (Panel 6)', () => {
     )
 
     const rows = screen.getAllByTestId('blocker-row')
-    expect(rows[0].className).not.toContain('apple-system-red')
+    expect(rows[0].className).not.toContain('sur-red')
   })
 
   it('renders the freed-capacity line when freedMinutes is set', () => {
@@ -127,6 +127,10 @@ describe('BlockerPanel (Panel 6)', () => {
       />
     )
 
-    expect(screen.getByText(standupStrings.blocker.general())).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        new RegExp(standupStrings.blocker.blockedTask({ task: standupStrings.blocker.general() }))
+      )
+    ).toBeInTheDocument()
   })
 })

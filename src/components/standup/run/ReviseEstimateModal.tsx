@@ -92,7 +92,7 @@ export function ReviseEstimateModal({
         </p>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3 text-[12.5px]">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3 text-[13px]">
         <dt className="text-[var(--apple-tertiary-label)]">Original estimate</dt>
         <dd data-testid="revise-original" className="text-right font-apple-mono tabular-nums text-[var(--apple-label)]">
           {formatMinutesAsHours(target.originalEstimateMinutes, { locale })}
@@ -156,7 +156,7 @@ export function ReviseEstimateModal({
             onChange={(event) => setDetail(event.target.value)}
             aria-describedby="revise-detail-hint"
           />
-          <span id="revise-detail-hint" className="text-[12px] text-[var(--apple-tertiary-label)]">
+          <span id="revise-detail-hint" className="text-[11px] text-[var(--apple-tertiary-label)]">
             {standupStrings.variance.reviseDetailRequired({
               minLength: MIN_REVISION_DETAIL_LENGTH
             })}
@@ -164,7 +164,7 @@ export function ReviseEstimateModal({
         </div>
       )}
 
-      <p className="text-[12px] text-[var(--apple-tertiary-label)]">
+      <p className="text-[11px] text-[var(--apple-tertiary-label)]">
         {standupStrings.variance.reviseOriginalUnchanged()}
       </p>
 

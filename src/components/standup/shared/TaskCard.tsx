@@ -239,7 +239,7 @@ export function TaskCard({
           >
             {task.skills.map((skill) => (
               <li key={skill}>
-                <Badge variant="outline" className="px-2 py-0 text-[10.5px]">
+                <Badge variant="outline" className="px-2 py-0 text-[11px]">
                   {skill}
                 </Badge>
               </li>

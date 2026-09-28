@@ -106,7 +106,7 @@ export function ExpandableMemberCard({
       className={cn(
         'apple-transition flex flex-col gap-2.5 rounded-[var(--apple-radius-lg)] border bg-card p-3',
         highlighted
-          ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/5 shadow-[0_0_0_3px_rgba(0,122,255,0.15)]'
+          ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/5 shadow-[0_0_0_3px_color-mix(in_srgb,var(--apple-system-blue)_15%,transparent)]'
           : 'border-[var(--apple-separator)]',
         className
       )}
@@ -114,7 +114,11 @@ export function ExpandableMemberCard({
       <div className="flex items-center gap-2.5">
         <Avatar className="h-9 w-9">
           {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt="" />}
-          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-[12px] font-semibold text-white">
+          {/* Tokenised, not `from-blue-500 to-purple-500`: raw Tailwind palette
+              steps here were the one place this card stepped outside the app's
+              Apple tokens, so it read as a different blue to everything around
+              it — including the run screen, which restyles this card. */}
+          <AvatarFallback className="bg-[var(--apple-tertiary-fill)] text-[11px] font-semibold text-[var(--apple-secondary-label)]">
             {initialsOf(member.name)}
           </AvatarFallback>
         </Avatar>
@@ -122,12 +126,12 @@ export function ExpandableMemberCard({
         <div className="min-w-0 flex-1">
           <p
             data-testid="member-name"
-            className="truncate text-[13.5px] font-semibold text-[var(--apple-label)]"
+            className="truncate text-[13px] font-semibold text-[var(--apple-label)]"
             title={member.name}
           >
             {member.name}
           </p>
-          <p className="truncate text-[11.5px] text-[var(--apple-secondary-label)]">
+          <p className="truncate text-[11px] text-[var(--apple-secondary-label)]">
             {member.role ? <span className="capitalize">{formatRole(member.role)}</span> : null}
             {member.role ? ' · ' : ''}
             {member.tasks.length === 1 ? '1 task' : `${member.tasks.length} tasks`}
@@ -187,7 +191,7 @@ export function ExpandableMemberCard({
           />
         </div>
       ) : (
-        <p className="text-[11.5px] text-[var(--apple-tertiary-label)]">
+        <p className="text-[11px] text-[var(--apple-tertiary-label)]">
           No capacity figure for this member.
         </p>
       )}
@@ -199,7 +203,7 @@ export function ExpandableMemberCard({
       {!expanded && member.tasks.length === 0 && (
         <p
           className={cn(
-            'apple-transition rounded-[var(--apple-radius-md)] border border-dashed px-2.5 py-2 text-center text-[12px]',
+            'apple-transition rounded-[var(--apple-radius-md)] border border-dashed px-2.5 py-2 text-center text-[11px]',
             highlighted
               ? 'border-[var(--apple-system-blue)] text-[var(--apple-system-blue)]'
               : 'border-[var(--apple-separator)] text-[var(--apple-tertiary-label)]'
@@ -217,7 +221,7 @@ export function ExpandableMemberCard({
                 Assigned work
               </h5>
               {member.tasks.length === 0 ? (
-                <p className="text-[12px] text-[var(--apple-tertiary-label)]">
+                <p className="text-[11px] text-[var(--apple-tertiary-label)]">
                   Nothing assigned yet.
                 </p>
               ) : (
@@ -251,7 +255,7 @@ export function ExpandableMemberCard({
                 Daily workload
               </h5>
               {member.capacityBreakdown ? (
-                <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11.5px]">
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
                   <WorkloadRow
                     label="Nominal"
                     minutes={member.capacityBreakdown.nominalMinutes}
@@ -275,7 +279,7 @@ export function ExpandableMemberCard({
                   />
                 </dl>
               ) : (
-                <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11.5px]">
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
                   <WorkloadRow
                     label="Assigned"
                     minutes={assignedMinutes as Minutes}

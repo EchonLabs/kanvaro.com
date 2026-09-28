@@ -1,12 +1,13 @@
 import { cn } from '@/lib/utils'
 
-export type IconChipTone = 'blue' | 'green' | 'orange' | 'red' | 'neutral'
+export type IconChipTone = 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'neutral'
 
 const CHIP_TONE: Record<IconChipTone, string> = {
   blue: 'bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)]',
   green: 'bg-[var(--apple-system-green)]/10 text-[var(--apple-system-green)]',
   orange: 'bg-[var(--apple-system-orange)]/10 text-[var(--apple-system-orange)]',
   red: 'bg-[var(--apple-system-red)]/10 text-[var(--apple-system-red)]',
+  purple: 'bg-[var(--apple-system-purple)]/10 text-[var(--apple-system-purple)]',
   neutral: 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]'
 }
 

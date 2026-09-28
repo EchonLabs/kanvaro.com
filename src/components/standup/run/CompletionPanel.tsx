@@ -7,9 +7,21 @@ import type { CompletionCheckResult } from '@/lib/standup/completion-checks'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
+import {
+  CARD_CLASSES,
+  CARD_TITLE_CLASSES,
+  IssueCount,
+  SCROLL_CLASSES,
+  SCROLL_MAX_NESTED,
+  TEXT_BODY,
+  TEXT_META
+} from './ui'
+
 /**
- * Panel 7 — the completion checks (§15.8.9), redesigned to live in the run
- * screen's sticky right rail rather than the bottom of a long scroll.
+ * Panel 7 — the completion checks (§15.8.9). Sits in the run screen's closing
+ * row beside Panel 6, per the "Daily Standup Page Redesign" blueprint: the
+ * checklist and the Complete button come last on the page because they come
+ * last in the meeting.
  *
  * Evaluates all eleven checks, but only ever *shows* the ones a PM has
  * something to do about (`fail`/`warn`) by default — the passed and
@@ -43,10 +55,10 @@ export interface CompletionPanelProps {
 }
 
 const ICON_TONE: Record<CompletionCheckResult['status'], string> = {
-  pass: 'text-[var(--apple-system-green)]',
-  fail: 'text-[var(--apple-system-red)]',
-  warn: 'text-[var(--apple-system-orange)]',
-  not_evaluated: 'text-[var(--apple-tertiary-label)]'
+  pass: 'text-[var(--sur-green)]',
+  fail: 'text-[var(--sur-red)]',
+  warn: 'text-[var(--sur-amber)]',
+  not_evaluated: 'text-[var(--sur-disabled)]'
 }
 
 const ICON_FOR: Record<CompletionCheckResult['status'], typeof CheckCircle2> = {
@@ -94,48 +106,47 @@ function CheckRow({
   return (
     <li
       data-testid="check-row"
-      className="apple-transition flex items-start gap-2.5 rounded-[var(--apple-radius-sm)] px-1.5 py-2"
+      className="apple-transition flex items-start gap-2"
     >
       <span
         key={`${check.checkId}-${check.status}`}
-        className={cn('mt-0.5 shrink-0 check-pop', ICON_TONE[check.status])}
+        className={cn('mt-[2px] shrink-0 check-pop', ICON_TONE[check.status])}
       >
-        <Icon className="h-[17px] w-[17px]" strokeWidth={2} aria-hidden="true" />
+        <Icon className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
       </span>
 
-      <div className="min-w-0 flex-1">
-        <p className="text-[12.5px] leading-snug text-[var(--apple-label)]">
+      {/* The blueprint's row: the message, then its actions inline after it
+          ("Liam J. is overallocated by 2h  Fix"). A long message wraps and
+          the actions follow it rather than squeezing it. */}
+      <p className={cn(TEXT_BODY, 'min-w-0 flex-1 leading-snug text-[var(--sur-secondary)]')}>
+        <span className="mr-2">
           {check.status === 'not_evaluated'
             ? standupStrings.run.checkNotEvaluated({ phase: check.ownedBy ?? '' })
             : check.message}
-        </p>
+        </span>
 
-        {needsAttention && (
-          <div className="mt-1 flex flex-wrap items-center gap-3">
-            {/* RUN-19's jump link. Only where there is something to jump to. */}
-            {check.entities.length > 0 && (
-              <a
-                href={`#${anchorFor(check.checkId)}`}
-                className="text-[11px] font-medium text-[var(--apple-system-blue)] hover:underline"
-              >
-                {standupStrings.run.jumpToFailure()}
-              </a>
-            )}
-
-            {/* Task 22 — AC-10's whole point: a PM must be able to knowingly
-                accept this exception instead of only being blocked by it. */}
-            {check.status === 'fail' && check.overridable && onOverride && (
-              <button
-                type="button"
-                onClick={() => onOverride(check)}
-                className="text-[11px] font-medium text-[var(--apple-system-orange)] hover:underline"
-              >
-                {standupStrings.run.override()}
-              </button>
-            )}
-          </div>
+        {/* RUN-19's jump link. Only where there is something to jump to. */}
+        {needsAttention && check.entities.length > 0 && (
+          <a
+            href={`#${anchorFor(check.checkId)}`}
+            className="mr-2 font-semibold text-[var(--sur-blue)] underline underline-offset-2"
+          >
+            {standupStrings.run.jumpToFailure()}
+          </a>
         )}
-      </div>
+
+        {/* Task 22 — AC-10's whole point: a PM must be able to knowingly
+            accept this exception instead of only being blocked by it. */}
+        {needsAttention && check.status === 'fail' && check.overridable && onOverride && (
+          <button
+            type="button"
+            onClick={() => onOverride(check)}
+            className="font-semibold text-[var(--sur-amber)] underline underline-offset-2"
+          >
+            {standupStrings.run.override()}
+          </button>
+        )}
+      </p>
     </li>
   )
 }
@@ -157,25 +168,29 @@ export function CompletionPanel({
   )
   const settled = checks.filter((check) => check.status === 'pass' || check.status === 'not_evaluated')
   const passedCount = checks.filter((check) => check.status === 'pass').length
+  const failedCount = checks.filter((check) => check.status === 'fail').length
 
   return (
     <section
       id="panel-7"
       aria-labelledby="panel-7-heading"
-      className={cn(
-        'scroll-mt-20 flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none',
-        className
-      )}
+      className={cn('scroll-mt-20 flex flex-col gap-4', CARD_CLASSES, className)}
     >
-      <div className="flex items-center justify-between">
-        <h3
-          id="panel-7-heading"
-          className="apple-section-label text-[var(--apple-tertiary-label)]"
-        >
-          {standupStrings.run.completionTitle()}
-        </h3>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <h3 id="panel-7-heading" className={CARD_TITLE_CLASSES}>
+            {standupStrings.run.completionTitle()}
+          </h3>
+          {/* Only the failing checks count as issues. A `warn` is advisory —
+              it never blocks completion — so folding warnings in here would
+              put a red number beside a checklist the PM can sign off as is. */}
+          <IssueCount
+            count={failedCount}
+            label={standupStrings.run.failingCheckCount({ count: failedCount })}
+          />
+        </div>
         {checks.length > 0 && (
-          <span className="font-apple-mono text-[11px] tabular-nums text-[var(--apple-tertiary-label)]">
+          <span className={cn(TEXT_META, 'tabular-nums text-[var(--sur-muted)]')}>
             {passedCount}/{checks.length}
           </span>
         )}
@@ -184,21 +199,24 @@ export function CompletionPanel({
       {checksUnavailable ? (
         <p
           role="alert"
-          className="rounded-[var(--apple-radius-md)] border border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/[0.06] px-3 py-2.5 text-[13px] text-[var(--apple-label)]"
+          className="rounded-[var(--sur-radius-inset)] border border-[var(--sur-amber)] bg-[var(--sur-amber-tint)] px-4 py-3 text-[13px] text-[var(--sur-text)]"
         >
           {standupStrings.run.checksUnavailable()}
         </p>
       ) : needsAttention.length === 0 && settled.length === 0 ? null : (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-2">
           {needsAttention.length > 0 ? (
-            <ul className="flex flex-col gap-0.5">
+            /* Eleven checks can all need attention at once on a bad day, and
+               this panel closes the page — the Complete button below it must
+               stay reachable without scrolling past the reasons it is off. */
+            <ul className={cn('flex flex-col gap-2', SCROLL_CLASSES, SCROLL_MAX_NESTED)}>
               {needsAttention.map((check) => (
                 <CheckRow key={check.checkId} check={check} onOverride={onOverride} />
               ))}
             </ul>
           ) : (
-            <p className="flex items-center gap-1.5 px-1.5 py-1 text-[12.5px] text-[var(--apple-system-green)]">
-              <CheckCircle2 className="h-[15px] w-[15px]" strokeWidth={2} aria-hidden="true" />
+            <p className={cn(TEXT_BODY, 'flex items-center gap-2 text-[var(--sur-secondary)]')}>
+              <CheckCircle2 className="h-3.5 w-3.5 text-[var(--sur-green)]" strokeWidth={2.25} aria-hidden="true" />
               {standupStrings.run.everythingChecksOut()}
             </p>
           )}
@@ -209,7 +227,10 @@ export function CompletionPanel({
                 type="button"
                 onClick={() => setShowAll((current) => !current)}
                 aria-expanded={showAll}
-                className="apple-transition flex items-center gap-1 self-start px-1.5 py-1 text-[11.5px] font-medium text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
+                className={cn(
+                  TEXT_META,
+                  'apple-transition flex items-center gap-1 self-start font-semibold text-[var(--sur-muted)] hover:text-[var(--sur-text)]'
+                )}
               >
                 <ChevronDown
                   className={cn('h-3 w-3 apple-transition', showAll && 'rotate-180')}
@@ -221,7 +242,7 @@ export function CompletionPanel({
               </button>
 
               {showAll && (
-                <ul className="flex flex-col gap-0.5">
+                <ul className={cn('flex flex-col gap-2', SCROLL_CLASSES, SCROLL_MAX_NESTED)}>
                   {settled.map((check) => (
                     <CheckRow key={check.checkId} check={check} onOverride={onOverride} />
                   ))}
@@ -232,13 +253,16 @@ export function CompletionPanel({
         </div>
       )}
 
-      <div className="flex flex-col gap-1.5 border-t border-[var(--apple-separator)] pt-3">
+      <div className="flex flex-col gap-2">
+        {/* The blueprint's sign-off button: full width, and when it cannot be
+            pressed it goes flat grey rather than a faded blue, so it reads as
+            "not yet" instead of "almost". */}
         <button
           type="button"
           onClick={onComplete}
           disabled={disabled || blocking.length > 0}
           aria-describedby="complete-reason"
-          className="apple-transition w-full rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] px-3.5 h-9 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40"
+          className="apple-transition w-full rounded-[var(--sur-radius-control)] bg-[var(--sur-blue-solid)] p-3 text-[15px] font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[var(--sur-neutral-tint)] disabled:text-[var(--sur-disabled)] disabled:hover:opacity-100"
         >
           {standupStrings.run.complete()}
         </button>
@@ -246,7 +270,7 @@ export function CompletionPanel({
         {/* Always rendered, so the button's accessible description is stable
             whether or not anything blocks — a description that appears and
             disappears is announced as a new element each time. */}
-        <span id="complete-reason" className="text-[11px] text-[var(--apple-secondary-label)]">
+        <span id="complete-reason" className={cn(TEXT_META, 'text-[var(--sur-muted)]')}>
           {checksUnavailable
             ? standupStrings.run.checksUnavailable()
             : firstBlocker

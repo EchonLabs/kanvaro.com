@@ -18,6 +18,7 @@ import {
 } from '../shared/TaskAssignmentSplitScreen'
 
 import type { BoardMemberView } from './CapacityBoard'
+import { CARD_TITLE_CLASSES } from './ui'
 
 /**
  * Panel 5's assignment surface (§15.8.7) — ALO-13 … ALO-17.
@@ -164,7 +165,7 @@ export function UnassignedPool({
         {/* D-K — the pool paginates rather than loading an unbounded sprint.
             Distinct from the split screen's own "showing N of M", which
             counts what the filters left of the tab currently open. */}
-        <div className="flex items-center gap-2 text-[12px] text-[var(--apple-secondary-label)]">
+        <div className="flex items-center gap-2 text-[11px] text-[var(--sur-muted)]">
           <span>{standupStrings.pool.showingCount({ shown, total: totalCount })}</span>
           {onShowMore && shown < totalCount && (
             <button
@@ -182,6 +183,13 @@ export function UnassignedPool({
       </div>
 
       <TaskAssignmentSplitScreen
+        // `minmax(0,1fr)`: the single-column track below `lg` otherwise sizes
+        // to the filter row's content and clips the cards on a phone.
+        className="grid-cols-[minmax(0,1fr)] gap-5"
+        repositoryTitle={standupStrings.run.allocationBacklogTitle()}
+        teamTitle={standupStrings.run.allocationBoardTitle()}
+        headingClassName={CARD_TITLE_CLASSES}
+        panelClassName="p-5"
         sprintLabel={sprintLabel}
         tasks={tasks}
         members={memberViews}
@@ -236,10 +244,10 @@ function PoolTab({
       onClick={() => onSelect(id)}
       onKeyDown={onKeyDown}
       className={cn(
-        'apple-transition rounded-[var(--apple-radius-sm)] px-2.5 py-1 text-[12.5px] font-medium',
+        'apple-transition rounded-[var(--sur-radius-control)] px-2.5 py-1 text-[11px] font-semibold',
         selected
-          ? 'bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)]'
-          : 'text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)]'
+          ? 'bg-[var(--sur-blue-tint)] text-[var(--sur-blue)]'
+          : 'text-[var(--sur-muted)] hover:bg-[var(--sur-surface)] hover:text-[var(--sur-text)]'
       )}
     >
       {label}

@@ -1,7 +1,8 @@
 import { IconChip, type IconChipTone } from './IconChip'
 import { cn } from '@/lib/utils'
 
-export interface StatCardProps {
+export interface StatCardProps
+  extends Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'className'> {
   href: string
   icon: React.ReactNode
   tone: IconChipTone
@@ -11,12 +12,25 @@ export interface StatCardProps {
 }
 
 /**
- * A single tile in the summary hero's stat grid — icon circle, a large
- * figure, and its label underneath. Still a real link to the section it
- * summarizes (see the page's own `StatTile` docblock for why an anchor
- * beats a scroll handler here).
+ * A single tile in a stand-up stat grid — icon circle, a large figure, and
+ * its label underneath. Still a real link to the section it summarizes (see
+ * the page's own `StatTile` docblock for why an anchor beats a scroll handler
+ * here).
+ *
+ * Extra anchor props pass through to the `<a>`, so a caller can tag or label
+ * a tile without this component growing a prop per consumer. The figure
+ * carries its own `stat-card-value` hook, because "the number in this tile"
+ * is a fact about the component rather than about any one grid.
  */
-export function StatCard({ href, icon, tone, value, label, className }: StatCardProps) {
+export function StatCard({
+  href,
+  icon,
+  tone,
+  value,
+  label,
+  className,
+  ...rest
+}: StatCardProps) {
   return (
     <a
       href={href}
@@ -24,10 +38,14 @@ export function StatCard({ href, icon, tone, value, label, className }: StatCard
         'apple-transition flex items-center gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4 hover:bg-[var(--apple-tertiary-fill)]',
         className
       )}
+      {...rest}
     >
       <IconChip icon={icon} tone={tone} size="md" className="h-10 w-10 [&>svg]:h-5 [&>svg]:w-5" />
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="font-apple-mono text-[22px] font-bold leading-none tabular-nums text-[var(--apple-label)]">
+        <span
+          data-testid="stat-card-value"
+          className="font-apple-mono text-[22px] font-bold leading-none tabular-nums text-[var(--apple-label)]"
+        >
           {value}
         </span>
         <span className="truncate text-[13px] text-[var(--apple-secondary-label)]">{label}</span>

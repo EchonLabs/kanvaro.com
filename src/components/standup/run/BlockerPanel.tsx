@@ -1,11 +1,26 @@
 'use client'
 
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Plus } from 'lucide-react'
 
 import { standupStrings } from '@/lib/standup/strings'
 import { freedCapacityMessage } from '@/lib/standup/blocker'
 import type { Minutes } from '@/lib/standup/minutes'
 import { cn } from '@/lib/utils'
+
+import {
+  Badge,
+  CARD_CLASSES,
+  CARD_TITLE_CLASSES,
+  EMPTY_CLASSES,
+  IssueCount,
+  LINK_BUTTON_CLASSES,
+  RowHead,
+  SCROLL_CLASSES,
+  SCROLL_MAX,
+  TEXT_META,
+  TINT_BUTTON_CLASSES,
+  type Tone
+} from './ui'
 
 /**
  * Panel 6 — blockers (§13, RUN-14..18).
@@ -42,83 +57,125 @@ export interface BlockerPanelProps {
   today: string
   onRaise: () => void
   onResolve: (blockerId: string) => void
+  className?: string
 }
 
-export function BlockerPanel({ blockers, onRaise, onResolve }: BlockerPanelProps) {
+const SEVERITY_TONE: Record<BlockerRow['severity'], Tone> = {
+  critical: 'red',
+  high: 'red',
+  medium: 'amber',
+  low: 'neutral'
+}
+
+export function BlockerPanel({ blockers, onRaise, onResolve, className }: BlockerPanelProps) {
   const sorted = [...blockers].sort((a, b) => (b.overdue ? 1 : 0) - (a.overdue ? 1 : 0))
+
+  // Every row this panel renders is an unresolved blocker, so the row count
+  // *is* the issue count. `sorted.length` rather than a filter, so the badge
+  // can never disagree with the list beneath it.
+  const issues = sorted.length
 
   return (
     <section
       id="panel-6"
       aria-labelledby="panel-6-heading"
-      className="scroll-mt-6 flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4"
+      className={cn('scroll-mt-6 flex flex-col gap-4', CARD_CLASSES, className)}
     >
-      <div className="flex items-center justify-between">
-        <h3 id="panel-6-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
-          {standupStrings.run.panel6()}
-        </h3>
-        <button
-          type="button"
-          onClick={onRaise}
-          className="apple-transition rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1 text-[12px] font-medium hover:bg-[var(--apple-quaternary-fill)]"
-        >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <h3 id="panel-6-heading" className={CARD_TITLE_CLASSES}>
+            {standupStrings.run.panel6()}
+          </h3>
+          <IssueCount count={issues} label={standupStrings.blocker.openCount({ count: issues })} />
+        </div>
+        <button type="button" onClick={onRaise} className={cn(TINT_BUTTON_CLASSES, 'gap-1')}>
+          <Plus className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
           {standupStrings.blocker.raise()}
         </button>
       </div>
 
       {sorted.length === 0 && (
-        <p className="rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] px-3 py-3 text-center text-[13px] text-[var(--apple-tertiary-label)]">
-          {standupStrings.blocker.empty()}
-        </p>
+        <p className={EMPTY_CLASSES}>{standupStrings.blocker.empty()}</p>
       )}
 
-      <ul className="flex flex-col gap-2">
-        {sorted.map((row) => (
-          <li
-            key={row.blockerId}
-            data-testid="blocker-row"
-            className={cn(
-              'flex flex-col gap-1.5 rounded-[var(--apple-radius-md)] border p-3 text-[13px]',
-              row.overdue
-                ? 'border-[var(--apple-system-red)]/40 bg-[var(--apple-system-red)]/[0.05]'
-                : 'border-[var(--apple-separator)] bg-background'
-            )}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              {row.overdue && (
-                <AlertTriangle
-                  className="h-3.5 w-3.5 shrink-0 text-[var(--apple-system-red)]"
-                  strokeWidth={2}
-                />
+      {/* The register has no natural ceiling — a bad sprint puts a dozen rows
+          here — and this panel shares a row with the completion checklist, so
+          an unbounded list drags the Complete button off screen. */}
+      <ul
+        className={cn(
+          'flex flex-col divide-y divide-[var(--sur-border)]',
+          sorted.length > 0 && `${SCROLL_CLASSES} ${SCROLL_MAX}`
+        )}
+      >
+        {sorted.map((row) => {
+          const meta = [
+            standupStrings.blocker.blockedTask({
+              task: row.taskKey ?? standupStrings.blocker.general()
+            }),
+            row.owner ? standupStrings.blocker.owner({ name: row.owner }) : null,
+            row.targetResolutionDate
+              ? standupStrings.blocker.target({ date: row.targetResolutionDate })
+              : null
+          ]
+            .filter(Boolean)
+            .join(' · ')
+
+          return (
+            <li
+              key={row.blockerId}
+              data-testid="blocker-row"
+              data-overdue={row.overdue || undefined}
+              className={cn(
+                'flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0',
+                // RUN-18: overdue is the one row that must not blend in.
+                row.overdue &&
+                  'rounded-[var(--sur-radius-inset)] border-y-0 bg-[var(--sur-red-tint)] px-3 first:pt-3 last:pb-3 text-[var(--sur-red)]'
               )}
-              <span className={cn('font-medium', row.overdue ? 'text-[var(--apple-system-red)]' : 'text-[var(--apple-label)]')}>
-                {row.taskKey ?? standupStrings.blocker.general()}
-              </span>
-              <span className={cn('min-w-0 flex-1', row.overdue ? 'text-[var(--apple-system-red)]' : 'text-[var(--apple-label)]')}>
-                {row.description}
-              </span>
-              <span className="shrink-0 rounded-full bg-[var(--apple-tertiary-fill)] px-2 py-0.5 text-[10.5px] font-medium uppercase tracking-wide text-[var(--apple-secondary-label)]">
-                {row.severity}
-              </span>
-            </div>
+            >
+              <RowHead
+                title={
+                  <span className="inline-flex items-start gap-1.5">
+                    {row.overdue && (
+                      <AlertTriangle
+                        className="mt-[2px] h-3.5 w-3.5 shrink-0 text-[var(--sur-red)]"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span className={cn(row.overdue && 'text-[var(--sur-red)]')}>
+                      {row.description}
+                    </span>
+                  </span>
+                }
+                meta={meta}
+                badge={
+                  <>
+                    {row.overdue && <Badge tone="red">{standupStrings.blocker.overdue()}</Badge>}
+                    <Badge tone={SEVERITY_TONE[row.severity]}>
+                      {standupStrings.blocker.severity({ severity: row.severity })}
+                    </Badge>
+                  </>
+                }
+              />
 
-            {row.freedMinutes !== undefined && (
-              <span className="text-[11.5px] text-[var(--apple-secondary-label)]">
-                {freedCapacityMessage(row.freedMinutes, row.blockerLabel)}
-              </span>
-            )}
+              {row.freedMinutes !== undefined && (
+                <span className={cn(TEXT_META, 'text-[var(--sur-secondary)]')}>
+                  {freedCapacityMessage(row.freedMinutes, row.blockerLabel)}
+                </span>
+              )}
 
-            {row.status !== 'resolved' && row.status !== 'wont_resolve' && (
-              <button
-                type="button"
-                onClick={() => onResolve(row.blockerId)}
-                className="apple-transition self-start rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1 text-[12px] font-medium hover:bg-[var(--apple-quaternary-fill)]"
-              >
-                {standupStrings.blocker.resolve()}
-              </button>
-            )}
-          </li>
-        ))}
+              {row.status !== 'resolved' && row.status !== 'wont_resolve' && (
+                <button
+                  type="button"
+                  onClick={() => onResolve(row.blockerId)}
+                  className={cn(LINK_BUTTON_CLASSES, 'self-start')}
+                >
+                  {standupStrings.blocker.resolve()}
+                </button>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

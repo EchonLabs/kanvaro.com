@@ -1359,3 +1359,76 @@ describe('Panel 5 — the pool assignment (Task 8 fix)', () => {
     await waitFor(() => expect(picker()).not.toBeDisabled())
   })
 })
+
+/**
+ * Panels 2 and 3 used to share one card, stacked with a rule between them, in
+ * the left half of a two-column grid. Yesterday's four buckets and the
+ * variance log are separate readings of the same day, and stacking them meant
+ * the second one started below the fold of the first — so on a real sprint the
+ * PM scrolled the page to reach a panel that was already scrolling itself.
+ *
+ * They are now two sibling cards across the full width, each scrolling inside
+ * its own column. The assertion is structural rather than visual: the two
+ * sections share a parent, which is only true once the wrapper card is gone.
+ */
+describe('Panels 2 and 3 — the review row (side by side)', () => {
+  const reviewData = (): Partial<RunScreenData> => ({
+    yesterday: {
+      buckets: [
+        { bucket: 'completed', rows: [] },
+        { bucket: 'in_progress', rows: [] },
+        { bucket: 'not_started', rows: [] },
+        { bucket: 'blocked', rows: [] }
+      ],
+      addedAfterCompletion: []
+    },
+    variance: { rows: [], members: [] }
+  })
+
+  it('renders Yesterday and Variance as siblings, not one inside a shared card', () => {
+    renderScreen(reviewData())
+
+    const yesterday = document.getElementById('panel-2')
+    const variance = document.getElementById('panel-3')
+
+    expect(yesterday).not.toBeNull()
+    expect(variance).not.toBeNull()
+    expect(yesterday!.parentElement).toBe(variance!.parentElement)
+    expect(yesterday!.contains(variance!)).toBe(false)
+    // They were already siblings when they shared a wrapper card, stacked in
+    // one column — so the parent has to be the two-column grid itself for this
+    // to mean "side by side" rather than "one above the other".
+    expect(yesterday!.parentElement!.className).toContain('grid-cols-2')
+  })
+
+  it('gives each panel its own card shell rather than a sub-heading inside one', () => {
+    renderScreen(reviewData())
+
+    // `CARD_CLASSES` carries the surface token; an embedded panel has no
+    // background of its own. This is the one thing that tells a reader the
+    // two panels are peers.
+    expect(document.getElementById('panel-2')!.className).toContain('--sur-surface')
+    expect(document.getElementById('panel-3')!.className).toContain('--sur-surface')
+  })
+
+  it('no longer renders the rule that separated the stacked panels', () => {
+    const { container } = render(
+      <ToastProvider>
+        <StandupRunScreen data={data(reviewData())} api={okApi()} />
+      </ToastProvider>
+    )
+
+    expect(container.querySelector('#panel-2 ~ hr, hr + #panel-3')).toBeNull()
+  })
+
+  it('still names the section above the two cards', () => {
+    renderScreen(reviewData())
+
+    const heading = screen.getByRole('heading', { name: standupStrings.run.reviewTitle() })
+    const yesterday = document.getElementById('panel-2')!
+
+    expect(
+      heading.compareDocumentPosition(yesterday) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+})

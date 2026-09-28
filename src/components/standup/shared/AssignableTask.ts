@@ -129,6 +129,7 @@ export function fromBoardMemberView(m: BoardMemberView): AssignableMemberView {
   return {
     id: m.memberId,
     name: m.name,
+    ...(m.avatarUrl ? { avatarUrl: m.avatarUrl } : {}),
     assignedMinutes: m.capacity.allocatedMinutes,
     capacityMinutes: m.capacity.effectiveMinutes,
     capacityBreakdown: m.capacity,

@@ -116,7 +116,7 @@ describe('YesterdayPanel', () => {
 
     expect(rendered.getByText('KAN-214')).toBeInTheDocument()
     expect(rendered.getByText('Invoice model')).toBeInTheDocument()
-    expect(rendered.getByLabelText('Kasun Perera')).toBeInTheDocument()
+    expect(rendered.getByText('Kasun Perera')).toBeInTheDocument()
     expect(rendered.getByTestId('previous-status')).toHaveTextContent('todo')
     expect(rendered.getByTestId('current-status')).toHaveValue('in_progress')
     expect(rendered.getByTestId('planned')).toHaveTextContent('6.0h')
@@ -272,6 +272,57 @@ describe('YesterdayPanel', () => {
     // Not one of the four buckets — the KAN-214 row from the ordinary
     // buckets stays separate from the KAN-300 added-after row.
     expect(screen.getByTestId('yesterday-row-KAN-214')).toBeInTheDocument()
+  })
+
+  /**
+   * The added-after row drew a bare initials circle — a plain `<span>`, not an
+   * `<Avatar>` — so the one row on this panel that names a person could never
+   * show that person's face, while the member cards above it did. The board
+   * already resolves an `avatarUrl` per member (uploaded photo, else Gravatar),
+   * so the row just had to read it.
+   */
+  it("shows the member's photo on an added-after row when the board sent one", async () => {
+    // Radix mounts `AvatarImage`'s `<img>` only once the browser reports the
+    // image loaded, which jsdom never does on its own — so the load is driven
+    // here rather than asserted around.
+    const NativeImage = window.Image
+    class LoadingImage extends NativeImage {
+      constructor() {
+        super()
+        // Radix subscribes with `addEventListener`, so a real event has to be
+        // dispatched — hence extending the native class rather than replacing
+        // it with a bare stub.
+        setTimeout(() => this.dispatchEvent(new Event('load')), 0)
+      }
+    }
+    ;(window as any).Image = LoadingImage
+
+    try {
+      const added = row({
+        taskKey: 'KAN-300',
+        taskId: 'task-300',
+        memberName: 'Nadia Silva',
+        avatarUrl: 'https://example.test/nadia.png'
+      })
+      render(<YesterdayPanel data={panelData([row()], [added])} api={makeApi()} />)
+
+      await waitFor(() => {
+        expect(
+          within(screen.getByTestId('yesterday-added-row-KAN-300')).getByRole('img')
+        ).toHaveAttribute('src', 'https://example.test/nadia.png')
+      })
+    } finally {
+      ;(window as any).Image = NativeImage
+    }
+  })
+
+  it('falls back to initials on an added-after row with no photo', () => {
+    const added = row({ taskKey: 'KAN-300', taskId: 'task-300', memberName: 'Nadia Silva' })
+    render(<YesterdayPanel data={panelData([row()], [added])} api={makeApi()} />)
+
+    const rowEl = screen.getByTestId('yesterday-added-row-KAN-300')
+    expect(within(rowEl).queryByRole('img')).toBeNull()
+    expect(within(rowEl).getByText('NS')).toBeInTheDocument()
   })
 
   it('omits the "added after completion" section entirely when empty', () => {

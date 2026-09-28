@@ -2,11 +2,30 @@
 
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar'
 
 import { formatMinutesAsHours, hoursToMinutes, minutes as toMinutes, roundToStep, type Minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import type { BucketedRows, YesterdayBucket, YesterdayRow } from '@/lib/standup/yesterday'
 import { cn } from '@/lib/utils'
+
+import {
+  Badge,
+  CARD_CLASSES,
+  CARD_TITLE_CLASSES,
+  initialsOf,
+  INSET_CLASSES,
+  IssueCount,
+  LINK_BUTTON_CLASSES,
+  RowHead,
+  RUN_FIELD_CLASSES,
+  SCROLL_CLASSES,
+  SCROLL_MAX_NESTED,
+  SECONDARY_BUTTON_CLASSES,
+  TEXT_BODY,
+  TEXT_META,
+  type Tone
+} from './ui'
 
 /**
  * Panel 2 — yesterday's review (§15.8.4, RUN-9..RUN-13).
@@ -52,6 +71,7 @@ export interface YesterdayPanelProps {
   statusOptions?: string[]
   disabled?: boolean
   locale?: string
+  className?: string
 }
 
 const HEADINGS: Record<YesterdayBucket, () => string> = {
@@ -66,7 +86,8 @@ export function YesterdayPanel({
   api,
   statusOptions = ['todo', 'in_progress', 'blocked', 'done'],
   disabled = false,
-  locale
+  locale,
+  className
 }: YesterdayPanelProps) {
   // Only `completed` starts collapsed (RUN-9): it is the bucket with nothing
   // left to decide.
@@ -145,27 +166,54 @@ export function YesterdayPanel({
     }
   }
 
+  /**
+   * The red heading count: yesterday's rows the PM still has to answer for —
+   * anything that did not finish, plus anything that landed on somebody's day
+   * after the stand-up closed (I1). The completed bucket is deliberately not in
+   * it: a finished task is the one row here with nothing to decide, which is
+   * also why it starts collapsed.
+   */
+  const issues =
+    data.buckets.reduce(
+      (total, bucket) => (bucket.bucket === 'completed' ? total : total + bucket.rows.length),
+      0
+    ) + data.addedAfterCompletion.length
+
   return (
     <section
       id="panel-2"
       aria-labelledby="panel-2-heading"
-      className="scroll-mt-6 flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4"
+      className={cn('scroll-mt-6 flex flex-col gap-4', CARD_CLASSES, className)}
     >
-      <h3 id="panel-2-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
-        {standupStrings.yesterday.title()}
-      </h3>
+      <div className="flex items-center gap-2">
+        <h3
+          id="panel-2-heading"
+          className={CARD_TITLE_CLASSES}
+        >
+          {standupStrings.yesterday.title()}
+        </h3>
+        {hasYesterday && (
+          <IssueCount
+            count={issues}
+            label={standupStrings.run.yesterdayIssueCount({ count: issues })}
+          />
+        )}
+      </div>
 
       {toast && (
         <p
           role="alert"
-          className="rounded-[var(--apple-radius-md)] border border-[var(--apple-system-red)]/30 bg-[var(--apple-system-red)]/[0.06] px-3 py-2 text-[13px] text-[var(--apple-system-red)]"
+          className={cn(
+            TEXT_BODY,
+            'rounded-[var(--sur-radius-inset)] border border-[var(--sur-red)] bg-[var(--sur-red-tint)] px-4 py-3 text-[var(--sur-red)]'
+          )}
         >
           {toast}
         </p>
       )}
 
       {!hasYesterday && (
-        <p className="text-[13px] text-[var(--apple-secondary-label)]">
+        <p className={cn(TEXT_BODY, 'text-[var(--sur-secondary)]')}>
           {standupStrings.yesterday.noPreviousStandup()}
         </p>
       )}
@@ -188,10 +236,10 @@ export function YesterdayPanel({
                     [bucket.bucket]: !isCollapsed
                   }))
                 }
-                className="apple-transition flex items-center gap-1.5 self-start text-left text-[13px] font-semibold text-[var(--apple-label)]"
+                className="apple-transition flex items-center gap-1.5 self-start text-left text-[13px] font-semibold text-[var(--sur-text)]"
               >
                 <ChevronDown
-                  className={cn('h-3.5 w-3.5 shrink-0 apple-transition', isCollapsed && '-rotate-90')}
+                  className={cn('h-3.5 w-3.5 shrink-0 text-[var(--sur-muted)] apple-transition', isCollapsed && '-rotate-90')}
                   strokeWidth={2}
                   aria-hidden="true"
                 />
@@ -199,9 +247,18 @@ export function YesterdayPanel({
               </button>
 
               {!isCollapsed && (
-                <ul id={bodyId} className="flex flex-col gap-2.5">
+                <ul
+                  id={bodyId}
+                  className={cn(
+                    'flex flex-col gap-3',
+                    // Roughly three rows before it scrolls. The four buckets
+                    // stack inside one card, so an unbounded in-progress
+                    // bucket on a large team buries the three below it.
+                    bucket.rows.length > 0 && `${SCROLL_CLASSES} ${SCROLL_MAX_NESTED} p-0.5`
+                  )}
+                >
                   {bucket.rows.length === 0 && (
-                    <li className="rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] px-3 py-2.5 text-[12.5px] text-[var(--apple-tertiary-label)]">
+                    <li className="rounded-[var(--sur-radius-inset)] border border-dashed border-[var(--sur-border)] px-3 py-2.5 text-[13px] text-[var(--sur-muted)]">
                       {standupStrings.yesterday.emptyBucket()}
                     </li>
                   )}
@@ -210,57 +267,69 @@ export function YesterdayPanel({
                     <li
                       key={row.allocationId ?? `${row.memberId}:${row.taskId}`}
                       data-testid={`yesterday-row-${row.taskKey ?? row.taskId}`}
-                      className="flex flex-col gap-3 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background p-3"
+                      className={cn(INSET_CLASSES, 'flex flex-col gap-3 p-3')}
                     >
-                      {/* Identity line */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-apple-mono text-[12px] text-[var(--apple-tertiary-label)]">
-                          {row.taskKey ?? row.taskId}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--apple-label)]">
-                          {row.title}
-                        </span>
-                        <span
-                          aria-label={row.memberName}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--apple-tertiary-fill)] text-[10px] font-semibold text-[var(--apple-secondary-label)]"
-                        >
-                          {initialsOf(row.memberName)}
-                        </span>
+                      {/* The blueprint's row head: "ARD-410 Base LLM Wiring",
+                          "Sarah K. · Planned 4h / Logged 4.5h", variance badge. */}
+                      <RowHead
+                        title={
+                          <>
+                            <span>{row.taskKey ?? row.taskId}</span> {row.title}
+                          </>
+                        }
+                        meta={
+                          <>
+                            <span>{row.memberName}</span> · Planned{' '}
+                            <span data-testid="planned" className="tabular-nums">
+                              {formatMinutesAsHours(row.plannedMinutes, { locale })}
+                            </span>{' '}
+                            / Logged{' '}
+                            <span data-testid="logged" className="tabular-nums">
+                              {formatMinutesAsHours(loggedOf(row), { locale })}
+                            </span>
+                          </>
+                        }
+                        badge={
+                          <>
+                            {row.ageInStandups > 1 && (
+                              <Badge tone="neutral" data-testid="age-badge">
+                                {standupStrings.yesterday.ageBadge({ standups: row.ageInStandups })}
+                              </Badge>
+                            )}
 
-                        {row.ageInStandups > 1 && (
-                          <span
-                            data-testid="age-badge"
-                            className="rounded-full bg-[var(--apple-tertiary-fill)] px-2 py-0.5 text-[11px] text-[var(--apple-secondary-label)]"
-                          >
-                            {standupStrings.yesterday.ageBadge({ standups: row.ageInStandups })}
-                          </span>
-                        )}
+                            {row.unplanned && (
+                              <Badge tone="amber" title={standupStrings.yesterday.unplannedHint()}>
+                                {standupStrings.yesterday.unplannedBadge()}
+                              </Badge>
+                            )}
 
-                        {row.unplanned && (
-                          <span
-                            title={standupStrings.yesterday.unplannedHint()}
-                            className="rounded-full bg-[var(--apple-system-orange)]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--apple-system-orange)]"
-                          >
-                            {standupStrings.yesterday.unplannedBadge()}
-                          </span>
-                        )}
-                      </div>
+                            <Badge tone={varianceTone(row.dayVarianceMinutes)}>
+                              <span data-testid="day-variance" className="tabular-nums">
+                                {formatMinutesAsHours(row.dayVarianceMinutes, { locale, signed: true })}
+                              </span>
+                              &nbsp;{standupStrings.yesterday.varianceBadge()}
+                            </Badge>
+                          </>
+                        }
+                      />
 
-                      {/* Stat grid — every RUN-12 field, full width at every breakpoint. */}
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                      {/* The rest of RUN-12's fields — status then and now, and
+                          what is left. Planned, logged and variance live in the
+                          row head above. */}
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <div
                           data-testid="previous-status"
-                          className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1.5"
+                          className="flex flex-col gap-0.5 rounded-[var(--sur-radius-control)] bg-[var(--sur-surface)] px-2 py-1.5"
                         >
-                          <span className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--sur-muted)]">
                             {standupStrings.yesterday.previousStatus()}
                           </span>
-                          <span className="text-[12.5px] text-[var(--apple-label)]">{row.previousStatus}</span>
+                          <span className="text-[13px] text-[var(--sur-text)]">{row.previousStatus}</span>
                         </div>
 
-                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1">
+                        <div className="flex flex-col gap-0.5 rounded-[var(--sur-radius-control)] bg-[var(--sur-surface)] px-2 py-1">
                           <label
-                            className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]"
+                            className="text-[11px] font-semibold uppercase tracking-wide text-[var(--sur-muted)]"
                             htmlFor={`status-${row.taskId}`}
                           >
                             {standupStrings.yesterday.currentStatus()}
@@ -272,7 +341,7 @@ export function YesterdayPanel({
                             value={statusOf(row)}
                             disabled={disabled}
                             onChange={(event) => changeStatus(row, event.target.value)}
-                            className="h-6 w-full rounded-[var(--apple-radius-sm)] border-0 bg-transparent p-0 text-[12.5px] text-[var(--apple-label)]"
+                            className="h-6 w-full rounded-[var(--sur-radius-control)] border-0 bg-transparent p-0 text-[13px] text-[var(--sur-text)]"
                           >
                             {statusOptions.map((option) => (
                               <option key={option} value={option}>
@@ -282,38 +351,11 @@ export function YesterdayPanel({
                           </select>
                         </div>
 
-                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1.5">
-                          <span className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
-                            Planned
-                          </span>
-                          <span data-testid="planned" className="font-apple-mono text-[12.5px] tabular-nums text-[var(--apple-label)]">
-                            {formatMinutesAsHours(row.plannedMinutes, { locale })}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1.5">
-                          <span className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
-                            Logged
-                          </span>
-                          <span data-testid="logged" className="font-apple-mono text-[12.5px] tabular-nums text-[var(--apple-label)]">
-                            {formatMinutesAsHours(loggedOf(row), { locale })}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1.5">
-                          <span className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
-                            Variance
-                          </span>
-                          <span data-testid="day-variance" className="font-apple-mono text-[12.5px] tabular-nums text-[var(--apple-label)]">
-                            {formatMinutesAsHours(row.dayVarianceMinutes, { locale, signed: true })}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] px-2 py-1.5">
-                          <span className="text-[10px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
+                        <div className="flex flex-col gap-0.5 rounded-[var(--sur-radius-control)] bg-[var(--sur-surface)] px-2 py-1.5">
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--sur-muted)]">
                             Remaining
                           </span>
-                          <span data-testid="remaining" className="font-apple-mono text-[12.5px] tabular-nums text-[var(--apple-label)]">
+                          <span data-testid="remaining" className="text-[13px] tabular-nums text-[var(--sur-text)]">
                             {formatMinutesAsHours(row.remainingEstimateMinutes, { locale })}
                           </span>
                         </div>
@@ -344,7 +386,7 @@ export function YesterdayPanel({
                               commitLoggedHours(row)
                             }
                           }}
-                          className="h-8 w-20 shrink-0 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-right text-[12.5px] tabular-nums disabled:opacity-40"
+                          className={cn(RUN_FIELD_CLASSES, 'w-20 shrink-0 text-right tabular-nums')}
                         />
 
                         <label className="sr-only" htmlFor={`note-${row.taskId}`}>
@@ -372,14 +414,14 @@ export function YesterdayPanel({
                               submitNote(row)
                             }
                           }}
-                          className="h-8 min-w-[10rem] flex-1 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2.5 text-[12.5px] disabled:opacity-40"
+                          className={cn(RUN_FIELD_CLASSES, 'min-w-[10rem] flex-1 px-2.5')}
                         />
                         <button
                           type="button"
                           data-testid="note-save"
                           disabled={disabled || !((noteDraft[row.taskId] ?? '').trim())}
                           onClick={() => submitNote(row)}
-                          className="apple-transition shrink-0 text-[12px] font-medium text-[var(--apple-system-blue)] hover:underline disabled:opacity-40"
+                          className={cn(LINK_BUTTON_CLASSES, 'shrink-0')}
                         >
                           {noteStatus[row.taskId] === 'saved'
                             ? standupStrings.yesterday.noteSaved()
@@ -391,7 +433,7 @@ export function YesterdayPanel({
                             type="button"
                             onClick={() => api.reviseEstimate(row)}
                             disabled={disabled}
-                            className="apple-transition text-[12px] font-medium text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:underline"
+                            className="apple-transition text-[13px] font-semibold text-[var(--sur-secondary)] hover:text-[var(--sur-text)] hover:underline"
                           >
                             {standupStrings.variance.reviseTitle()}
                           </button>
@@ -399,7 +441,7 @@ export function YesterdayPanel({
                           <button
                             type="button"
                             onClick={() => api.openTask(row.taskId)}
-                            className="apple-transition text-[12px] font-medium text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:underline"
+                            className="apple-transition text-[13px] font-semibold text-[var(--sur-secondary)] hover:text-[var(--sur-text)] hover:underline"
                           >
                             {`Open ${row.taskKey ?? row.taskId}`}
                           </button>
@@ -418,7 +460,7 @@ export function YesterdayPanel({
                   onClick={() =>
                     api.confirmCompleted({ taskIds: bucket.rows.map((row) => row.taskId) })
                   }
-                  className="apple-transition self-start rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2.5 py-1 text-[12px] font-medium hover:bg-[var(--apple-quaternary-fill)]"
+                  className={cn(SECONDARY_BUTTON_CLASSES, 'h-8 self-start px-3 text-[13px]')}
                 >
                   {standupStrings.yesterday.markAllConfirmed()}
                 </button>
@@ -434,36 +476,43 @@ export function YesterdayPanel({
           is not an "always all four" section). */}
       {hasYesterday && data.addedAfterCompletion.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h4 className="text-[13px] font-semibold text-[var(--apple-label)]">
+          <h4 className="text-[13px] font-semibold text-[var(--sur-text)]">
             {standupStrings.yesterday.bucketCount({
               label: standupStrings.yesterday.addedAfterCompletion(),
               count: data.addedAfterCompletion.length
             })}
           </h4>
-          <ul className="flex flex-col gap-2.5">
+          <ul className={cn('flex flex-col gap-2.5', SCROLL_CLASSES, SCROLL_MAX_NESTED, 'p-0.5')}>
             {data.addedAfterCompletion.map((row) => (
               <li
                 key={row.allocationId ?? `${row.memberId}:${row.taskId}`}
                 data-testid={`yesterday-added-row-${row.taskKey ?? row.taskId}`}
-                className="flex flex-wrap items-center gap-3 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background p-3 text-[12.5px]"
+                className={cn(INSET_CLASSES, 'flex flex-wrap items-center gap-3 p-3 text-[13px]')}
               >
-                <span className="font-apple-mono text-[12px] text-[var(--apple-tertiary-label)]">
+                <span className={cn(TEXT_META, 'font-semibold text-[var(--sur-muted)]')}>
                   {row.taskKey ?? row.taskId}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[var(--apple-label)]">{row.title}</span>
-                <span
-                  aria-label={row.memberName}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--apple-tertiary-fill)] text-[10px] font-semibold text-[var(--apple-secondary-label)]"
-                >
-                  {initialsOf(row.memberName)}
-                </span>
-                <span data-testid="added-current-status" className="shrink-0 text-[var(--apple-secondary-label)]">
+                <span className="min-w-0 flex-1 truncate font-semibold text-[var(--sur-text)]">{row.title}</span>
+                {/* A real `Avatar`, not a styled `<span>`: this is the only row
+                    on the panel that names a person, and it used to be the one
+                    place their photo could never appear. `AvatarImage` is only
+                    mounted when the board sent a URL, so Radix does not have to
+                    fail a load to reach the fallback. */}
+                <Avatar aria-label={row.memberName} className="h-6 w-6">
+                  {row.avatarUrl && (
+                    <AvatarImage src={row.avatarUrl} alt="" className="object-cover" />
+                  )}
+                  <AvatarFallback className="bg-[var(--sur-neutral-tint)] text-[11px] font-semibold text-[var(--sur-secondary)]">
+                    {initialsOf(row.memberName)}
+                  </AvatarFallback>
+                </Avatar>
+                <span data-testid="added-current-status" className="shrink-0 text-[var(--sur-secondary)]">
                   {standupStrings.yesterday.currentStatus()} {row.currentStatus}
                 </span>
-                <span data-testid="planned" className="font-apple-mono shrink-0 tabular-nums text-[var(--apple-label)]">
+                <span data-testid="planned" className="shrink-0 tabular-nums text-[var(--sur-text)]">
                   {formatMinutesAsHours(row.plannedMinutes, { locale })}
                 </span>
-                <span data-testid="logged" className="font-apple-mono shrink-0 tabular-nums text-[var(--apple-label)]">
+                <span data-testid="logged" className="shrink-0 tabular-nums text-[var(--sur-text)]">
                   {formatMinutesAsHours(row.loggedMinutes, { locale })}
                 </span>
               </li>
@@ -479,13 +528,11 @@ function hoursText(value: Minutes): string {
   return String(Number((value / 60).toFixed(2)))
 }
 
-function initialsOf(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
+/** Over is amber (the blueprint's "+0.5h variance"), under blue, on-plan green. */
+function varianceTone(minutesOver: number): Tone {
+  if (minutesOver > 0) return 'amber'
+  if (minutesOver < 0) return 'blue'
+  return 'green'
 }
 
 export type { YesterdayRow, Minutes }

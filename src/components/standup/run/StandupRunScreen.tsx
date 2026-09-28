@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, RefreshCw, Users, Video, Zap } from 'lucide-react'
+import { RefreshCw, Video } from 'lucide-react'
 
 import type { QuickAddTask } from '@/components/standup/primitives/QuickAddCombobox'
 import { AttendancePanel, type ReassignPromptView } from './AttendancePanel'
@@ -24,6 +24,17 @@ import { ModalOverlay } from '@/components/standup/primitives/ModalOverlay'
 import { UnassignedPool } from './UnassignedPool'
 import { SprintCloseReadinessPanel } from './SprintCloseReadinessPanel'
 import { useStandupShortcuts } from './useStandupShortcuts'
+import {
+  Badge,
+  Banner,
+  INSET_CLASSES,
+  PRIMARY_BUTTON_CLASSES,
+  SECONDARY_BUTTON_CLASSES,
+  SECTION_SUBTITLE_CLASSES,
+  SECTION_TITLE_CLASSES,
+  type Tone
+} from './ui'
+import { cn } from '@/lib/utils'
 import {
   evaluateFinalDayCarryForwardDisposition,
   type OpenTaskReadiness
@@ -209,6 +220,8 @@ function deriveOverrideContext(
 export interface RunScreenMember {
   memberId: string
   name: string
+  /** Profile photo; the avatar falls back to initials without one. */
+  avatarUrl?: string
   attendance?: AttendanceStatus
   partialMinutes?: Minutes
   capacity: CapacityBreakdown
@@ -426,21 +439,20 @@ export interface RunScreenApi {
   resolveBlocker?(input: ResolveBlockerSubmitInput): Promise<void>
 }
 
-/** Mirrors `StandupSchedule.tsx`'s `STATUS_TONE`/pill convention so a
- * stand-up's status reads the same color on the schedule hub and here. */
-const STATUS_PILL: Record<string, string> = {
-  Scheduled: 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]',
-  Ready: 'bg-blue-50 dark:bg-blue-950/30 text-[var(--apple-system-blue)]',
-  In_Progress: 'bg-blue-50 dark:bg-blue-950/30 text-[var(--apple-system-blue)]',
-  Completed: 'bg-emerald-50 dark:bg-emerald-950/30 text-[var(--apple-system-green)]',
-  Reopened: 'bg-orange-50 dark:bg-orange-950/30 text-[var(--apple-system-orange)]',
+/** Mirrors `StandupSchedule.tsx`'s `STATUS_TONE` convention so a stand-up's
+ * status reads the same color on the schedule hub and here. */
+const STATUS_TONE: Record<string, Tone> = {
+  Scheduled: 'neutral',
+  Ready: 'blue',
+  In_Progress: 'blue',
+  Completed: 'green',
+  Reopened: 'amber',
   // Three of the model's eight legal statuses previously fell back to the
-  // generic tertiary-fill styling below, which reads identically to
-  // `Scheduled` — a PM who lands here on a `Missed` day had no visual signal
-  // anything was wrong.
-  Missed: 'bg-red-50 dark:bg-red-950/30 text-[var(--apple-system-red)]',
-  Skipped_Holiday: 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]',
-  Cancelled: 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]'
+  // generic neutral styling, which reads identically to `Scheduled` — a PM
+  // who lands here on a `Missed` day had no visual signal anything was wrong.
+  Missed: 'red',
+  Skipped_Holiday: 'neutral',
+  Cancelled: 'neutral'
 }
 
 export interface RunScreenViewer {
@@ -977,10 +989,10 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     elapsedRatio >= 1.3 ? 'timer-red' : elapsedRatio >= 1 ? 'timer-amber' : 'timer-neutral'
   const timerToneClass =
     timerTone === 'timer-red'
-      ? 'border-red-500 text-red-600'
+      ? 'border-[var(--sur-red)] text-[var(--sur-red)]'
       : timerTone === 'timer-amber'
-        ? 'border-amber-500 text-amber-600'
-        : 'border-border text-muted-foreground'
+        ? 'border-[var(--sur-amber)] text-[var(--sur-amber)]'
+        : 'border-[var(--sur-border)] text-[var(--sur-muted)]'
 
   const [completing, setCompleting] = useState(false)
 
@@ -1190,17 +1202,54 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
   )
 
   /**
+   * The summary bar's "Plan Status: 74% Allocated" — the team's allocated
+   * hours against its effective capacity, both straight off each member's
+   * server-computed `CapacityBreakdown`. Nothing is re-derived: a percentage
+   * that disagreed with the capacity board beneath it would be worse than
+   * none. Null when nobody has capacity today (a team-wide holiday, say),
+   * rather than a divide-by-zero "Infinity%".
+   */
+  const planPercent = useMemo(() => {
+    const totals = board.members.reduce(
+      (sum, member) => ({
+        allocated: sum.allocated + member.capacity.allocatedMinutes,
+        effective: sum.effective + member.capacity.effectiveMinutes
+      }),
+      { allocated: 0, effective: 0 }
+    )
+    return totals.effective > 0 ? Math.round((totals.allocated / totals.effective) * 100) : null
+  }, [board.members])
+
+  const planTone =
+    planPercent === null
+      ? 'text-[var(--sur-muted)]'
+      : planPercent > 100
+        ? 'text-[var(--sur-red)]'
+        : planPercent >= 90
+          ? 'text-[var(--sur-green)]'
+          : 'text-[var(--sur-amber)]'
+
+  const attendanceTone =
+    presentCount === board.members.length ? 'text-[var(--sur-green)]' : 'text-[var(--sur-amber)]'
+
+  /**
    * §15.8.10: on day one the pool takes the primary position and the board
    * is secondary but always visible.
    */
   const panelFive = (
-    <section id="panel-5" aria-labelledby="panel-5-heading" className="scroll-mt-6 flex flex-col gap-3">
-      <h3 id="panel-5-heading" className="apple-section-label text-[var(--apple-tertiary-label)]">
-        {standupStrings.run.panel5()}
-      </h3>
+    <section id="panel-5" aria-labelledby="panel-5-heading" className="scroll-mt-6 flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 id="panel-5-heading" className={SECTION_TITLE_CLASSES}>
+            {standupStrings.run.panel5()}
+          </h3>
+          {board.sprintName && <Badge tone="blue">{board.sprintName}</Badge>}
+        </div>
+        <p className={SECTION_SUBTITLE_CLASSES}>{standupStrings.run.allocationSubtitle()}</p>
+      </div>
 
       {isDayOne && board.dayOne && (
-        <div className="flex flex-col gap-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-3 text-[13px]">
+        <div className={cn(INSET_CLASSES, 'flex flex-col gap-1 px-4 py-3 text-[13px] text-[var(--sur-text)]')}>
           <p data-testid="day-one-progress">
             {standupStrings.run.dayOneProgress({
               assigned: board.dayOne.assignedTasks,
@@ -1213,7 +1262,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           </p>
           {/* ALO-21 — soft. It never blocks completion. */}
           {board.dayOne.stillUnassigned ? (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+            <p className="text-[11px] font-semibold text-[var(--sur-amber)]">
               {standupStrings.run.dayOneUnassignedWarning({
                 count: board.dayOne.stillUnassigned
               })}
@@ -1242,156 +1291,190 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     </section>
   )
 
+  const showYesterday = !isDayOne && Boolean(board.yesterday)
+  const showVariance = !isDayOne && Boolean(board.variance)
+  const showCarryForward = !isDayOne && Boolean(board.carryForward)
+
+  /*
+   * The layout is the "Daily Standup Page Redesign" blueprint, top to bottom:
+   * summary bar, system banners, the attendance row, today's allocation
+   * (the visually central block), yesterday's review beside the carry-forward
+   * register, and blockers beside the completion checklist. The two-up rows
+   * collapse to one column below `xl` — each of those panels carries editable
+   * rows that need more than half a laptop screen.
+   *
+   * The completion checklist used to be a sticky right rail. It now closes
+   * the page beside the blockers, as the blueprint has it: its "Fix" links
+   * still jump to whichever panel failed, and Ctrl/Cmd+Enter still completes
+   * from anywhere, so nothing it offered depends on it being always in view.
+   */
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-    <div className="flex min-w-0 flex-col gap-6">
-      <header className="flex flex-col gap-3 border-b border-[var(--apple-separator)] pb-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Zap className="h-7 w-7 shrink-0 text-[var(--apple-system-blue)]" strokeWidth={1.5} />
-            <div>
-              <h2 className="text-[20px] sm:text-[22px] font-bold tracking-tight text-[var(--apple-label)]">
+    <div className="standup-run flex min-w-0 flex-col gap-6">
+      <header className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--sur-radius-card)] border border-[var(--sur-border)] bg-[var(--sur-surface)] px-5 py-4 sm:px-8">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <p className="text-[11px] text-[var(--sur-muted)]">
+              {standupStrings.run.summaryEyebrow()}
+            </p>
+            <h2 className="text-[17px] font-semibold text-[var(--sur-text)]">
+              {board.scheduledStartAt && board.viewerTimeZone && board.projectTimeZone
+                ? formatDualTimezone({
+                    instant: new Date(board.scheduledStartAt),
+                    viewerTimeZone: board.viewerTimeZone,
+                    projectTimeZone: board.projectTimeZone
+                  })
+                : board.date}
+            </h2>
+          </div>
+
+          <span aria-hidden="true" className="hidden h-8 w-px bg-[var(--sur-border)] sm:block" />
+
+          <dl className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
+            <div className="flex items-center gap-2">
+              <dt className="sr-only">Status</dt>
+              <dd>
+                <Badge tone={STATUS_TONE[board.status] ?? 'neutral'}>
+                  {standupStrings.schedule.status[board.status] ?? board.status}
+                </Badge>
+              </dd>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <dt className="sr-only">Sprint day</dt>
+              <dd className="font-semibold text-[var(--sur-secondary)]">
                 {standupStrings.run.dayOf({
                   day: board.sprintDayNumber,
                   total: board.totalSprintDays
                 })}
-              </h2>
-              <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
-                {board.scheduledStartAt && board.viewerTimeZone && board.projectTimeZone
-                  ? formatDualTimezone({
-                      instant: new Date(board.scheduledStartAt),
-                      viewerTimeZone: board.viewerTimeZone,
-                      projectTimeZone: board.projectTimeZone
-                    })
-                  : board.date}
-              </p>
+              </dd>
             </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {(board.status === 'Ready' || board.status === 'Scheduled') && api.start && (
-              <button
-                type="button"
-                onClick={() => void onStart()}
-                disabled={starting}
-                className="apple-transition rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] px-3.5 h-9 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40"
-              >
-                {standupStrings.run.start()}
-              </button>
+            <div className="flex items-center gap-2">
+              <dt className="text-[var(--sur-secondary)]">{standupStrings.run.summaryAttendance()}</dt>
+              <dd className={cn('font-semibold', attendanceTone)}>
+                {standupStrings.run.summaryAttendanceValue({
+                  present: presentCount,
+                  total: board.members.length
+                })}
+              </dd>
+            </div>
+
+            {planPercent !== null && (
+              <div className="flex items-center gap-2">
+                <dt className="text-[var(--sur-secondary)]">{standupStrings.run.summaryPlan()}</dt>
+                <dd data-testid="plan-status" className={cn('font-semibold tabular-nums', planTone)}>
+                  {standupStrings.run.summaryPlanValue({ percent: planPercent })}
+                </dd>
+              </div>
             )}
-            {/* E49. Before this, a `Missed` day was a dead end — no Start (it
-                only ever renders for Ready/Scheduled above), no Backfill
-                anywhere in the UI, despite the endpoint and saga behind it
-                being fully built. */}
-            {board.status === 'Missed' && api.backfill && (
-              <button
-                type="button"
-                onClick={() => setBackfilling(true)}
-                className="apple-transition rounded-[var(--apple-radius-md)] bg-[var(--apple-system-red)] px-3.5 h-9 text-[13px] font-semibold text-white hover:opacity-90"
-              >
-                {standupStrings.run.backfill()}
-              </button>
+
+            <div className="flex items-center gap-2">
+              <dt className="sr-only">Facilitator</dt>
+              <dd className="text-[var(--sur-secondary)]">
+                {standupStrings.run.facilitator({ name: board.facilitatorName })}
+              </dd>
+            </div>
+
+            {timerActive && (
+              <div className="flex items-center">
+                <dt className="sr-only">Elapsed</dt>
+                <dd>
+                  <span
+                    data-testid="standup-timer"
+                    data-tone={timerTone}
+                    aria-label={standupStrings.run.elapsedTime({
+                      elapsed: elapsedLabel,
+                      duration: durationMinutes
+                    })}
+                    className={cn(
+                      'inline-flex rounded-[var(--sur-radius-control)] border px-2 py-[3px] text-[11px] font-semibold tabular-nums',
+                      timerToneClass
+                    )}
+                  >
+                    {standupStrings.run.elapsedTime({ elapsed: elapsedLabel, duration: durationMinutes })}
+                  </span>
+                </dd>
+              </div>
             )}
-            {board.status === 'Completed' && summaryHref && (
-              <a
-                href={summaryHref}
-                className="apple-transition inline-flex items-center rounded-[var(--apple-radius-md)] bg-[var(--apple-system-blue)] px-3.5 h-9 text-[13px] font-semibold text-white hover:opacity-90"
-              >
-                {standupStrings.run.viewSummary()}
-              </a>
-            )}
-            {board.meetingUrl && (
-              <a
-                href={board.meetingUrl}
-                className="apple-transition inline-flex items-center gap-1.5 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] px-3 h-9 text-[13px] font-medium text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]"
-              >
-                <Video className="h-3.5 w-3.5" strokeWidth={1.75} />
-                {standupStrings.run.joinCall()}
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={() => void reload()}
-              className="apple-transition inline-flex items-center gap-1.5 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] px-3 h-9 text-[13px] font-medium text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)]"
-            >
-              <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {standupStrings.run.refresh()}
-            </button>
-          </div>
+          </dl>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-[13px] text-[var(--apple-secondary-label)]">
-          <span
-            className={`apple-section-label rounded-full px-2.5 py-1 ${STATUS_PILL[board.status] ?? 'bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)]'}`}
-          >
-            {standupStrings.schedule.status[board.status] ?? board.status}
-          </span>
-
-          {timerActive && (
-            <span
-              data-testid="standup-timer"
-              data-tone={timerTone}
-              aria-label={standupStrings.run.elapsedTime({
-                elapsed: elapsedLabel,
-                duration: durationMinutes
-              })}
-              className={`font-apple-mono rounded-full border px-2.5 py-1 text-xs tabular-nums ${timerToneClass}`}
-            >
-              {standupStrings.run.elapsedTime({ elapsed: elapsedLabel, duration: durationMinutes })}
-            </span>
+        <div className="flex flex-wrap items-center gap-3">
+          {board.meetingUrl && (
+            <a href={board.meetingUrl} className={SECONDARY_BUTTON_CLASSES}>
+              <Video className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+              {standupStrings.run.joinCall()}
+            </a>
           )}
-
-          <span>{standupStrings.run.facilitator({ name: board.facilitatorName })}</span>
-
-          <span className="inline-flex items-center gap-1">
-            <Users className="h-3.5 w-3.5" strokeWidth={1.75} />
-            {standupStrings.run.presentOf({
-              present: presentCount,
-              total: board.members.length
-            })}
-          </span>
+          <button type="button" onClick={() => void reload()} className={SECONDARY_BUTTON_CLASSES}>
+            <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+            {standupStrings.run.refresh()}
+          </button>
+          {(board.status === 'Ready' || board.status === 'Scheduled') && api.start && (
+            <button
+              type="button"
+              onClick={() => void onStart()}
+              disabled={starting}
+              className={PRIMARY_BUTTON_CLASSES}
+            >
+              {standupStrings.run.start()}
+            </button>
+          )}
+          {/* E49. Before this, a `Missed` day was a dead end — no Start (it
+              only ever renders for Ready/Scheduled above), no Backfill
+              anywhere in the UI, despite the endpoint and saga behind it
+              being fully built. */}
+          {board.status === 'Missed' && api.backfill && (
+            <button
+              type="button"
+              onClick={() => setBackfilling(true)}
+              className={cn(PRIMARY_BUTTON_CLASSES, 'bg-[var(--sur-red-solid)]')}
+            >
+              {standupStrings.run.backfill()}
+            </button>
+          )}
+          {board.status === 'Completed' && summaryHref && (
+            <a href={summaryHref} className={PRIMARY_BUTTON_CLASSES}>
+              {standupStrings.run.viewSummary()}
+            </a>
+          )}
         </div>
       </header>
 
       {/* RUN-25's rollback notice, and the RUN-23 reload. `status` rather than
           `alert`: it reports what already happened, it does not interrupt. */}
       {notice && (
-        <p
-          role="status"
-          data-testid="run-notice"
-          className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] px-3 py-2 text-[13px] text-[var(--apple-label)]"
-        >
+        <Banner tone="blue" lead={standupStrings.run.noticeLead()} data-testid="run-notice">
           {notice}
-        </p>
+        </Banner>
       )}
 
       {readOnly && (
-        <p className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] px-3 py-2 text-[13px] text-[var(--apple-secondary-label)]">
+        <Banner tone="amber" lead={standupStrings.run.lockedLead()}>
           {standupStrings.run.lockedForMembers()}
-        </p>
+        </Banner>
       )}
 
       {/* R2's blocking banner: a previous /complete call died mid-saga.
           Non-dismissible — resuming (a plain re-POST) is the only way past
           it, so there is nothing for a dismiss action to safely do. */}
       {board.completionState && (
-        <div
+        <Banner
+          tone="red"
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-red)]/30 bg-[var(--apple-system-red)]/[0.06] px-3 py-2"
+          action={
+            <button
+              type="button"
+              onClick={() => void onComplete()}
+              disabled={completing}
+              className={cn(PRIMARY_BUTTON_CLASSES, 'h-8 bg-[var(--sur-red-solid)] px-3 text-[13px]')}
+            >
+              {standupStrings.run.completionInterruptedResume()}
+            </button>
+          }
         >
-          <span className="flex items-center gap-2 text-[13px] text-[var(--apple-system-red)]">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            {standupStrings.run.completionInterruptedBanner()}
-          </span>
-          <button
-            type="button"
-            onClick={() => void onComplete()}
-            disabled={completing}
-            className="apple-transition rounded-[var(--apple-radius-md)] bg-[var(--apple-system-red)] px-3 h-8 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40"
-          >
-            {standupStrings.run.completionInterruptedResume()}
-          </button>
-        </div>
+          {standupStrings.run.completionInterruptedBanner()}
+        </Banner>
       )}
 
       {isDayOne && panelFive}
@@ -1406,29 +1489,64 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         locale={locale}
       />
 
-      {/* Panels 2 and 3 explain yesterday, so day one — which has no
-          yesterday — shows neither (§15.8.10). */}
-      {!isDayOne && board.yesterday && (
-        <YesterdayPanel
-          data={board.yesterday}
-          api={yesterdayApi}
-          disabled={readOnly}
-          locale={locale}
-        />
+      {!isDayOne && panelFive}
+
+      {/* Panels 2, 3 and 4 explain yesterday, so day one — which has no
+          yesterday — shows none of them (§15.8.10). */}
+      {/* Panels 2 and 3 are two readings of the same day — what moved, and what
+          it cost against the estimate — so they sit side by side across the full
+          width rather than stacked inside one card. Stacked, the variance log
+          began below the fold of a panel that was already scrolling itself, and
+          reaching it meant scrolling the page past a scroll box. Each is now a
+          card of its own, scrolling in its own column.
+
+          `items-start` rather than the default `stretch`: the two panels have no
+          reason to be the same height, and stretching the shorter one leaves a
+          card with a long empty tail. */}
+      {(showYesterday || showVariance) && (
+        <section aria-labelledby="review-heading" className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <h3 id="review-heading" className={SECTION_TITLE_CLASSES}>
+              {standupStrings.run.reviewTitle()}
+            </h3>
+            <p className={SECTION_SUBTITLE_CLASSES}>{standupStrings.run.reviewSubtitle()}</p>
+          </div>
+
+          {/* One column below `xl`, and also whenever only one of the two
+              panels loaded — a soft-failed variance fetch should leave
+              yesterday at full width, not beside an empty half. */}
+          <div
+            className={cn(
+              'grid items-start gap-5',
+              showYesterday && showVariance && 'xl:grid-cols-2'
+            )}
+          >
+            {board.yesterday && showYesterday && (
+              <YesterdayPanel
+                className="min-w-0"
+                data={board.yesterday}
+                api={yesterdayApi}
+                disabled={readOnly}
+                locale={locale}
+              />
+            )}
+
+            {board.variance && showVariance && (
+              <VariancePanel
+                className="min-w-0"
+                data={board.variance}
+                onRevise={(row) => api.reviseEstimate?.(row)}
+                onGiveReason={(row) => api.giveNotStartedReason?.(row)}
+                onViewLedger={(memberId) => api.viewDebtLedger?.(memberId)}
+                disabled={readOnly}
+                locale={locale}
+              />
+            )}
+          </div>
+        </section>
       )}
 
-      {!isDayOne && board.variance && (
-        <VariancePanel
-          data={board.variance}
-          onRevise={(row) => api.reviseEstimate?.(row)}
-          onGiveReason={(row) => api.giveNotStartedReason?.(row)}
-          onViewLedger={(memberId) => api.viewDebtLedger?.(memberId)}
-          disabled={readOnly}
-          locale={locale}
-        />
-      )}
-
-      {!isDayOne && board.carryForward && (
+      {board.carryForward && showCarryForward && (
         <CarryForwardPanel
           data={board.carryForward}
           api={{
@@ -1446,8 +1564,6 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           disabled={readOnly}
         />
       )}
-
-      {!isDayOne && panelFive}
 
       {board.shape === 'final_day' && board.sprintClose && (
         <SprintCloseReadinessPanel
@@ -1468,12 +1584,25 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         />
       )}
 
-      <BlockerPanel
-        blockers={openBlockers}
-        today={board.date}
-        onRaise={() => setRaisingBlocker(true)}
-        onResolve={(blockerId) => setResolvingBlockerId(blockerId)}
-      />
+      <div className="grid items-start gap-5 xl:grid-cols-2">
+        <BlockerPanel
+          className="min-w-0"
+          blockers={openBlockers}
+          today={board.date}
+          onRaise={() => setRaisingBlocker(true)}
+          onResolve={(blockerId) => setResolvingBlockerId(blockerId)}
+        />
+
+        <CompletionPanel
+          className="min-w-0"
+          checks={checks}
+          blocking={blocking}
+          disabled={completionPanelDisabled}
+          checksUnavailable={checksUnavailable}
+          onComplete={() => void onComplete()}
+          onOverride={onOverride}
+        />
+      </div>
 
       {raisingBlocker && (
         <ModalOverlay open onClose={() => setRaisingBlocker(false)} labelledBy="raise-blocker-title">
@@ -1494,39 +1623,6 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           />
         </ModalOverlay>
       )}
-    </div>
-
-    {/*
-     * The completion checklist's sticky right rail. Replaces the old top
-     * "jump to section" bar entirely — its own "Fix" links (shown only on a
-     * failing check) are now the only navigation aid on this screen, so a
-     * link only ever appears when something is actually wrong, and only for
-     * a section that is actually mounted (no more clicking a stale anchor
-     * into the browser's "no such id, scroll to top" fallback). Falls back
-     * to normal document flow below `lg` — a fixed sidebar has nowhere to go
-     * on a phone-width screen.
-     *
-     * `top-0`, not `top-6`: `<main>` in `MainLayout` already gives the whole
-     * page `lg:p-6` of breathing room, so a sticky offset on top of that
-     * doubled the gap once the panel was actually stuck, making it look like
-     * it was hanging low with dead space above it. No `max-h`/`overflow-y-auto`
-     * either — clamping this panel's height meant "Show passed checks" opened
-     * a cramped inner scrollbar that could clip the Complete button out of
-     * view. Letting the panel grow with its own content means expanding it
-     * scrolls the page itself, and the Complete button — always the last
-     * thing in the panel — surfaces the same way everything else on the page
-     * does, not behind a second, easy-to-miss scroll gesture.
-     */}
-    <aside className="lg:sticky lg:top-0 lg:self-start">
-      <CompletionPanel
-        checks={checks}
-        blocking={blocking}
-        disabled={completionPanelDisabled}
-        checksUnavailable={checksUnavailable}
-        onComplete={() => void onComplete()}
-        onOverride={onOverride}
-      />
-    </aside>
 
       {/* Task 22. `overrideContext` is null whenever `overridingCheck` is —
           and also, for CC-3/CC-10, when no entity carried a resolvable

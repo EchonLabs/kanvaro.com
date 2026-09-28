@@ -67,7 +67,7 @@ export const POOL_DROPPABLE_ID = 'assignment-pool'
  * is the only surface that has these controls.
  */
 export const FIELD_CLASSES =
-  'h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-[12.5px] text-[var(--apple-label)]'
+  'h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-[13px] text-[var(--apple-label)]'
 
 const PRIORITIES = ['critical', 'high', 'medium', 'low'] as const
 
@@ -207,7 +207,18 @@ export interface TaskAssignmentSplitScreenProps {
   emptyPoolMessage?: string
   locale?: string
   className?: string
+  /**
+   * The two panels' headings and chrome. Planning keeps the defaults; the run
+   * screen swaps in its blueprint's "Unassigned Backlog" / "Active
+   * Assignments & Capacity" titles and card padding.
+   */
+  repositoryTitle?: string
+  teamTitle?: string
+  headingClassName?: string
+  panelClassName?: string
 }
+
+const DEFAULT_HEADING_CLASSES = 'apple-section-label text-[var(--apple-tertiary-label)]'
 
 export function TaskAssignmentSplitScreen({
   sprintLabel,
@@ -221,7 +232,11 @@ export function TaskAssignmentSplitScreen({
   renderMemberTaskRow,
   emptyPoolMessage,
   locale,
-  className
+  className,
+  repositoryTitle = 'Task repository',
+  teamTitle = 'Team assignment',
+  headingClassName = DEFAULT_HEADING_CLASSES,
+  panelClassName = 'p-3.5'
 }: TaskAssignmentSplitScreenProps) {
   const sensors = useSensors(
     // Same activation distance as every other board in the module: without
@@ -339,6 +354,9 @@ export function TaskAssignmentSplitScreen({
           assignOptions={assignOptions}
           emptyPoolMessage={emptyPoolMessage}
           locale={locale}
+          title={repositoryTitle}
+          headingClassName={headingClassName}
+          panelClassName={panelClassName}
           onSearch={setSearch}
           onPriority={setPriority}
           onSkill={setSkill}
@@ -355,12 +373,13 @@ export function TaskAssignmentSplitScreen({
 
         <section
           aria-label="Team assignment"
-          className="flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-3.5"
+          className={cn(
+            'flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
+            panelClassName
+          )}
         >
           <div className="flex items-baseline justify-between gap-2">
-            <h3 className="apple-section-label text-[var(--apple-tertiary-label)]">
-              Team assignment
-            </h3>
+            <h3 className={headingClassName}>{teamTitle}</h3>
             <span className="font-apple-mono text-[11px] tabular-nums text-[var(--apple-tertiary-label)]">
               {members.length}
             </span>
@@ -431,6 +450,9 @@ function TaskRepository({
   assignOptions,
   emptyPoolMessage,
   locale,
+  title,
+  headingClassName,
+  panelClassName,
   onSearch,
   onPriority,
   onSkill,
@@ -455,6 +477,9 @@ function TaskRepository({
   assignOptions: AssignOption[]
   emptyPoolMessage?: string
   locale?: string
+  title: string
+  headingClassName: string
+  panelClassName: string
   onSearch: (value: string) => void
   onPriority: (value: string) => void
   onSkill: (value: string) => void
@@ -471,18 +496,17 @@ function TaskRepository({
       ref={setNodeRef}
       aria-label="Task repository"
       className={cn(
-        'apple-transition flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border bg-card p-3.5',
+        'apple-transition flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border bg-card',
+        panelClassName,
         isOver
           ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/5'
           : 'border-[var(--apple-separator)]'
       )}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="apple-section-label text-[var(--apple-tertiary-label)]">
-          Task repository
-        </h3>
+        <h3 className={headingClassName}>{title}</h3>
         {sprintLabel && (
-          <span className="truncate text-[11.5px] text-[var(--apple-secondary-label)]">
+          <span className="truncate text-[11px] text-[var(--apple-secondary-label)]">
             {sprintLabel}
           </span>
         )}
@@ -591,7 +615,7 @@ function TaskRepository({
         </ul>
       )}
 
-      <p className="text-[11.5px] text-[var(--apple-secondary-label)]">
+      <p className="text-[11px] text-[var(--apple-secondary-label)]">
         Showing {tasks.length} of {totalCount}
       </p>
     </section>
@@ -618,7 +642,7 @@ function EmptyRepository({
         <button
           type="button"
           onClick={onClearFilters}
-          className="apple-transition rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-1 text-[12px] hover:bg-[var(--apple-quaternary-fill)]"
+          className="apple-transition rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-1 text-[13px] hover:bg-[var(--apple-quaternary-fill)]"
         >
           Clear filters
         </button>

@@ -612,6 +612,7 @@ function toRunScreenData(
     members: (board.members ?? []).map((member: any) => ({
       memberId: member.memberId,
       name: member.name ?? member.memberId,
+      avatarUrl: member.avatarUrl,
       attendance: member.attendance,
       partialMinutes:
         member.partialMinutes === undefined ? undefined : minutes(member.partialMinutes),

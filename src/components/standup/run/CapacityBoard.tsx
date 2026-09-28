@@ -74,6 +74,12 @@ export interface BoardAllocationView {
 export interface BoardMemberView {
   memberId: string
   name: string
+  /**
+   * Carried, not rendered here: `fromBoardMemberView` passes it to
+   * `ExpandableMemberCard`, which draws the photo. The board's own rows show
+   * the member's name and capacity bar, never a second avatar.
+   */
+  avatarUrl?: string
   capacity: CapacityBreakdown
   allocations: BoardAllocationView[]
 }
@@ -133,7 +139,7 @@ export function MemberRunAlerts({
       {capacity.strandedMinutes > 0 && (
         <div
           role="alert"
-          className="flex flex-col gap-2 rounded-[var(--apple-radius-md)] border border-[var(--apple-system-red)]/30 bg-[var(--apple-system-red)]/[0.06] p-2.5 text-[12.5px]"
+          className="flex flex-col gap-2 rounded-[var(--apple-radius-md)] border border-[var(--apple-system-red)]/30 bg-[var(--apple-system-red)]/[0.06] p-2.5 text-[13px]"
         >
           <p className="flex items-start gap-1.5 text-[var(--apple-system-red)]">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} />
@@ -179,7 +185,7 @@ export function MemberAllocationRow({
   return (
     <div className="flex items-start justify-between gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 py-1.5">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[12.5px] text-[var(--apple-label)]">
+        <p className="truncate text-[13px] text-[var(--apple-label)]">
           {allocation.taskKey ? (
             <span className="font-apple-mono text-[11px] text-[var(--apple-tertiary-label)]">
               {allocation.taskKey}{' '}
@@ -352,7 +358,7 @@ function CapacityBreakdownList({
       {/* OB-10. Without this, a full day on a day holding a two-hour review
           reads as a defect rather than as the project's setting. */}
       {!ceremoniesConsumeCapacity && (
-        <p className="rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] p-2 text-[11.5px] text-[var(--apple-secondary-label)]">
+        <p className="rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] p-2 text-[11px] text-[var(--apple-secondary-label)]">
           {standupStrings.capacity.ceremoniesNotDeducted()}
         </p>
       )}

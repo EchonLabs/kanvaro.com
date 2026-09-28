@@ -113,7 +113,7 @@ export function OverrideModal({ type, affected, onCancel, onSubmit }: OverrideMo
       </div>
 
       {!validation.valid && justification.length > 0 && (
-        <p role="alert" className="text-[12px] text-[var(--apple-system-red)]">
+        <p role="alert" className="text-[11px] text-[var(--apple-system-red)]">
           {standupStrings.override.validationError({
             code: validation.code,
             minLength: JUSTIFICATION_MIN_LENGTH
@@ -131,7 +131,7 @@ export function OverrideModal({ type, affected, onCancel, onSubmit }: OverrideMo
         </label>
       )}
 
-      <p className="text-[12px] text-[var(--apple-tertiary-label)]">{standupStrings.override.attributionNotice()}</p>
+      <p className="text-[11px] text-[var(--apple-tertiary-label)]">{standupStrings.override.attributionNotice()}</p>
 
       <div className="flex justify-end gap-2 pt-1">
         <Button type="button" variant="outline" onClick={onCancel}>
