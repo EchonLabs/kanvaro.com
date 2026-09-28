@@ -8,6 +8,7 @@ export async function processTaskDeadlines(baseUrl?: string) {
 
   const now = new Date()
   const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
   const results = {
     dueSoon24h: 0,
@@ -89,9 +90,9 @@ export async function processTaskDeadlines(baseUrl?: string) {
     }
   }
 
-  // Process overdue tasks
+  // Process overdue tasks (within the last 7 days to avoid processing very old tasks)
   const overdueTasks = await Task.find({
-    dueDate: { $lt: now },
+    dueDate: { $gte: sevenDaysAgo, $lt: now },
     status: { $nin: ['done', 'cancelled'] },
     archived: { $ne: true },
     'remindersSent.overdue': { $ne: true }
