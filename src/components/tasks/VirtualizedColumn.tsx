@@ -32,8 +32,6 @@ interface Column {
   color: string
 }
 
-const CARD_VERTICAL_GAP = 28
-
 interface VirtualizedColumnProps {
   column: Column
   tasks: PopulatedTask[]
@@ -81,9 +79,9 @@ export default function VirtualizedColumn({
   const rowVirtualizer = useVirtualizer({
     count: tasks.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 220,
-    overscan: 6,
-    measureElement: (element) => element?.getBoundingClientRect().height || 0,
+    estimateSize: () => 180,
+    overscan: 5,
+    gap: 12,
   })
 
   const setDroppableRef = (node: HTMLDivElement | null) => {
@@ -144,7 +142,7 @@ export default function VirtualizedColumn({
               style={{ background: getColumnAccentColor(column.key) }} />
             <div
               ref={scrollRef}
-              className="h-full overflow-auto overflow-x-hidden px-4 py-4 pt-5 space-y-3"
+              className="h-full overflow-auto overflow-x-hidden px-4 py-4 pt-5"
             >
               {tasks.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
@@ -156,25 +154,26 @@ export default function VirtualizedColumn({
                 </div>
               ) : (
                 <div
-                  className="relative"
+                  className="relative w-full"
                   style={{
                     height: `${rowVirtualizer.getTotalSize()}px`,
                   }}
                 >
                   {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const task = tasks[virtualRow.index]
+                    if (!task) return null
                     return (
                       <div
-                        key={virtualRow.key}
+                        key={task._id?.toString() || virtualRow.key}
+                        ref={rowVirtualizer.measureElement}
+                        data-index={virtualRow.index}
                         style={{
                           position: 'absolute',
                           top: 0,
                           left: 0,
                           width: '100%',
-                          height: `${virtualRow.size}px`,
                           transform: `translateY(${virtualRow.start}px)`,
                           padding: '0 0.35rem',
-                          marginBottom: `${CARD_VERTICAL_GAP}px`,
                         }}
                       >
                         <SortableTask
