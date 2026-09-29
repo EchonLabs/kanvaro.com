@@ -282,9 +282,10 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
   const handleCategoriesUpdated = useCallback((updatedCategories: TaskCategory[]) => {
     setCategories(updatedCategories)
-    setFormData(prev => updatedCategories.some(category => category.key === prev.category)
-      ? prev
-      : { ...prev, category: '' })
+    setFormData(prev => {
+      const match = updatedCategories.find(c => c.key === prev.category || c.key.toLowerCase() === prev.category.toLowerCase() || c.title.toLowerCase() === prev.category.toLowerCase())
+      return { ...prev, category: match ? match.key : '' }
+    })
   }, [])
 
   const fetchCategories = useCallback(async (projectIdParam: string | undefined) => {
@@ -307,9 +308,11 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
       const sortedCategories = [...data.data].sort((a: TaskCategory, b: TaskCategory) => a.order - b.order)
       setCategories(sortedCategories)
-      setFormData(prev => sortedCategories.some(category => category.key === prev.category)
-        ? prev
-        : { ...prev, category: '' })
+      setFormData(prev => {
+        const catToFind = prev.category || (typeof task?.category === 'string' ? task.category : (task?.category?.key || task?.category?.title || ''))
+        const matched = sortedCategories.find(c => c.key === catToFind || c.key.toLowerCase() === catToFind.toLowerCase() || c.title.toLowerCase() === catToFind.toLowerCase())
+        return { ...prev, category: matched ? matched.key : '' }
+      })
     } catch (err) {
       console.error('Failed to fetch task categories:', err)
       setCategories([])
