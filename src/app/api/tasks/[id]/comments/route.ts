@@ -71,8 +71,8 @@ export async function POST(
     }
 
     const { user } = authResult
-    const userId = user.id
-    const organizationId = user.organization
+    const userId = user.id.toString()
+    const organizationId = user.organization.toString()
     const taskId = params.id
 
     const payload = await request.json()
@@ -174,22 +174,25 @@ export async function POST(
     )
 
     // Prepare notification recipients: mentioned users + assignees + parent author (if replying)
-    const notifyUserIds = new Set<string>()
-    mentions.forEach(id => notifyUserIds.add(id))
-    // Add all assignees to notifications
+    const mentionedUserIds = new Set<string>()
+    mentions.forEach(id => {
+      if (id !== userId) mentionedUserIds.add(id)
+    })
+
+    const otherNotifyUserIds = new Set<string>()
     if (Array.isArray(task.assignedTo)) {
       task.assignedTo.forEach(assignee => {
-        if (assignee.user && assignee.user.toString() !== userId) {
-          notifyUserIds.add(assignee.user.toString())
+        const aId = assignee.user?.toString()
+        if (aId && aId !== userId && !mentionedUserIds.has(aId)) {
+          otherNotifyUserIds.add(aId)
         }
       })
     }
-    if (parentAuthorId && parentAuthorId !== userId) {
-      notifyUserIds.add(parentAuthorId)
+    if (parentAuthorId && parentAuthorId !== userId && !mentionedUserIds.has(parentAuthorId)) {
+      otherNotifyUserIds.add(parentAuthorId)
     }
-    notifyUserIds.delete(userId) // do not notify self
 
-    if (notifyUserIds.size > 0) {
+    if (mentionedUserIds.size > 0 || otherNotifyUserIds.size > 0) {
       // Build absolute URL for email notifications
       let baseUrl = ''
       if (process.env.NEXT_PUBLIC_APP_URL) {
@@ -211,23 +214,55 @@ export async function POST(
       // Fire-and-forget notification to reduce request latency
       void (async () => {
         try {
-          await notificationService.createBulkNotifications(
-            Array.from(notifyUserIds),
-            organizationId,
-            {
-              type: 'task',
-              title: parentCommentId ? 'New reply on task comment' : 'New task comment',
-              message: `${parentCommentId ? 'New reply' : 'New comment'} on task ${task.displayId || task.title || 'task'}`,
-              data: {
-                entityType: 'task',
-                entityId: taskId,
-                action: 'updated',
-                url
-              },
-              sendEmail: true,
-              sendPush: false
-            }
-          )
+          const promises: Promise<any>[] = []
+
+          // Send mention notification to mentioned users
+          if (mentionedUserIds.size > 0) {
+            promises.push(
+              notificationService.createBulkNotifications(
+                Array.from(mentionedUserIds),
+                organizationId,
+                {
+                  type: 'task',
+                  title: 'Mentioned in a comment',
+                  message: `You were mentioned in a comment on task "${task.title || task.displayId || 'task'}"`,
+                  data: {
+                    entityType: 'task',
+                    entityId: taskId,
+                    action: 'updated',
+                    url
+                  },
+                  sendEmail: true,
+                  sendPush: false
+                }
+              )
+            )
+          }
+
+          // Send comment notification to other assignees / parent author
+          if (otherNotifyUserIds.size > 0) {
+            promises.push(
+              notificationService.createBulkNotifications(
+                Array.from(otherNotifyUserIds),
+                organizationId,
+                {
+                  type: 'task',
+                  title: parentCommentId ? 'New reply on task comment' : 'New task comment',
+                  message: `${parentCommentId ? 'New reply' : 'New comment'} on task "${task.title || task.displayId || 'task'}"`,
+                  data: {
+                    entityType: 'task',
+                    entityId: taskId,
+                    action: 'updated',
+                    url
+                  },
+                  sendEmail: true,
+                  sendPush: false
+                }
+              )
+            )
+          }
+
+          await Promise.allSettled(promises)
         } catch (err) {
           console.error('Notification error (comment post):', err)
         }

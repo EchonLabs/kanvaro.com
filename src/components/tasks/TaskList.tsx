@@ -27,7 +27,8 @@ import {
   Target,
   User,
   Loader2,
-  Plus
+  Plus,
+  Settings2
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -36,6 +37,8 @@ import EditTaskModal from './EditTaskModal'
 import ViewTaskModal from './ViewTaskModal'
 import CreateTaskModal from './CreateTaskModal'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
+import { CategoryBadge } from './TasksShared'
+import TaskCategoryManagerModal from './TaskCategoryManagerModal'
 
 interface Task {
   _id: string
@@ -44,6 +47,8 @@ interface Task {
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled' | 'backlog'
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+  category?: string 
+  project?: { _id: string; name: string } | string
   assignedTo?: Array<{
     user?: {
       _id: string
@@ -99,8 +104,11 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const [showViewModal, setShowViewModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [availableStatuses, setAvailableStatuses] = useState<string[]>(['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled', 'backlog'])
+  const [categoryMap, setCategoryMap] = useState<Record<string, string>>({})
+  const [categoryFilter, setCategoryFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -193,6 +201,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       if (typeFilter !== 'all') params.set('type', typeFilter)
+      if (categoryFilter !== 'all') params.set('category', categoryFilter)
       const url = `/api/tasks?${params.toString()}`
       const response = await fetch(url)
       const data = await response.json()
@@ -213,6 +222,14 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       }
     }
   }
+
+  const categoryOptions = useMemo(
+    () =>
+      Object.entries(categoryMap)
+        .map(([key, title]) => ({ key, title }))
+        .sort((a, b) => a.title.localeCompare(b.title)),
+    [categoryMap]
+  )
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -261,6 +278,33 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     }
   }
 
+  const getCategoryTitle = (categoryKey?: string): string | null => {
+    if (!categoryKey) return null
+    return categoryMap[categoryKey] || categoryKey
+  }
+
+  const loadCategories = useCallback(async () => {
+    if (!projectId || projectId === 'all') {
+      setCategoryMap({})
+      return
+    }
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/task-categories`)
+      const data = await res.json()
+      if (res.ok && data.success && Array.isArray(data.data)) {
+        const map: Record<string, string> = {}
+        data.data.forEach((category: any) => { map[category.key] = category.title })
+        setCategoryMap(map)
+      }
+    } catch {
+      // fallback to raw category key
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    void loadCategories()
+  }, [loadCategories])
+
   // Tasks are already paginated and filtered from the server
   const paginatedTasks = tasks
 
@@ -271,12 +315,12 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   // Refetch when pagination or filters change
   useEffect(() => {
     fetchTasks()
-  }, [currentPage, pageSize, debouncedSearchQuery, statusFilter, priorityFilter, typeFilter])
+  }, [currentPage, pageSize, debouncedSearchQuery, statusFilter, priorityFilter, typeFilter, categoryFilter])
 
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [debouncedSearchQuery, statusFilter, priorityFilter, typeFilter])
+  }, [debouncedSearchQuery, statusFilter, priorityFilter, typeFilter, categoryFilter])
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
     // Check permission for status change
@@ -508,6 +552,37 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
               <SelectItem value="task">Task</SelectItem>
             </SelectContent>
           </Select>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Select
+              value={categoryFilter}
+              onValueChange={setCategoryFilter}
+              disabled={categoryOptions.length === 0}
+            >
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categoryOptions.map((c) => (
+                  <SelectItem key={c.key} value={c.key}>{c.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <PermissionGate permission={Permission.PROJECT_UPDATE} projectId={projectId}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCategoryManagerOpen(true)}
+                disabled={!projectId || projectId === 'all'}
+                className="h-9 px-3 flex-shrink-0"
+                title={projectId === 'all' ? 'Select a project to manage categories' : 'Manage categories'}
+              >
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </PermissionGate>
+          </div>
         </div>
       </div>
 
@@ -545,6 +620,13 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                       <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
                         {formatToTitleCase(task.type)}
                       </Badge>
+                      {task.category && (
+                        <CategoryBadge
+                          category={task.category}
+                          title={getCategoryTitle(task.category)}
+                          className="flex-shrink-0"
+                        />
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
@@ -720,6 +802,15 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         onClose={() => setShowCreateModal(false)}
         projectId={projectId}
         onTaskCreated={handleTaskCreated}
+      />
+
+      <TaskCategoryManagerModal
+        isOpen={isCategoryManagerOpen}
+        onClose={() => setIsCategoryManagerOpen(false)}
+        projectId={projectId === 'all' ? '' : projectId}
+        onCategoriesUpdated={async () => {
+          await loadCategories()
+        }}
       />
 
       {selectedTask && (

@@ -1,3 +1,49 @@
+# [1.45.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.44.0...v1.45.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* add node-cron background schedulers for all tasks ([0367a75](https://github.com/EchonLabs/kanvaro.com/commit/0367a759f04ddb3287b56ee995742607e97bf33d))
+* filter overdue task notifications by 7-day window ([36e377e](https://github.com/EchonLabs/kanvaro.com/commit/36e377eb61a572e2d47463ef10034d9c2af5dd0c))
+* kanban board ui ([c029167](https://github.com/EchonLabs/kanvaro.com/commit/c029167b1447653f3c5c24849141f3030a2a94dd))
+* update task schema for notifications ([500ea26](https://github.com/EchonLabs/kanvaro.com/commit/500ea2616240046b627357aabaf53395391e410f))
+
+
+### Features
+
+* add due-date reminder notifications ([21e16b1](https://github.com/EchonLabs/kanvaro.com/commit/21e16b178581bc0f4084409ed49cbb665fbb2b62))
+
+# [1.44.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.43.0...v1.44.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* assignee notifications and add status transition details ([9d8116e](https://github.com/EchonLabs/kanvaro.com/commit/9d8116e1633e84ad70d4a09c43704cd3fd2ace89))
+* handle unassignment and prevent duplicate task notifications ([96a1add](https://github.com/EchonLabs/kanvaro.com/commit/96a1add500ec9e4dd0c40bab160deafed3818430))
+
+
+### Features
+
+* [@mention](https://github.com/mention) notifications from general assignee alerts ([a0c9f40](https://github.com/EchonLabs/kanvaro.com/commit/a0c9f40a4606838c1aa326ab6a28b34f609fed14))
+
+# [1.43.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.4...v1.43.0) (2026-09-28)
+
+
+### Features
+
+* implement task category filtering be ([de9ab34](https://github.com/EchonLabs/kanvaro.com/commit/de9ab347039b9e773dd704a45aa30db45c34cf62))
+* implement task category management ([5bab0d2](https://github.com/EchonLabs/kanvaro.com/commit/5bab0d26801e069353cf76d6e33c62e534fd12e7))
+* implement task category management FE ([7f08cf3](https://github.com/EchonLabs/kanvaro.com/commit/7f08cf3fc65ae14bfba23f1ea7bd9e2feb56063c))
+* interfact to create, rename, delete ([526c98a](https://github.com/EchonLabs/kanvaro.com/commit/526c98a83b505ca3572a1abf2f402c559131eb4c))
+
+## [1.42.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.3...v1.42.4) (2026-09-28)
+
+
+### Bug Fixes
+
+* Kanban board functionality ([82aaa4c](https://github.com/EchonLabs/kanvaro.com/commit/82aaa4c538c8a5bbece6ca830f50d4eb35fa21a3))
+* virtualized task card spacing and height ([eaf724c](https://github.com/EchonLabs/kanvaro.com/commit/eaf724cdfd2343472147fa5d25427ec97017fe0b))
+
 ## [1.42.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.2...v1.42.3) (2026-09-10)
 
 
