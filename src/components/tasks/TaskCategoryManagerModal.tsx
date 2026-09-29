@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Check, GripVertical, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import {
@@ -47,6 +47,8 @@ export default function TaskCategoryManagerModal({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   const loadCategories = useCallback(async (): Promise<TaskCategory[]> => {
     if (!projectId) {
@@ -144,6 +146,51 @@ export default function TaskCategoryManagerModal({
       notifyError({ title: 'Rename Failed', message: err instanceof Error ? err.message : 'Failed to rename task category' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index)
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index)
+    }
+  }
+
+  const handleDrop = async (dropIndex: number) => {
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null)
+      setDragOverIndex(null)
+      return
+    }
+
+    const updated = [...categories]
+    const [removed] = updated.splice(draggedIndex, 1)
+    updated.splice(dropIndex, 0, removed)
+    const reordered = updated.map((c, i) => ({ ...c, order: i }))
+
+    setCategories(reordered)
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/task-categories`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categories: reordered })
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        onCategoriesUpdated(reordered)
+      } else {
+        await loadCategories()
+      }
+    } catch (err) {
+      console.error('Failed to reorder categories:', err)
+      await loadCategories()
     }
   }
 
@@ -293,11 +340,29 @@ export default function TaskCategoryManagerModal({
                     No task categories yet. Add one above to get started.
                   </div>
                 ) : (
-                  categories.map((category) => (
+                  categories.map((category, index) => (
                     <div
                       key={category.key}
-                      className="flex min-h-[44px] items-center gap-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-3.5 py-2.5"
+                      draggable={!editingKey && !saving}
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDrop={() => void handleDrop(index)}
+                      onDragEnd={() => {
+                        setDraggedIndex(null)
+                        setDragOverIndex(null)
+                      }}
+                      className={`flex min-h-[44px] items-center gap-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-3.5 py-2.5 transition-all ${
+                        dragOverIndex === index ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/10 ring-1 ring-[var(--apple-system-blue)]' : ''
+                      } ${draggedIndex === index ? 'opacity-40' : ''}`}
                     >
+                      {!editingKey && (
+                        <div
+                          className="cursor-grab active:cursor-grabbing text-[var(--apple-tertiary-label)] hover:text-[var(--apple-label)] flex-shrink-0"
+                          title="Drag to reorder"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </div>
+                      )}
                       {editingKey === category.key ? (
                         <div className="flex flex-1 items-center gap-2 min-w-0">
                           <Input
