@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Button } from '@/components/ui/Button'
@@ -10,10 +10,12 @@ import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { AddCustomStatusModal } from '@/components/sprints/AddCustomStatusModal'
 import { DeleteCustomStatusModal } from '@/components/sprints/DeleteCustomStatusModal'
+import { DeleteSubtaskModal } from '@/components/sprints/DeleteSubtaskModal'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
@@ -58,7 +60,8 @@ import {
   ArrowDown,
   Check,
   Link2,
-  X
+  X,
+  CornerDownRight
 } from 'lucide-react'
 
 interface Sprint {
@@ -143,9 +146,38 @@ interface Sprint {
     startDate?: string
     dueDate?: string
     createdAt?: string
+    subtasks?: SubtaskItem[]
   }>
   createdAt: string
   updatedAt: string
+}
+
+export interface NestedSubtaskItem {
+  _id?: string
+  title: string
+  description?: string
+  status: string
+  isCompleted?: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface SubtaskItem {
+  _id?: string
+  title: string
+  description?: string
+  status: string
+  isCompleted?: boolean
+  assignedTo?: any
+  story?: any
+  dueDate?: string
+  type?: string
+  priority?: string
+  estimatedHours?: number
+  actualHours?: number
+  createdAt?: string
+  updatedAt?: string
+  subtasks?: NestedSubtaskItem[]
 }
 
 type SprintTask = NonNullable<Sprint['tasks']>[number]
@@ -298,11 +330,46 @@ export default function SprintDetailPage() {
   const [tableSelectedTasks, setTableSelectedTasks] = useState<Set<string>>(new Set())
   const [activeStatusMenuTaskId, setActiveStatusMenuTaskId] = useState<string | null>(null)
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
+  const [expandedTableTasks, setExpandedTableTasks] = useState<Set<string>>(new Set())
+  const [subtaskUpdatingId, setSubtaskUpdatingId] = useState<string | null>(null)
+  const [editingSubtaskModalOpen, setEditingSubtaskModalOpen] = useState(false)
+  const [editingSubtaskParentId, setEditingSubtaskParentId] = useState<string | null>(null)
+  const [editingSubtaskIndex, setEditingSubtaskIndex] = useState<number | null>(null)
+  const [editingSubtaskForm, setEditingSubtaskForm] = useState<{
+    title: string
+    status: string
+    priority: string
+    type: string
+    assignedTo: string
+    dueDate: string
+    estimatedHours: string
+    description: string
+    nestedSubtasks: NestedSubtaskItem[]
+  }>({
+    title: '',
+    status: 'todo',
+    priority: 'medium',
+    type: 'subtask',
+    assignedTo: '',
+    dueDate: '',
+    estimatedHours: '',
+    description: '',
+    nestedSubtasks: []
+  })
+  const [isSubtaskSaving, setIsSubtaskSaving] = useState(false)
   const [editingTask, setEditingTask] = useState<NonNullable<Sprint['tasks']>[number] | null>(null)
   const [savingTaskEdit, setSavingTaskEdit] = useState(false)
   const [taskToDeleteId, setTaskToDeleteId] = useState<string | null>(null)
   const [deletingTask, setDeletingTask] = useState(false)
   const [showDeleteTaskConfirm, setShowDeleteTaskConfirm] = useState(false)
+  const [subtaskToDelete, setSubtaskToDelete] = useState<{
+    parentTaskId: string
+    subtaskIndex: number
+    nestedIndex?: number
+    title: string
+    type: 'subtask' | 'nested'
+  } | null>(null)
+  const [isDeletingSubtaskItem, setIsDeletingSubtaskItem] = useState(false)
   const [editFormData, setEditFormData] = useState({
     module: '',
     title: '',
@@ -467,7 +534,6 @@ export default function SprintDetailPage() {
   const handleTaskPriorityChange = async (taskId: string, newPriority: string) => {
     try {
       setTaskStatusUpdating(taskId)
-      setActivePriorityMenuTaskId(null)
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -537,6 +603,611 @@ export default function SprintDetailPage() {
     return Array.from(map.values())
   }, [sprint?.teamMembers, uniqueAssignees, editingTask])
 
+  // Subtask expansion & table handlers
+  const toggleTableTaskExpanded = (taskId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    setExpandedTableTasks(prev => {
+      const next = new Set(prev)
+      if (next.has(taskId)) next.delete(taskId)
+      else next.add(taskId)
+      return next
+    })
+  }
+
+  // Auto-expand tasks that have subtasks so they appear under the main tasks immediately
+  useEffect(() => {
+    if (sprint?.tasks) {
+      const idsWithSubtasks = sprint.tasks
+        .filter(t => t.subtasks && t.subtasks.length > 0)
+        .map(t => t._id)
+      if (idsWithSubtasks.length > 0) {
+        setExpandedTableTasks(prev => {
+          const next = new Set(prev)
+          idsWithSubtasks.forEach(id => next.add(id))
+          return next
+        })
+      }
+    }
+  }, [sprint?.tasks])
+
+  const handleOpenEditSubtask = (parentTaskId: string, st: SubtaskItem, index: number) => {
+    setEditingSubtaskParentId(parentTaskId)
+    setEditingSubtaskIndex(index)
+    const assigneeId = typeof st.assignedTo === 'object' && st.assignedTo !== null
+      ? (st.assignedTo._id || (st.assignedTo as any).id || '')
+      : (typeof st.assignedTo === 'string' ? st.assignedTo : '')
+    const rawNested = Array.isArray(st.subtasks) ? st.subtasks : []
+    const mappedNested: NestedSubtaskItem[] = rawNested.map(nst => ({
+      _id: nst._id,
+      title: nst.title || '',
+      description: nst.description || '',
+      status: nst.status || 'todo',
+      isCompleted: nst.isCompleted ?? (nst.status === 'done' || nst.status === 'completed')
+    }))
+    setEditingSubtaskForm({
+      title: st.title || '',
+      status: st.status || 'todo',
+      priority: (st.priority || 'medium').toLowerCase(),
+      type: st.type || 'subtask',
+      assignedTo: assigneeId,
+      dueDate: st.dueDate ? st.dueDate.split('T')[0] : '',
+      estimatedHours: st.estimatedHours !== undefined && st.estimatedHours !== null ? String(st.estimatedHours) : '',
+      description: st.description || '',
+      nestedSubtasks: mappedNested
+    })
+    setEditingSubtaskModalOpen(true)
+  }
+
+  const handleOpenAddSubtask = (parentTaskId: string) => {
+    setEditingSubtaskParentId(parentTaskId)
+    setEditingSubtaskIndex(-1)
+    setEditingSubtaskForm({
+      title: '',
+      status: 'todo',
+      priority: 'medium',
+      type: 'subtask',
+      assignedTo: '',
+      dueDate: '',
+      estimatedHours: '',
+      description: '',
+      nestedSubtasks: []
+    })
+    setEditingSubtaskModalOpen(true)
+  }
+
+  const handleAddNestedSubtaskToForm = () => {
+    setEditingSubtaskForm(prev => ({
+      ...prev,
+      nestedSubtasks: [
+        ...prev.nestedSubtasks,
+        {
+          title: '',
+          description: '',
+          status: 'todo',
+          isCompleted: false
+        }
+      ]
+    }))
+  }
+
+  const handleUpdateNestedSubtaskInForm = (
+    index: number,
+    field: keyof NestedSubtaskItem,
+    value: any
+  ) => {
+    setEditingSubtaskForm(prev => {
+      const list = [...prev.nestedSubtasks]
+      const current = { ...list[index] }
+      if (field === 'status') {
+        current.status = value
+        current.isCompleted = value === 'done' || value === 'completed'
+      } else if (field === 'isCompleted') {
+        current.isCompleted = !!value
+        current.status = value ? 'done' : (current.status === 'done' ? 'todo' : current.status)
+      } else {
+        (current as any)[field] = value
+      }
+      list[index] = current
+      return { ...prev, nestedSubtasks: list }
+    })
+  }
+
+  const handleRemoveNestedSubtaskFromForm = (index: number) => {
+    setEditingSubtaskForm(prev => ({
+      ...prev,
+      nestedSubtasks: prev.nestedSubtasks.filter((_, i) => i !== index)
+    }))
+  }
+
+  const handleOpenAddNestedSubtask = (parentTaskId: string, st: SubtaskItem, index: number) => {
+    handleOpenEditSubtask(parentTaskId, st, index)
+    setEditingSubtaskForm(prev => ({
+      ...prev,
+      nestedSubtasks: [
+        ...prev.nestedSubtasks,
+        {
+          title: '',
+          description: '',
+          status: 'todo',
+          isCompleted: false
+        }
+      ]
+    }))
+  }
+
+  const handleSaveSubtaskModal = async () => {
+    if (!editingSubtaskParentId || !editingSubtaskForm.title.trim()) return
+    const parentTask = sprint?.tasks?.find(t => t._id === editingSubtaskParentId)
+    if (!parentTask) return
+
+    try {
+      setIsSubtaskSaving(true)
+      const currentSubtasks = [...(parentTask.subtasks || [])]
+      
+      const validNestedSubtasks: NestedSubtaskItem[] = (editingSubtaskForm.nestedSubtasks || [])
+        .filter(n => n.title && n.title.trim().length > 0)
+        .map(n => ({
+          _id: n._id,
+          title: n.title.trim(),
+          description: n.description?.trim() || undefined,
+          status: n.status || 'todo',
+          isCompleted: n.isCompleted ?? (n.status === 'done' || n.status === 'completed')
+        }))
+
+      // If subtask is being set to done, verify all nested subtasks are done
+      const isSubtaskMarkedDone = editingSubtaskForm.status === 'done' || editingSubtaskForm.status === 'completed'
+      if (isSubtaskMarkedDone && validNestedSubtasks.length > 0) {
+        const hasIncomplete = validNestedSubtasks.some(n => !(n.isCompleted || n.status === 'done' || n.status === 'completed'))
+        if (hasIncomplete) {
+          notifyError({
+            title: 'Cannot mark as done',
+            message: 'Subtask cannot be marked as done until all of its nested subtasks are completed.'
+          })
+          setIsSubtaskSaving(false)
+          return
+        }
+      }
+
+      const newOrUpdatedSubtask: SubtaskItem = {
+        title: editingSubtaskForm.title.trim(),
+        status: editingSubtaskForm.status,
+        isCompleted: editingSubtaskForm.status === 'done' || editingSubtaskForm.status === 'completed',
+        priority: editingSubtaskForm.priority,
+        type: editingSubtaskForm.type,
+        assignedTo: editingSubtaskForm.assignedTo || undefined,
+        dueDate: editingSubtaskForm.dueDate ? editingSubtaskForm.dueDate : undefined,
+        estimatedHours: editingSubtaskForm.estimatedHours ? Number(editingSubtaskForm.estimatedHours) : undefined,
+        description: editingSubtaskForm.description.trim() || undefined,
+        subtasks: validNestedSubtasks
+      }
+
+      let updatedSubtasks: SubtaskItem[] = []
+      if (editingSubtaskIndex !== null && editingSubtaskIndex >= 0) {
+        const existing = currentSubtasks[editingSubtaskIndex]
+        if (existing?._id) newOrUpdatedSubtask._id = existing._id
+        updatedSubtasks = currentSubtasks.map((st, i) => i === editingSubtaskIndex ? { ...st, ...newOrUpdatedSubtask } : st)
+      } else {
+        updatedSubtasks = [...currentSubtasks, newOrUpdatedSubtask]
+      }
+
+      const payloadSubtasks = updatedSubtasks.map(st => ({
+        ...st,
+        assignedTo: typeof st.assignedTo === 'object' && st.assignedTo !== null
+          ? (st.assignedTo._id || (st.assignedTo as any).id)
+          : st.assignedTo
+      }))
+
+      const res = await fetch(`/api/tasks/${editingSubtaskParentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtasks: payloadSubtasks })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save subtask')
+      }
+
+      const savedSubtasks = data.data?.subtasks || updatedSubtasks
+
+      setSprint(prev => {
+        if (!prev || !prev.tasks) return prev
+        const updatedTasks = prev.tasks.map(t =>
+          t._id === editingSubtaskParentId
+            ? { ...t, subtasks: savedSubtasks }
+            : t
+        )
+        return {
+          ...prev,
+          tasks: updatedTasks
+        }
+      })
+
+      setExpandedTableTasks(prev => new Set(prev).add(editingSubtaskParentId))
+      setEditingSubtaskModalOpen(false)
+      notifySuccess({
+        title: editingSubtaskIndex !== null && editingSubtaskIndex >= 0 ? 'Subtask updated' : 'Subtask added'
+      })
+    } catch (err) {
+      notifyError({
+        title: 'Error saving subtask',
+        message: err instanceof Error ? err.message : 'Failed to save subtask'
+      })
+    } finally {
+      setIsSubtaskSaving(false)
+    }
+  }
+
+  const handleSubtaskStatusChange = async (parentTaskId: string, subtaskIndex: number, newStatus: string) => {
+    const parentTask = sprint?.tasks?.find(t => t._id === parentTaskId)
+    if (!parentTask || !parentTask.subtasks) return
+    const key = `${parentTaskId}-${subtaskIndex}`
+    try {
+      setSubtaskUpdatingId(key)
+      const currentSubtasks = [...parentTask.subtasks]
+      const targetSubtask = currentSubtasks[subtaskIndex]
+      if (!targetSubtask) return
+
+      const isCompleted = newStatus === 'done' || newStatus === 'completed'
+
+      if (isCompleted && targetSubtask.subtasks && targetSubtask.subtasks.length > 0) {
+        const incompleteNested = targetSubtask.subtasks.filter(
+          nst => !(nst.isCompleted || nst.status === 'done' || nst.status === 'completed')
+        )
+        if (incompleteNested.length > 0) {
+          notifyError({
+            title: 'Cannot mark as done',
+            message: `Subtask cannot be marked as done until all nested subtasks are completed (${targetSubtask.subtasks.length - incompleteNested.length}/${targetSubtask.subtasks.length} completed).`
+          })
+          setSubtaskUpdatingId(null)
+          return
+        }
+      }
+
+      const updatedSubtasks = currentSubtasks.map((st, i) =>
+        i === subtaskIndex ? { ...st, status: newStatus, isCompleted } : st
+      )
+
+      // Optimistic update
+      setSprint(prev => {
+        if (!prev || !prev.tasks) return prev
+        return {
+          ...prev,
+          tasks: prev.tasks.map(t => t._id === parentTaskId ? { ...t, subtasks: updatedSubtasks } : t)
+        }
+      })
+
+      const payloadSubtasks = updatedSubtasks.map(st => ({
+        ...st,
+        assignedTo: typeof st.assignedTo === 'object' && st.assignedTo !== null
+          ? (st.assignedTo._id || (st.assignedTo as any).id)
+          : st.assignedTo
+      }))
+
+      const res = await fetch(`/api/tasks/${parentTaskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtasks: payloadSubtasks })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update subtask status')
+      }
+
+      if (data.data) {
+        setSprint(prev => {
+          if (!prev || !prev.tasks) return prev
+          const updatedTasks = prev.tasks.map(t =>
+            t._id === parentTaskId
+              ? {
+                  ...t,
+                  status: data.data.status || t.status,
+                  subtasks: data.data.subtasks || updatedSubtasks
+                }
+              : t
+          )
+          const updatedProgress = buildProgressFromTasks(updatedTasks, prev.progress) || prev.progress
+          return {
+            ...prev,
+            tasks: updatedTasks,
+            taskSummary: buildTaskSummaryFromTasks(updatedTasks),
+            progress: updatedProgress
+          }
+        })
+      }
+      notifySuccess({ title: 'Subtask status updated' })
+    } catch (err) {
+      notifyError({
+        title: 'Failed to update subtask status',
+        message: err instanceof Error ? err.message : 'Failed to update subtask status'
+      })
+    } finally {
+      setSubtaskUpdatingId(null)
+    }
+  }
+
+  const handleSubtaskPriorityChange = async (parentTaskId: string, subtaskIndex: number, newPriority: string) => {
+    const parentTask = sprint?.tasks?.find(t => t._id === parentTaskId)
+    if (!parentTask || !parentTask.subtasks) return
+    const key = `${parentTaskId}-${subtaskIndex}`
+    try {
+      setSubtaskUpdatingId(key)
+      const currentSubtasks = [...parentTask.subtasks]
+      const updatedSubtasks = currentSubtasks.map((st, i) =>
+        i === subtaskIndex ? { ...st, priority: newPriority } : st
+      )
+
+      // Optimistic update
+      setSprint(prev => {
+        if (!prev || !prev.tasks) return prev
+        return {
+          ...prev,
+          tasks: prev.tasks.map(t => t._id === parentTaskId ? { ...t, subtasks: updatedSubtasks } : t)
+        }
+      })
+
+      const payloadSubtasks = updatedSubtasks.map(st => ({
+        ...st,
+        assignedTo: typeof st.assignedTo === 'object' && st.assignedTo !== null
+          ? (st.assignedTo._id || (st.assignedTo as any).id)
+          : st.assignedTo
+      }))
+
+      const res = await fetch(`/api/tasks/${parentTaskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtasks: payloadSubtasks })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update subtask priority')
+      }
+      notifySuccess({ title: 'Subtask priority updated' })
+    } catch (err) {
+      notifyError({
+        title: 'Failed to update subtask priority',
+        message: err instanceof Error ? err.message : 'Failed to update subtask priority'
+      })
+    } finally {
+      setSubtaskUpdatingId(null)
+    }
+  }
+
+  const handleSubtaskAssigneeChange = async (parentTaskId: string, subtaskIndex: number, newAssigneeId: string | null) => {
+    const parentTask = sprint?.tasks?.find(t => t._id === parentTaskId)
+    if (!parentTask || !parentTask.subtasks) return
+    const key = `${parentTaskId}-${subtaskIndex}`
+    try {
+      setSubtaskUpdatingId(key)
+      const currentSubtasks = [...parentTask.subtasks]
+      const member = newAssigneeId ? assignableMembers.find(m => m.id === newAssigneeId) : null
+      
+      const updatedSubtasks = currentSubtasks.map((st, i) =>
+        i === subtaskIndex
+          ? {
+              ...st,
+              assignedTo: newAssigneeId
+                ? { _id: newAssigneeId, firstName: member?.name?.split(' ')[0] || '', lastName: member?.name?.split(' ').slice(1).join(' ') || '', email: member?.email || '' }
+                : undefined
+            }
+          : st
+      )
+
+      // Optimistic update
+      setSprint(prev => {
+        if (!prev || !prev.tasks) return prev
+        return {
+          ...prev,
+          tasks: prev.tasks.map(t => t._id === parentTaskId ? { ...t, subtasks: updatedSubtasks } : t)
+        }
+      })
+
+      const payloadSubtasks = currentSubtasks.map((st, i) =>
+        i === subtaskIndex
+          ? {
+              ...st,
+              assignedTo: newAssigneeId || undefined
+            }
+          : st
+      )
+
+      const res = await fetch(`/api/tasks/${parentTaskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtasks: payloadSubtasks })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update subtask assignee')
+      }
+      if (data.data?.subtasks) {
+        setSprint(prev => {
+          if (!prev || !prev.tasks) return prev
+          return {
+            ...prev,
+            tasks: prev.tasks.map(t => t._id === parentTaskId ? { ...t, subtasks: data.data.subtasks } : t)
+          }
+        })
+      }
+      notifySuccess({ title: 'Subtask assignee updated' })
+    } catch (err) {
+      notifyError({
+        title: 'Failed to update subtask assignee',
+        message: err instanceof Error ? err.message : 'Failed to update subtask assignee'
+      })
+    } finally {
+      setSubtaskUpdatingId(null)
+    }
+  }
+
+  const handleDeleteSubtask = async (parentTaskId: string, subtaskIndex: number) => {
+    const parentTask = sprint?.tasks?.find(t => t._id === parentTaskId)
+    if (!parentTask || !parentTask.subtasks) return
+    const subtask = parentTask.subtasks[subtaskIndex]
+    if (!subtask) return
+
+    try {
+      setIsDeletingSubtaskItem(true)
+      const updatedSubtasks = parentTask.subtasks.filter((_, i) => i !== subtaskIndex)
+      
+      // Optimistic update
+      setSprint(prev => {
+        if (!prev || !prev.tasks) return prev
+        return {
+          ...prev,
+          tasks: prev.tasks.map(t => t._id === parentTaskId ? { ...t, subtasks: updatedSubtasks } : t)
+        }
+      })
+
+      const payloadSubtasks = updatedSubtasks.map(st => ({
+        ...st,
+        assignedTo: typeof st.assignedTo === 'object' && st.assignedTo !== null
+          ? (st.assignedTo._id || (st.assignedTo as any).id)
+          : st.assignedTo
+      }))
+
+      const res = await fetch(`/api/tasks/${parentTaskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtasks: payloadSubtasks })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to delete subtask')
+      }
+      notifySuccess({ title: 'Subtask deleted' })
+    setSubtaskToDelete(null)
+    } catch (err) {
+      notifyError({
+        title: 'Failed to delete subtask',
+        message: err instanceof Error ? err.message : 'Failed to delete subtask'
+      })
+    } finally {
+      setIsDeletingSubtaskItem(false)
+    }
+  }
+
+  const handleNestedSubtaskStatusChange = async (
+    parentTaskId: string,
+    subtaskIndex: number,
+    nestedIndex: number,
+    newStatus: string
+  ) => {
+    const parentTask = sprint?.tasks?.find(t => t._id === parentTaskId)
+    if (!parentTask || !parentTask.subtasks) return
+    const key = `${parentTaskId}-${subtaskIndex}-${nestedIndex}`
+    try {
+      setSubtaskUpdatingId(key)
+      const currentSubtasks = [...parentTask.subtasks]
+      const targetSubtask = currentSubtasks[subtaskIndex]
+      if (!targetSubtask || !targetSubtask.subtasks) return
+
+      const isCompleted = newStatus === 'done' || newStatus === 'completed'
+      const updatedNested = targetSubtask.subtasks.map((nst, ni) =>
+        ni === nestedIndex ? { ...nst, status: newStatus, isCompleted } : nst
+      )
+      const allNestedDone = updatedNested.every(nst => nst.isCompleted || nst.status === 'done' || nst.status === 'completed')
+
+      const updatedSubtasks = currentSubtasks.map((st, i) => {
+        if (i !== subtaskIndex) return st
+        // If nested subtasks are not all done, ensure subtask is not marked done
+        if (!allNestedDone && (st.status === 'done' || st.status === 'completed' || st.isCompleted)) {
+          return { ...st, status: 'in_progress', isCompleted: false, subtasks: updatedNested }
+        }
+        return { ...st, subtasks: updatedNested }
+      })
+
+      // Optimistic update
+      setSprint(prev => {
+        if (!prev || !prev.tasks) return prev
+        return {
+          ...prev,
+          tasks: prev.tasks.map(t => t._id === parentTaskId ? { ...t, subtasks: updatedSubtasks } : t)
+        }
+      })
+
+      const payloadSubtasks = updatedSubtasks.map(st => ({
+        ...st,
+        assignedTo: typeof st.assignedTo === 'object' && st.assignedTo !== null
+          ? (st.assignedTo._id || (st.assignedTo as any).id)
+          : st.assignedTo
+      }))
+
+      const res = await fetch(`/api/tasks/${parentTaskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtasks: payloadSubtasks })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update nested subtask status')
+      }
+      notifySuccess({ title: 'Nested subtask status updated' })
+    } catch (err) {
+      notifyError({
+        title: 'Failed to update status',
+        message: err instanceof Error ? err.message : 'Failed to update status'
+      })
+    } finally {
+      setSubtaskUpdatingId(null)
+    }
+  }
+
+  const handleDeleteNestedSubtask = async (
+    parentTaskId: string,
+    subtaskIndex: number,
+    nestedIndex: number
+  ) => {
+    const parentTask = sprint?.tasks?.find(t => t._id === parentTaskId)
+    if (!parentTask || !parentTask.subtasks) return
+    const subtask = parentTask.subtasks[subtaskIndex]
+    if (!subtask || !subtask.subtasks) return
+    const nested = subtask.subtasks[nestedIndex]
+    if (!nested) return
+
+    try {
+      setIsDeletingSubtaskItem(true)
+      const updatedNested = subtask.subtasks.filter((_, i) => i !== nestedIndex)
+      const updatedSubtasks = parentTask.subtasks.map((st, i) =>
+        i === subtaskIndex ? { ...st, subtasks: updatedNested } : st
+      )
+
+      // Optimistic update
+      setSprint(prev => {
+        if (!prev || !prev.tasks) return prev
+        return {
+          ...prev,
+          tasks: prev.tasks.map(t => t._id === parentTaskId ? { ...t, subtasks: updatedSubtasks } : t)
+        }
+      })
+
+      const payloadSubtasks = updatedSubtasks.map(st => ({
+        ...st,
+        assignedTo: typeof st.assignedTo === 'object' && st.assignedTo !== null
+          ? (st.assignedTo._id || (st.assignedTo as any).id)
+          : st.assignedTo
+      }))
+
+      const res = await fetch(`/api/tasks/${parentTaskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtasks: payloadSubtasks })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to delete nested subtask')
+      }
+      notifySuccess({ title: 'Nested subtask deleted' })
+    setSubtaskToDelete(null)
+    } catch (err) {
+      notifyError({
+        title: 'Failed to delete nested subtask',
+        message: err instanceof Error ? err.message : 'Failed to delete nested subtask'
+      })
+    } finally {
+      setIsDeletingSubtaskItem(false)
+    }
+  }
+
   // Bulk Assign Handler
   const handleBulkAssign = async (member: { id: string; name: string; email?: string } | null) => {
     if (tableSelectedTasks.size === 0) return
@@ -564,7 +1235,6 @@ export default function SprintDetailPage() {
         title: member ? `Assigned ${selectedIds.length} tasks to ${member.name}` : `Unassigned ${selectedIds.length} tasks`
       })
       setTableSelectedTasks(new Set())
-      setBulkAssignMenuOpen(false)
       fetchSprint({ silent: true })
     } catch (err) {
       notifyError({
@@ -635,7 +1305,6 @@ export default function SprintDetailPage() {
         title: targetSprintId ? `Moved ${selectedIds.length} tasks to sprint` : `Moved ${selectedIds.length} tasks to backlog`
       })
       setTableSelectedTasks(new Set())
-      setBulkMoveMenuOpen(false)
       fetchSprint({ silent: true })
     } catch (err) {
       notifyError({
@@ -2532,281 +3201,806 @@ export default function SprintDetailPage() {
                                 const currentPriorityCfg = PRIORITY_CONFIG[p] || PRIORITY_CONFIG.medium
 
                                 return (
-                                  <tr
-                                    key={task._id}
-                                    className={`hover:bg-blue-50/30 dark:hover:bg-blue-950/10 transition-colors ${
-                                      isEditingThisTask
-                                        ? 'bg-blue-50/60 dark:bg-blue-950/30 ring-1 ring-blue-500/30'
-                                        : isSelected
-                                        ? 'bg-blue-50/40 dark:bg-blue-950/20'
-                                        : ''
-                                    }`}
-                                  >
-                                    {/* Checkbox */}
-                                    <td className="py-3 pl-4 pr-2">
-                                      <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={() => {
-                                          setTableSelectedTasks(prev => {
-                                            const next = new Set(prev)
-                                            if (next.has(task._id)) next.delete(task._id)
-                                            else next.add(task._id)
-                                            return next
-                                          })
-                                        }}
-                                        className="rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                      />
-                                    </td>
+                                  <Fragment key={task._id}>
+                                    <tr
+                                      className={`hover:bg-blue-50/30 dark:hover:bg-blue-950/10 transition-colors ${
+                                        isEditingThisTask
+                                          ? 'bg-blue-50/60 dark:bg-blue-950/30 ring-1 ring-blue-500/30'
+                                          : isSelected
+                                          ? 'bg-blue-50/40 dark:bg-blue-950/20'
+                                          : ''
+                                      }`}
+                                    >
+                                      {/* Checkbox */}
+                                      <td className="py-3 pl-4 pr-2">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={() => {
+                                            setTableSelectedTasks(prev => {
+                                              const next = new Set(prev)
+                                              if (next.has(task._id)) next.delete(task._id)
+                                              else next.add(task._id)
+                                              return next
+                                            })
+                                          }}
+                                          className="rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                        />
+                                      </td>
 
-                                    {/* Task ID */}
-                                    <td className="py-3 px-3 whitespace-nowrap">
-                                      <span className="font-apple-mono text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60">
-                                        #{task.displayId || task._id.slice(-4)}
-                                      </span>
-                                    </td>
+                                      {/* Task ID */}
+                                      <td className="py-3 px-3 whitespace-nowrap">
+                                        <span className="font-apple-mono text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60">
+                                          #{task.displayId || task._id.slice(-4)}
+                                        </span>
+                                      </td>
 
-                                    {/* Module */}
-                                    <td className="py-3 px-3 whitespace-nowrap">
-                                      <span
-                                        className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate max-w-[120px] block"
-                                        title={task.module || task.story?.title || task.epic?.title || '—'}
-                                      >
-                                        {task.module || task.story?.title || task.epic?.title || '—'}
-                                      </span>
-                                    </td>
+                                      {/* Module */}
+                                      <td className="py-3 px-3 whitespace-nowrap">
+                                        <span
+                                          className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate max-w-[120px] block"
+                                          title={task.module || task.story?.title || task.epic?.title || '—'}
+                                        >
+                                          {task.module || task.story?.title || task.epic?.title || '—'}
+                                        </span>
+                                      </td>
 
-                                    {/* Task Title */}
-                                    <td className="py-3 px-3">
-                                      <span
-                                        onClick={() => handleOpenEditTask(task)}
-                                        className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer line-clamp-1"
-                                        title={task.title}
-                                      >
-                                        {task.title || 'Untitled Task'}
-                                      </span>
-                                    </td>
-
-                                    {/* Type */}
-                                    <td className="py-3 px-3 whitespace-nowrap">
-                                      {(() => {
-                                        const t = (task.type || 'task').toLowerCase()
-                                        let badgeCls = 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
-                                        if (t === 'story') badgeCls = 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
-                                        else if (t === 'bug') badgeCls = 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
-                                        else if (t === 'task') badgeCls = 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800'
-                                        else if (t === 'improvement') badgeCls = 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                                        return (
-                                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badgeCls}`}>
-                                            {formatToTitleCase(t)}
+                                      {/* Task Title */}
+                                      <td className="py-3 px-3">
+                                        <div className="flex items-center gap-1.5">
+                                          {task.subtasks && task.subtasks.length > 0 && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                toggleTableTaskExpanded(task._id)
+                                              }}
+                                              className="p-1 -ml-1 rounded-md hover:bg-gray-200/70 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0"
+                                              title={expandedTableTasks.has(task._id) ? "Collapse subtasks" : `Expand ${task.subtasks.length} subtask${task.subtasks.length > 1 ? 's' : ''}`}
+                                            >
+                                              <ChevronRight
+                                                className={`w-3.5 h-3.5 transition-transform duration-150 ${
+                                                  expandedTableTasks.has(task._id) ? 'rotate-90 text-blue-600 dark:text-blue-400' : 'text-gray-400'
+                                                }`}
+                                              />
+                                              <span className="text-[10px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded-full border border-gray-200/80 dark:border-gray-700 leading-none">
+                                                {task.subtasks.length}
+                                              </span>
+                                            </button>
+                                          )}
+                                          <span
+                                            onClick={() => handleOpenEditTask(task)}
+                                            className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer line-clamp-1"
+                                            title={task.title}
+                                          >
+                                            {task.title || 'Untitled Task'}
                                           </span>
-                                        )
-                                      })()}
-                                    </td>
+                                        </div>
+                                      </td>
 
-                                    {/* Assignee */}
-                                    <td className="py-3 px-3 whitespace-nowrap">
-                                      {(() => {
-                                        if (!task.assignedTo || !Array.isArray(task.assignedTo) || task.assignedTo.length === 0) {
+                                      {/* Type */}
+                                      <td className="py-3 px-3 whitespace-nowrap">
+                                        {(() => {
+                                          const t = (task.type || 'task').toLowerCase()
+                                          let badgeCls = 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+                                          if (t === 'story') badgeCls = 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
+                                          else if (t === 'bug') badgeCls = 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+                                          else if (t === 'task') badgeCls = 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800'
+                                          else if (t === 'improvement') badgeCls = 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
                                           return (
-                                            <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400" title="Unassigned">
-                                              <User className="w-3.5 h-3.5" />
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badgeCls}`}>
+                                              {formatToTitleCase(t)}
+                                            </span>
+                                          )
+                                        })()}
+                                      </td>
+
+                                      {/* Assignee */}
+                                      <td className="py-3 px-3 whitespace-nowrap">
+                                        {(() => {
+                                          if (!task.assignedTo || !Array.isArray(task.assignedTo) || task.assignedTo.length === 0) {
+                                            return (
+                                              <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400" title="Unassigned">
+                                                <User className="w-3.5 h-3.5" />
+                                              </div>
+                                            )
+                                          }
+                                          const first = task.assignedTo[0]
+                                          const name = typeof first === 'object'
+                                            ? `${first?.user?.firstName || first?.firstName || ''} ${first?.user?.lastName || first?.lastName || ''}`.trim()
+                                            : 'Assignee'
+                                          const initial = name ? name.charAt(0).toUpperCase() : 'U'
+                                          return (
+                                            <div className="flex items-center gap-1.5" title={name || 'Assignee'}>
+                                              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-semibold shadow-xs">
+                                                {initial}
+                                              </div>
+                                              {task.assignedTo.length > 1 && (
+                                                <span className="text-[11px] font-medium text-gray-500">+{task.assignedTo.length - 1}</span>
+                                              )}
                                             </div>
                                           )
-                                        }
-                                        const first = task.assignedTo[0]
-                                        const name = typeof first === 'object'
-                                          ? `${first?.user?.firstName || first?.firstName || ''} ${first?.user?.lastName || first?.lastName || ''}`.trim()
-                                          : 'Assignee'
-                                        const initial = name ? name.charAt(0).toUpperCase() : 'U'
-                                        return (
-                                          <div className="flex items-center gap-1.5" title={name || 'Assignee'}>
-                                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-semibold shadow-xs">
-                                              {initial}
+                                        })()}
+                                      </td>
+
+                                      {/* Priority Dropdown */}
+                                      <td className="py-3 px-3 whitespace-nowrap">
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <button
+                                              type="button"
+                                              disabled={taskStatusUpdating === task._id}
+                                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${currentPriorityCfg.cls} hover:opacity-90 transition-opacity cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 select-none`}
+                                            >
+                                              {currentPriorityCfg.icon}
+                                              <span>{currentPriorityCfg.label}</span>
+                                              <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+                                            </button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent
+                                            align="start"
+                                            side={isNearBottom ? 'top' : 'bottom'}
+                                            sideOffset={4}
+                                            collisionPadding={12}
+                                            onCloseAutoFocus={(e) => e.preventDefault()}
+                                            className="z-[10050] w-36 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1.5 shadow-xl text-xs [&_*]:text-xs outline-none"
+                                          >
+                                            {(['critical', 'high', 'medium', 'low'] as const).map(priKey => {
+                                              const cfg = priorityConfig[priKey]
+                                              const isPriSelected = p === priKey
+                                              return (
+                                                <DropdownMenuItem
+                                                  key={priKey}
+                                                  onClick={() => handleTaskPriorityChange(task._id, priKey)}
+                                                  className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left cursor-pointer rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors ${
+                                                    isPriSelected ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20' : 'text-gray-700 dark:text-gray-300'
+                                                  }`}
+                                                >
+                                                  <span className="flex items-center gap-2">
+                                                    {cfg.icon}
+                                                    <span>{cfg.label}</span>
+                                                  </span>
+                                                  {isPriSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                                                </DropdownMenuItem>
+                                              )
+                                            })}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </td>
+
+                                      {/* Status Dropdown */}
+                                      <td className="py-3 px-3 whitespace-nowrap">
+                                        <DropdownMenu
+                                          open={activeStatusMenuTaskId === task._id}
+                                          onOpenChange={(open) => setActiveStatusMenuTaskId(open ? task._id : null)}
+                                        >
+                                          <DropdownMenuTrigger asChild>
+                                            <button
+                                              type="button"
+                                              disabled={taskStatusUpdating === task._id || task.archived}
+                                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getTaskStatusBadgeClass(task.status)} hover:opacity-90 transition-opacity cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 select-none`}
+                                            >
+                                              <span>{formatTaskStatusLabel(task.status)}</span>
+                                              <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+                                            </button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent
+                                            align="start"
+                                            side={isNearBottom ? 'top' : 'bottom'}
+                                            sideOffset={4}
+                                            collisionPadding={12}
+                                            onCloseAutoFocus={(e) => e.preventDefault()}
+                                            className="z-[10050] w-48 max-h-80 overflow-y-auto thin-scrollbar rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1.5 shadow-xl text-xs [&_*]:text-xs outline-none"
+                                          >
+                                            {projectStatusOptions.map(option => {
+                                              const isStatSelected = task.status === option.value
+                                              const isCustomStatus = Boolean(option.value) && !DEFAULT_TASK_STATUS_KEYS.includes(option.value as any)
+                                              return (
+                                                <DropdownMenuItem
+                                                  key={option.value}
+                                                  onSelect={() => {
+                                                    setActiveStatusMenuTaskId(null)
+                                                    handleTaskStatusChange(task._id, option.value)
+                                                  }}
+                                                  className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left cursor-pointer rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors group ${
+                                                    isStatSelected ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20' : 'text-gray-700 dark:text-gray-300'
+                                                  }`}
+                                                >
+                                                  <div className="flex items-center gap-2 min-w-0 mr-1.5">
+                                                    <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                                      option.value === 'done' || option.value === 'completed'
+                                                        ? 'bg-emerald-500'
+                                                        : option.value === 'in_progress'
+                                                        ? 'bg-amber-500'
+                                                        : option.value === 'testing'
+                                                        ? 'bg-purple-500'
+                                                        : option.value === 'review'
+                                                        ? 'bg-indigo-500'
+                                                        : 'bg-blue-500'
+                                                    }`} />
+                                                    <span className="truncate">{option.label}</span>
+                                                  </div>
+                                                  <div className="flex items-center gap-1.5 shrink-0">
+                                                    {isStatSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                                                    {isCustomStatus && (
+                                                      <button
+                                                        type="button"
+                                                        data-action="delete-status"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation()
+                                                          e.preventDefault()
+                                                          setActiveStatusMenuTaskId(null)
+                                                          setTimeout(() => {
+                                                            setStatusToDelete({ value: option.value, label: option.label })
+                                                          }, 50)
+                                                        }}
+                                                        className="p-1 rounded text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                                                        title={`Delete status "${option.label}"`}
+                                                      >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                      </button>
+                                                    )}
+                                                  </div>
+                                                </DropdownMenuItem>
+                                              )
+                                            })}
+                                            <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+                                            <DropdownMenuItem
+                                              onSelect={() => {
+                                                setActiveStatusMenuTaskId(null)
+                                                setTargetTaskIdForNewStatus(task._id)
+                                                setTimeout(() => {
+                                                  setIsAddStatusModalOpen(true)
+                                                }, 50)
+                                              }}
+                                              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left cursor-pointer rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/80 text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 focus:text-blue-600 dark:focus:text-blue-400 data-[highlighted]:text-blue-600 dark:data-[highlighted]:text-blue-400 font-medium transition-colors group"
+                                            >
+                                              <Plus className="w-3.5 h-3.5 shrink-0 transition-colors" />
+                                              <span>Add new status</span>
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </td>
+
+                                      {/* Start Date */}
+                                      <td className="py-3 px-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                                        {formatShortDate(task.startDate || task.createdAt)}
+                                      </td>
+
+                                      {/* Due Date */}
+                                      <td className="py-3 px-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                                        {formatShortDate(task.dueDate)}
+                                      </td>
+
+                                      {/* Estimated Hours */}
+                                      <td className="py-3 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-600 dark:text-gray-400">
+                                        {task.estimatedHours ? `${task.estimatedHours}h` : '—'}
+                                      </td>
+
+                                      {/* Actual Hours */}
+                                      <td className="py-3 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-600 dark:text-gray-400">
+                                        {task.actualHours ? `${task.actualHours}h` : (task.loggedHours ? `${task.loggedHours}h` : '—')}
+                                      </td>
+
+                                      {/* Action Buttons */}
+                                      <td className="py-3 pr-4 pl-2 text-right whitespace-nowrap">
+                                        <div className="inline-flex items-center justify-end gap-1">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleOpenAddSubtask(task._id)
+                                            }}
+                                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                                            title="Add subtask"
+                                          >
+                                            <Plus className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleOpenEditTask(task)
+                                            }}
+                                            className={`p-1.5 rounded-lg transition-colors cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ${
+                                              isEditingThisTask
+                                                ? 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 ring-1 ring-blue-500/30'
+                                                : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                            }`}
+                                            title="Edit task"
+                                          >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+
+                                    {/* Render Subtasks under Main Task if expanded */}
+                                    {expandedTableTasks.has(task._id) && task.subtasks && task.subtasks.length > 0 && task.subtasks.map((st, stIdx) => {
+                                      const isStUpdating = subtaskUpdatingId === `${task._id}-${stIdx}`
+                                      const stPriKey = (st.priority || 'medium').toLowerCase()
+                                      const stPriCfg = PRIORITY_CONFIG[stPriKey] || PRIORITY_CONFIG.medium
+                                      const stDisplayId = `${task.displayId || task._id.slice(-4)}.${stIdx + 1}`
+
+                                      return (
+                                        <Fragment key={st._id ? st._id : `${task._id}-subtask-${stIdx}`}>
+                                          <tr
+                                            className="bg-slate-50/50 dark:bg-slate-900/30 hover:bg-blue-50/30 dark:hover:bg-blue-950/20 border-b border-gray-100 dark:border-gray-800/50 transition-colors"
+                                          >
+                                          {/* Checkbox Indent with elbow branch */}
+                                          <td className="py-2.5 pl-4 pr-2 text-right">
+                                            <div className="flex items-center justify-end pr-1 text-gray-400 dark:text-gray-500 font-mono text-xs select-none">
+                                              ↳
                                             </div>
-                                            {task.assignedTo.length > 1 && (
-                                              <span className="text-[11px] font-medium text-gray-500">+{task.assignedTo.length - 1}</span>
-                                            )}
-                                          </div>
-                                        )
-                                      })()}
-                                    </td>
+                                          </td>
 
-                                    {/* Priority Dropdown */}
-                                    <td className="py-3 px-3 whitespace-nowrap">
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <button
-                                            type="button"
-                                            disabled={taskStatusUpdating === task._id}
-                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${currentPriorityCfg.cls} hover:opacity-90 transition-opacity cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 select-none`}
-                                          >
-                                            {currentPriorityCfg.icon}
-                                            <span>{currentPriorityCfg.label}</span>
-                                            <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
-                                          </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                          align="start"
-                                          side={isNearBottom ? 'top' : 'bottom'}
-                                          sideOffset={4}
-                                          collisionPadding={12}
-                                          onCloseAutoFocus={(e) => e.preventDefault()}
-                                          className="z-[10050] w-36 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1.5 shadow-xl text-xs [&_*]:text-xs outline-none"
-                                        >
-                                          {(['critical', 'high', 'medium', 'low'] as const).map(priKey => {
-                                            const cfg = priorityConfig[priKey]
-                                            const isPriSelected = p === priKey
-                                            return (
-                                              <DropdownMenuItem
-                                                key={priKey}
-                                                onClick={() => handleTaskPriorityChange(task._id, priKey)}
-                                                className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left cursor-pointer rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors ${
-                                                  isPriSelected ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20' : 'text-gray-700 dark:text-gray-300'
+                                          {/* Subtask ID */}
+                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                            <span className="font-apple-mono text-[11px] font-medium px-2 py-0.5 rounded-full border border-gray-200/80 dark:border-gray-800 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 shadow-2xs">
+                                              #{stDisplayId}
+                                            </span>
+                                          </td>
+
+                                          {/* Module */}
+                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                            <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[120px] block" title={task.module || '—'}>
+                                              {task.module || '—'}
+                                            </span>
+                                          </td>
+
+                                          {/* Subtask Title */}
+                                          <td className="py-2.5 px-3">
+                                            <div className="flex items-center gap-2 pl-2">
+                                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${st.status === 'done' || st.status === 'completed' || st.isCompleted ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                                              <span
+                                                onClick={() => handleOpenEditSubtask(task._id, st, stIdx)}
+                                                className={`text-xs font-medium cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-1 ${
+                                                  st.status === 'done' || st.status === 'completed' || st.isCompleted
+                                                    ? 'line-through text-gray-400 dark:text-gray-500'
+                                                    : 'text-gray-800 dark:text-gray-200'
                                                 }`}
+                                                title={`${st.title} (Click to edit)`}
                                               >
-                                                <span className="flex items-center gap-2">
-                                                  {cfg.icon}
-                                                  <span>{cfg.label}</span>
+                                                {st.title}
+                                              </span>
+                                              {st.subtasks && st.subtasks.length > 0 && (
+                                                <span
+                                                  onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleOpenEditSubtask(task._id, st, stIdx)
+                                                  }}
+                                                  className="inline-flex items-center text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40 cursor-pointer"
+                                                  title={`${st.subtasks.filter(n => n.isCompleted || n.status === 'done' || n.status === 'completed').length} of ${st.subtasks.length} nested subtasks completed`}
+                                                >
+                                                  {st.subtasks.filter(n => n.isCompleted || n.status === 'done' || n.status === 'completed').length}/{st.subtasks.length}
                                                 </span>
-                                                {isPriSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
-                                              </DropdownMenuItem>
-                                            )
-                                          })}
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </td>
+                                              )}
+                                            </div>
+                                          </td>
 
-                                    {/* Status Dropdown */}
-                                    <td className="py-3 px-3 whitespace-nowrap">
-                                      <DropdownMenu
-                                        open={activeStatusMenuTaskId === task._id}
-                                        onOpenChange={(open) => setActiveStatusMenuTaskId(open ? task._id : null)}
-                                      >
-                                        <DropdownMenuTrigger asChild>
-                                          <button
-                                            type="button"
-                                            disabled={taskStatusUpdating === task._id || task.archived}
-                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getTaskStatusBadgeClass(task.status)} hover:opacity-90 transition-opacity cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 select-none`}
-                                          >
-                                            <span>{formatTaskStatusLabel(task.status)}</span>
-                                            <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
-                                          </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                          align="start"
-                                          side={isNearBottom ? 'top' : 'bottom'}
-                                          sideOffset={4}
-                                          collisionPadding={12}
-                                          onCloseAutoFocus={(e) => e.preventDefault()}
-                                          className="z-[10050] w-48 max-h-80 overflow-y-auto thin-scrollbar rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1.5 shadow-xl text-xs [&_*]:text-xs outline-none"
-                                        >
-                                          {projectStatusOptions.map(option => {
-                                            const isStatSelected = task.status === option.value
-                                            const isCustomStatus = Boolean(option.value) && !DEFAULT_TASK_STATUS_KEYS.includes(option.value as any)
-                                            return (
-                                              <DropdownMenuItem
-                                                key={option.value}
-                                                onSelect={() => {
-                                                  setActiveStatusMenuTaskId(null)
-                                                  handleTaskStatusChange(task._id, option.value)
-                                                }}
-                                                className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left cursor-pointer rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors group ${
-                                                  isStatSelected ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20' : 'text-gray-700 dark:text-gray-300'
-                                                }`}
+                                          {/* Type */}
+                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                            {(() => {
+                                              const t = (st.type || 'subtask').toLowerCase()
+                                              let badgeCls = 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
+                                              if (t === 'bug') badgeCls = 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+                                              else if (t === 'task') badgeCls = 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800'
+                                              else if (t === 'feature') badgeCls = 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                                              else if (t === 'improvement') badgeCls = 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
+                                              return (
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${badgeCls}`}>
+                                                  {formatToTitleCase(t)}
+                                                </span>
+                                              )
+                                            })()}
+                                          </td>
+
+                                          {/* Assignee (Interactive dropdown) */}
+                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <button
+                                                  type="button"
+                                                  disabled={isStUpdating}
+                                                  className="cursor-pointer outline-none focus:outline-none focus:ring-0 select-none group flex items-center gap-1.5"
+                                                >
+                                                  {(() => {
+                                                    const assigneeObj = typeof st.assignedTo === 'object' && st.assignedTo !== null ? st.assignedTo : null
+                                                    const assigneeId = typeof st.assignedTo === 'string' ? st.assignedTo : assigneeObj?._id || ''
+                                                    const member = assignableMembers.find(m => m.id === assigneeId)
+                                                    const name = assigneeObj
+                                                      ? `${assigneeObj.firstName || ''} ${assigneeObj.lastName || ''}`.trim() || assigneeObj.email
+                                                      : (member?.name || '')
+                                                    const initial = name ? name.charAt(0).toUpperCase() : ''
+                                                    if (initial) {
+                                                      return (
+                                                        <div
+                                                          className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-semibold shadow-2xs hover:ring-2 hover:ring-blue-400 transition-all"
+                                                          title={`Assigned to ${name} (Click to change)`}
+                                                        >
+                                                          {initial}
+                                                        </div>
+                                                      )
+                                                    }
+                                                    return (
+                                                      <div
+                                                        className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 dark:group-hover:bg-blue-950/40 transition-colors"
+                                                        title="Unassigned (Click to assign)"
+                                                      >
+                                                        <User className="w-3 h-3" />
+                                                      </div>
+                                                    )
+                                                  })()}
+                                                </button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent
+                                                align="start"
+                                                side={isNearBottom ? 'top' : 'bottom'}
+                                                sideOffset={4}
+                                                className="z-[10050] w-48 max-h-60 overflow-y-auto thin-scrollbar rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1 shadow-xl text-xs outline-none"
                                               >
-                                                <div className="flex items-center gap-2 min-w-0 mr-1.5">
-                                                  <span className={`w-2 h-2 rounded-full shrink-0 ${
-                                                    option.value === 'done' || option.value === 'completed'
-                                                      ? 'bg-emerald-500'
-                                                      : option.value === 'in_progress'
-                                                      ? 'bg-amber-500'
-                                                      : option.value === 'testing'
-                                                      ? 'bg-purple-500'
-                                                      : option.value === 'review'
-                                                      ? 'bg-indigo-500'
-                                                      : 'bg-blue-500'
-                                                  }`} />
-                                                  <span className="truncate">{option.label}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                  {isStatSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
-                                                  {isCustomStatus && (
-                                                    <button
-                                                      type="button"
-                                                      data-action="delete-status"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        e.preventDefault()
-                                                        setActiveStatusMenuTaskId(null)
-                                                        setTimeout(() => {
-                                                          setStatusToDelete({ value: option.value, label: option.label })
-                                                        }, 50)
-                                                      }}
-                                                      className="p-1 rounded text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                                                      title={`Delete status "${option.label}"`}
+                                                <DropdownMenuItem
+                                                  onClick={() => handleSubtaskAssigneeChange(task._id, stIdx, null)}
+                                                  className="flex items-center gap-2 px-3 py-1.5 cursor-pointer text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/80"
+                                                >
+                                                  <User className="w-3.5 h-3.5 text-gray-400" />
+                                                  <span>Unassigned</span>
+                                                </DropdownMenuItem>
+                                                {assignableMembers.map(m => {
+                                                  const currentId = typeof st.assignedTo === 'object' && st.assignedTo !== null ? st.assignedTo?._id : st.assignedTo
+                                                  const isMemberSelected = currentId === m.id
+                                                  return (
+                                                    <DropdownMenuItem
+                                                      key={m.id}
+                                                      onClick={() => handleSubtaskAssigneeChange(task._id, stIdx, m.id)}
+                                                      className={`flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/80 ${
+                                                        isMemberSelected ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20' : 'text-gray-700 dark:text-gray-300'
+                                                      }`}
                                                     >
-                                                      <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                                      <div className="flex items-center gap-2 min-w-0">
+                                                        <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[9px] font-bold shrink-0">
+                                                          {m.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <span className="truncate">{m.name}</span>
+                                                      </div>
+                                                      {isMemberSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                                                    </DropdownMenuItem>
+                                                  )
+                                                })}
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          </td>
+
+                                          {/* Priority (Interactive dropdown) */}
+                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <button
+                                                  type="button"
+                                                  disabled={isStUpdating}
+                                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${stPriCfg.cls} hover:opacity-90 transition-opacity cursor-pointer outline-none focus:outline-none focus:ring-0 select-none`}
+                                                >
+                                                  {stPriCfg.icon}
+                                                  <span>{stPriCfg.label}</span>
+                                                  <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                                                </button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent
+                                                align="start"
+                                                side={isNearBottom ? 'top' : 'bottom'}
+                                                sideOffset={4}
+                                                className="z-[10050] w-36 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1 shadow-xl text-xs outline-none"
+                                              >
+                                                {(['critical', 'high', 'medium', 'low'] as const).map(priKey => {
+                                                  const cfg = PRIORITY_CONFIG[priKey]
+                                                  const isSelectedPri = stPriKey === priKey
+                                                  return (
+                                                    <DropdownMenuItem
+                                                      key={priKey}
+                                                      onClick={() => handleSubtaskPriorityChange(task._id, stIdx, priKey)}
+                                                      className={`w-full flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/80 ${
+                                                        isSelectedPri ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20' : 'text-gray-700 dark:text-gray-300'
+                                                      }`}
+                                                    >
+                                                      <span className="flex items-center gap-2">
+                                                        {cfg.icon}
+                                                        <span>{cfg.label}</span>
+                                                      </span>
+                                                      {isSelectedPri && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                                                    </DropdownMenuItem>
+                                                  )
+                                                })}
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          </td>
+
+                                          {/* Status (Interactive dropdown) */}
+                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <button
+                                                  type="button"
+                                                  disabled={isStUpdating}
+                                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${getTaskStatusBadgeClass(st.status || 'todo')} hover:opacity-90 transition-opacity cursor-pointer outline-none focus:outline-none focus:ring-0 select-none`}
+                                                >
+                                                  <span>{formatTaskStatusLabel(st.status || 'todo')}</span>
+                                                  <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                                                </button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent
+                                                align="start"
+                                                side={isNearBottom ? 'top' : 'bottom'}
+                                                sideOffset={4}
+                                                className="z-[10050] w-48 max-h-80 overflow-y-auto thin-scrollbar rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1.5 shadow-xl text-xs outline-none"
+                                              >
+                                                {projectStatusOptions.map(option => {
+                                                  const isStatSelected = (st.status || 'todo') === option.value
+                                                  return (
+                                                    <DropdownMenuItem
+                                                      key={option.value}
+                                                      onClick={() => handleSubtaskStatusChange(task._id, stIdx, option.value)}
+                                                      className={`w-full flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/80 ${
+                                                        isStatSelected ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20' : 'text-gray-700 dark:text-gray-300'
+                                                      }`}
+                                                    >
+                                                      <div className="flex items-center gap-2 min-w-0 mr-1.5">
+                                                        <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                                          option.value === 'done' || option.value === 'completed'
+                                                            ? 'bg-emerald-500'
+                                                            : option.value === 'in_progress'
+                                                            ? 'bg-amber-500'
+                                                            : option.value === 'testing'
+                                                            ? 'bg-purple-500'
+                                                            : option.value === 'review'
+                                                            ? 'bg-indigo-500'
+                                                            : 'bg-blue-500'
+                                                        }`} />
+                                                        <span className="truncate">{option.label}</span>
+                                                      </div>
+                                                      {isStatSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                                                    </DropdownMenuItem>
+                                                  )
+                                                })}
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          </td>
+
+                                          {/* Start Date */}
+                                          <td className="py-2.5 px-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+                                            {formatShortDate(st.createdAt)}
+                                          </td>
+
+                                          {/* Due Date */}
+                                          <td className="py-2.5 px-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+                                            {formatShortDate(st.dueDate)}
+                                          </td>
+
+                                          {/* Estimated Hours */}
+                                          <td className="py-2.5 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-500 dark:text-gray-400">
+                                            {st.estimatedHours ? `${st.estimatedHours}h` : '—'}
+                                          </td>
+
+                                          {/* Actual Hours */}
+                                          <td className="py-2.5 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-500 dark:text-gray-400">
+                                            {st.actualHours ? `${st.actualHours}h` : '—'}
+                                          </td>
+
+                                          {/* Action Buttons (Edit / Delete) */}
+                                          <td className="py-2 pr-4 pl-2 text-right whitespace-nowrap">
+                                            <div className="inline-flex items-center justify-end gap-1">
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  handleOpenAddNestedSubtask(task._id, st, stIdx)
+                                                }}
+                                                className="p-1 rounded-md hover:bg-blue-50 dark:hover:bg-blue-950/40 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                                                title="Add nested subtask"
+                                              >
+                                                <Plus className="w-3 h-3" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  handleOpenEditSubtask(task._id, st, stIdx)
+                                                }}
+                                                className="p-1 rounded-md hover:bg-gray-200/70 dark:hover:bg-gray-700/70 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
+                                                title="Edit subtask"
+                                              >
+                                                <Pencil className="w-3 h-3" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setSubtaskToDelete({
+                                                    parentTaskId: task._id,
+                                                    subtaskIndex: stIdx,
+                                                    title: st.title || 'Subtask',
+                                                    type: 'subtask'
+                                                  })
+                                                }}
+                                                className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-950/40 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+                                                title="Delete subtask"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+
+                                        {/* Render Nested Subtasks if any */}
+                                        {st.subtasks && st.subtasks.length > 0 && st.subtasks.map((nst, nstIdx) => {
+                                          const isNstUpdating = subtaskUpdatingId === `${task._id}-${stIdx}-${nstIdx}`
+                                          const isNstDone = nst.isCompleted || nst.status === 'done' || nst.status === 'completed'
+                                          const nstDisplayId = `${stDisplayId}.${nstIdx + 1}`
+
+                                          return (
+                                            <tr
+                                              key={nst._id ? nst._id : `${task._id}-subtask-${stIdx}-nested-${nstIdx}`}
+                                              className="bg-slate-100/50 dark:bg-slate-900/60 hover:bg-blue-50/20 dark:hover:bg-blue-950/20 border-b border-gray-100/60 dark:border-gray-800/40 transition-colors"
+                                            >
+                                              {/* Indent with double branch */}
+                                              <td className="py-2 pl-4 pr-2 text-right">
+                                                <div className="flex items-center justify-end pr-1 text-gray-400 dark:text-gray-500 font-mono text-xs select-none">
+                                                  ↳↳
+                                                </div>
+                                              </td>
+
+                                              {/* Nested ID */}
+                                              <td className="py-2 px-3 whitespace-nowrap">
+                                                <span className="font-apple-mono text-[10px] font-medium px-2 py-0.5 rounded-full border border-gray-200/60 dark:border-gray-800 text-gray-500 dark:text-gray-400 bg-white/70 dark:bg-gray-800/70">
+                                                  #{nstDisplayId}
+                                                </span>
+                                              </td>
+
+                                              {/* Module */}
+                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400 dark:text-gray-600">
+                                                —
+                                              </td>
+
+                                              {/* Nested Subtask Title */}
+                                              <td className="py-2 px-3">
+                                                <div className="flex items-center gap-2 pl-4">
+                                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isNstDone ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                                  <span
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      handleOpenEditSubtask(task._id, st, stIdx)
+                                                    }}
+                                                    className={`text-xs cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-1 ${
+                                                      isNstDone ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
+                                                    }`}
+                                                    title={`${nst.title}${nst.description ? ` (${nst.description})` : ''} (Click to edit)`}
+                                                  >
+                                                    {nst.title}
+                                                  </span>
+                                                  {nst.description && (
+                                                    <span className="text-[11px] text-gray-400 italic truncate max-w-[150px]">
+                                                      {nst.description}
+                                                    </span>
                                                   )}
                                                 </div>
-                                              </DropdownMenuItem>
-                                            )
-                                          })}
-                                          <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-                                          <DropdownMenuItem
-                                            onSelect={() => {
-                                              setActiveStatusMenuTaskId(null)
-                                              setTargetTaskIdForNewStatus(task._id)
-                                              setTimeout(() => {
-                                                setIsAddStatusModalOpen(true)
-                                              }, 50)
-                                            }}
-                                            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left cursor-pointer rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/80 text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 focus:text-blue-600 dark:focus:text-blue-400 data-[highlighted]:text-blue-600 dark:data-[highlighted]:text-blue-400 font-medium transition-colors group"
-                                          >
-                                            <Plus className="w-3.5 h-3.5 shrink-0 transition-colors" />
-                                            <span>Add new status</span>
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </td>
+                                              </td>
 
-                                    {/* Start Date */}
-                                    <td className="py-3 px-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                                      {formatShortDate(task.startDate || task.createdAt)}
-                                    </td>
+                                              {/* Type */}
+                                              <td className="py-2 px-3 whitespace-nowrap">
+                                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+                                                  Nested
+                                                </span>
+                                              </td>
 
-                                    {/* Due Date */}
-                                    <td className="py-3 px-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                                      {formatShortDate(task.dueDate)}
-                                    </td>
+                                              {/* Assignee */}
+                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                                —
+                                              </td>
 
-                                    {/* Estimated Hours */}
-                                    <td className="py-3 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-600 dark:text-gray-400">
-                                      {task.estimatedHours ? `${task.estimatedHours}h` : '—'}
-                                    </td>
+                                              {/* Priority */}
+                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                                —
+                                              </td>
 
-                                    {/* Actual Hours */}
-                                    <td className="py-3 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-600 dark:text-gray-400">
-                                      {task.actualHours ? `${task.actualHours}h` : (task.loggedHours ? `${task.loggedHours}h` : '—')}
-                                    </td>
+                                              {/* Status (Interactive dropdown) */}
+                                              <td className="py-2 px-3 whitespace-nowrap">
+                                                <DropdownMenu>
+                                                  <DropdownMenuTrigger asChild>
+                                                    <button
+                                                      type="button"
+                                                      disabled={isNstUpdating}
+                                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${getTaskStatusBadgeClass(nst.status || 'todo')} hover:opacity-90 transition-opacity cursor-pointer outline-none focus:outline-none focus:ring-0 select-none`}
+                                                    >
+                                                      <span>{formatTaskStatusLabel(nst.status || 'todo')}</span>
+                                                      <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                                                    </button>
+                                                  </DropdownMenuTrigger>
+                                                  <DropdownMenuContent
+                                                    align="start"
+                                                    side={isNearBottom ? 'top' : 'bottom'}
+                                                    sideOffset={4}
+                                                    className="z-[10050] w-48 max-h-80 overflow-y-auto thin-scrollbar rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1.5 shadow-xl text-xs outline-none"
+                                                  >
+                                                    {projectStatusOptions.map(option => {
+                                                      const isStatSelected = (nst.status || 'todo') === option.value
+                                                      return (
+                                                        <DropdownMenuItem
+                                                          key={option.value}
+                                                          onClick={() => handleNestedSubtaskStatusChange(task._id, stIdx, nstIdx, option.value)}
+                                                          className={`w-full flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/80 ${
+                                                            isStatSelected ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20' : 'text-gray-700 dark:text-gray-300'
+                                                          }`}
+                                                        >
+                                                          <div className="flex items-center gap-2 min-w-0 mr-1.5">
+                                                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                                              option.value === 'done' || option.value === 'completed'
+                                                                ? 'bg-emerald-500'
+                                                                : option.value === 'in_progress'
+                                                                ? 'bg-amber-500'
+                                                                : option.value === 'testing'
+                                                                ? 'bg-purple-500'
+                                                                : option.value === 'review'
+                                                                ? 'bg-indigo-500'
+                                                                : 'bg-blue-500'
+                                                            }`} />
+                                                            <span className="truncate">{option.label}</span>
+                                                          </div>
+                                                          {isStatSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                                                        </DropdownMenuItem>
+                                                      )
+                                                    })}
+                                                  </DropdownMenuContent>
+                                                </DropdownMenu>
+                                              </td>
 
-                                    {/* Edit Action Button */}
-                                    <td className="py-3 pr-4 pl-2 text-right whitespace-nowrap">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenEditTask(task)}
-                                        className={`p-1.5 rounded-lg transition-colors cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ${
-                                          isEditingThisTask
-                                            ? 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 ring-1 ring-blue-500/30'
-                                            : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
-                                        }`}
-                                        title="Edit task"
-                                      >
-                                        <Pencil className="w-3.5 h-3.5" />
-                                      </button>
-                                    </td>
-                                  </tr>
+                                              {/* Start Date */}
+                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                                —
+                                              </td>
+
+                                              {/* Due Date */}
+                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                                —
+                                              </td>
+
+                                              {/* Est Hours */}
+                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                                —
+                                              </td>
+
+                                              {/* Act Hours */}
+                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                                —
+                                              </td>
+
+                                              {/* Action Buttons */}
+                                              <td className="py-2 pr-4 pl-2 text-right whitespace-nowrap">
+                                                <div className="inline-flex items-center justify-end gap-1">
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      setSubtaskToDelete({
+                                                        parentTaskId: task._id,
+                                                        subtaskIndex: stIdx,
+                                                        nestedIndex: nstIdx,
+                                                        title: nst.title || 'Nested Subtask',
+                                                        type: 'nested'
+                                                      })
+                                                    }}
+                                                    className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-950/40 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+                                                    title="Delete nested subtask"
+                                                  >
+                                                    <Trash2 className="w-3 h-3" />
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          )
+                                        })}
+                                      </Fragment>
+                                    )
+                                  })}
+                                  </Fragment>
                                 )
                               })}
                             </tbody>
@@ -3347,6 +4541,31 @@ export default function SprintDetailPage() {
           isLoading={isDeletingStatus}
         />
 
+        {/* Delete Subtask / Nested Subtask Confirmation Modal */}
+        <DeleteSubtaskModal
+          isOpen={!!subtaskToDelete}
+          onClose={() => {
+            if (!isDeletingSubtaskItem) {
+              setSubtaskToDelete(null)
+            }
+          }}
+          onConfirm={() => {
+            if (!subtaskToDelete) return
+            if (subtaskToDelete.type === 'subtask') {
+              handleDeleteSubtask(subtaskToDelete.parentTaskId, subtaskToDelete.subtaskIndex)
+            } else if (subtaskToDelete.type === 'nested' && subtaskToDelete.nestedIndex !== undefined) {
+              handleDeleteNestedSubtask(
+                subtaskToDelete.parentTaskId,
+                subtaskToDelete.subtaskIndex,
+                subtaskToDelete.nestedIndex
+              )
+            }
+          }}
+          itemName={subtaskToDelete?.title || ''}
+          itemType={subtaskToDelete?.type || 'subtask'}
+          isLoading={isDeletingSubtaskItem}
+        />
+
         <ResponsiveDialog
           open={completeModalOpen}
           onOpenChange={(open) => {
@@ -3674,6 +4893,330 @@ export default function SprintDetailPage() {
                 All tasks in this sprint are completed. You can finish the sprint immediately.
               </p>
             )}
+          </div>
+        </ResponsiveDialog>
+
+        {/* Subtask Add / Edit Modal */}
+        <ResponsiveDialog
+          open={editingSubtaskModalOpen}
+          onOpenChange={(open) => setEditingSubtaskModalOpen(open)}
+          title={editingSubtaskIndex !== null && editingSubtaskIndex >= 0 ? "Edit Subtask" : "Add Subtask"}
+          description={editingSubtaskIndex !== null && editingSubtaskIndex >= 0 ? "Update subtask details and assignments" : "Create a new subtask under this task"}
+          className="max-w-2xl"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditingSubtaskModalOpen(false)}
+                disabled={isSubtaskSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSaveSubtaskModal}
+                disabled={isSubtaskSaving || !editingSubtaskForm.title.trim()}
+                className="gap-2"
+              >
+                {isSubtaskSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {editingSubtaskIndex !== null && editingSubtaskIndex >= 0 ? "Save Changes" : "Create Subtask"}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 py-1 max-h-[75vh] overflow-y-auto thin-scrollbar pr-1">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Subtask Title <span className="text-red-500">*</span></Label>
+              <Input
+                placeholder="Enter subtask title..."
+                value={editingSubtaskForm.title}
+                onChange={e => setEditingSubtaskForm(prev => ({ ...prev, title: e.target.value }))}
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Status</Label>
+                <Select
+                  value={editingSubtaskForm.status}
+                  onValueChange={val => setEditingSubtaskForm(prev => ({ ...prev, status: val }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10060]">
+                    {projectStatusOptions.map(st => {
+                      const hasIncompleteFormNested = editingSubtaskForm.nestedSubtasks.some(
+                        n => !(n.isCompleted || n.status === 'done' || n.status === 'completed')
+                      )
+                      const isFormDoneDisabled = (st.value === 'done' || st.value === 'completed') && editingSubtaskForm.nestedSubtasks.length > 0 && hasIncompleteFormNested
+
+                      return (
+                        <SelectItem key={st.value} value={st.value} disabled={isFormDoneDisabled}>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`w-2 h-2 rounded-full shrink-0 ${
+                                !st.color?.startsWith('#') && !st.color?.startsWith('rgb')
+                                  ? (st.value === 'done' || st.value === 'completed'
+                                      ? 'bg-emerald-500'
+                                      : st.value === 'in_progress'
+                                      ? 'bg-amber-500'
+                                      : st.value === 'testing'
+                                      ? 'bg-purple-500'
+                                      : st.value === 'review'
+                                      ? 'bg-indigo-500'
+                                      : 'bg-blue-500')
+                                  : ''
+                              }`}
+                              style={
+                                st.color?.startsWith('#') || st.color?.startsWith('rgb')
+                                  ? { backgroundColor: st.color }
+                                  : undefined
+                              }
+                            />
+                            <span className={isFormDoneDisabled ? 'opacity-40' : ''}>{st.label}</span>
+                            {isFormDoneDisabled && (
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono ml-auto">
+                                (nested pending)
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Priority</Label>
+                <Select
+                  value={editingSubtaskForm.priority}
+                  onValueChange={val => setEditingSubtaskForm(prev => ({ ...prev, priority: val }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          {config.icon}
+                          <span>{config.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Type</Label>
+                <Select
+                  value={editingSubtaskForm.type}
+                  onValueChange={val => setEditingSubtaskForm(prev => ({ ...prev, type: val }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="subtask">Subtask</SelectItem>
+                    <SelectItem value="task">Task</SelectItem>
+                    <SelectItem value="bug">Bug</SelectItem>
+                    <SelectItem value="feature">Feature</SelectItem>
+                    <SelectItem value="improvement">Improvement</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Assignee</Label>
+                <Select
+                  value={editingSubtaskForm.assignedTo || '__unassigned__'}
+                  onValueChange={val => setEditingSubtaskForm(prev => ({ ...prev, assignedTo: val === '__unassigned__' ? '' : val }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__unassigned__">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Unassigned</span>
+                      </div>
+                    </SelectItem>
+                    {assignableMembers.map(member => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">
+                            {member.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span>{member.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Due Date</Label>
+                <Input
+                  type="date"
+                  value={editingSubtaskForm.dueDate}
+                  onChange={e => setEditingSubtaskForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Estimated Hours</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="e.g. 2"
+                  value={editingSubtaskForm.estimatedHours}
+                  onChange={e => setEditingSubtaskForm(prev => ({ ...prev, estimatedHours: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Description</Label>
+              <Textarea
+                rows={2}
+                placeholder="Add subtask details or notes..."
+                value={editingSubtaskForm.description}
+                onChange={e => setEditingSubtaskForm(prev => ({ ...prev, description: e.target.value }))}
+              />
+            </div>
+
+            {/* Nested Subtasks Section */}
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CornerDownRight className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    Nested Subtasks
+                  </span>
+                  {editingSubtaskForm.nestedSubtasks.length > 0 && (
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40">
+                      {editingSubtaskForm.nestedSubtasks.filter(n => n.isCompleted || n.status === 'done' || n.status === 'completed').length}/{editingSubtaskForm.nestedSubtasks.length}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddNestedSubtaskToForm}
+                  className="h-7 text-xs font-medium gap-1.5 border-dashed border-blue-300 dark:border-blue-700/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Nested Subtask</span>
+                </Button>
+              </div>
+
+              {editingSubtaskForm.nestedSubtasks.length === 0 ? (
+                <div
+                  onClick={handleAddNestedSubtaskToForm}
+                  className="border border-dashed border-gray-200 dark:border-gray-800 rounded-xl p-3.5 text-center cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/20 dark:hover:bg-blue-950/10 transition-colors group"
+                >
+                  <div className="flex items-center justify-center gap-2 text-xs text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Click to add a nested subtask under this subtask</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1 thin-scrollbar">
+                  {editingSubtaskForm.nestedSubtasks.map((nst, nIndex) => {
+                    const isDone = nst.isCompleted || nst.status === 'done' || nst.status === 'completed'
+                    return (
+                      <div
+                        key={nst._id || nIndex}
+                        className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/40 space-y-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isDone}
+                            onChange={(e) => handleUpdateNestedSubtaskInForm(nIndex, 'isCompleted', e.target.checked)}
+                            className="rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4 shrink-0"
+                          />
+                          <Input
+                            placeholder="Nested subtask title..."
+                            value={nst.title}
+                            onChange={(e) => handleUpdateNestedSubtaskInForm(nIndex, 'title', e.target.value)}
+                            className={`h-8 text-xs flex-1 bg-white dark:bg-gray-900 ${
+                              isDone ? 'line-through text-gray-400 dark:text-gray-500' : ''
+                            }`}
+                          />
+                          <div className="w-32 shrink-0">
+                            <Select
+                              value={nst.status || 'todo'}
+                              onValueChange={(val) => handleUpdateNestedSubtaskInForm(nIndex, 'status', val)}
+                            >
+                              <SelectTrigger className="h-8 text-xs bg-white dark:bg-gray-900">
+                                <SelectValue placeholder="Status" />
+                              </SelectTrigger>
+                              <SelectContent className="z-[10060]">
+                                {projectStatusOptions.map(st => (
+                                  <SelectItem key={st.value} value={st.value}>
+                                    <div className="flex items-center gap-1.5 text-xs">
+                                      <span
+                                        className={`w-2 h-2 rounded-full shrink-0 ${
+                                          !st.color?.startsWith('#') && !st.color?.startsWith('rgb')
+                                            ? (st.value === 'done' || st.value === 'completed'
+                                                ? 'bg-emerald-500'
+                                                : st.value === 'in_progress'
+                                                ? 'bg-amber-500'
+                                                : st.value === 'testing'
+                                                ? 'bg-purple-500'
+                                                : st.value === 'review'
+                                                ? 'bg-indigo-500'
+                                                : 'bg-blue-500')
+                                            : ''
+                                        }`}
+                                        style={
+                                          st.color?.startsWith('#') || st.color?.startsWith('rgb')
+                                            ? { backgroundColor: st.color }
+                                            : undefined
+                                        }
+                                      />
+                                      <span className="truncate">{st.label}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveNestedSubtaskFromForm(nIndex)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer shrink-0"
+                            title="Remove nested subtask"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <Input
+                          placeholder="Optional note / description..."
+                          value={nst.description || ''}
+                          onChange={(e) => handleUpdateNestedSubtaskInForm(nIndex, 'description', e.target.value)}
+                          className="h-7 text-[11px] bg-white dark:bg-gray-900 placeholder:text-gray-400"
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </ResponsiveDialog>
     </MainLayout>

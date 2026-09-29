@@ -369,7 +369,8 @@ export async function GET(request: NextRequest) {
       ...taskSearchFilter,
       organization: organizationId,
       project: project ? project : { $in: projectIds },
-      archived: false
+      archived: false,
+      sprint: null
     }
 
     // Apply task visibility permissions (same as tasks API)

@@ -21,7 +21,8 @@ import {
   AlertTriangle,
   Zap,
   XCircle,
-  Layers
+  Layers,
+  BookOpen
 } from 'lucide-react'
 
 interface ViewTaskModalProps {
@@ -269,48 +270,131 @@ export default function ViewTaskModal({
             <div>
               <label className="text-sm font-medium text-muted-foreground">Subtasks</label>
               <div className="mt-1 space-y-2">
-                {task.subtasks.map((subtask: any, index: number) => (
-                  <div key={subtask._id || index} className="p-3 border rounded-lg">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          <div className="mt-1">
-                            {subtask.isCompleted ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <Circle className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className={`font-medium ${subtask.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
-                                {subtask.title}
-                              </span>
-                              <Badge className={`${getSubtaskBadgeClass(subtask.status)} text-xs flex items-center gap-1`}>
-                                {getSubtaskStatusIcon(subtask.status)}
-                                <span>{subtask.status?.replace('_', ' ')}</span>
-                              </Badge>
+                {task.subtasks.map((subtask: any, index: number) => {
+                  const subtaskAssignee = typeof subtask.assignedTo === 'object' && subtask.assignedTo !== null
+                    ? subtask.assignedTo
+                    : null
+                  return (
+                    <div key={subtask._id || index} className="p-3 border rounded-lg">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-1">
+                              {subtask.isCompleted ? (
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <Circle className="h-4 w-4 text-muted-foreground" />
+                              )}
                             </div>
-                            {subtask.description && (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {subtask.description}
-                              </p>
-                            )}
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`font-medium ${subtask.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
+                                  {subtask.title}
+                                </span>
+                                <Badge className={`${getSubtaskBadgeClass(subtask.status)} text-xs flex items-center gap-1`}>
+                                  {getSubtaskStatusIcon(subtask.status)}
+                                  <span>{subtask.status?.replace('_', ' ')}</span>
+                                </Badge>
+                                {subtask.type && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-muted-foreground capitalize">
+                                    {subtask.type}
+                                  </span>
+                                )}
+                                {subtask.priority && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-muted-foreground capitalize">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                      subtask.priority === 'critical' ? 'bg-red-500' :
+                                      subtask.priority === 'high' ? 'bg-orange-500' :
+                                      subtask.priority === 'medium' ? 'bg-amber-500' : 'bg-blue-500'
+                                    }`} />
+                                    {subtask.priority}
+                                  </span>
+                                )}
+                                {subtask.dueDate && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-muted-foreground">
+                                    <Calendar className="h-3 w-3" />
+                                    {new Date(subtask.dueDate).toLocaleDateString()}
+                                  </span>
+                                )}
+                                {subtask.estimatedHours !== undefined && subtask.estimatedHours !== null && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-muted-foreground">
+                                    <Clock className="h-3 w-3" />
+                                    {subtask.estimatedHours}h
+                                  </span>
+                                )}
+                                {subtask.story && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
+                                    <BookOpen className="h-3 w-3" />
+                                    {typeof subtask.story === 'object' ? subtask.story.title : 'User Story'}
+                                  </span>
+                                )}
+                                {subtaskAssignee && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
+                                    <span className="h-3.5 w-3.5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[9px] font-bold">
+                                      {(subtaskAssignee.firstName?.[0] || '') + (subtaskAssignee.lastName?.[0] || '')}
+                                    </span>
+                                    {subtaskAssignee.firstName} {subtaskAssignee.lastName}
+                                  </span>
+                                )}
+                              </div>
+                              {subtask.description && (
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {subtask.description}
+                                </p>
+                              )}
+                            </div>
                           </div>
+                          {subtask.isCompleted && (
+                            <Badge variant="outline" className="text-xs text-green-700 border-green-200 bg-green-50">
+                              Completed
+                            </Badge>
+                          )}
                         </div>
-                        {subtask.isCompleted && (
-                          <Badge variant="outline" className="text-xs text-green-700 border-green-200 bg-green-50">
-                            Completed
-                          </Badge>
+
+                        {/* Nested Subtasks */}
+                        {subtask.subtasks && subtask.subtasks.length > 0 && (
+                          <div className="ml-7 pl-3 border-l-2 border-slate-200 dark:border-slate-800 space-y-1.5 pt-2">
+                            {subtask.subtasks.map((nested: any, nIdx: number) => {
+                              const isNestedDone = nested.isCompleted || nested.status === 'done'
+                              return (
+                                <div key={nested._id || nIdx} className="flex items-start gap-2">
+                                  <div className="mt-0.5">
+                                    {isNestedDone ? (
+                                      <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                                    ) : (
+                                      <Circle className="h-3.5 w-3.5 text-muted-foreground" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-xs ${isNestedDone ? 'line-through text-muted-foreground' : ''}`}>
+                                        {nested.title}
+                                      </span>
+                                      <Badge className={`${getSubtaskBadgeClass(nested.status)} text-[10px] py-0 px-1.5 flex items-center gap-1`}>
+                                        {getSubtaskStatusIcon(nested.status)}
+                                        <span>{nested.status?.replace('_', ' ')}</span>
+                                      </Badge>
+                                    </div>
+                                    {nested.description && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">
+                                        {nested.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
                         )}
-                      </div>
-                      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                        <span>Created {formatDateTimeModal(subtask.createdAt)}</span>
-                        <span>Updated {formatDateTimeModal(subtask.updatedAt)}</span>
+
+                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                          <span>Created {formatDateTimeModal(subtask.createdAt)}</span>
+                          <span>Updated {formatDateTimeModal(subtask.updatedAt)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

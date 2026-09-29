@@ -5,6 +5,7 @@ import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { Sprint } from '@/models/Sprint'
+import '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
 import { CompletionService } from '@/lib/completion-service'
 import { notificationService } from '@/lib/notification-service'
@@ -107,7 +108,7 @@ function sanitizeLabels(input: any): string[] {
   return []
 }
 
-type IncomingSubtask = {
+type IncomingNestedSubtask = {
   _id?: string
   title?: unknown
   description?: unknown
@@ -115,7 +116,22 @@ type IncomingSubtask = {
   isCompleted?: unknown
 }
 
-function sanitizeSubtasks(input: any): Array<{
+type IncomingSubtask = {
+  _id?: string
+  title?: unknown
+  description?: unknown
+  status?: unknown
+  isCompleted?: unknown
+  assignedTo?: unknown
+  story?: unknown
+  dueDate?: unknown
+  type?: unknown
+  priority?: unknown
+  estimatedHours?: unknown
+  subtasks?: unknown
+}
+
+function sanitizeNestedSubtasks(input: any): Array<{
   _id?: string
   title: string
   description?: string
@@ -127,12 +143,12 @@ function sanitizeSubtasks(input: any): Array<{
   }
 
   return input
-    .filter((item: IncomingSubtask) => typeof item?.title === 'string' && item.title.trim().length > 0)
-    .map((item: IncomingSubtask) => {
+    .filter((item: IncomingNestedSubtask) => typeof item?.title === 'string' && item.title.trim().length > 0)
+    .map((item: IncomingNestedSubtask) => {
       const rawStatus = typeof item.status === 'string' ? item.status : undefined
       const status = rawStatus && TASK_STATUS_SET.has(rawStatus as TaskStatus)
         ? rawStatus as TaskStatus
-        : 'backlog'
+        : 'todo'
 
       const sanitized: {
         _id?: string
@@ -148,8 +164,8 @@ function sanitizeSubtasks(input: any): Array<{
           : status === 'done'
       }
 
-      if (item._id && typeof item._id === 'string') {
-        sanitized._id = item._id
+      if (item._id) {
+        sanitized._id = typeof item._id === 'string' ? item._id : String(item._id)
       }
 
       if (typeof item.description === 'string') {
@@ -161,6 +177,151 @@ function sanitizeSubtasks(input: any): Array<{
 
       return sanitized
     })
+}
+
+function sanitizeSubtasks(input: any): Array<{
+  _id?: string
+  title: string
+  description?: string
+  status: TaskStatus
+  isCompleted: boolean
+  assignedTo?: mongoose.Types.ObjectId
+  story?: mongoose.Types.ObjectId
+  dueDate?: Date
+  type?: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  estimatedHours?: number
+  subtasks?: Array<{
+    _id?: string
+    title: string
+    description?: string
+    status: TaskStatus
+    isCompleted: boolean
+  }>
+}> {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  const VALID_TYPES = new Set(['task', 'bug', 'feature', 'improvement', 'subtask'])
+  const VALID_PRIORITIES = new Set(['low', 'medium', 'high', 'critical'])
+
+  return input
+    .filter((item: IncomingSubtask) => typeof item?.title === 'string' && item.title.trim().length > 0)
+    .map((item: IncomingSubtask) => {
+      const rawStatus = typeof item.status === 'string' ? item.status : undefined
+      const status = rawStatus && TASK_STATUS_SET.has(rawStatus as TaskStatus)
+        ? rawStatus as TaskStatus
+        : 'todo'
+
+      const sanitized: {
+        _id?: string
+        title: string
+        description?: string
+        status: TaskStatus
+        isCompleted: boolean
+        assignedTo?: mongoose.Types.ObjectId
+        story?: mongoose.Types.ObjectId
+        dueDate?: Date
+        type?: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+        priority?: 'low' | 'medium' | 'high' | 'critical'
+        estimatedHours?: number
+        subtasks?: Array<{
+          _id?: string
+          title: string
+          description?: string
+          status: TaskStatus
+          isCompleted: boolean
+        }>
+      } = {
+        title: (item.title as string).trim(),
+        status,
+        isCompleted: typeof item.isCompleted === 'boolean'
+          ? item.isCompleted
+          : status === 'done',
+        type: typeof item.type === 'string' && VALID_TYPES.has(item.type) ? (item.type as any) : 'subtask',
+        priority: typeof item.priority === 'string' && VALID_PRIORITIES.has(item.priority) ? (item.priority as any) : 'medium',
+        subtasks: sanitizeNestedSubtasks(item.subtasks)
+      }
+
+      if (sanitized.subtasks && sanitized.subtasks.length > 0) {
+        const hasIncompleteNested = sanitized.subtasks.some(
+          (nst: any) => !(nst.isCompleted || nst.status === 'done' || nst.status === 'completed')
+        )
+        if (hasIncompleteNested && (sanitized.status === 'done' || (sanitized.status as any) === 'completed' || sanitized.isCompleted)) {
+          sanitized.status = 'in_progress'
+          sanitized.isCompleted = false
+        }
+      }
+
+      if (item._id) {
+        sanitized._id = typeof item._id === 'string' ? item._id : String(item._id)
+      }
+
+      if (typeof item.description === 'string') {
+        const trimmed = item.description.trim()
+        if (trimmed.length > 0) {
+          sanitized.description = trimmed
+        }
+      }
+
+      if (item.assignedTo) {
+        const rawId = typeof item.assignedTo === 'string'
+          ? item.assignedTo.trim()
+          : (typeof item.assignedTo === 'object' && item.assignedTo !== null && '_id' in item.assignedTo)
+            ? String((item.assignedTo as any)._id).trim()
+            : undefined
+
+        if (rawId && mongoose.Types.ObjectId.isValid(rawId)) {
+          sanitized.assignedTo = new mongoose.Types.ObjectId(rawId)
+        }
+      }
+
+      if (item.story) {
+        const rawId = typeof item.story === 'string'
+          ? item.story.trim()
+          : (typeof item.story === 'object' && item.story !== null && '_id' in item.story)
+            ? String((item.story as any)._id).trim()
+            : undefined
+
+        if (rawId && mongoose.Types.ObjectId.isValid(rawId)) {
+          sanitized.story = new mongoose.Types.ObjectId(rawId)
+        }
+      }
+
+      if (item.dueDate) {
+        const d = new Date(item.dueDate as any)
+        if (!Number.isNaN(d.getTime())) {
+          sanitized.dueDate = d
+        }
+      }
+
+      if (item.estimatedHours !== undefined && item.estimatedHours !== null && item.estimatedHours !== '') {
+        const val = typeof item.estimatedHours === 'number' ? item.estimatedHours : Number(item.estimatedHours)
+        if (!Number.isNaN(val) && val >= 0) {
+          sanitized.estimatedHours = val
+        }
+      }
+
+      return sanitized
+    })
+}
+
+function areAllSubtasksCompleted(subtasks: any[]): boolean {
+  if (!subtasks || subtasks.length === 0) return true
+  return subtasks.every(st => {
+    const isStDone = st.isCompleted === true || st.status === 'done'
+    if (!isStDone) return false
+    if (st.subtasks && Array.isArray(st.subtasks) && st.subtasks.length > 0) {
+      return st.subtasks.every((nested: any) => nested.isCompleted === true || nested.status === 'done')
+    }
+    return true
+  })
+}
+
+function hasAnyIncompleteSubtasks(subtasks: any[]): boolean {
+  if (!subtasks || subtasks.length === 0) return false
+  return !areAllSubtasksCompleted(subtasks)
 }
 
 function sanitizeAttachments(
@@ -258,6 +419,8 @@ export async function GET(
       .populate([
         { path: 'project', select: '_id name' },
         { path: 'assignedTo.user', select: '_id firstName lastName email avatar' },
+        { path: 'subtasks.assignedTo', select: '_id firstName lastName email avatar' },
+        { path: 'subtasks.story', select: '_id title' },
         { path: 'createdBy', select: 'firstName lastName email' },
         { path: 'assignedBy', select: 'firstName lastName email' },
         { path: 'comments.author', select: 'firstName lastName email' },
@@ -505,6 +668,47 @@ export async function PUT(
       currentSprint: currentTask.sprint
     })
 
+    // Auto-sync subtask assignees: ensure anyone assigned to a subtask is also in assignedTo
+    if (Object.prototype.hasOwnProperty.call(updateData, 'subtasks') && Array.isArray(updateData.subtasks)) {
+      const subtaskAssigneeIds = new Set<string>()
+      for (const st of updateData.subtasks) {
+        if (st.assignedTo) {
+          subtaskAssigneeIds.add(st.assignedTo.toString())
+        }
+      }
+      if (subtaskAssigneeIds.size > 0) {
+        let currentAssignedTo: any[] = []
+        let hasAssignedToInPayload = false
+        if (Object.prototype.hasOwnProperty.call(updateData, 'assignedTo') && Array.isArray(updateData.assignedTo)) {
+          currentAssignedTo = [...updateData.assignedTo]
+          hasAssignedToInPayload = true
+        } else if (Array.isArray(currentTask.assignedTo)) {
+          currentAssignedTo = currentTask.assignedTo.map((item: any) => ({
+            user: item?.user?._id ? item.user._id.toString() : (item?.user ? item.user.toString() : item.toString()),
+            firstName: item?.firstName,
+            lastName: item?.lastName,
+            email: item?.email,
+            hourlyRate: item?.hourlyRate
+          }))
+        }
+
+        let addedAny = false
+        for (const subAssigneeId of Array.from(subtaskAssigneeIds)) {
+          const alreadyInTask = currentAssignedTo.some((item: any) => {
+            const uid = item?.user?._id ? item.user._id.toString() : (item?.user ? item.user.toString() : item.toString())
+            return uid === subAssigneeId
+          })
+          if (!alreadyInTask) {
+            currentAssignedTo.push({ user: subAssigneeId })
+            addedAny = true
+          }
+        }
+        if (hasAssignedToInPayload || addedAny) {
+          updateData.assignedTo = currentAssignedTo
+        }
+      }
+    }
+
     // Handle project changes - regenerate taskNumber and displayId for new project
     if (updateData.project && updateData.project !== currentTask.project.toString()) {
       console.log('[Task PUT] Project change detected', {
@@ -583,7 +787,7 @@ export async function PUT(
       }
     }
 
-    // If task status is changing to 'todo', update all sub-tasks to 'todo'
+    // If task status is changing to 'todo', update all sub-tasks and nested sub-tasks to 'todo'
     if (updateData.status === 'todo' && currentTask.status !== 'todo') {
       // Use existing subtasks from currentTask if subtasks are not being updated in this request
       const subtasksToUpdate = Object.prototype.hasOwnProperty.call(updateData, 'subtasks')
@@ -592,13 +796,46 @@ export async function PUT(
 
       if (subtasksToUpdate.length > 0) {
         const updatedSubtasks = subtasksToUpdate.map((subtask: any) => ({
-          _id: subtask._id,
-          title: subtask.title || '',
-          description: subtask.description,
+          ...subtask,
           status: 'todo' as TaskStatus,
-          isCompleted: false
+          isCompleted: false,
+          subtasks: Array.isArray(subtask.subtasks)
+            ? subtask.subtasks.map((nested: any) => ({
+                ...nested,
+                status: 'todo' as TaskStatus,
+                isCompleted: false
+              }))
+            : []
         }))
         updateData.subtasks = updatedSubtasks
+      }
+    }
+
+    // Subtask completion rules:
+    // 1. Task cannot be marked done if any subtask or nested subtask is incomplete
+    // 2. If all subtasks are completed, automatically mark the main task as complete
+    // 3. If a done task has subtasks updated to incomplete, revert task to in_progress
+    const effectiveSubtasks = Object.prototype.hasOwnProperty.call(updateData, 'subtasks')
+      ? updateData.subtasks
+      : (currentTask.subtasks && Array.isArray(currentTask.subtasks) ? currentTask.subtasks : [])
+
+    if (updateData.status === 'done') {
+      if (hasAnyIncompleteSubtasks(effectiveSubtasks)) {
+        return NextResponse.json(
+          { error: 'Cannot mark task as complete: all subtasks and nested subtasks must be completed first.' },
+          { status: 400 }
+        )
+      }
+      updateData.completedAt = new Date()
+    } else if (Object.prototype.hasOwnProperty.call(updateData, 'subtasks')) {
+      if (effectiveSubtasks.length > 0 && areAllSubtasksCompleted(effectiveSubtasks)) {
+        updateData.status = 'done'
+        updateData.completedAt = new Date()
+      } else if (hasAnyIncompleteSubtasks(effectiveSubtasks)) {
+        if (currentTask.status === 'done' || updateData.status === 'done') {
+          updateData.status = 'in_progress'
+          updateData.completedAt = null
+        }
       }
     }
 
@@ -649,6 +886,8 @@ export async function PUT(
       .populate([
         { path: 'project', select: '_id name' },
         { path: 'assignedTo.user', select: '_id firstName lastName email avatar' },
+        { path: 'subtasks.assignedTo', select: '_id firstName lastName email avatar' },
+        { path: 'subtasks.story', select: '_id title' },
         { path: 'createdBy', select: 'firstName lastName email' },
         { path: 'assignedBy', select: 'firstName lastName email' },
         {

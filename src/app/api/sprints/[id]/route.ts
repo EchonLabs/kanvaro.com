@@ -128,6 +128,7 @@ export async function GET(
       .select('title displayId status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint movedFromSprint story epic module startDate dueDate createdAt')
       .populate([
         { path: 'assignedTo.user', select: '_id firstName lastName email avatar' },
+        { path: 'subtasks.assignedTo', select: '_id firstName lastName email avatar' },
         { path: 'sprint', select: 'name _id' },
         { path: 'story', select: 'title' },
         { path: 'epic', select: 'title' }
@@ -159,7 +160,28 @@ export async function GET(
         priority: taskObj.priority,
         type: taskObj.type,
         archived: taskObj.archived ?? false,
-        subtasks: Array.isArray(taskObj.subtasks) ? taskObj.subtasks : [],
+        subtasks: Array.isArray(taskObj.subtasks)
+          ? taskObj.subtasks.map((st: any) => {
+              const mappedNested = Array.isArray(st.subtasks)
+                ? st.subtasks.map((nst: any) => ({
+                    ...nst,
+                    _id: nst._id ? nst._id.toString() : undefined
+                  }))
+                : []
+              const hasIncompleteNested = mappedNested.length > 0 &&
+                mappedNested.some((nst: any) => !(nst.isCompleted || nst.status === 'done' || nst.status === 'completed'))
+              const isCompleted = hasIncompleteNested ? false : (st.isCompleted ?? (st.status === 'done' || st.status === 'completed'))
+              const status = hasIncompleteNested && (st.status === 'done' || st.status === 'completed') ? 'in_progress' : st.status
+
+              return {
+                ...st,
+                status,
+                isCompleted,
+                _id: st._id ? st._id.toString() : undefined,
+                subtasks: mappedNested
+              }
+            })
+          : [],
         assignedTo: taskObj.assignedTo,
         movedToSprint, // Indicates if task was moved to another sprint
         movedToBacklog: !taskObj.sprint && taskObj.movedFromSprint && taskObj.movedFromSprint.toString() === sprintId,
