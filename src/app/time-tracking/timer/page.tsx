@@ -147,7 +147,7 @@ export default function TimerPage() {
 
   const filteredProjects = projects.filter((project) =>
     project.name.toLowerCase().includes(projectSearch.toLowerCase())
-  ).sort((a, b) => a.name.localeCompare(b.name))
+  ).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
 
   const showInitialTasksLoading = tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)
 

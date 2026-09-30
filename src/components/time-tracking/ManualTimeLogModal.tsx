@@ -181,9 +181,9 @@ export function ManualTimeLogModal({
   }, [employees, employeeSearch])
 
   const filteredProjects = useMemo(() => {
-    if (!projectSearch.trim()) return projects
+    if (!projectSearch.trim()) return [...projects].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
     const searchLower = projectSearch.toLowerCase()
-    return projects.filter(p => p.name?.toLowerCase().includes(searchLower))
+    return projects.filter(p => p.name?.toLowerCase().includes(searchLower)).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectSearch])
 
   const filteredTasks = useMemo(() => {

@@ -575,9 +575,9 @@ export default function CreateTaskPage() {
 
   // Memoize filtered projects to avoid recalculating on every render
   const filteredProjects = useMemo(() => {
-    if (!projectQuery.trim()) return projects
-    const q = projectQuery.toLowerCase()
-    return projects.filter(p => p.name.toLowerCase().includes(q))
+    const q = projectQuery.toLowerCase().trim()
+    if (!q) return [...projects].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
+    return projects.filter(p => (p.name || '').toLowerCase().includes(q)).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectQuery])
 
   // Memoize filtered categories to avoid recalculating on every render

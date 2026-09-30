@@ -72,8 +72,8 @@ export default function CreateStoryPage() {
 
   const filteredProjects = useMemo(() => {
     const query = projectQuery.trim().toLowerCase()
-    if (!query) return projects
-    return projects.filter(project => project.name.toLowerCase().includes(query))
+    if (!query) return [...projects].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
+    return projects.filter(project => project.name.toLowerCase().includes(query)).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectQuery])
 
   // Auth initialization - trigger data loading

@@ -179,7 +179,7 @@ export function TimeLogs({
     const result = filterProjects.filter(project =>
       project.name?.toLowerCase().includes(projectSearch.toLowerCase())
     )
-    return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    return result.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [filterProjects, projectSearch])
 
   const filteredTasks = useMemo(() => {
