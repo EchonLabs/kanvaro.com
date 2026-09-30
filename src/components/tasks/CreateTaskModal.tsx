@@ -30,6 +30,12 @@ import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
 import { Permission, PermissionGate } from '@/lib/permissions'
 import TaskCategoryManagerModal from './TaskCategoryManagerModal'
 
+interface TaskCategory {
+  key: string
+  title: string
+  order: number
+}
+
 interface CreateTaskModalProps {
   isOpen: boolean
   onClose: () => void
@@ -138,8 +144,8 @@ export default function CreateTaskModal({
   onClose,
   projectId,
   onTaskCreated,
-  defaultStatus: _defaultStatus,
-  availableStatuses: _availableStatuses,
+  defaultStatus,
+  availableStatuses,
   stayOnCurrentPage = false,
   sprintId
 }: CreateTaskModalProps) {
