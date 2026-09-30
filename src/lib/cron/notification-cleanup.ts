@@ -36,6 +36,7 @@ export async function processNotificationCleanup() {
 
   return {
     success: true,
+    totalDeleted,
     message: `Notification cleanup completed. Deleted ${totalDeleted} old notifications across ${results.length} organizations`,
     details: results,
   }

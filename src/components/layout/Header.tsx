@@ -205,7 +205,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className={cn('text-sm font-medium break-words text-[var(--apple-label)]', !notification.isRead && 'font-semibold')}>{notification.title}</p>
-                          <p className="text-[13px] text-[var(--apple-secondary-label)] break-words mt-0.5 line-clamp-2">
+                          <p className="text-[13px] text-[var(--apple-secondary-label)] break-words mt-0.5 line-clamp-2 whitespace-pre-line">
                             {notification.message}
                           </p>
                           <p className="text-xs text-[var(--apple-tertiary-label)] mt-0.5">

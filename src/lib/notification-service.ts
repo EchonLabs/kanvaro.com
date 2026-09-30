@@ -377,7 +377,7 @@ export class NotificationService {
         <p>Hello ${userName},</p>
         
         <div class="notification-content">
-            <p>${notification.message}</p>
+            <p>${(notification.message || '').replace(/\n/g, '<br/>')}</p>
         </div>
 
         ${notification.data ? `

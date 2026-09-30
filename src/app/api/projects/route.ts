@@ -330,7 +330,16 @@ export async function POST(request: NextRequest) {
             taskUpdates: settings?.notifications?.taskUpdates ?? true,
             budgetAlerts: settings?.notifications?.budgetAlerts ?? true,
             deadlineReminders: settings?.notifications?.deadlineReminders ?? true
-          }
+          },
+          taskCategories: Array.isArray(settings?.taskCategories) && settings.taskCategories.length > 0
+            ? settings.taskCategories
+            : [
+                { key: 'dev', title: 'Dev', order: 0 },
+                { key: 'qa', title: 'QA', order: 1 },
+                { key: 'design', title: 'Design', order: 2 },
+                { key: 'client-revisions', title: 'Client Revisions', order: 3 },
+                { key: 'bug-fixing', title: 'Bug Fixing', order: 4 },
+              ]
         },
         tags: tags || [],
         customFields: customFields || {},

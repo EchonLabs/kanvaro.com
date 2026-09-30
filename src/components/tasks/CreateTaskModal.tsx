@@ -26,9 +26,9 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { AttachmentList } from '@/components/ui/AttachmentList'
 import { useNotify } from '@/lib/notify'
 import { TASK_TITLE_MAX_WORDS, countWords, truncateToMaxWords } from '@/lib/text/word-limit'
-import { Permission } from '@/lib/permissions/permission-definitions'
-import { PermissionGate } from '@/lib/permissions/permission-components'
-import TaskCategoryManagerModal from '@/components/tasks/TaskCategoryManagerModal'
+import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
+import { Permission, PermissionGate } from '@/lib/permissions'
+import TaskCategoryManagerModal from './TaskCategoryManagerModal'
 
 interface TaskCategory {
   key: string
@@ -44,6 +44,7 @@ interface CreateTaskModalProps {
   defaultStatus?: string
   availableStatuses?: Array<{ key: string; title: string }>
   stayOnCurrentPage?: boolean // If true, don't redirect after task creation
+  sprintId?: string
 }
 
 interface User {
@@ -143,9 +144,10 @@ export default function CreateTaskModal({
   onClose,
   projectId,
   onTaskCreated,
-  defaultStatus: _defaultStatus,
-  availableStatuses: _availableStatuses,
-  stayOnCurrentPage = false
+  defaultStatus,
+  availableStatuses,
+  stayOnCurrentPage = false,
+  sprintId
 }: CreateTaskModalProps) {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
 
@@ -159,7 +161,7 @@ export default function CreateTaskModal({
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [projectQuery, setProjectQuery] = useState('')
-  const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [subtasks, setSubtasks] = useState<SubtaskItem[]>([])
   const [assignedTo, setAssignedTo] = useState<string[]>([])
   const [assigneeHourlyRates, setAssigneeHourlyRates] = useState<Record<string, string>>({})
   const [assigneeQuery, setAssigneeQuery] = useState('')
@@ -444,32 +446,7 @@ export default function CreateTaskModal({
   }, [isOpen, projectId])
 
 
-  const addSubtask = () => {
-    setSubtasks([...subtasks, {
-      title: '',
-      description: '',
-      status: 'backlog',
-      isCompleted: false
-    }])
-  }
 
-  const updateSubtask = (index: number, field: keyof Subtask, value: any) => {
-    setSubtasks(prev => {
-      const updated = [...prev]
-      updated[index] = {
-        ...updated[index],
-        [field]: field === 'status' ? (value as SubtaskStatus) : value
-      }
-      if (field === 'status') {
-        updated[index].isCompleted = (value as SubtaskStatus) === 'done'
-      }
-      return updated
-    })
-  }
-
-  const removeSubtask = (index: number) => {
-    setSubtasks(subtasks.filter((_, i) => i !== index))
-  }
 
   const addLabel = () => {
     const trimmed = newLabel.trim()
@@ -571,7 +548,8 @@ export default function CreateTaskModal({
       return
     }
     // Validate required fields including subtasks titles
-    const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
+    const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0)) ||
+      subtasks.some(st => (st.subtasks || []).some(n => !(n.title && n.title.trim().length > 0)))
     const missingDueDate = !(formData.dueDate && formData.dueDate.trim().length > 0)
     const missingAssignees = assignedTo.length === 0
     const missingCategory = !formData.category
@@ -603,12 +581,30 @@ export default function CreateTaskModal({
       return
     }
     try {
-      const preparedSubtasks = subtasks.map(subtask => ({
-        title: subtask.title.trim(),
-        description: subtask.description?.trim() || undefined,
-        status: 'backlog', // Sub-tasks always created with backlog status
-        isCompleted: false
-      }))
+      const preparedSubtasks = subtasks
+        .filter(st => st.title && st.title.trim().length > 0)
+        .map(subtask => ({
+          title: subtask.title.trim(),
+          description: subtask.description?.trim() || undefined,
+          status: subtask.status || 'todo',
+          isCompleted: subtask.status === 'done' ? true : !!subtask.isCompleted,
+          assignedTo: subtask.assignedTo || undefined,
+          story: subtask.story || undefined,
+          dueDate: subtask.dueDate || undefined,
+          type: subtask.type || 'subtask',
+          priority: subtask.priority || 'medium',
+          estimatedHours: subtask.estimatedHours !== undefined && subtask.estimatedHours !== null && subtask.estimatedHours !== ''
+            ? Number(subtask.estimatedHours)
+            : undefined,
+          subtasks: (subtask.subtasks || [])
+            .filter(n => n.title && n.title.trim().length > 0)
+            .map(n => ({
+              title: n.title.trim(),
+              description: n.description?.trim() || undefined,
+              status: n.status || 'todo',
+              isCompleted: n.status === 'done' ? true : !!n.isCompleted
+            }))
+        }))
 
       const assignedToPayload = assignedTo.map(userId => {
         const member = projectMembers.find(m => m._id.toString() === userId.toString())
@@ -627,7 +623,7 @@ export default function CreateTaskModal({
         },
         body: JSON.stringify({
           ...formData,
-          status: 'backlog',
+          status: defaultStatus || 'backlog',
           project: effectiveProjectId,
           assignedTo: assignedToPayload,
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
@@ -656,6 +652,18 @@ export default function CreateTaskModal({
         notifyError({ title: 'Failed to Create Task', message: message })
         setLoading(false)
         return
+      }
+
+      if (sprintId && data.data?._id) {
+        try {
+          await fetch(`/api/tasks/${data.data._id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sprint: sprintId })
+          })
+        } catch (sprintErr) {
+          console.error('Failed to link task to sprint:', sprintErr)
+        }
       }
 
       notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
@@ -1360,60 +1368,19 @@ export default function CreateTaskModal({
             </div>
 
             {/* Subtasks Section */}
-            <div className="space-y-3 mt-4 pt-4 border-t border-[var(--apple-separator)]">
-              <div className="flex items-center justify-between">
-                <h3 className="text-[14px] font-semibold text-[var(--apple-label)]">Subtasks</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addSubtask} className="rounded-full h-8 px-4 text-[13px] border-[var(--apple-separator)]">
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  Add Subtask
-                </Button>
-              </div>
-
-              {subtasks.map((subtask, index) => (
-                <div key={index} className="p-4 border border-[var(--apple-separator)] rounded-[var(--apple-radius-lg)] space-y-3 bg-[var(--apple-bg-primary)]">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-[13px] font-semibold text-[var(--apple-label)]">Subtask {index + 1}</h4>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeSubtask(index)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div>
-                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Title *</label>
-                    <Input
-                      value={subtask.title}
-                      onChange={(e) => updateSubtask(index, 'title', e.target.value)}
-                      placeholder="Subtask title"
-                      className="mt-1.5 h-9 rounded-[var(--apple-radius-pill)] text-[14px]"
-                      required
-                    />
-                  </div>
-
-                  {/* <div>
-                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Description</label>
-                    <Textarea
-                      value={subtask.description || ''}
-                      onChange={(e) => updateSubtask(index, 'description', e.target.value)}
-                      placeholder="Subtask description"
-                      rows={2}
-                    />
-                  </div> */}
-                </div>
-              ))}
-
-              {subtasks.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Target className="h-12 w-12 mx-auto mb-4" />
-                  <p>No subtasks added yet</p>
-                  <p className="text-sm">Click "Add Subtask" to create subtasks for this task</p>
-                </div>
-              )}
+            <div className="mt-4 pt-4 border-t border-[var(--apple-separator)]">
+              <SubtasksEditor
+                subtasks={subtasks}
+                onChange={setSubtasks}
+                projectMembers={projectMembers}
+                stories={stories}
+                onAssigneeAdded={(newUserId) => {
+                  if (!assignedTo.includes(newUserId)) {
+                    setAssignedTo(prev => [...prev, newUserId])
+                  }
+                }}
+                disabled={loading}
+              />
             </div>
 
           </form>
@@ -1428,8 +1395,8 @@ export default function CreateTaskModal({
             !(projectId || (selectedProjectId && selectedProjectId.trim().length > 0)) ||
             !(formData.dueDate && formData.dueDate.trim().length > 0) ||
             assignedTo.length === 0 ||
-            !formData.category ||
-            subtasks.some(st => !(st.title && st.title.trim().length > 0))
+            subtasks.some(st => !(st.title && st.title.trim().length > 0)) ||
+            subtasks.some(st => (st.subtasks || []).some(n => !(n.title && n.title.trim().length > 0)))
           }>
             {loading ? (
               <>

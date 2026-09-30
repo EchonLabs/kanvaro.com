@@ -102,11 +102,12 @@ export async function POST(
         _id?: any
         author?: any
         parentCommentId?: any
+        mentions?: any[]
       }>
     }
 
     const task = await Task.findById(taskId)
-      .select('organization project assignedTo createdBy title displayId comments._id comments.author')
+      .select('organization project assignedTo createdBy title displayId comments._id comments.author comments.mentions')
       .lean<LeanTask>()
       .exec()
 
@@ -142,6 +143,7 @@ export async function POST(
 
     // Validate parent comment if provided
     let parentAuthorId: string | null = null
+    let parentHasMentions = false
     if (parentCommentId) {
       const parent = task.comments?.find((c: any) => c._id?.toString() === parentCommentId)
       if (!parent) {
@@ -151,6 +153,7 @@ export async function POST(
         )
       }
       parentAuthorId = parent.author?.toString() || null
+      parentHasMentions = Array.isArray(parent.mentions) && parent.mentions.length > 0
     }
 
     const commentId = new mongoose.Types.ObjectId()
@@ -179,20 +182,25 @@ export async function POST(
       if (id !== userId) mentionedUserIds.add(id)
     })
 
-    const otherNotifyUserIds = new Set<string>()
+    const parentNotifyUserId = (parentAuthorId && parentAuthorId !== userId && !mentionedUserIds.has(parentAuthorId))
+      ? parentAuthorId
+      : null
+
+    const assigneeNotifyUserIds = new Set<string>()
     if (Array.isArray(task.assignedTo)) {
       task.assignedTo.forEach(assignee => {
         const aId = assignee.user?.toString()
-        if (aId && aId !== userId && !mentionedUserIds.has(aId)) {
-          otherNotifyUserIds.add(aId)
+        if (aId && aId !== userId && !mentionedUserIds.has(aId) && aId !== parentNotifyUserId) {
+          assigneeNotifyUserIds.add(aId)
         }
       })
     }
-    if (parentAuthorId && parentAuthorId !== userId && !mentionedUserIds.has(parentAuthorId)) {
-      otherNotifyUserIds.add(parentAuthorId)
-    }
 
-    if (mentionedUserIds.size > 0 || otherNotifyUserIds.size > 0) {
+    const hasMentions = mentionedUserIds.size > 0
+    const isTargetedMentionThread = hasMentions || parentHasMentions
+    const shouldEmailAssignees = !isTargetedMentionThread
+
+    if (mentionedUserIds.size > 0 || parentNotifyUserId || assigneeNotifyUserIds.size > 0) {
       // Build absolute URL for email notifications
       let baseUrl = ''
       if (process.env.NEXT_PUBLIC_APP_URL) {
@@ -216,7 +224,7 @@ export async function POST(
         try {
           const promises: Promise<any>[] = []
 
-          // Send mention notification to mentioned users
+          // 1. Send mention notification (In-app + Email)
           if (mentionedUserIds.size > 0) {
             promises.push(
               notificationService.createBulkNotifications(
@@ -239,11 +247,34 @@ export async function POST(
             )
           }
 
-          // Send comment notification to other assignees / parent author
-          if (otherNotifyUserIds.size > 0) {
+          // 2. Send reply notification to parent comment author (In-app + Email)
+          if (parentNotifyUserId) {
+            promises.push(
+              notificationService.createNotification(
+                parentNotifyUserId,
+                organizationId,
+                {
+                  type: 'task',
+                  title: 'New reply on task comment',
+                  message: `New reply on your comment on task "${task.title || task.displayId || 'task'}"`,
+                  data: {
+                    entityType: 'task',
+                    entityId: taskId,
+                    action: 'updated',
+                    url
+                  },
+                  sendEmail: true,
+                  sendPush: false
+                }
+              )
+            )
+          }
+
+          // Send comment notification to other task assignees (In-app + Email for normal comments; In-app ONLY if mentions/reply exist)
+          if (assigneeNotifyUserIds.size > 0) {
             promises.push(
               notificationService.createBulkNotifications(
-                Array.from(otherNotifyUserIds),
+                Array.from(assigneeNotifyUserIds),
                 organizationId,
                 {
                   type: 'task',
@@ -255,7 +286,7 @@ export async function POST(
                     action: 'updated',
                     url
                   },
-                  sendEmail: true,
+                  sendEmail: shouldEmailAssignees,
                   sendPush: false
                 }
               )
