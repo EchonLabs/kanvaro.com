@@ -162,7 +162,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
   const filteredProjects = useMemo(() => {
     const query = projectSearchQuery.trim().toLowerCase()
     const result = projects.filter((project) => project.name.toLowerCase().includes(query))
-    return result.sort((a, b) => a.name.localeCompare(b.name))
+    return result.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectSearchQuery])
 
   const assigneeOptions = useMemo(() => {
@@ -344,7 +344,30 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
       // Sort by order to ensure correct display order
       return [...project.settings.kanbanStatuses].sort((a, b) => (a.order || 0) - (b.order || 0))
     }
-    // Fall back to default columns if no custom columns are set
+    
+    // If "All Projects" is selected, aggregate default columns and any custom columns
+    if (selectedProjectId === 'all' && projects.length > 0) {
+      const statusSet = new Set<string>()
+      const aggregatedCols: any[] = []
+      
+      // Always include default columns
+      defaultColumns.forEach((col: any) => {
+        statusSet.add(col.key)
+        aggregatedCols.push(col)
+      })
+      
+      projects.forEach(p => {
+        p.settings?.kanbanStatuses?.forEach(col => {
+          if (!statusSet.has(col.key)) {
+            statusSet.add(col.key)
+            aggregatedCols.push(col)
+          }
+        })
+      })
+      return aggregatedCols
+    }
+
+    // Fall back to default columns if no custom columns are set and we're not aggregating
     return defaultColumns
   }
 
