@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Target,
@@ -124,6 +125,7 @@ export interface KanbanBoardProps {
 const defaultColumns = DEFAULT_KANBAN_COLUMNS
 
 export default function KanbanBoard({ projectId, filters, onProjectChange, onCreateTask, onEditTask, onDeleteTask }: KanbanBoardProps) {
+  const { error: notifyError } = useNotify()
   const [project, setProject] = useState<Project | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState(projectId)
@@ -487,12 +489,20 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
         if (!data.success) {
           // Revert optimistic update on failure
           console.error('Failed to update task status:', data.error)
+          notifyError({
+            title: 'Cannot Update Status',
+            message: data.error || 'Failed to update task status'
+          })
           setTasks(tasks.map(task =>
             task._id?.toString() === activeId ? { ...task, status: originalStatus } as PopulatedTask : task
           ))
         }
       } catch (error) {
         console.error('Failed to update task status:', error)
+        notifyError({
+          title: 'Cannot Update Status',
+          message: 'Network error while updating task status'
+        })
         // Revert optimistic update on network failure
         setTasks(tasks.map(task =>
           task._id?.toString() === activeId ? { ...task, status: originalStatus } as PopulatedTask : task

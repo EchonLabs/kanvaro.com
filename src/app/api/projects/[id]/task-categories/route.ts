@@ -93,7 +93,35 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       return NextResponse.json({ error: 'Only project managers and admins can manage task categories' }, { status: 403 })
     }
 
-    const { key, title: rawTitle } = await request.json()
+    const payload = await request.json()
+
+    // 1. Reorder categories if categories array is provided
+    if (Array.isArray(payload.categories)) {
+      const currentCategories = categoriesFor(project)
+      const categoryMap = new Map(currentCategories.map(c => [c.key, c]))
+
+      const updatedCategories: TaskCategory[] = []
+      for (let i = 0; i < payload.categories.length; i++) {
+        const key = typeof payload.categories[i] === 'string' ? payload.categories[i] : payload.categories[i]?.key
+        const existing = categoryMap.get(key)
+        if (existing) {
+          updatedCategories.push({ ...existing, order: i })
+          categoryMap.delete(key)
+        }
+      }
+
+      categoryMap.forEach((remaining) => {
+        updatedCategories.push({ ...remaining, order: updatedCategories.length })
+      })
+
+      project.set('settings.taskCategories', updatedCategories)
+      await project.save()
+
+      return NextResponse.json({ success: true, data: updatedCategories })
+    }
+
+    // 2. Rename category if key and title are provided
+    const { key, title: rawTitle } = payload
     const title = normalizeTitle(rawTitle)
     const categories = categoriesFor(project)
     const category = categories.find(item => item.key === key)
@@ -109,7 +137,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     return NextResponse.json({ success: true, data: category })
   } catch (error) {
-    console.error('Rename task category error:', error)
+    console.error('Update task category error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

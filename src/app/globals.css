@@ -448,8 +448,14 @@
 }
 
 /* Custom scrollbar — Apple HIG style */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--apple-fill, rgba(156, 163, 175, 0.4)) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -457,12 +463,39 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--apple-fill);
+  background: var(--apple-fill, rgba(156, 163, 175, 0.5));
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--apple-secondary-fill);
+  background: var(--apple-secondary-fill, rgba(107, 114, 128, 0.8));
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 999px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.8);
+}
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
 }
 
 /* Loading animation */

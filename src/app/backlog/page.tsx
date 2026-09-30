@@ -45,7 +45,9 @@ import {
   Layers,
   BookOpen,
   ListTodo,
-  X
+  X,
+  CheckSquare,
+  Square
 } from 'lucide-react'
 import {
   StatusBadge, PriorityBadge, TypeBadge, CategoryBadge,
@@ -1290,36 +1292,29 @@ export default function BacklogPage() {
         return
       }
 
-      // Update backlog items state
+      // Update backlog items state: remove tasks that are now assigned to sprint
       setBacklogItems((prev) =>
-        prev.map((item) => {
-          // Update stories
-          if (item.type === 'story' && storyIdsForSprint.includes(item._id)) {
-            return {
-              ...item,
-              sprint: {
-                _id: sprint._id,
-                name: sprint.name,
-                status: sprint.status
-              },
-              status: 'in_progress'  // Match API update
+        prev
+          .filter((item) => !(item.type === 'task' && uniqueTaskIds.includes(item._id)))
+          .map((item) => {
+            // Update stories
+            if (item.type === 'story' && storyIdsForSprint.includes(item._id)) {
+              return {
+                ...item,
+                sprint: {
+                  _id: sprint._id,
+                  name: sprint.name,
+                  status: sprint.status
+                },
+                status: 'in_progress'  // Match API update
+              }
             }
-          }
-          // Update tasks
-          if (item.type === 'task' && uniqueTaskIds.includes(item._id)) {
-            return {
-              ...item,
-              sprint: {
-                _id: sprint._id,
-                name: sprint.name,
-                status: sprint.status
-              },
-              status: 'todo'  // Match API update
-            }
-          }
-          return item
-        })
+            return item
+          })
       )
+
+      // Refresh backlog items from server to keep counts and pagination accurate
+      fetchBacklogItems()
 
       // Build success message
       const parts: string[] = []
@@ -1460,6 +1455,9 @@ export default function BacklogPage() {
       const message = `${parts.join(' and ')} removed from sprint successfully.`
 
       notifySuccess({ title: 'Success', message: message })
+
+      // Refresh backlog items from server to keep counts and list accurate
+      fetchBacklogItems()
 
       setShowSprintModal(false)
       resetSprintModalState()
@@ -1602,8 +1600,9 @@ export default function BacklogPage() {
   }
 
   // When assigning work to a sprint, temporarily narrow items to the sprint's project
+  // Tasks assigned to sprints should not be displayed in the backlog module
   const displayedItems = useMemo(() => {
-    let items = backlogItems
+    let items = backlogItems.filter((item) => !(item.type === 'task' && item.sprint))
     if (selectedSprintId) {
       const selectedSprint = sprints.find((s) => s._id === selectedSprintId)
       if (selectedSprint?.project?._id) {
@@ -2159,19 +2158,31 @@ export default function BacklogPage() {
               onClick={handleSelectModeToggle}
               disabled={!canManageSprints}
               title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
-              className="rounded-full h-9 text-[13px] border-[var(--apple-separator)]"
+              className={cn(
+                'rounded-full h-9 text-[13px] border-[var(--apple-separator)] px-3.5 transition-colors',
+                selectMode && 'bg-[var(--apple-secondary-fill)] text-[var(--apple-label)]'
+              )}
             >
-              <List className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+              {selectMode ? (
+                <X className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+              ) : (
+                <List className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+              )}
               {selectMode ? 'Cancel Selection' : 'Select Mode'}
             </Button>
             {selectMode && (
               <>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={allSelectableItemsSelected ? deselectAll : selectAll}
-                  className="rounded-full h-9 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
+                  className="rounded-full h-9 text-[13px] border-[var(--apple-separator)] bg-card text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] px-3.5 transition-colors"
                 >
+                  {allSelectableItemsSelected ? (
+                    <Square className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+                  ) : (
+                    <CheckSquare className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+                  )}
                   {allSelectableItemsSelected ? 'Deselect All' : 'Select All'}
                 </Button>
                 {(selectedTaskCount > 0 || selectedStoryCount > 0) && (
@@ -2179,7 +2190,7 @@ export default function BacklogPage() {
                     size="sm"
                     onClick={() => handleOpenSprintModal(selectedTaskIds, selectedStoryIds)}
                     disabled={(selectedTaskCount === 0 && selectedStoryCount === 0) || assigningSprint}
-                    className="rounded-full h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px]"
+                    className="rounded-full h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px] px-3.5 transition-colors"
                   >
                     {assigningSprint ? (
                       <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -2193,7 +2204,7 @@ export default function BacklogPage() {
             )}
           </div>
           {selectMode && (
-            <div className="text-[13px] text-[var(--apple-secondary-label)] sm:ml-auto">
+            <div className="sm:ml-auto flex items-center">
               {(() => {
                 const parts: string[] = []
                 if (selectedStoryCount > 0) {
@@ -2202,13 +2213,23 @@ export default function BacklogPage() {
                 if (selectedTaskCount > 0) {
                   parts.push(`${selectedTaskCount} task${selectedTaskCount !== 1 ? 's' : ''}`)
                 }
-                return parts.length > 0 ? parts.join(' and ') + ' selected' : 'No items selected'
+                const hasSelection = parts.length > 0
+                return (
+                  <span className={cn(
+                    'text-[12px] font-medium px-2.5 py-1 rounded-full transition-colors',
+                    hasSelection
+                      ? 'bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border border-[var(--apple-system-blue)]/20'
+                      : 'text-[var(--apple-secondary-label)]'
+                  )}>
+                    {hasSelection ? parts.join(' and ') + ' selected' : 'No items selected'}
+                  </span>
+                )
               })()}
             </div>
           )}
         </div>
         {selectMode && (
-          <p className="text-[12px] text-[var(--apple-secondary-label)] -mt-2">
+          <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">
             Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included.{' '}
             <span className="text-[var(--apple-system-orange)]">Items already in a sprint cannot be selected.</span>
           </p>

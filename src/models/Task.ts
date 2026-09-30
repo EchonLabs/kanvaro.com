@@ -3,12 +3,29 @@ import mongoose, { Schema, Document } from 'mongoose'
 export const TASK_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
 export type TaskStatus = typeof TASK_STATUS_VALUES[number]
 
+export interface INestedSubtask {
+  _id?: mongoose.Types.ObjectId
+  title: string
+  description?: string
+  status: TaskStatus
+  isCompleted: boolean
+  createdAt?: Date
+  updatedAt?: Date
+}
+
 export interface ITaskSubtask {
   _id?: mongoose.Types.ObjectId
   title: string
   description?: string
   status: TaskStatus
   isCompleted: boolean
+  assignedTo?: mongoose.Types.ObjectId | any
+  story?: mongoose.Types.ObjectId | any
+  dueDate?: Date
+  type?: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  estimatedHours?: number
+  subtasks?: INestedSubtask[]
   createdAt?: Date
   updatedAt?: Date
 }
@@ -25,6 +42,7 @@ export interface ITask extends Document {
   project: mongoose.Types.ObjectId
   taskNumber: number
   displayId: string
+  module?: string
   story?: mongoose.Types.ObjectId
   epic?: mongoose.Types.ObjectId
   parentTask?: mongoose.Types.ObjectId
@@ -89,6 +107,29 @@ export interface ITask extends Document {
   updatedAt: Date
 }
 
+const NestedSubtaskSchema = new Schema<INestedSubtask>({
+  title: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 200
+  },
+  description: {
+    type: String,
+    trim: true,
+    maxlength: 1000
+  },
+  status: {
+    type: String,
+    default: 'todo',
+    trim: true
+  },
+  isCompleted: {
+    type: Boolean,
+    default: false
+  }
+}, { timestamps: true })
+
 const SubtaskSchema = new Schema<ITaskSubtask>({
   title: {
     type: String,
@@ -111,6 +152,35 @@ const SubtaskSchema = new Schema<ITaskSubtask>({
   isCompleted: {
     type: Boolean,
     default: false
+  },
+  assignedTo: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  story: {
+    type: Schema.Types.ObjectId,
+    ref: 'Story'
+  },
+  dueDate: {
+    type: Date
+  },
+  type: {
+    type: String,
+    enum: ['bug', 'feature', 'improvement', 'task', 'subtask'],
+    default: 'subtask'
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'critical'],
+    default: 'medium'
+  },
+  estimatedHours: {
+    type: Number,
+    min: 0
+  },
+  subtasks: {
+    type: [NestedSubtaskSchema],
+    default: []
   }
 }, { timestamps: true })
 
@@ -170,6 +240,10 @@ const TaskSchema = new Schema<ITask>({
     required: true,
     trim: true,
     maxlength: 50
+  },
+  module: {
+    type: String,
+    trim: true
   },
   story: {
     type: Schema.Types.ObjectId,
