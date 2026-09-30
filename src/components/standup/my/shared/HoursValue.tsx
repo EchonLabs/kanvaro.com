@@ -26,7 +26,7 @@ export function HoursValue({ minutes: value, locale, signed = false, label, tone
   const described = describeMinutes(value, locale)
   return (
     <span
-      className={cn('font-apple-mono tabular-nums text-[15px]', TONE_CLASSES[tone])}
+      className={cn('font-apple-mono tabular-nums apple-type-body', TONE_CLASSES[tone])}
       aria-label={label ? `${label} ${described}` : described}
     >
       {formatted}

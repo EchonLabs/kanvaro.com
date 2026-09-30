@@ -99,10 +99,10 @@ export function MyPositionSection({ memberId, carryForward, locale }: MyPosition
             return (
               <li
                 key={item.itemId}
-                className={cn('flex flex-col gap-2.5 rounded-lg border bg-[var(--my-canvas)] p-4', style.border)}
+                className={cn('flex flex-col gap-2.5 rounded-[var(--apple-radius-sm)] border bg-[var(--my-inset)] p-4', style.border)}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className={cn('flex items-center gap-1.5 text-[12px] font-semibold', style.text)}>
+                  <span className={cn('flex items-center gap-1.5 apple-type-footnote font-semibold', style.text)}>
                     {raised ? (
                       <ArrowUpRight className="h-3 w-3" strokeWidth={2.5} aria-hidden />
                     ) : (
@@ -110,7 +110,7 @@ export function MyPositionSection({ memberId, carryForward, locale }: MyPosition
                     )}
                     {standupStrings.my.ageBand[item.ageBand] ?? item.ageBand}
                   </span>
-                  <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold', style.badge)}>
+                  <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 apple-type-caption font-semibold', style.badge)}>
                     {standupStrings.my.ageBadge({ count: item.ageInStandups })}
                   </span>
                 </div>
@@ -119,7 +119,7 @@ export function MyPositionSection({ memberId, carryForward, locale }: MyPosition
                   title={item.taskTitle}
                   className="whitespace-normal font-semibold"
                 />
-                <p className="text-[12px] leading-4 text-[var(--my-muted)]">{body}</p>
+                <p className="apple-type-footnote text-[var(--my-muted)]">{body}</p>
               </li>
             )
           })}

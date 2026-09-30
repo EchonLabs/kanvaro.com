@@ -66,7 +66,7 @@ export function SectionCard({
           <CardTitle className="truncate">{title}</CardTitle>
         </div>
         {summary ? (
-          <span className="shrink-0 text-[13px] text-[var(--apple-secondary-label)]">{summary}</span>
+          <span className="shrink-0 apple-type-subheadline text-[var(--apple-secondary-label)]">{summary}</span>
         ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">{children}</CardContent>

@@ -91,14 +91,14 @@ export function BlockersSection({ memberId, blockers, onRaise, locale }: Blocker
                   <li
                     key={row.blockerId}
                     className={cn(
-                      'flex items-start gap-3 rounded-lg border bg-[var(--my-canvas)] p-3',
+                      'flex items-start gap-3 rounded-[var(--apple-radius-sm)] border bg-[var(--my-inset)] p-3',
                       row.overdue ? 'border-[var(--my-red)]' : 'border-[var(--my-border)]'
                     )}
                   >
                     <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--my-red)]" strokeWidth={2} aria-hidden />
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <p className="text-[14px] font-medium text-[var(--my-text)]">{row.description}</p>
-                      <p className="text-[12px] text-[var(--my-muted)]">
+                      <p className="apple-type-callout font-medium text-[var(--my-text)]">{row.description}</p>
+                      <p className="apple-type-footnote text-[var(--my-muted)]">
                         {meta}
                         {row.overdue ? (
                           <span className="font-semibold text-[var(--my-red)]">
@@ -124,7 +124,7 @@ export function BlockersSection({ memberId, blockers, onRaise, locale }: Blocker
             submit()
           }}
         >
-          <label htmlFor="my-standup-roadblock" className="text-[13px] font-semibold text-[var(--my-text)]">
+          <label htmlFor="my-standup-roadblock" className="apple-type-subheadline font-semibold text-[var(--my-text)]">
             {standupStrings.my.raiseRoadblock()}
           </label>
           <textarea
@@ -133,7 +133,7 @@ export function BlockersSection({ memberId, blockers, onRaise, locale }: Blocker
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder={standupStrings.my.roadblockPlaceholder()}
-            className="w-full resize-y rounded-md border border-[var(--my-border)] bg-[var(--my-canvas)] p-3 text-[13px] text-[var(--my-text)] placeholder:text-[var(--my-subtle)] focus:border-[var(--my-blue)] focus:outline-none"
+            className="w-full resize-y rounded-[var(--apple-radius-sm)] border border-[var(--my-border)] bg-[var(--my-inset)] p-3 apple-type-subheadline text-[var(--my-text)] placeholder:text-[var(--my-subtle)] focus:border-[var(--my-blue)] focus:outline-none"
           />
           <div className="flex items-center justify-between gap-3">
             <button
@@ -141,7 +141,7 @@ export function BlockersSection({ memberId, blockers, onRaise, locale }: Blocker
               role="switch"
               aria-checked={urgent}
               onClick={() => setUrgent((prev) => !prev)}
-              className="flex items-center gap-1.5 text-[12px] text-[var(--my-muted)] hover:text-[var(--my-text)]"
+              className="flex items-center gap-1.5 apple-type-footnote text-[var(--my-muted)] hover:text-[var(--my-text)]"
             >
               <span
                 aria-hidden
@@ -155,7 +155,7 @@ export function BlockersSection({ memberId, blockers, onRaise, locale }: Blocker
             <button
               type="submit"
               disabled={!canSubmit}
-              className="rounded-md border border-[var(--my-red)] bg-[var(--my-red-tint)] px-3 py-2 text-[12px] font-semibold text-[var(--my-red)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-[var(--apple-radius-sm)] border border-[var(--my-red)] bg-[var(--my-red-tint)] px-3 py-2 apple-type-footnote font-semibold text-[var(--my-red)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {standupStrings.my.fileRoadblock()}
             </button>

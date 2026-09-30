@@ -23,7 +23,7 @@ export function StatusPill({ tone, children, className }: StatusPillProps) {
   return (
     <Badge
       variant="outline"
-      className={cn('rounded-[var(--apple-radius-sm)] text-[13px] font-medium', TONE_CLASSES[tone], className)}
+      className={cn('rounded-[var(--apple-radius-sm)] apple-type-subheadline font-medium', TONE_CLASSES[tone], className)}
     >
       {children}
     </Badge>

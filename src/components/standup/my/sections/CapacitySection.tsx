@@ -90,8 +90,8 @@ export function CapacitySection({ capacity, allocationCount, debt, locale }: Cap
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[22px] font-bold text-[var(--my-text)]">{percentage}%</span>
-          <span className="text-[10px] uppercase text-[var(--my-muted)]">
+          <span className="apple-type-title2 font-bold text-[var(--my-text)]">{percentage}%</span>
+          <span className="apple-type-caption uppercase text-[var(--my-muted)]">
             {standupStrings.my.capacityAllocated()}
           </span>
         </div>
@@ -120,7 +120,7 @@ export function CapacitySection({ capacity, allocationCount, debt, locale }: Cap
           ))}
         </div>
 
-        <p data-testid="capacity-summary" className="text-[14px] leading-5 text-[var(--my-muted)]">
+        <p data-testid="capacity-summary" className="apple-type-callout text-[var(--my-muted)]">
           {headlineFor(capacity, allocationCount, locale)}
           {/* VAR-10's exact wording spells out "hours" ("2.0 hours"), unlike every other figure here. */}
           {debt && debt.outstandingDebtMinutes > 0 ? (

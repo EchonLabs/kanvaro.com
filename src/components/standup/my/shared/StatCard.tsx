@@ -44,11 +44,11 @@ export function StatCard({
       <span className="flex min-w-0 flex-col gap-0.5">
         <span
           data-testid="stat-card-value"
-          className="font-apple-mono text-[22px] font-bold leading-none tabular-nums text-[var(--apple-label)]"
+          className="font-apple-mono apple-type-title2 font-bold leading-none tabular-nums text-[var(--apple-label)]"
         >
           {value}
         </span>
-        <span className="truncate text-[13px] text-[var(--apple-secondary-label)]">{label}</span>
+        <span className="truncate apple-type-subheadline text-[var(--apple-secondary-label)]">{label}</span>
       </span>
     </a>
   )

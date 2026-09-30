@@ -15,9 +15,9 @@ export function TaskRow({ taskKey, title, plannedMinutes, loggedMinutes, trailin
   return (
     <div className="flex flex-col gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate text-[15px] font-medium text-[var(--apple-label)]">{title}</span>
+        <span className="truncate apple-type-body font-medium text-[var(--apple-label)]">{title}</span>
         {taskKey ? (
-          <span className="font-apple-mono text-[13px] text-[var(--apple-tertiary-label)]">{taskKey}</span>
+          <span className="font-apple-mono apple-type-subheadline text-[var(--apple-tertiary-label)]">{taskKey}</span>
         ) : null}
       </div>
       <div className="flex items-center gap-3">

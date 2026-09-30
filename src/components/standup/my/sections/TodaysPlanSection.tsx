@@ -53,13 +53,13 @@ export function TodaysPlanSection({
   children
 }: TodaysPlanSectionProps) {
   return (
-    <div className="flex w-full flex-col gap-4 rounded-xl border border-[var(--my-border)] bg-[var(--my-canvas)] p-4 sm:p-5">
+    <div className="flex w-full flex-col gap-4 rounded-[var(--apple-radius-md)] border border-[var(--my-border)] bg-[var(--my-inset)] p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
-          <h3 className="text-[16px] font-semibold text-[var(--my-text)]">
+          <h3 className="apple-type-headline font-semibold text-[var(--my-text)]">
             {standupStrings.my.todayPlanTitle()}
           </h3>
-          <p className="text-[13px] text-[var(--my-muted)]">
+          <p className="apple-type-subheadline text-[var(--my-muted)]">
             {summaryFor(allocations.length, capacity.gapMinutes, locale)}
           </p>
         </div>
@@ -71,11 +71,11 @@ export function TodaysPlanSection({
       </div>
 
       {readOnly && allocations.length > 0 ? (
-        <p className="text-[13px] text-[var(--my-muted)]">{standupStrings.my.lockedReason()}</p>
+        <p className="apple-type-subheadline text-[var(--my-muted)]">{standupStrings.my.lockedReason()}</p>
       ) : null}
 
       {allocations.length === 0 ? (
-        <p className="text-[14px] text-[var(--my-muted)]">{standupStrings.my.todayEmpty()}</p>
+        <p className="apple-type-callout text-[var(--my-muted)]">{standupStrings.my.todayEmpty()}</p>
       ) : (
         <ul className="flex flex-col gap-4">
           {allocations.map((row) => {
@@ -83,7 +83,7 @@ export function TodaysPlanSection({
             return (
               <li
                 key={row.allocationId}
-                className="group flex flex-wrap items-center gap-4 rounded-lg border border-[var(--my-border)] bg-[var(--my-canvas)] p-4 focus-within:border-[var(--my-blue)] sm:flex-nowrap"
+                className="group flex flex-wrap items-center gap-4 rounded-[var(--apple-radius-sm)] border border-[var(--my-border)] bg-[var(--my-surface)] p-4 focus-within:border-[var(--my-blue)] sm:flex-nowrap"
               >
                 {/* The row being edited is the one the design ticks and outlines in blue. */}
                 <Square
@@ -100,15 +100,15 @@ export function TodaysPlanSection({
                 <div className="flex min-w-[12rem] flex-1 flex-col gap-0.5">
                   <TaskTitle taskKey={row.taskKey} title={row.title} className="whitespace-normal" />
                   {detail ? (
-                    <p className="text-[12px] text-[var(--my-muted)] first-letter:uppercase">{detail}</p>
+                    <p className="apple-type-footnote text-[var(--my-muted)] first-letter:uppercase">{detail}</p>
                   ) : null}
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-[13px] text-[var(--my-subtle)] group-focus-within:text-[var(--my-muted)]">
+                  <span className="apple-type-subheadline text-[var(--my-subtle)] group-focus-within:text-[var(--my-muted)]">
                     {standupStrings.my.allocatedLabel()}
                   </span>
-                  <label className="flex items-center rounded-[4px] border border-[var(--my-border)] bg-[var(--my-inset)] px-2.5 py-1.5 group-focus-within:border-[var(--my-blue)]">
+                  <label className="flex items-center rounded-[6px] border border-[var(--my-border)] bg-[var(--my-inset)] px-2.5 py-1.5 group-focus-within:border-[var(--my-blue)]">
                     <HourStepper
                       variant="bare"
                       taskLabel={row.title}
@@ -116,9 +116,9 @@ export function TodaysPlanSection({
                       onChange={(next) => onChangeHours(row.allocationId, next)}
                       disabled={readOnly}
                       locale={locale}
-                      inputClassName="my-mono w-10 bg-transparent text-right text-[13px] text-[var(--my-muted)] outline-none [appearance:textfield] focus:font-bold focus:text-[var(--my-blue)] disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      inputClassName="my-mono w-10 bg-transparent text-right apple-type-subheadline text-[var(--my-muted)] outline-none [appearance:textfield] focus:font-bold focus:text-[var(--my-blue)] disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
-                    <span className="my-mono text-[13px] text-[var(--my-muted)] group-focus-within:font-bold group-focus-within:text-[var(--my-blue)]">
+                    <span className="my-mono apple-type-subheadline text-[var(--my-muted)] group-focus-within:font-bold group-focus-within:text-[var(--my-blue)]">
                       h
                     </span>
                   </label>

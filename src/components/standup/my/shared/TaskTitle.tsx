@@ -12,7 +12,7 @@ export interface TaskTitleProps {
  */
 export function TaskTitle({ taskKey, title, className }: TaskTitleProps) {
   return (
-    <p className={cn('min-w-0 truncate text-[14px] font-medium text-[var(--my-text)]', className)}>
+    <p className={cn('min-w-0 truncate apple-type-callout font-medium text-[var(--my-text)]', className)}>
       {taskKey ? (
         <>
           [<span>{taskKey}</span>]{title ? ' ' : ''}

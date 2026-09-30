@@ -25,8 +25,8 @@ export function Tag({ tone, shape = 'pill', className, children }: TagProps) {
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center whitespace-nowrap px-2.5 py-1 text-[12px] font-semibold leading-none',
-        shape === 'pill' ? 'rounded-full' : 'rounded-[4px]',
+        'inline-flex shrink-0 items-center whitespace-nowrap px-2.5 py-1 apple-type-footnote font-semibold leading-none',
+        shape === 'pill' ? 'rounded-full' : 'rounded-[6px]',
         TAG_TONE_CLASSES[tone],
         className
       )}

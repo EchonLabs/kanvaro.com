@@ -75,12 +75,26 @@
 
   /* Apple HIG section header label */
   .apple-section-label {
-    font-size: 11px;
+    font-size: var(--apple-font-caption);
     font-weight: 600;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--apple-tertiary-label);
   }
+
+  /* Apple HIG text styles — size, leading and tracking from the type-scale
+     tokens. Weight is deliberately left out: emphasis is `font-semibold` /
+     `font-bold` on the element, so a style never fights a weight class over
+     which utility wins. */
+  .apple-type-title1      { font-size: var(--apple-font-title1);      line-height: 1.2;  letter-spacing: -0.02em; }
+  .apple-type-title2      { font-size: var(--apple-font-title2);      line-height: 1.25; letter-spacing: -0.015em; }
+  .apple-type-title3      { font-size: var(--apple-font-title3);      line-height: 1.25; letter-spacing: -0.01em; }
+  .apple-type-headline    { font-size: var(--apple-font-headline);    line-height: 1.3;  letter-spacing: -0.01em; }
+  .apple-type-body        { font-size: var(--apple-font-body);        line-height: 1.4; }
+  .apple-type-callout     { font-size: var(--apple-font-callout);     line-height: 1.4; }
+  .apple-type-subheadline { font-size: var(--apple-font-subheadline); line-height: 1.4; }
+  .apple-type-footnote    { font-size: var(--apple-font-footnote);    line-height: 1.35; }
+  .apple-type-caption     { font-size: var(--apple-font-caption);     line-height: 1.3;  letter-spacing: 0.01em; }
 
   /* Apple HIG spring-like easing transition */
   .apple-transition {
@@ -440,6 +454,19 @@
     --apple-radius-lg: 16px;
     --apple-radius-xl: 20px;
     --apple-radius-pill: 999px;
+
+    /* Type scale — Apple HIG text styles at the app's desktop sizes. Read
+       through the `.apple-type-*` utilities below rather than `text-[Npx]`,
+       so a surface's type follows this one scale instead of its own. */
+    --apple-font-title1: 28px;
+    --apple-font-title2: 22px;
+    --apple-font-title3: 20px;
+    --apple-font-headline: 17px;
+    --apple-font-body: 15px;
+    --apple-font-callout: 14px;
+    --apple-font-subheadline: 13px;
+    --apple-font-footnote: 12px;
+    --apple-font-caption: 11px;
 
     /* Premium cobalt-azure — charts, card accents, button bg, progress bars, avatars */
     --apple-chart-from: #3D8EFF;
@@ -823,97 +850,130 @@
   color: hsl(var(--foreground));
 }
 
-/* Sprint planning surface — the dark values are the Figma "Dark sprint
-   planning" palette verbatim; the light values are its daylight counterpart. */
+/* Sprint planning surface.
+
+   Derived from the app's Apple HIG tokens, as the run screen's `--sur-*`
+   palette is, rather than the Figma "Dark sprint planning" hexes it started
+   from — those were a parallel design system that made planning look like a
+   different product to the sprint page it is reached from.
+
+   Surfaces are the shadcn `--card`/`--background` pair the rest of the app's
+   cards sit on; the accent is the theme accent the app's buttons use. The
+   status inks are stepped, for the same reason and to the same values as the
+   run screen's: Apple's vivid systemGreen/Orange cannot carry 11-13px text on
+   white (2.2:1), so light mode uses the darker step and dark mode, where every
+   system colour already clears AA on #1C1C1E, uses the system colour. Tints
+   are mixed from the vivid colour at 12%, matching the app's badge tints. */
 :root {
-  --plan-canvas: #F5F6F8;
-  --plan-surface: #FFFFFF;
-  --plan-raised: #F2F4F7;
-  --plan-border: #E1E5EB;
-  --plan-text: #14171C;
-  --plan-muted: #5F6875;
-  --plan-accent: #3478F6;
-  --plan-danger: #C93C3C;
-  --plan-warning: #B8720B;
-  --plan-success: #23855A;
-  --plan-idle: #8A93A1;
-  --plan-violet: #7A5AF8;
-  --plan-danger-bg: #FCECEC;
-  --plan-warning-bg: #FDF3E1;
-  --plan-info-bg: #EAF1FE;
-  --plan-success-bg: #E3F4EC;
+  --plan-surface: hsl(var(--card));
+  --plan-raised: var(--apple-quaternary-fill);
+  --plan-border: var(--apple-separator);
+  --plan-track: var(--apple-tertiary-fill);
+  --plan-text: var(--apple-label);
+  --plan-muted: var(--apple-secondary-label);
+  --plan-accent: var(--apple-card-gradient);
+  --plan-danger: #D70015;
+  --plan-warning: #A66300;
+  --plan-success: #22843A;
+  --plan-idle: var(--apple-system-gray);
+  --plan-violet: var(--apple-system-purple);
+  --plan-danger-bg: color-mix(in srgb, var(--apple-system-red) 12%, transparent);
+  --plan-warning-bg: color-mix(in srgb, var(--apple-system-orange) 12%, transparent);
+  --plan-info-bg: color-mix(in srgb, var(--apple-card-gradient) 12%, transparent);
+  --plan-success-bg: color-mix(in srgb, var(--apple-system-green) 12%, transparent);
+  --plan-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
 }
 
 .dark {
-  --plan-canvas: #0D0F12;
-  --plan-surface: #171A20;
-  --plan-raised: #1D2128;
-  --plan-border: #2A3039;
-  --plan-text: #F4F5F7;
-  --plan-muted: #9AA2AF;
-  --plan-accent: #3478F6;
-  --plan-danger: #D94C4C;
-  --plan-warning: #D88A15;
-  --plan-success: #2F9D68;
-  --plan-idle: #9AA2AF;
-  --plan-violet: #7A5AF8;
-  --plan-danger-bg: #321D21;
-  --plan-warning-bg: #352812;
-  --plan-info-bg: #17253D;
-  --plan-success-bg: #173627;
+  --plan-danger: var(--apple-system-red);
+  --plan-warning: var(--apple-system-orange);
+  --plan-success: var(--apple-system-green);
+  --plan-shadow: none;
 }
 
-/* My Stand-up surface — the dark values are the Figma "My Stand-up page
-   redesign" palette verbatim; the light values are its daylight counterpart.
-   Tints are the design's 12% accent washes. */
+/* A fixed-height task list on the planning screen: the scope panes and the
+   assignment lanes. Same reasoning as the run screen's `.sur-scroll` — the
+   global hairline scrollbar gives no signal that a clipped list has more
+   below — so these get a visible track. Opt-in by class. */
+.plan-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--apple-fill) var(--plan-track);
+}
+
+.plan-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.plan-scroll::-webkit-scrollbar-track {
+  background: var(--plan-track);
+  border-radius: var(--apple-radius-pill);
+}
+
+.plan-scroll::-webkit-scrollbar-thumb {
+  background: var(--apple-fill);
+  border-radius: var(--apple-radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.plan-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--apple-secondary-fill);
+  background-clip: padding-box;
+}
+
+/* My Stand-up surface.
+
+   Derived from the app's Apple HIG tokens, exactly as the run screen's
+   `--sur-*` and sprint planning's `--plan-*` are, rather than the Figma "My
+   Stand-up page redesign" hexes it started from — those were a Tailwind
+   slate/blue-600 ramp, and slate's blue cast plus a `#2563EB` accent made this
+   screen read as a different, bluer product than the sprint planning screen a
+   member reaches it from.
+
+   Surfaces are the shadcn `--background`/`--card` pair the rest of the app's
+   cards sit on; the accent is `--apple-card-gradient`, the themeable accent the
+   app's own buttons and links use, so this screen follows an accent-theme
+   switch instead of staying blue. The status inks are stepped for the same
+   reason and to the same values as the planning and run screens': Apple's vivid
+   systemGreen/Orange cannot carry 11-13px text on white (2.2:1), so light mode
+   uses the darker step and dark mode, where every system colour already clears
+   AA on #1C1C1E, uses the system colour. Tints are mixed from the vivid colour
+   at 12%, matching the app's badge tints. */
 :root {
-  --my-canvas: #F8FAFC;
-  --my-surface: #FFFFFF;
-  --my-raised: #F1F5F9;
-  --my-inset: #F1F5F9;
-  --my-border: #E2E8F0;
-  --my-text: #0F172A;
-  --my-muted: #475569;
-  --my-subtle: #64748B;
-  --my-blue: #2563EB;
-  --my-green: #059669;
-  --my-amber: #D97706;
-  --my-red: #DC2626;
-  --my-violet: #7C3AED;
-  --my-blue-tint: rgba(37, 99, 235, 0.10);
-  --my-green-tint: rgba(5, 150, 105, 0.10);
-  --my-amber-tint: rgba(217, 119, 6, 0.10);
-  --my-red-tint: rgba(220, 38, 38, 0.10);
-  --my-violet-tint: rgba(124, 58, 237, 0.10);
+  --my-surface: hsl(var(--card));
+  --my-raised: var(--apple-quaternary-fill);
+  --my-inset: var(--apple-tertiary-fill);
+  --my-border: var(--apple-separator);
+  --my-text: var(--apple-label);
+  --my-muted: var(--apple-secondary-label);
+  --my-subtle: var(--apple-tertiary-label);
+  --my-blue: var(--apple-card-gradient);
+  --my-green: #22843A;
+  --my-amber: #A66300;
+  --my-red: #D70015;
+  --my-violet: var(--apple-system-purple);
+  --my-blue-tint: color-mix(in srgb, var(--apple-card-gradient) 12%, transparent);
+  --my-green-tint: color-mix(in srgb, var(--apple-system-green) 12%, transparent);
+  --my-amber-tint: color-mix(in srgb, var(--apple-system-orange) 12%, transparent);
+  --my-red-tint: color-mix(in srgb, var(--apple-system-red) 12%, transparent);
+  --my-violet-tint: color-mix(in srgb, var(--apple-system-purple) 12%, transparent);
 }
 
 .dark {
-  --my-canvas: #090A0F;
-  --my-surface: #141722;
-  --my-raised: #1C1F2E;
-  --my-inset: #0F1117;
-  --my-border: #222634;
-  --my-text: #F8FAFC;
-  --my-muted: #94A3B8;
-  --my-subtle: #64748B;
-  --my-blue: #3B82F6;
-  --my-green: #10B981;
-  --my-amber: #F59E0B;
-  --my-red: #EF4444;
-  --my-violet: #8B5CF6;
-  --my-blue-tint: rgba(59, 130, 246, 0.12);
-  --my-green-tint: rgba(16, 185, 129, 0.12);
-  --my-amber-tint: rgba(245, 158, 11, 0.12);
-  --my-red-tint: rgba(239, 68, 68, 0.12);
-  --my-violet-tint: rgba(139, 92, 246, 0.12);
+  --my-green: var(--apple-system-green);
+  --my-amber: var(--apple-system-orange);
+  --my-red: var(--apple-system-red);
 }
 
-.my-standup {
-  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
-
+/* No `font-family` override: this surface inherits the app's global Nunito
+   Sans like every other screen. `.my-mono` stays as a class name — some twenty
+   call sites use it for tabular figures — but is now the same declaration as
+   the global `.font-apple-mono`, so a figure here matches one on the sprint
+   page rather than switching to JetBrains Mono. */
 .my-standup .my-mono {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: 'Nunito Sans', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
 

@@ -128,7 +128,7 @@ export function YesterdaySection({
   return (
     <JourneyStep {...STEP} state={state}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-        <div className="flex shrink-0 items-center gap-3 whitespace-nowrap text-[13px] text-[var(--my-muted)]">
+        <div className="flex shrink-0 items-center gap-3 whitespace-nowrap apple-type-subheadline text-[var(--my-muted)]">
           <p>
             {standupStrings.my.yesterdayDone()}{' '}
             <strong className="font-bold text-[var(--my-green)]">{doneCount}</strong>
@@ -145,13 +145,13 @@ export function YesterdaySection({
             </strong>
           </p>
         </div>
-        <p className="min-w-0 flex-1 text-[14px] leading-5 text-[var(--my-muted)]">
+        <p className="min-w-0 flex-1 apple-type-callout text-[var(--my-muted)]">
           {readOnly ? standupStrings.my.yesterdayLockedNote() : standupStrings.my.yesterdayEditableNote()}
         </p>
       </div>
 
       {notice ? (
-        <p role="status" className="text-[13px] text-[var(--my-red)]">
+        <p role="status" className="apple-type-subheadline text-[var(--my-red)]">
           {notice}
         </p>
       ) : null}
@@ -159,7 +159,7 @@ export function YesterdaySection({
       <div className="flex w-full flex-col" role="table" aria-label={STEP.title}>
         <div
           role="row"
-          className="hidden items-start rounded-t-lg bg-[var(--my-raised)] px-3 py-2.5 text-[12px] font-semibold text-[var(--my-muted)] sm:flex"
+          className="hidden items-start rounded-t-[var(--apple-radius-sm)] bg-[var(--my-raised)] px-3 py-2.5 apple-type-footnote font-semibold text-[var(--my-muted)] sm:flex"
         >
           <span role="columnheader" className="min-w-0 flex-1">
             {standupStrings.my.columnTask()}
@@ -189,18 +189,18 @@ export function YesterdaySection({
                 <div className="flex min-w-0 items-center gap-2">
                   <TaskTitle taskKey={row.taskKey} title={row.title} />
                   {carried ? (
-                    <span className="shrink-0 rounded-[4px] bg-[var(--my-violet-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--my-violet)]">
+                    <span className="shrink-0 rounded-[6px] bg-[var(--my-violet-tint)] px-1.5 py-0.5 apple-type-caption font-semibold text-[var(--my-violet)]">
                       {standupStrings.my.carryBadge({ count: carried })}
                     </span>
                   ) : null}
                 </div>
                 {variance?.explanation ? (
-                  <p className="text-[12px] text-[var(--my-subtle)]">{variance.explanation}</p>
+                  <p className="apple-type-footnote text-[var(--my-subtle)]">{variance.explanation}</p>
                 ) : null}
               </div>
 
               <div role="cell" className="flex shrink-0 flex-col items-start sm:w-[120px] sm:items-center">
-                <span className="my-mono whitespace-nowrap text-[13px] text-[var(--my-muted)]">
+                <span className="my-mono whitespace-nowrap apple-type-subheadline text-[var(--my-muted)]">
                   {formatMinutesAsHours(row.plannedMinutes, { locale })} /{' '}
                   {formatMinutesAsHours(row.loggedMinutes, { locale })}
                 </span>
@@ -235,10 +235,10 @@ export function YesterdaySection({
 
 function VarianceLine({ minutes, locale }: { minutes: number; locale?: string }) {
   if (minutes === 0) {
-    return <span className="text-[11px] text-[var(--my-green)]">{standupStrings.my.perfectMatch()}</span>
+    return <span className="apple-type-caption text-[var(--my-green)]">{standupStrings.my.perfectMatch()}</span>
   }
   return (
-    <span className={cn('text-[11px]', minutes > 0 ? 'text-[var(--my-amber)]' : 'text-[var(--my-blue)]')}>
+    <span className={cn('apple-type-caption', minutes > 0 ? 'text-[var(--my-amber)]' : 'text-[var(--my-blue)]')}>
       {standupStrings.my.varianceAmount({
         hours: formatMinutesAsHours(minutes as any, { locale, signed: true })
       })}
@@ -264,7 +264,7 @@ function StatusSelect({
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
       className={cn(
-        'cursor-pointer appearance-none rounded-[4px] border-0 px-2.5 py-1 text-right text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--my-blue)] disabled:cursor-default disabled:opacity-100',
+        'cursor-pointer appearance-none rounded-[6px] border-0 px-2.5 py-1 text-right apple-type-footnote font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--my-blue)] disabled:cursor-default disabled:opacity-100',
         TAG_TONE_CLASSES[STATUS_TONE[value] ?? 'neutral']
       )}
     >
@@ -289,7 +289,7 @@ function LoggedHoursInput({
   onCommit: (minutes: number) => void
 }) {
   return (
-    <label className="group flex items-center rounded-[4px] border border-[var(--my-border)] bg-[var(--my-surface)] px-2 py-1 focus-within:border-[var(--my-blue)]">
+    <label className="group flex items-center rounded-[6px] border border-[var(--my-border)] bg-[var(--my-surface)] px-2 py-1 focus-within:border-[var(--my-blue)]">
       <input
         type="number"
         inputMode="decimal"
@@ -308,9 +308,9 @@ function LoggedHoursInput({
           event.target.value = hoursText(snapped)
           onCommit(snapped)
         }}
-        className="my-mono w-9 appearance-none bg-transparent text-right text-[13px] text-[var(--my-muted)] outline-none [appearance:textfield] focus:font-bold focus:text-[var(--my-blue)] disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="my-mono w-9 appearance-none bg-transparent text-right apple-type-subheadline text-[var(--my-muted)] outline-none [appearance:textfield] focus:font-bold focus:text-[var(--my-blue)] disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
-      <span className="my-mono text-[13px] text-[var(--my-muted)] group-focus-within:font-bold group-focus-within:text-[var(--my-blue)]">
+      <span className="my-mono apple-type-subheadline text-[var(--my-muted)] group-focus-within:font-bold group-focus-within:text-[var(--my-blue)]">
         h
       </span>
     </label>

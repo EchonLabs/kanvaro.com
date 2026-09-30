@@ -36,10 +36,10 @@ export function PullMoreWorkSection({
   const spare = hours(gapMinutes)
 
   return (
-    <div className="flex w-full flex-col gap-3 rounded-[10px] border border-[var(--my-border)] bg-[var(--my-inset)] p-4">
-      <div className="flex items-start gap-2.5 rounded-lg bg-[var(--my-blue-tint)] px-3.5 py-2.5">
+    <div className="flex w-full flex-col gap-3 rounded-[var(--apple-radius-sm)] border border-[var(--my-border)] bg-[var(--my-inset)] p-4">
+      <div className="flex items-start gap-2.5 rounded-[var(--apple-radius-sm)] bg-[var(--my-blue-tint)] px-3.5 py-2.5">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--my-blue)]" strokeWidth={2} aria-hidden />
-        <p className="text-[13px] text-[var(--my-text)]">
+        <p className="apple-type-subheadline text-[var(--my-text)]">
           <Emphasize
             text={standupStrings.my.spareCapacity({ hours: spare })}
             phrase={standupStrings.my.spareCapacityPhrase({ hours: spare })}
@@ -62,7 +62,7 @@ export function PullMoreWorkSection({
             <li
               key={task.taskId}
               className={cn(
-                'flex items-center gap-3 rounded-lg border border-[var(--my-border)] bg-[var(--my-canvas)] p-3',
+                'flex items-center gap-3 rounded-[var(--apple-radius-sm)] border border-[var(--my-border)] bg-[var(--my-surface)] p-3',
                 overLimit && 'opacity-40'
               )}
             >
@@ -72,7 +72,7 @@ export function PullMoreWorkSection({
                 disabled={disabled || overLimit}
                 onClick={() => onAdd(task.taskId)}
                 className={cn(
-                  'shrink-0 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-[12px]',
+                  'shrink-0 whitespace-nowrap rounded-[var(--apple-radius-sm)] border px-2.5 py-1.5 apple-type-footnote',
                   overLimit
                     ? 'cursor-not-allowed border-[var(--my-border)] bg-[var(--my-raised)] text-[var(--my-subtle)]'
                     : 'border-[var(--my-blue)] bg-[var(--my-blue-tint)] font-semibold text-[var(--my-blue)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50'
@@ -86,7 +86,7 @@ export function PullMoreWorkSection({
                   title={task.title}
                   className={overLimit ? 'text-[var(--my-muted)]' : undefined}
                 />
-                <p className={cn('text-[12px]', overLimit ? 'text-[var(--my-subtle)]' : 'text-[var(--my-muted)]')}>
+                <p className={cn('apple-type-footnote', overLimit ? 'text-[var(--my-subtle)]' : 'text-[var(--my-muted)]')}>
                   {meta}
                 </p>
               </div>
