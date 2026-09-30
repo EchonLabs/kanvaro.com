@@ -26,7 +26,7 @@ interface TaskCategoryManagerModalProps {
   isOpen: boolean
   onClose: () => void
   projectId: string
-  onCategoriesUpdated: (categories: TaskCategory[]) => void
+  onCategoriesUpdated: (categories: TaskCategory[], deleteInfo?: { deletedKey: string; targetKey?: string }) => void
 }
 
 export default function TaskCategoryManagerModal({
@@ -221,12 +221,14 @@ export default function TaskCategoryManagerModal({
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to delete task category')
       }
+      const deletedKey = categoryToDelete
+      const targetKey = deleteAction === 'migrate' ? migrationKey : undefined
       setDeleteConfirmOpen(false)
       setCategoryToDelete(null)
       setDeleteAction('migrate')
       setMigrationKey('')
       const updatedCategories = await loadCategories()
-      onCategoriesUpdated(updatedCategories)
+      onCategoriesUpdated(updatedCategories, { deletedKey, targetKey })
       notifySuccess({ title: 'Category Deleted', message: 'Task category deleted successfully' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete task category')
