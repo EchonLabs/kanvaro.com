@@ -1,3 +1,13 @@
+## [1.45.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.1...v1.45.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* add default task categories for new projects ([f878dfe](https://github.com/EchonLabs/kanvaro.com/commit/f878dfe9c8a2e05b14221cb9cca51feb5fa0ad35))
+* add reordering for task categories ([88bb1c7](https://github.com/EchonLabs/kanvaro.com/commit/88bb1c7f2aeadc2639145b94e1b7a2315e35f1a1))
+* add total deleted count to notification cleanup ([e514984](https://github.com/EchonLabs/kanvaro.com/commit/e51498423f0df3aae2478512f0a96bce869e178c))
+* category title display and update on deletion ([4c8a7f4](https://github.com/EchonLabs/kanvaro.com/commit/4c8a7f4143a972cea35ec5c728203aad5c29283e))
+
 ## [1.45.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.0...v1.45.1) (2026-09-30)
 
 
