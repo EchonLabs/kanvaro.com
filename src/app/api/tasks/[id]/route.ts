@@ -667,8 +667,8 @@ export async function PUT(
     }
 
     const hasCategoryUpdate = Object.prototype.hasOwnProperty.call(updateData, 'category')
-    if (hasCategoryUpdate || !currentTask.category) {
-      const categoryInput = hasCategoryUpdate && typeof updateData.category === 'string'
+    if (hasCategoryUpdate) {
+      const categoryInput = typeof updateData.category === 'string'
         ? updateData.category.trim()
         : ''
       if (!categoryInput) {
@@ -1149,8 +1149,11 @@ export async function PUT(
         // Send notifications for important changes (non-blocking)
         const notificationPromises: Promise<unknown>[] = []
 
+        // Check if assignedTo was explicitly included in the update payload
+        const hasAssignedToUpdate = Object.prototype.hasOwnProperty.call(updateData, 'assignedTo')
+
         // Notify if task was assigned to someone new
-        const currentAssignedToIds = Array.isArray(currentTask.assignedTo)
+        const currentAssignedToIds: string[] = Array.isArray(currentTask.assignedTo)
           ? currentTask.assignedTo.map((item: any) => {
             if (typeof item === 'object' && item.user) {
               return typeof item.user === 'object' ? item.user._id?.toString() : item.user.toString()
@@ -1158,16 +1161,17 @@ export async function PUT(
             return item.toString()
           })
           : currentTask.assignedTo ? [currentTask.assignedTo.toString()] : []
-        const newAssignedToIds = Array.isArray(updateData.assignedTo)
+        const newAssignedToIds: string[] = hasAssignedToUpdate ? (Array.isArray(updateData.assignedTo)
           ? updateData.assignedTo.map((item: any) => {
             if (typeof item === 'object' && item.user) {
               return typeof item.user === 'object' ? item.user._id?.toString() : item.user.toString()
             }
             return item.toString()
           })
-          : []
+          : [])
+          : currentAssignedToIds
 
-        const assignedUsersChanged = JSON.stringify(currentAssignedToIds.sort()) !== JSON.stringify(newAssignedToIds.sort())
+        const assignedUsersChanged = hasAssignedToUpdate && (JSON.stringify(currentAssignedToIds.sort()) !== JSON.stringify(newAssignedToIds.sort()))
 
         let baseUrl: string
 
@@ -1346,7 +1350,7 @@ export async function PUT(
                 const projectName = project?.name
                 const title = isStatusChanged ? 'Task Status Changed' : 'Task Updated'
                 const message = isStatusChanged
-                  ? `Task "${task.title}" ${oldStatusLabel} -> ${newStatusLabel}${projectName ? ` in project "${projectName}"` : ''}`
+                  ? `Task "${task.title}"\n${oldStatusLabel} -> ${newStatusLabel}${projectName ? ` in project "${projectName}"` : ''}`
                   : `Task "${task.title}" has been updated${projectName ? ` in project "${projectName}"` : ''}`
 
                 return notificationService.createNotification(assigneeId, organizationId, {
