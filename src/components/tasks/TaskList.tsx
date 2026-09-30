@@ -278,10 +278,15 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     }
   }
 
-  const getCategoryTitle = (categoryKey?: string): string | null => {
+  const getCategoryTitle = useCallback((categoryKey?: string): string | null => {
     if (!categoryKey) return null
-    return categoryMap[categoryKey] || categoryKey
-  }
+    if (categoryMap[categoryKey]) return categoryMap[categoryKey]
+    const entry = Object.entries(categoryMap).find(
+      ([k, v]) => k.toLowerCase() === categoryKey.toLowerCase() || v.toLowerCase() === categoryKey.toLowerCase()
+    )
+    if (entry) return entry[1]
+    return categoryKey
+  }, [categoryMap])
 
   const loadCategories = useCallback(async () => {
     if (!projectId || projectId === 'all') {
@@ -810,6 +815,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         projectId={projectId === 'all' ? '' : projectId}
         onCategoriesUpdated={async () => {
           await loadCategories()
+          fetchTasks()
         }}
       />
 
@@ -823,6 +829,10 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             }}
             task={selectedTask}
             onTaskUpdated={handleTaskUpdated}
+            onRefreshTasks={() => {
+              loadCategories()
+              fetchTasks()
+            }}
           />
 
           <ViewTaskModal

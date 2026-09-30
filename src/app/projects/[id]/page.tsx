@@ -2704,6 +2704,10 @@ export default function ProjectDetailPage() {
                 // Refresh tasks list
                 fetchTasks()
               }}
+              onRefreshTasks={() => {
+                fetchProject()
+                fetchTasks()
+              }}
             />
           )}
 

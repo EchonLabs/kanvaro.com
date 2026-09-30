@@ -40,6 +40,7 @@ interface EditTaskModalProps {
   onClose: () => void
   task: any
   onTaskUpdated: () => void
+  onRefreshTasks?: () => void
 }
 
 interface User {
@@ -110,7 +111,7 @@ interface TaskFormData {
   category: string
 }
 
-export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: EditTaskModalProps) {
+export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, onRefreshTasks }: EditTaskModalProps) {
   const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
   const [users, setUsers] = useState<User[]>([])
@@ -172,9 +173,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
         story: task.story?._id || task.story || '',
         epic: task.epic?._id || task.epic || '',
         isBillable: typeof task.isBillable === 'boolean' ? task.isBillable : true,
-        category: typeof task.category === 'string'
-          ? task.category
-          : (task.category?._id || task.category?.key || '')
+        category: task.category || ''
       }
       setFormData(initialData)
       setInitialFormData(initialData)
@@ -299,13 +298,33 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
     }
   }, [isOpen, task])
 
-  const handleCategoriesUpdated = useCallback((updatedCategories: TaskCategory[]) => {
+  const getCategoryTitle = useCallback((categoryKey?: string): string => {
+    if (!categoryKey) return ''
+    const found = categories.find(c =>
+      c.key === categoryKey ||
+      c.key.toLowerCase() === categoryKey.toLowerCase() ||
+      c.title.toLowerCase() === categoryKey.toLowerCase()
+    )
+    return found ? found.title : categoryKey
+  }, [categories])
+
+  const handleCategoriesUpdated = useCallback((updatedCategories: TaskCategory[], deleteInfo?: { deletedKey: string; targetKey?: string }) => {
     setCategories(updatedCategories)
-    setFormData(prev => {
-      const match = updatedCategories.find(c => c.key === prev.category || c.key.toLowerCase() === prev.category.toLowerCase() || c.title.toLowerCase() === prev.category.toLowerCase())
-      return { ...prev, category: match ? match.key : '' }
-    })
-  }, [])
+    const resolveNext = (current: string) => {
+      if (deleteInfo && (current === deleteInfo.deletedKey || current.toLowerCase() === deleteInfo.deletedKey.toLowerCase())) {
+        return deleteInfo.targetKey || ''
+      }
+      const match = updatedCategories.find(c =>
+        c.key === current ||
+        c.key.toLowerCase() === current.toLowerCase() ||
+        c.title.toLowerCase() === current.toLowerCase()
+      )
+      return match ? match.key : ''
+    }
+    setFormData(prev => ({ ...prev, category: resolveNext(prev.category) }))
+    setInitialFormData(prev => (prev ? ({ ...prev, category: resolveNext(prev.category) }) : prev))
+    onRefreshTasks?.()
+  }, [onRefreshTasks])
 
   const fetchCategories = useCallback(async (projectIdParam: string | undefined) => {
     if (!projectIdParam) {
@@ -321,21 +340,23 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
       if (!response.ok || !data.success || !Array.isArray(data.data)) {
         setCategories([])
-        setFormData(prev => ({ ...prev, category: '' }))
         return
       }
 
       const sortedCategories = [...data.data].sort((a: TaskCategory, b: TaskCategory) => a.order - b.order)
       setCategories(sortedCategories)
       setFormData(prev => {
-        const catToFind = prev.category || (typeof task?.category === 'string' ? task.category : (task?.category?.key || task?.category?.title || ''))
-        const matched = sortedCategories.find(c => c.key === catToFind || c.key.toLowerCase() === catToFind.toLowerCase() || c.title.toLowerCase() === catToFind.toLowerCase())
-        return { ...prev, category: matched ? matched.key : '' }
+        if (!prev.category) return prev
+        const match = sortedCategories.find(c =>
+          c.key === prev.category ||
+          c.key.toLowerCase() === prev.category.toLowerCase() ||
+          c.title.toLowerCase() === prev.category.toLowerCase()
+        )
+        return match ? { ...prev, category: match.key } : prev
       })
     } catch (err) {
       console.error('Failed to fetch task categories:', err)
       setCategories([])
-      setFormData(prev => ({ ...prev, category: '' }))
     } finally {
       setLoadingCategories(false)
     }
@@ -802,7 +823,10 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                     </div>
                     <Select
                       value={formData.category}
-                      onValueChange={(value) => setFormData({ ...formData, category: value })}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        setFormData({ ...formData, category: value })
+                      }}
                       disabled={!taskProjectId || loadingCategories}
                       onOpenChange={(open) => { if (open) setCategoryQuery('') }}
                     >
@@ -813,7 +837,9 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                             : loadingCategories
                               ? 'Loading categories...'
                               : 'Select a category'
-                        } />
+                        }>
+                          {formData.category ? getCategoryTitle(formData.category) : undefined}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">
                         <div className="p-2">
