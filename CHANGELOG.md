@@ -1,3 +1,11 @@
+## [1.45.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.0...v1.45.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* refine email delivery for comment mentions and replies ([5100a48](https://github.com/EchonLabs/kanvaro.com/commit/5100a486448ad9457f6c9fbbf66b604302752a07))
+* resolve flase unassign notifcation and imporve status update formating ([f2ffc41](https://github.com/EchonLabs/kanvaro.com/commit/f2ffc41d40b0c1f03dc898178cab3073df049bdb))
+
 # [1.45.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.44.0...v1.45.0) (2026-09-28)
 
 

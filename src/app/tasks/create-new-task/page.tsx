@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { AttachmentList } from '@/components/ui/AttachmentList'
 import { countWords, TASK_TITLE_MAX_WORDS, truncateToMaxWords } from '@/lib/text/word-limit'
+import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
 
 interface Project {
   _id: string
@@ -160,7 +161,7 @@ export default function CreateTaskPage() {
   const [assignedTo, setAssignedTo] = useState<string[]>([])
   const [assigneeQuery, setAssigneeQuery] = useState('');
   const [newLabel, setNewLabel] = useState('')
-  const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [subtasks, setSubtasks] = useState<SubtaskItem[]>([])
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
   const [attachmentError, setAttachmentError] = useState('')
@@ -312,8 +313,10 @@ export default function CreateTaskPage() {
       }
 
       // Validate required fields before submitting
-      const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
-      if (!formData.title.trim() || !formData.project || !formData.dueDate || !formData.category) {
+      const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0)) ||
+        subtasks.some(st => (st.subtasks || []).some(n => !(n.title && n.title.trim().length > 0)))
+
+      if (!formData.title.trim() || !formData.project || !formData.dueDate) {
         notifyError({ title: 'Validation Error', message: 'Please fill in all required fields' })
         setLoading(false)
         return
@@ -333,17 +336,35 @@ export default function CreateTaskPage() {
       }
 
       if (missingSubtaskTitle) {
-        notifyError({ title: 'Validation Error', message: 'Please fill in all required subtask titles' })
+        notifyError({ title: 'Validation Error', message: 'Please fill in all required subtask and nested subtask titles' })
         setLoading(false)
         return
       }
 
-      const preparedSubtasks = subtasks.map(subtask => ({
-        title: subtask.title.trim(),
-        description: subtask.description?.trim() || undefined,
-        status: 'backlog', // Sub-tasks always created with backlog status
-        isCompleted: false
-      }))
+      const preparedSubtasks = subtasks
+        .filter(st => st.title && st.title.trim().length > 0)
+        .map(subtask => ({
+          title: subtask.title.trim(),
+          description: subtask.description?.trim() || undefined,
+          status: subtask.status || 'todo',
+          isCompleted: subtask.status === 'done' ? true : !!subtask.isCompleted,
+          assignedTo: subtask.assignedTo || undefined,
+          story: subtask.story || undefined,
+          dueDate: subtask.dueDate || undefined,
+          type: subtask.type || 'subtask',
+          priority: subtask.priority || 'medium',
+          estimatedHours: subtask.estimatedHours !== undefined && subtask.estimatedHours !== null && subtask.estimatedHours !== ''
+            ? Number(subtask.estimatedHours)
+            : undefined,
+          subtasks: (subtask.subtasks || [])
+            .filter(n => n.title && n.title.trim().length > 0)
+            .map(n => ({
+              title: n.title.trim(),
+              description: n.description?.trim() || undefined,
+              status: n.status || 'todo',
+              isCompleted: n.status === 'done' ? true : !!n.isCompleted
+            }))
+        }))
 
       const assignedToPayload = assignedTo.map(userId => {
         const member = projectMembers.find(m => m._id.toString() === userId.toString())
@@ -481,33 +502,6 @@ export default function CreateTaskPage() {
     }))
   }
 
-  const addSubtask = () => {
-    setSubtasks([...subtasks, {
-      title: '',
-      description: '',
-      status: 'backlog',
-      isCompleted: false
-    }])
-  }
-
-  const updateSubtask = (index: number, field: keyof Subtask, value: any) => {
-    setSubtasks(prev => {
-      const updated = [...prev]
-      updated[index] = {
-        ...updated[index],
-        [field]: field === 'status' ? (value as SubtaskStatus) : value
-      }
-      if (field === 'status') {
-        updated[index].isCompleted = (value as SubtaskStatus) === 'done'
-      }
-      return updated
-    })
-  }
-
-  const removeSubtask = (index: number) => {
-    setSubtasks(subtasks.filter((_, i) => i !== index))
-  }
-
   const uploadAttachmentFile = useCallback(async (file: File) => {
     if (!currentUser) {
       throw new Error('User information is still loading. Please try again.')
@@ -616,7 +610,8 @@ export default function CreateTaskPage() {
       !!formData.dueDate &&
       !!formData.category &&
       assignedTo.length > 0 &&
-      !subtasks.some(st => !(st.title && st.title.trim().length > 0))
+      !subtasks.some(st => !(st.title && st.title.trim().length > 0)) &&
+      !subtasks.some(st => (st.subtasks || []).some(n => !(n.title && n.title.trim().length > 0)))
     )
   }, [formData.title, formData.project, formData.dueDate, formData.category, assignedTo.length, subtasks])
 
@@ -1204,59 +1199,19 @@ export default function CreateTaskPage() {
               </div>
 
               {/* Subtasks Section */}
-              <div className="space-y-4 pt-6 mt-6 border-t border-muted">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">Subtasks</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={addSubtask}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Subtask
-                  </Button>
-                </div>
-
-                {subtasks.map((subtask, index) => (
-                  <div key={index} className="p-4 border rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">Subtask {index + 1}</h4>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeSubtask(index)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-foreground">Title *</label>
-                      <Input
-                        value={subtask.title}
-                        onChange={(e) => updateSubtask(index, 'title', e.target.value)}
-                        placeholder="Subtask title"
-                        required
-                      />
-                    </div>
-
-                    {/* <div>
-                    <label className="text-sm font-medium text-foreground">Description</label>
-                    <Textarea
-                      value={subtask.description || ''}
-                      onChange={(e) => updateSubtask(index, 'description', e.target.value)}
-                      placeholder="Subtask description"
-                      rows={2}
-                    />
-                  </div> */}
-                  </div>
-                ))}
-
-                {subtasks.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Target className="h-12 w-12 mx-auto mb-4" />
-                    <p>No subtasks added yet</p>
-                    <p className="text-sm">Click "Add Subtask" to create subtasks for this task</p>
-                  </div>
-                )}
+              <div className="pt-6 mt-6 border-t border-muted">
+                <SubtasksEditor
+                  subtasks={subtasks}
+                  onChange={setSubtasks}
+                  projectMembers={projectMembers}
+                  stories={stories}
+                  onAssigneeAdded={(newUserId) => {
+                    if (!assignedTo.includes(newUserId)) {
+                      setAssignedTo(prev => [...prev, newUserId])
+                    }
+                  }}
+                  disabled={loading}
+                />
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-end pt-6 mt-8 border-t border-muted">

@@ -23,9 +23,11 @@ import {
   Settings2
 } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
+import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import TaskCategoryManagerModal from '@/components/tasks/TaskCategoryManagerModal'
+import { TaskStatus } from '@/models/Task'
 
 interface TaskCategory {
   key: string
@@ -148,9 +150,9 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
     isBillable: true,
     category: ''
   })
-  const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [subtasks, setSubtasks] = useState<SubtaskItem[]>([])
   const [initialFormData, setInitialFormData] = useState<TaskFormData | null>(null)
-  const [initialSubtasks, setInitialSubtasks] = useState<Subtask[]>([])
+  const [initialSubtasks, setInitialSubtasks] = useState<SubtaskItem[]>([])
   const [availableStatuses, setAvailableStatuses] = useState<Array<{ value: SubtaskStatus; label: string }>>(SUBTASK_STATUS_OPTIONS)
 
   const taskProjectId = getTaskProjectId(task)
@@ -233,15 +235,32 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
       }
 
       // Set subtasks if they exist
-      const initialSubtasksData: Subtask[] = task.subtasks && Array.isArray(task.subtasks)
+      const initialSubtasksData: SubtaskItem[] = task.subtasks && Array.isArray(task.subtasks)
         ? task.subtasks.map((subtask: any) => ({
           _id: subtask._id,
-          title: subtask.title,
+          title: subtask.title || '',
           description: subtask.description || '',
-          status: (subtask.status || 'todo') as SubtaskStatus,
+          status: (subtask.status || 'todo') as TaskStatus,
           isCompleted: typeof subtask.isCompleted === 'boolean'
             ? subtask.isCompleted
-            : subtask.status === 'done'
+            : subtask.status === 'done',
+          assignedTo: subtask.assignedTo?._id || subtask.assignedTo || undefined,
+          story: subtask.story?._id || subtask.story || undefined,
+          dueDate: subtask.dueDate || undefined,
+          type: subtask.type || 'subtask',
+          priority: subtask.priority || 'medium',
+          estimatedHours: subtask.estimatedHours !== undefined && subtask.estimatedHours !== null ? subtask.estimatedHours : undefined,
+          subtasks: Array.isArray(subtask.subtasks)
+            ? subtask.subtasks.map((nested: any) => ({
+                _id: nested._id,
+                title: nested.title || '',
+                description: nested.description || '',
+                status: (nested.status || 'todo') as TaskStatus,
+                isCompleted: typeof nested.isCompleted === 'boolean'
+                  ? nested.isCompleted
+                  : nested.status === 'done'
+              }))
+            : []
         }))
         : []
       setSubtasks(initialSubtasksData)
@@ -474,15 +493,51 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
     }
 
     try {
-      const preparedSubtasks = subtasks.map(subtask => ({
-        _id: subtask._id,
-        title: subtask.title.trim(),
-        description: subtask.description?.trim() || undefined,
-        status: subtask.status,
-        isCompleted: subtask.status === 'done' ? true : subtask.isCompleted
-      }))
+      const preparedSubtasks = subtasks
+        .filter(st => st.title && st.title.trim().length > 0)
+        .map(subtask => ({
+          _id: subtask._id,
+          title: subtask.title.trim(),
+          description: subtask.description?.trim() || undefined,
+          status: subtask.status || 'todo',
+          isCompleted: subtask.status === 'done' ? true : !!subtask.isCompleted,
+          assignedTo: subtask.assignedTo || undefined,
+          story: subtask.story || undefined,
+          dueDate: subtask.dueDate || undefined,
+          type: subtask.type || 'subtask',
+          priority: subtask.priority || 'medium',
+          estimatedHours: subtask.estimatedHours !== undefined && subtask.estimatedHours !== null && subtask.estimatedHours !== ''
+            ? Number(subtask.estimatedHours)
+            : undefined,
+          subtasks: (subtask.subtasks || [])
+            .filter(n => n.title && n.title.trim().length > 0)
+            .map(n => ({
+              _id: n._id,
+              title: n.title.trim(),
+              description: n.description?.trim() || undefined,
+              status: n.status || 'todo',
+              isCompleted: n.status === 'done' ? true : !!n.isCompleted
+            }))
+        }))
 
-      // Send assignedTo as array
+      // Check subtask completion rules before submitting
+      const hasIncomplete = preparedSubtasks.some(st => {
+        const isStDone = st.isCompleted || st.status === 'done'
+        if (!isStDone) return true
+        return (st.subtasks || []).some(n => !n.isCompleted && n.status !== 'done')
+      })
+
+      let finalStatus = formData.status
+      if (finalStatus === 'done' && hasIncomplete) {
+        notifyError({
+          title: 'Completion Blocked',
+          message: 'Cannot mark task as complete: all subtasks and nested subtasks must be completed first.'
+        })
+        setLoading(false)
+        return
+      } else if (preparedSubtasks.length > 0 && !hasIncomplete) {
+        finalStatus = 'done'
+      }
 
       const response = await fetch(`/api/tasks/${task._id}`, {
         method: 'PUT',
@@ -491,6 +546,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
         },
         body: JSON.stringify({
           ...formData,
+          status: finalStatus,
           assignedTo: assignedTo.map(assignee => ({
             user: assignee._id,
             firstName: assignee.firstName,
@@ -527,48 +583,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
     }
   }
 
-  const addSubtask = () => {
-    setSubtasks([...subtasks, {
-      title: '',
-      description: '',
-      status: 'todo',
-      isCompleted: false
-    }])
-  }
 
-  const updateSubtask = (index: number, field: keyof Subtask, value: any) => {
-    setSubtasks(prev => {
-      const updated = [...prev]
-      updated[index] = {
-        ...updated[index],
-        [field]: field === 'status' ? (value as SubtaskStatus) : value
-      }
-      if (field === 'status') {
-        updated[index].isCompleted = (value as SubtaskStatus) === 'done'
-      }
-      return updated
-    })
-  }
-
-  const toggleSubtaskCompletion = (index: number, checked: boolean) => {
-    setSubtasks(prev => {
-      const updated = [...prev]
-      const current = updated[index]
-      const nextStatus: SubtaskStatus = checked
-        ? 'done'
-        : (current.status === 'done' ? 'todo' : (current.status || 'todo'))
-      updated[index] = {
-        ...current,
-        status: nextStatus,
-        isCompleted: checked
-      }
-      return updated
-    })
-  }
-
-  const removeSubtask = (index: number) => {
-    setSubtasks(subtasks.filter((_, i) => i !== index))
-  }
 
   const hasChanges = (): boolean => {
     // If initial data hasn't been loaded yet, no changes can be detected
@@ -675,7 +690,14 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
         normalizeString(current.title) !== normalizeString(initial.title) ||
         normalizeString(current.description) !== normalizeString(initial.description) ||
         current.status !== initial.status ||
-        current.isCompleted !== initial.isCompleted
+        current.isCompleted !== initial.isCompleted ||
+        (current.assignedTo || '') !== (initial.assignedTo || '') ||
+        (current.story || '') !== (initial.story || '') ||
+        (current.dueDate ? new Date(current.dueDate).toISOString().split('T')[0] : '') !== (initial.dueDate ? new Date(initial.dueDate).toISOString().split('T')[0] : '') ||
+        (current.type || 'subtask') !== (initial.type || 'subtask') ||
+        (current.priority || 'medium') !== (initial.priority || 'medium') ||
+        (current.estimatedHours !== undefined && current.estimatedHours !== null ? Number(current.estimatedHours) : '') !== (initial.estimatedHours !== undefined && initial.estimatedHours !== null ? Number(initial.estimatedHours) : '') ||
+        JSON.stringify(current.subtasks || []) !== JSON.stringify(initial.subtasks || [])
       ) {
         return true
       }
@@ -1224,97 +1246,29 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
               </div>
 
               {/* Subtasks Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">Subtasks</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={addSubtask}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Subtask
-                  </Button>
-                </div>
-
-                {subtasks.map((subtask, index) => (
-                  <div key={index} className="p-4 border rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">Subtask {index + 1}</h4>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeSubtask(index)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div>
-                        <label className="text-sm font-medium text-foreground">Title *</label>
-                        <Input
-                          value={subtask.title}
-                          onChange={(e) => updateSubtask(index, 'title', e.target.value)}
-                          placeholder="Subtask title"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium text-foreground">Status</label>
-                        <Select
-                          value={subtask.status}
-                          onValueChange={(value) => updateSubtask(index, 'status', value as SubtaskStatus)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {SUBTASK_STATUS_OPTIONS.map(option => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-foreground">Description</label>
-                      <div className="mt-1">
-                        <RichTextEditor
-                          value={subtask.description || ''}
-                          onChange={(value) => updateSubtask(index, 'description', value)}
-                          placeholder="Subtask description"
-                          disabled={loading}
-                          maxLength={2000}
-                          showCharCount={true}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Supports rich text formatting. Maximum 2,000 characters.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        checked={subtask.isCompleted || subtask.status === 'done'}
-                        onCheckedChange={(checked) => toggleSubtaskCompletion(index, !!checked)}
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        Mark as completed
-                      </span>
-                    </div>
-                  </div>
-                ))}
-
-                {subtasks.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Target className="h-12 w-12 mx-auto mb-4" />
-                    <p>No subtasks added yet</p>
-                    <p className="text-sm">Click "Add Subtask" to create subtasks for this task</p>
-                  </div>
-                )}
+              <div className="pt-4 border-t border-[var(--apple-separator)]">
+                <SubtasksEditor
+                  subtasks={subtasks}
+                  onChange={setSubtasks}
+                  projectMembers={users}
+                  stories={stories}
+                  onAssigneeAdded={(newUserId) => {
+                    const alreadySelected = assignedTo.some(a => a._id === newUserId)
+                    if (!alreadySelected) {
+                      const member = users.find(u => u._id === newUserId)
+                      if (member) {
+                        setAssignedTo(prev => [...prev, {
+                          _id: member._id,
+                          firstName: member.firstName,
+                          lastName: member.lastName,
+                          email: member.email,
+                          hourlyRate: member.projectHourlyRate?.toString()
+                        }])
+                      }
+                    }
+                  }}
+                  disabled={loading}
+                />
               </div>
 
             </form>
