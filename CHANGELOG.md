@@ -1,3 +1,10 @@
+## [1.45.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.2...v1.45.3) (2026-09-30)
+
+
+### Bug Fixes
+
+* resolve TypeScript errors and missing types in CreateTaskModal ([23e4fd3](https://github.com/EchonLabs/kanvaro.com/commit/23e4fd3ede5a4a23ad95d0473ee20182b59500be))
+
 ## [1.45.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.1...v1.45.2) (2026-09-30)
 
 
