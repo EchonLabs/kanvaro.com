@@ -175,3 +175,23 @@ describe('AssignmentBoard — what is left to do', () => {
     expect(screen.getByText('1 task still needs an assignee')).toBeInTheDocument()
   })
 })
+
+describe('AssignmentBoard — viewers without SPRINT_UPDATE', () => {
+  it('shows who owns what with no picker to change it', () => {
+    const onAssign = jest.fn()
+    render(
+      <AssignmentBoard
+        tasks={[task('1', 'kasun'), task('2')]}
+        members={members}
+        busy={false}
+        readOnly
+        onAssign={onAssign}
+      />
+    )
+
+    expect(screen.getByText('Task 1')).toBeInTheDocument()
+    expect(screen.getByText('Task 2')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Assign Task 1 to')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Assign Task 2 to')).not.toBeInTheDocument()
+  })
+})

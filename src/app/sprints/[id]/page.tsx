@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
@@ -30,7 +31,6 @@ import {
   Play,
   XCircle,
   BarChart3,
-  User,
   Loader2,
   Edit,
   Trash2,
@@ -63,11 +63,13 @@ interface Sprint {
     firstName: string
     lastName: string
     email: string
+    avatar?: string
   }>
   createdBy: {
     firstName: string
     lastName: string
     email: string
+    avatar?: string
   }
   progress: {
     completionPercentage: number
@@ -1463,13 +1465,14 @@ export default function SprintDetailPage() {
               <div className="px-5 py-3 space-y-2.5">
                 {sprint.teamMembers && sprint.teamMembers.length > 0 ? sprint.teamMembers.map((member, index) => {
                   const displayName = `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'Unknown User'
-                  const initials = displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
                   return (
                     <div key={member._id || index} className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white font-semibold text-[13px] select-none"
-                        style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 1px 4px var(--apple-chart-glow)' }}>
-                        {initials}
-                      </div>
+                      <GravatarAvatar
+                        user={{ firstName: member.firstName, lastName: member.lastName, email: member.email, avatar: member.avatar }}
+                        size={36}
+                        gravatarOptions={{ default: 'identicon' }}
+                        className="ring-1 ring-[var(--apple-separator)]"
+                      />
                       <span className="text-[13px] text-[var(--apple-label)] font-medium leading-tight">{displayName}</span>
                     </div>
                   )
@@ -1486,10 +1489,12 @@ export default function SprintDetailPage() {
               </div>
               <div className="px-5 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-white font-semibold text-[13px] select-none"
-                    style={{ background: 'var(--apple-card-gradient)', boxShadow: '0 1px 4px var(--apple-chart-glow)' }}>
-                    {`${sprint.createdBy?.firstName || ''} ${sprint.createdBy?.lastName || ''}`.trim().split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || <User className="h-4 w-4" />}
-                  </div>
+                  <GravatarAvatar
+                    user={sprint.createdBy}
+                    size={36}
+                    gravatarOptions={{ default: 'identicon' }}
+                    className="ring-1 ring-[var(--apple-separator)]"
+                  />
                   <div>
                     <p className="text-[13px] font-medium text-[var(--apple-label)] leading-tight">
                       {sprint.createdBy?.firstName} {sprint.createdBy?.lastName}

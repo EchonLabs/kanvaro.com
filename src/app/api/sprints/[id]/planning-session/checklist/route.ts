@@ -23,11 +23,23 @@ export const GET = withSprintPermission(
     // the screen — an ObjectId in that warning is worse than no warning.
     const memberIds = (sprint.teamMembers ?? []).map((id: any) => id.toString())
     const users = memberIds.length
-      ? await User.find({ _id: { $in: memberIds } }).select('firstName lastName email').lean()
+      ? await User.find({ _id: { $in: memberIds } }).select('firstName lastName email avatar').lean()
       : []
 
     const names = new Map<string, string>()
+    // The workload board shows each member's own avatar, so it needs the same
+    // identity fields every other avatar in the app is drawn from.
+    const identities = new Map<
+      string,
+      { firstName?: string; lastName?: string; email?: string; avatar?: string }
+    >()
     for (const user of users as any[]) {
+      identities.set(user._id.toString(), {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        avatar: user.avatar
+      })
       names.set(
         user._id.toString(),
         [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email
@@ -87,6 +99,7 @@ export const GET = withSprintPermission(
       members: named.totals.perMember.map((member) => ({
         id: member.memberId,
         name: names.get(member.memberId) ?? member.name,
+        ...identities.get(member.memberId),
         assignedMinutes: member.assignedMinutes,
         capacityMinutes: member.capacityMinutes
       }))

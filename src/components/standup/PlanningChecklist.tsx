@@ -59,6 +59,8 @@ interface Props {
   /** Scrolls to the section that fixes a check. */
   onJump?: (target: ChecklistFixTarget) => void
   busy?: boolean
+  /** Viewers see what is blocking, without the fixes they are not allowed to make. */
+  readOnly?: boolean
 }
 
 /** What a passing check guarantees. */
@@ -119,7 +121,8 @@ export function PlanningChecklist({
   onEstimateTask,
   onOpenTask,
   onJump,
-  busy
+  busy,
+  readOnly = false
 }: Props) {
   const [showPassed, setShowPassed] = useState(false)
 
@@ -127,18 +130,22 @@ export function PlanningChecklist({
   const advisory = items.filter((item) => item.kind === 'advisory' && !item.passed)
   const passed = items.filter((item) => item.passed)
 
-  const rowProps = { offendingTasks, offendingMembers, onEstimateTask, onOpenTask, onJump }
+  const rowProps = { offendingTasks, offendingMembers, onEstimateTask, onOpenTask, onJump, readOnly }
 
   return (
     <PlanCard
       id="planning-checklist"
       title="Planning checklist"
-      description="Blocking issues must be fixed. Advisories may be acknowledged and waived."
+      description={
+        readOnly
+          ? 'What still stands between this sprint and a completed plan.'
+          : 'Blocking issues must be fixed. Advisories may be acknowledged and waived.'
+      }
       aria-busy={busy}
     >
       <div className="flex w-full flex-col gap-[14px]">
         {blocking.length > 0 && (
-          <ChecklistGroup label={`BLOCKING · ${blocking.length}`} tone="danger">
+          <ChecklistGroup label={`Blocking · ${blocking.length}`} tone="danger">
             {blocking.map((item) => (
               <CheckRows key={item.checkId} item={item} {...rowProps} />
             ))}
@@ -146,21 +153,21 @@ export function PlanningChecklist({
         )}
 
         {advisory.length > 0 && (
-          <ChecklistGroup label={`ADVISORY · ${advisory.length}`} tone="warning">
+          <ChecklistGroup label={`Advisory · ${advisory.length}`} tone="warning">
             {advisory.map((item) => (
               <CheckRows
                 key={item.checkId}
                 item={item}
                 {...rowProps}
                 acknowledged={acknowledged.includes(item.checkId)}
-                onAcknowledge={onAcknowledge}
+                onAcknowledge={readOnly ? undefined : onAcknowledge}
               />
             ))}
           </ChecklistGroup>
         )}
 
         {blocking.length === 0 && advisory.length === 0 && items.length > 0 && (
-          <p className="flex items-center gap-3 rounded-[12px] bg-[var(--plan-success-bg)] p-3 text-[12px] font-bold text-[var(--plan-text)]">
+          <p className="apple-type-subheadline flex items-center gap-3 rounded-[var(--apple-radius-md)] bg-[var(--plan-success-bg)] p-3 font-semibold text-[var(--plan-text)]">
             <Check className="h-4 w-4 shrink-0 text-[var(--plan-success)]" />
             All {items.length} {items.length === 1 ? 'check' : 'checks'} pass
           </p>
@@ -172,7 +179,7 @@ export function PlanningChecklist({
               type="button"
               onClick={() => setShowPassed((current) => !current)}
               aria-expanded={showPassed}
-              className="flex items-center gap-1 self-start text-[12px] text-[var(--plan-muted)] transition-colors hover:text-[var(--plan-text)]"
+              className="apple-type-footnote flex items-center gap-1 self-start rounded-[var(--apple-radius-pill)] font-medium text-[var(--plan-muted)] transition-colors hover:text-[var(--plan-text)]"
             >
               <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showPassed && 'rotate-180')} />
               {showPassed ? 'Hide passed checks' : `Show ${passed.length} passed`}
@@ -183,10 +190,10 @@ export function PlanningChecklist({
                 {passed.map((item) => (
                   <li
                     key={item.checkId}
-                    className="flex items-center gap-3 rounded-[12px] bg-[var(--plan-raised)] p-3"
+                    className="flex items-center gap-3 rounded-[var(--apple-radius-md)] bg-[var(--plan-raised)] p-3"
                   >
                     <Check aria-label="Passed" className="h-4 w-4 shrink-0 text-[var(--plan-success)]" />
-                    <span className="text-[12px] text-[var(--plan-text)]">
+                    <span className="apple-type-subheadline text-[var(--plan-text)]">
                       {CHECK_LABELS[item.checkId] ?? item.checkId}
                     </span>
                   </li>
@@ -213,7 +220,7 @@ function ChecklistGroup({
     <section className="flex flex-col gap-2">
       <h3
         className={cn(
-          'text-[12px] font-bold',
+          'apple-type-caption font-semibold uppercase tracking-[0.07em]',
           tone === 'danger' ? 'text-[var(--plan-danger)]' : 'text-[var(--plan-warning)]'
         )}
       >
@@ -233,6 +240,7 @@ interface CheckRowsProps {
   onEstimateTask: (taskId: string, hours: number) => Promise<void>
   onOpenTask: (taskId: string) => void
   onJump?: (target: ChecklistFixTarget) => void
+  readOnly: boolean
 }
 
 /**
@@ -247,7 +255,8 @@ function CheckRows({
   onAcknowledge,
   onEstimateTask,
   onOpenTask,
-  onJump
+  onJump,
+  readOnly
 }: CheckRowsProps) {
   const title = ISSUE_TITLES[item.checkId] ?? CHECK_LABELS[item.checkId] ?? item.checkId
   const tasks = offendingTasks.filter((task) => item.offendingIds?.includes(task.id))
@@ -258,9 +267,10 @@ function CheckRows({
   // PLN-7 — an advisory needs an explicit acknowledgement, never a silent pass.
   const acknowledge = isAdvisory && onAcknowledge && (
     <PlanButton
+      size="sm"
       aria-pressed={!!acknowledged}
       onClick={() => onAcknowledge(item.checkId, !acknowledged)}
-      className={cn(acknowledged && 'border-[var(--plan-success)] text-[var(--plan-success)]')}
+      className={cn(acknowledged && 'border-[var(--plan-success)] bg-[var(--plan-success-bg)] text-[var(--plan-success)] hover:bg-[var(--plan-success-bg)]')}
     >
       {acknowledged && <Check />}
       {acknowledged ? 'Acknowledged' : 'Acknowledge & waive'}
@@ -289,11 +299,12 @@ function CheckRows({
             }
             dimmed={acknowledged}
           >
-            {item.checkId === 'PC-3' ? (
-              <EstimateEntry task={task} onEstimateTask={onEstimateTask} />
-            ) : (
-              <PlanButton onClick={() => onOpenTask(task.id)}>Fix</PlanButton>
-            )}
+            {!readOnly &&
+              (item.checkId === 'PC-3' ? (
+                <EstimateEntry task={task} onEstimateTask={onEstimateTask} />
+              ) : (
+                <PlanButton size="sm" onClick={() => onOpenTask(task.id)}>Fix</PlanButton>
+              ))}
             {acknowledge}
           </IssueRow>
         ))}
@@ -311,8 +322,8 @@ function CheckRows({
       detail={detail || undefined}
       dimmed={acknowledged}
     >
-      {target && onJump && (
-        <PlanButton onClick={() => onJump(target)}>
+      {target && onJump && !readOnly && (
+        <PlanButton size="sm" onClick={() => onJump(target)}>
           {members.length > 0 && !isAdvisory ? 'Reassign tasks' : 'Fix'}
         </PlanButton>
       )}
@@ -341,7 +352,7 @@ function IssueRow({
   return (
     <li
       className={cn(
-        'flex flex-wrap items-center gap-3 rounded-[12px] p-3 sm:flex-nowrap',
+        'flex flex-wrap items-center gap-3 rounded-[var(--apple-radius-md)] p-3 sm:flex-nowrap',
         tone === 'danger' ? 'bg-[var(--plan-danger-bg)]' : 'bg-[var(--plan-warning-bg)]'
       )}
     >
@@ -351,8 +362,8 @@ function IssueRow({
         <AlertTriangle aria-label="Advisory" className="h-4 w-4 shrink-0 text-[var(--plan-warning)]" />
       )}
       <div className={cn('flex min-w-0 flex-1 flex-col gap-[3px]', dimmed && 'opacity-60')}>
-        <span className="text-[12px] font-bold text-[var(--plan-text)]">{title}</span>
-        {detail && <span className="text-[11px] text-[var(--plan-muted)]">{detail}</span>}
+        <span className="apple-type-subheadline font-semibold text-[var(--plan-text)]">{title}</span>
+        {detail && <span className="apple-type-footnote text-[var(--plan-muted)]">{detail}</span>}
       </div>
       {children && <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>}
     </li>
@@ -402,15 +413,15 @@ function EstimateEntry({
           }}
           placeholder="Hours"
           aria-label={`Estimate for ${task.key} in hours`}
-          className="w-[72px] rounded-[8px] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-2 text-[11px] text-[var(--plan-text)] placeholder:text-[var(--plan-muted)] focus:border-[var(--plan-accent)] focus:outline-none"
+          className="apple-type-footnote h-8 w-[84px] rounded-[var(--apple-radius-pill)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-3 tabular-nums text-[var(--plan-text)] placeholder:text-[var(--plan-muted)] focus:border-[var(--plan-accent)] focus:outline-none"
         />
-        <PlanButton onClick={save} disabled={!valid || saving}>
+        <PlanButton size="sm" onClick={save} disabled={!valid || saving}>
           {saving && <Loader2 className="animate-spin" />}
           Enter estimate
         </PlanButton>
       </div>
       {error && (
-        <p className="text-[11px] text-[var(--plan-danger)]" role="alert">
+        <p className="apple-type-caption text-[var(--plan-danger)]" role="alert">
           {error}
         </p>
       )}

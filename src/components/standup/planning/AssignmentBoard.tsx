@@ -21,7 +21,6 @@ import { useMemo, useState } from 'react'
 import {
   closestCorners,
   DndContext,
-  DragOverlay,
   PointerSensor,
   useDraggable,
   useDroppable,
@@ -30,17 +29,24 @@ import {
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
+import { ArrowLeftRight } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
 import {
   assigneeIdOf,
-  assigneeNamesOf,
   isQaRole,
   type AssignableMember,
   type ScopeTask
 } from './types'
-import { PlanCard, PlanTaskCard, planButtonClass } from './ui'
+import {
+  PlanAvatar,
+  PlanCard,
+  PlanDragOverlay,
+  PlanTaskCard,
+  planButtonClass,
+  planTaskActionClass
+} from './ui'
 
 const UNASSIGNED_LANE = 'unassigned'
 
@@ -51,6 +57,11 @@ export interface AssignmentBoardProps {
   tasks: ScopeTask[]
   members: AssignableMember[]
   busy: boolean
+  /**
+   * Viewers without SPRINT_UPDATE (team members, QA) see who owns what but
+   * get no drag, no picker - the server would refuse the change anyway.
+   */
+  readOnly?: boolean
   /** `null` clears the assignment. Resolves once the server has agreed. */
   onAssign: (taskId: string, assigneeId: string | null, member?: AssignableMember) => Promise<void>
 }
@@ -81,10 +92,18 @@ export function estimateLabel(task: ScopeTask): string {
 interface Lane {
   id: string
   name: string
+  /** The lane's owner, for its avatar; absent on the Unassigned lane. */
+  member?: AssignableMember
   tasks: ScopeTask[]
 }
 
-export function AssignmentBoard({ tasks, members, busy, onAssign }: AssignmentBoardProps) {
+export function AssignmentBoard({
+  tasks,
+  members,
+  busy,
+  readOnly = false,
+  onAssign
+}: AssignmentBoardProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const [activeTask, setActiveTask] = useState<ScopeTask | null>(null)
 
@@ -116,6 +135,7 @@ export function AssignmentBoard({ tasks, members, busy, onAssign }: AssignmentBo
       .map((member) => ({
         id: member.memberId,
         name: member.name,
+        member,
         tasks: byAssignee.get(member.memberId) ?? []
       }))
 
@@ -156,7 +176,7 @@ export function AssignmentBoard({ tasks, members, busy, onAssign }: AssignmentBo
     setActiveTask(null)
     const overId = event.over?.id
     const taskId = event.active.id
-    if (busy || typeof overId !== 'string' || typeof taskId !== 'string') return
+    if (busy || readOnly || typeof overId !== 'string' || typeof taskId !== 'string') return
     handleAssign(taskId, overId === UNASSIGNED_LANE ? null : overId)
   }
 
@@ -164,13 +184,17 @@ export function AssignmentBoard({ tasks, members, busy, onAssign }: AssignmentBo
     <PlanCard
       id="planning-assignment"
       title="Assignment board"
-      description="Scoped tasks grouped by owner. Unassigned work stays visible."
+      description={
+        readOnly
+          ? 'Scoped tasks grouped by owner.'
+          : 'Scoped tasks grouped by owner. Drag a task onto a person, or use its move button.'
+      }
       aria-label="Task assignment"
       aside={
         <p
           role="status"
           className={cn(
-            'text-[12px]',
+            'apple-type-subheadline font-semibold',
             unassignedCount > 0 ? 'text-[var(--plan-warning)]' : 'text-[var(--plan-success)]'
           )}
         >
@@ -183,26 +207,35 @@ export function AssignmentBoard({ tasks, members, busy, onAssign }: AssignmentBo
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
+        // dnd-kit's default auto-scroll drives the page scroller whenever the
+        // drag preview nears its edge, accelerating - on a page this long it
+        // ran the board off-screen before a card could reach a lane. The lanes
+        // are fixed-height now, so the board fits in view; the wheel still
+        // scrolls mid-drag for the rare lane below the fold.
+        autoScroll={false}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
         <div className="grid w-full gap-3 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">
           {lanes.map((lane) => (
-            <AssignmentLane key={lane.id} lane={lane}>
+            <AssignmentLane key={lane.id} lane={lane} readOnly={readOnly}>
               {lane.tasks.map((task) => (
                 <DraggableAssignmentCard
                   key={task._id}
                   task={task}
                   busy={busy}
+                  readOnly={readOnly}
                   picker={
-                    <MovePicker
-                      task={task}
-                      value={laneOf.get(task._id) ?? null}
-                      teamOptions={teamOptions}
-                      qaOptions={qaOptions}
-                      busy={busy}
-                      onChange={(memberId) => handleAssign(task._id, memberId)}
-                    />
+                    !readOnly && (
+                      <MovePicker
+                        task={task}
+                        value={laneOf.get(task._id) ?? null}
+                        teamOptions={teamOptions}
+                        qaOptions={qaOptions}
+                        busy={busy}
+                        onChange={(memberId) => handleAssign(task._id, memberId)}
+                      />
+                    )
                   }
                 />
               ))}
@@ -210,42 +243,66 @@ export function AssignmentBoard({ tasks, members, busy, onAssign }: AssignmentBo
           ))}
         </div>
 
-        <DragOverlay>
+        <PlanDragOverlay>
           {activeTask ? (
             <PlanTaskCard
               taskKey={activeTask.displayId}
               title={activeTask.title}
               meta={metaOf(activeTask)}
-              className="cursor-grabbing shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
+              className="cursor-grabbing shadow-[0_8px_28px_rgba(0,0,0,0.18)]"
             />
           ) : null}
-        </DragOverlay>
+        </PlanDragOverlay>
       </DndContext>
     </PlanCard>
   )
 }
 
+/** Just the estimate: the lane a card sits in already names its owner. */
 function metaOf(task: ScopeTask): string {
-  return `${estimateLabel(task)} · ${assigneeNamesOf(task)[0] ?? 'Unassigned'}`
+  return estimateLabel(task)
 }
 
-function AssignmentLane({ lane, children }: { lane: Lane; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: lane.id })
+function AssignmentLane({
+  lane,
+  readOnly,
+  children
+}: {
+  lane: Lane
+  readOnly: boolean
+  children: React.ReactNode
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: lane.id, disabled: readOnly })
 
   return (
     <div
       ref={setNodeRef}
       aria-label={`${lane.name} column`}
       className={cn(
-        'flex min-h-[180px] min-w-0 flex-col gap-[10px] rounded-[12px] bg-[var(--plan-raised)] p-3 ring-1 ring-transparent transition-shadow',
+        'flex min-w-0 flex-col gap-2 rounded-[var(--apple-radius-md)] bg-[var(--plan-raised)] p-3 ring-2 ring-transparent transition-shadow',
         isOver && 'ring-[var(--plan-accent)]'
       )}
     >
-      <p className="truncate text-[12px] font-bold text-[var(--plan-text)]">{lane.name}</p>
-      {children}
-      <p className="mt-auto pt-1 text-center text-[10px] text-[var(--plan-muted)]">
-        Drop tasks here
-      </p>
+      <div className="flex min-w-0 items-center gap-2">
+        <PlanAvatar member={lane.member} size={24} />
+        <p className="apple-type-subheadline min-w-0 flex-1 truncate font-semibold text-[var(--plan-text)]">
+          {lane.name}
+        </p>
+        <span className="apple-type-caption shrink-0 tabular-nums text-[var(--plan-muted)]">
+          {lane.tasks.length}
+        </span>
+      </div>
+      {/* Fixed height, so a heavily loaded owner scrolls inside their lane
+          instead of stretching the whole row of lanes down the page. */}
+      <div className="plan-scroll -mr-1.5 flex h-[216px] flex-col gap-1.5 pr-1.5">
+        {lane.tasks.length > 0 ? (
+          children
+        ) : (
+          <p className="apple-type-caption flex flex-1 items-center justify-center rounded-[var(--apple-radius-sm)] border border-dashed border-[var(--plan-border)] text-center text-[var(--plan-muted)]">
+            {readOnly ? 'No tasks' : 'Drop tasks here'}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
@@ -253,16 +310,24 @@ function AssignmentLane({ lane, children }: { lane: Lane; children: React.ReactN
 function DraggableAssignmentCard({
   task,
   busy,
+  readOnly,
   picker
 }: {
   task: ScopeTask
   busy: boolean
+  readOnly: boolean
   picker: React.ReactNode
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task._id,
-    disabled: busy
+    disabled: busy || readOnly
   })
+
+  if (readOnly) {
+    return (
+      <PlanTaskCard taskKey={task.displayId} title={task.title} meta={metaOf(task)} grip={false} />
+    )
+  }
 
   return (
     <PlanTaskCard
@@ -280,7 +345,7 @@ function DraggableAssignmentCard({
 }
 
 /**
- * The card's "Move" button is a native select dressed as the Figma button, so
+ * The card's move button is a native select dressed as an icon button, so
  * the keyboard path gets the platform picker for free and QA can be offered
  * under a group label that says what choosing them does.
  */
@@ -301,15 +366,20 @@ function MovePicker({
 }) {
   return (
     <label
+      title="Move to another owner"
       className={planButtonClass(
         'secondary',
-        'relative cursor-pointer focus-within:ring-2 focus-within:ring-[var(--plan-accent)]'
+        cn(
+          planTaskActionClass,
+          'relative w-7 cursor-pointer px-0 focus-within:ring-2 focus-within:ring-[var(--plan-accent)]'
+        ),
+        'sm'
       )}
       // Stops the card's drag listener from claiming the pointer.
       onPointerDown={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
-      <span aria-hidden>Move</span>
+      <ArrowLeftRight aria-hidden />
       <select
         aria-label={`Assign ${task.title} to`}
         value={value ?? ''}

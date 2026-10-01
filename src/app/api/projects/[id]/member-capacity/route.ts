@@ -38,7 +38,7 @@ export const GET = withStandupPermission(
 
     const project = await Project.findById(projectId)
       .select('teamMembers projectRoles')
-      .populate('teamMembers.memberId', 'firstName lastName email')
+      .populate('teamMembers.memberId', 'firstName lastName email avatar')
       .lean()
 
     // Sprint planning's assignment board groups QA separately, so it can offer
@@ -71,6 +71,7 @@ export const GET = withStandupPermission(
         firstName: entry.memberId?.firstName,
         lastName: entry.memberId?.lastName,
         email: entry.memberId?.email,
+        avatar: entry.memberId?.avatar,
         dailyCapacityMinutes,
         dailyCapacityHours: minutesToHours(dailyCapacityMinutes),
         role: roleByMember.get(memberId) ?? null,

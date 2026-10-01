@@ -33,6 +33,11 @@ export interface AssignableMember {
   role?: string | null
   assignedMinutes?: number
   capacityMinutes?: number
+  /** Identity for the member's avatar on the assignment board. */
+  firstName?: string
+  lastName?: string
+  email?: string
+  avatar?: string
 }
 
 const QA_ROLES = ['project_qa_lead', 'project_tester']

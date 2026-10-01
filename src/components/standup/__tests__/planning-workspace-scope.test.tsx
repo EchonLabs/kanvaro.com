@@ -6,9 +6,12 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { PlanningWorkspace, resolveDrop } from '../PlanningWorkspace'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
+// Flipped per test to render the screen as a team member or QA would see it.
+let mockCanUpdate = true
+
 jest.mock('@/lib/permissions/permission-context', () => ({
   usePermissions: () => ({
-    hasPermission: () => true,
+    hasPermission: () => mockCanUpdate,
     loading: false,
     permissions: { global: [], project: {} }
   })
@@ -158,6 +161,38 @@ describe('PlanningWorkspace — persistent scope/backlog panes', () => {
         })
       )
     )
+  })
+})
+
+describe('PlanningWorkspace — view-only for team members and QA', () => {
+  beforeEach(() => {
+    mockCanUpdate = false
+  })
+
+  afterEach(() => {
+    mockCanUpdate = true
+    jest.restoreAllMocks()
+  })
+
+  it('shows scope and backlog without Add or Remove', async () => {
+    global.fetch = mockFetch()
+
+    render(
+      <TooltipProvider>
+        <PlanningWorkspace
+          sprintId="s1"
+          sprintName="Sprint 1"
+          sprintStatus="planning"
+          projectId="p1"
+        />
+      </TooltipProvider>
+    )
+
+    expect(await screen.findByText('Not yet scoped')).toBeInTheDocument()
+    expect(screen.getAllByText('Already in sprint').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Sprint goal')).toHaveAttribute('readonly')
   })
 })
 

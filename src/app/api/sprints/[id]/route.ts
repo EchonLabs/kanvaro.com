@@ -58,8 +58,8 @@ export async function GET(
 
     const sprint = await Sprint.findOne({ _id: sprintId })
       .populate('project', 'name')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email avatar')
+      .populate('teamMembers', 'firstName lastName email avatar')
 
     if (!sprint) {
       return NextResponse.json(
@@ -344,8 +344,8 @@ export async function PUT(
       { new: true }
     )
       .populate('project', 'name')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email avatar')
+      .populate('teamMembers', 'firstName lastName email avatar')
 
     if (!sprint) {
       return NextResponse.json(

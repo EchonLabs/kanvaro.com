@@ -14,11 +14,13 @@
  * button with `aria-describedby`, and clicking a blocked button raises a toast
  * rather than doing nothing.
  */
+import { Check } from 'lucide-react'
+
 import { InfoTooltip } from '@/components/ui/InfoTooltip'
 import { cn } from '@/lib/utils'
 
 import { type StepId, type StepState } from './gates'
-import { planButtonClass, type PlanTone } from './ui'
+import { planButtonClass, planCardClass, type PlanTone } from './ui'
 
 export interface GateButtonProps {
   id: string
@@ -97,60 +99,94 @@ const STATE_LABEL: Record<StepState, string> = {
   locked: 'not started'
 }
 
+/**
+ * Planning progress as one completion bar, not a row of numbered steps.
+ *
+ * The numbered circles read as tabs, and tabs promise you can click to a step.
+ * You can't: each step is unlocked by the one before it. A bar says what is
+ * actually true here, "this much is done, this is next", and the step names
+ * sit under their quarter of it so the order is still visible.
+ */
 export function PlanningStepRail({ states }: { states: Record<StepId, StepState> }) {
-  return (
-    <ol
-      aria-label="Sprint planning steps"
-      className="flex w-full flex-wrap items-start justify-between gap-4 rounded-[16px] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-4"
-    >
-      {PLANNING_STEPS.map((step, index) => {
-        const state = states[step.id]
-        const reached = state !== 'locked'
-        const isLast = index === PLANNING_STEPS.length - 1
+  const total = PLANNING_STEPS.length
+  const doneCount = PLANNING_STEPS.filter((step) => states[step.id] === 'done').length
+  const current = PLANNING_STEPS.find((step) => states[step.id] === 'current')
+  const pct = Math.round((doneCount / total) * 100)
+  const allDone = doneCount === total
+  const fill = allDone ? 'var(--plan-success)' : 'var(--plan-accent)'
 
-        return (
-          <li
+  return (
+    <section
+      aria-label="Sprint planning progress"
+      className={cn(planCardClass, 'flex w-full flex-col gap-3 p-4 sm:px-5')}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <p className="apple-type-subheadline font-semibold text-[var(--plan-text)]">
+            {allDone ? 'Ready to complete' : `Step ${doneCount + 1} of ${total} · ${current?.label}`}
+          </p>
+          <p className="apple-type-footnote text-[var(--plan-muted)]">
+            {allDone ? 'Every step is done.' : current?.hint}
+          </p>
+        </div>
+        <p
+          className="apple-type-subheadline font-semibold tabular-nums"
+          style={{ color: allDone ? 'var(--plan-success)' : 'var(--plan-text)' }}
+        >
+          {pct}%
+        </p>
+      </div>
+
+      <div
+        role="progressbar"
+        aria-label="Planning steps complete"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={doneCount}
+        aria-valuetext={`${doneCount} of ${total} steps done`}
+        className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--plan-track)]"
+      >
+        <div
+          className="relative h-full overflow-hidden rounded-full transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%`, backgroundColor: fill }}
+        >
+          {pct > 2 && <span aria-hidden className="progress-shimmer absolute inset-0" />}
+        </div>
+        {/* Quarter ticks, so the bar still reads as four steps. */}
+        {PLANNING_STEPS.slice(1).map((step, index) => (
+          <span
             key={step.id}
-            aria-current={state === 'current' ? 'step' : undefined}
-            title={step.hint}
-            className="flex min-w-[4.5rem] flex-col items-center gap-[9px]"
-          >
-            <span
-              aria-hidden
+            aria-hidden
+            className="absolute top-0 h-full w-[2px] -translate-x-1/2 bg-[var(--plan-surface)]"
+            style={{ left: `${((index + 1) / total) * 100}%` }}
+          />
+        ))}
+      </div>
+
+      <ol aria-label="Sprint planning steps" className="grid grid-cols-4 gap-2">
+        {PLANNING_STEPS.map((step) => {
+          const state = states[step.id]
+          return (
+            <li
+              key={step.id}
+              aria-current={state === 'current' ? 'step' : undefined}
+              title={step.hint}
               className={cn(
-                'flex h-[26px] w-[26px] items-center justify-center rounded-full text-[11px] font-bold',
-                reached
-                  ? 'bg-[var(--plan-accent)] text-white'
-                  : 'bg-[var(--plan-raised)] text-[var(--plan-muted)]'
-              )}
-            >
-              {index + 1}
-            </span>
-            <span
-              className={cn(
-                'text-[12px]',
-                state === 'current' && 'font-bold text-[var(--plan-text)]',
+                'apple-type-footnote flex min-w-0 items-center gap-1',
+                state === 'current' && 'font-semibold text-[var(--plan-text)]',
                 state === 'done' && 'text-[var(--plan-text)]',
                 state === 'locked' && 'text-[var(--plan-muted)]'
               )}
             >
-              {step.label}
-              <span className="sr-only">
-                {`, ${STATE_LABEL[state]}. ${step.hint}.`}
-              </span>
-            </span>
-            {!isLast && (
-              <span
-                aria-hidden
-                className={cn(
-                  'h-px w-[clamp(3rem,12vw,150px)]',
-                  state === 'done' ? 'bg-[var(--plan-accent)]' : 'bg-[var(--plan-border)]'
-                )}
-              />
-            )}
-          </li>
-        )
-      })}
-    </ol>
+              {state === 'done' && (
+                <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-[var(--plan-success)]" />
+              )}
+              <span className="truncate">{step.label}</span>
+              <span className="sr-only">{`, ${STATE_LABEL[state]}. ${step.hint}.`}</span>
+            </li>
+          )
+        })}
+      </ol>
+    </section>
   )
 }

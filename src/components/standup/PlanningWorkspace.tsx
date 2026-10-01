@@ -16,7 +16,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   closestCorners,
   DndContext,
-  DragOverlay,
   PointerSensor,
   useDraggable,
   useDroppable,
@@ -56,7 +55,7 @@ import {
   type OffendingTask
 } from './PlanningChecklist'
 import { PokerModal } from './PokerModal'
-import { PokerResultsModal, type PokerResultsQueueEntry } from './PokerResultsModal'
+import { PokerResultsModal } from './PokerResultsModal'
 import { AssignmentBoard, estimateLabel } from './planning/AssignmentBoard'
 import { completeGate, pokerGate, stepStates, type GateInput } from './planning/gates'
 import { GateButton, PlanningStepRail } from './planning/PlanningSteps'
@@ -69,16 +68,25 @@ import {
 } from './planning/types'
 import {
   PlanBanner,
+  PlanAvatar,
   PlanButton,
   PlanCard,
+  planCardClass,
+  PlanDragOverlay,
   PlanPill,
   PlanTaskCard,
+  planTaskActionClass,
   scrollToSection
 } from './planning/ui'
 
 interface MemberLoad {
   id: string
   name: string
+  /** Identity for the member's avatar — absent for a user since deleted. */
+  firstName?: string
+  lastName?: string
+  email?: string
+  avatar?: string
   assignedMinutes: number
   capacityMinutes: number
 }
@@ -107,6 +115,7 @@ interface ProjectMember {
   firstName?: string
   lastName?: string
   email?: string
+  avatar?: string
   /** Project role, so the assignment picker can group QA separately. */
   role?: string | null
   dailyCapacityMinutes?: number
@@ -166,6 +175,9 @@ export function PlanningWorkspace({
   // casting a vote only needs SPRINT_VIEW. A team member reaches this screen to
   // vote and must not be shown controls the API would refuse.
   const canFacilitate = hasPermission(Permission.SPRINT_UPDATE, projectId)
+  // Everyone else - team members and QA - watches planning rather than runs
+  // it: the only thing they act on here is joining a poker round.
+  const readOnly = !canFacilitate
 
   // Matches KanbanBoard's sensor config: without an activation distance, the
   // draggable row's pointerdown listener can register a drag before a click
@@ -467,7 +479,11 @@ export function PlanningWorkspace({
       onSprintTeam: true,
       role: projectMembers.find((candidate) => candidate.memberId === member.id)?.role ?? null,
       assignedMinutes: member.assignedMinutes,
-      capacityMinutes: member.capacityMinutes
+      capacityMinutes: member.capacityMinutes,
+      firstName: member.firstName,
+      lastName: member.lastName,
+      email: member.email,
+      avatar: member.avatar
     }))
 
     const onTeam = new Set(sprintTeam.map((member) => member.memberId))
@@ -480,7 +496,11 @@ export function PlanningWorkspace({
           member.email ||
           member.memberId,
         onSprintTeam: false,
-        role: member.role ?? null
+        role: member.role ?? null,
+        firstName: member.firstName,
+        lastName: member.lastName,
+        email: member.email,
+        avatar: member.avatar
       }))
 
     return [...sprintTeam, ...qa]
@@ -490,6 +510,28 @@ export function PlanningWorkspace({
     () => unpokeredTasks(scope, pokerCoveredIds),
     [scope, pokerCoveredIds]
   )
+
+  /**
+   * Who the round would admit if the facilitator changed nothing.
+   *
+   * This has to be what the server's own default is — `resolveParticipants`
+   * falls back to the sprint team and always adds the facilitator — because
+   * the picker draws a checkbox per *project* member. Ticking them all by
+   * default said "everyone here is voting" while an untouched round actually
+   * admitted only the sprint team, and un-ticking one person materialised the
+   * selection to every project member, quietly promoting everyone who was
+   * never on the sprint into the round.
+   */
+  const defaultVoterIds = useMemo(() => {
+    const sprintTeam = (data?.members ?? []).map((member) => member.id)
+    const facilitatorOnProject = projectMembers.some((member) => member.memberId === user?.id)
+    return Array.from(
+      new Set(facilitatorOnProject && user?.id ? [...sprintTeam, user.id] : sprintTeam)
+    )
+  }, [data?.members, projectMembers, user?.id])
+
+  /** The picker's live selection: the facilitator's edit, or the default. */
+  const effectiveVoterIds = voterIds ?? defaultVoterIds
 
   const gateInput = useMemo<GateInput>(
     () => ({
@@ -538,16 +580,18 @@ export function PlanningWorkspace({
       // team, which must still fall back to the lockout-safe default.
       const facilitatorIsCandidate = projectMembers.some((member) => member.memberId === user?.id)
       const excludeFacilitator =
-        facilitatorIsCandidate && voterIds !== null && !voterIds.includes(user!.id)
+        facilitatorIsCandidate && !!user?.id && !effectiveVoterIds.includes(user.id)
 
       const response = await fetch(`/api/sprints/${sprintId}/poker-sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           taskIds: unpokered.map((task) => task._id),
-          // Omitted entirely when untouched, so the server keeps its sprint-team
-          // default rather than receiving an empty list.
-          ...(voterIds?.length ? { participantIds: voterIds } : {}),
+          // Sent explicitly, even untouched: the round must admit exactly the
+          // people the picker showed ticked. Leaving it off let the server
+          // apply its own default, which could be a different set from the one
+          // the facilitator was looking at when they pressed Start.
+          ...(effectiveVoterIds.length ? { participantIds: effectiveVoterIds } : {}),
           ...(excludeFacilitator ? { excludeFacilitator: true } : {})
         })
       })
@@ -645,14 +689,14 @@ export function PlanningWorkspace({
         {header()}
         <div
           role="status"
-          className="flex flex-col items-center gap-3 rounded-[16px] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-8 text-center"
+          className={cn(planCardClass, 'flex flex-col items-center gap-3 p-8 text-center')}
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--plan-success-bg)]">
             <Check className="h-5 w-5 text-[var(--plan-success)]" />
           </span>
-          <h2 className="text-[16px] font-bold text-[var(--plan-text)]">Planning complete</h2>
-          <p className="text-[13px] text-[var(--plan-text)]">{completed.message}</p>
-          <p className="text-[12px] text-[var(--plan-muted)]">
+          <h2 className="apple-type-headline font-semibold text-[var(--plan-text)]">Planning complete</h2>
+          <p className="apple-type-body text-[var(--plan-text)]">{completed.message}</p>
+          <p className="apple-type-subheadline text-[var(--plan-muted)]">
             Stand-ups are generated when the scheduler runs for this sprint.
           </p>
         </div>
@@ -815,15 +859,16 @@ export function PlanningWorkspace({
             id="sprint-goal"
             aria-label="Sprint goal"
             value={goal}
+            readOnly={readOnly}
             onChange={(event) => setGoal(event.target.value)}
-            onBlur={saveGoal}
+            onBlur={readOnly ? undefined : saveGoal}
             maxLength={GOAL_MAX}
             placeholder="Ship the invoicing module end to end for pilot customers."
-            className="min-h-[88px] w-full resize-y rounded-[12px] border border-[var(--plan-border)] bg-[var(--plan-raised)] p-[14px] text-[13px] leading-[1.45] text-[var(--plan-text)] placeholder:text-[var(--plan-muted)] focus:border-[var(--plan-accent)] focus:outline-none"
+            className="apple-type-body min-h-[88px] w-full resize-y rounded-[var(--apple-radius-md)] border border-[var(--plan-border)] bg-[var(--plan-raised)] p-[14px] text-[var(--plan-text)] placeholder:text-[var(--plan-muted)] focus:border-[var(--plan-accent)] focus:outline-none"
           />
           <p
             className={cn(
-              'text-[10px]',
+              'apple-type-caption tabular-nums',
               goal.trim().length < GOAL_MIN ? 'text-[var(--plan-warning)]' : 'text-[var(--plan-muted)]'
             )}
           >
@@ -837,11 +882,20 @@ export function PlanningWorkspace({
         <PlanCard
           id="planning-scope"
           title="Sprint scope"
-          description="Drag tasks between lists, or use Add and Remove for keyboard-friendly planning."
+          description={
+            readOnly
+              ? 'What is committed to this sprint, and what is left in the backlog.'
+              : 'Drag tasks between lists, or use Add and Remove for keyboard-friendly planning.'
+          }
         >
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
+            // Off, as on the assignment board: the default edge auto-scroll ran
+            // the page to the bottom as soon as a card was picked up low in the
+            // viewport. Both panes are fixed-height and side by side, so the
+            // drop target is always on screen.
+            autoScroll={false}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
@@ -855,6 +909,7 @@ export function PlanningWorkspace({
                 actionLabel="Add"
                 onAction={(taskId) => moveTask(taskId, true)}
                 busy={busy}
+                readOnly={readOnly}
               />
               <TaskPane
                 id="sprint-scope"
@@ -865,21 +920,22 @@ export function PlanningWorkspace({
                 actionLabel="Remove"
                 onAction={(taskId) => moveTask(taskId, false)}
                 busy={busy}
+                readOnly={readOnly}
               />
             </div>
 
             {/* Portals outside the panes' scroll containers, so the dragged
                 card stays visible the whole way across to the other pane. */}
-            <DragOverlay>
+            <PlanDragOverlay>
               {activeTask ? (
                 <PlanTaskCard
                   taskKey={activeTask.displayId}
                   title={activeTask.title}
                   meta={taskMeta(activeTask)}
-                  className="cursor-grabbing shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
+                  className="cursor-grabbing shadow-[0_8px_28px_rgba(0,0,0,0.18)]"
                 />
               ) : null}
-            </DragOverlay>
+            </PlanDragOverlay>
           </DndContext>
         </PlanCard>
       )}
@@ -891,6 +947,7 @@ export function PlanningWorkspace({
           tasks={scope}
           members={assignableMembers}
           busy={busy}
+          readOnly={readOnly}
           onAssign={assignTask}
         />
       )}
@@ -910,6 +967,7 @@ export function PlanningWorkspace({
           onOpenTask={(taskId) => window.open(`/tasks/${taskId}`, '_blank')}
           onJump={jumpTo}
           busy={busy}
+          readOnly={readOnly}
         />
       )}
 
@@ -923,9 +981,9 @@ export function PlanningWorkspace({
         description="Select the teammates joining this round. You can always run it with the sprint team as it stands."
       >
         <div className="space-y-3">
-          <div className="max-h-[280px] space-y-1 overflow-y-auto rounded-[10px] border border-[var(--apple-separator)] p-2">
+          <div className="max-h-[280px] space-y-1 overflow-y-auto rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] p-2">
             {projectMembers.length === 0 && (
-              <p className="p-2 text-[13px] text-[var(--apple-secondary-label)]">
+              <p className="apple-type-subheadline p-2 text-[var(--apple-secondary-label)]">
                 Loading the project team…
               </p>
             )}
@@ -934,28 +992,37 @@ export function PlanningWorkspace({
                 [member.firstName, member.lastName].filter(Boolean).join(' ') ||
                 member.email ||
                 member.memberId
-              const ticked = voterIds === null || voterIds.includes(member.memberId)
+              const ticked = effectiveVoterIds.includes(member.memberId)
+              const onSprintTeam = (data?.members ?? []).some(
+                (teamMember) => teamMember.id === member.memberId
+              )
 
               return (
                 <label
                   key={member.memberId}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-[var(--apple-quaternary-fill)]"
+                  className="flex cursor-pointer items-center gap-2.5 rounded-[var(--apple-radius-sm)] px-2 py-1.5 hover:bg-[var(--apple-quaternary-fill)]"
                 >
                   <Checkbox
                     checked={ticked}
                     onCheckedChange={(checked) => {
-                      // `null` means "untouched, use the server default", so the
-                      // first tick has to materialise the current selection.
-                      const current =
-                        voterIds ?? projectMembers.map((entry) => entry.memberId)
+                      // Materialises from the *default* selection, never from
+                      // "every project member" — otherwise removing one person
+                      // adds everybody else who was not on the sprint.
                       setVoterIds(
                         checked
-                          ? Array.from(new Set([...current, member.memberId]))
-                          : current.filter((id) => id !== member.memberId)
+                          ? Array.from(new Set([...effectiveVoterIds, member.memberId]))
+                          : effectiveVoterIds.filter((id) => id !== member.memberId)
                       )
                     }}
                   />
-                  <span className="text-[13px] text-[var(--apple-label)]">{name}</span>
+                  <span className="apple-type-subheadline flex-1 text-[var(--apple-label)]">
+                    {name}
+                  </span>
+                  {!onSprintTeam && (
+                    <span className="apple-type-caption shrink-0 text-[var(--apple-tertiary-label)]">
+                      {member.memberId === user?.id ? 'Facilitator' : 'Not on sprint'}
+                    </span>
+                  )}
                 </label>
               )
             })}
@@ -992,6 +1059,8 @@ export function PlanningWorkspace({
           )}
           pointsToHours={poker.session.pointsToHours}
           estimationUnit={poker.session.estimationUnit}
+          deckType={poker.session.deckType}
+          currentUserId={user?.id}
           onEstimated={refresh}
         />
       )}
@@ -1001,20 +1070,8 @@ export function PlanningWorkspace({
           open={viewingPokerResults}
           onOpenChange={setViewingPokerResults}
           sessionId={lastCompletedPokerSession._id}
-          estimationUnit={lastCompletedPokerSession.estimationUnit}
-          queue={(lastCompletedPokerSession.queue ?? []).map((entry: any): PokerResultsQueueEntry => {
-            const taskId = String(entry.task)
-            const task = scopeById.get(taskId)
-            return {
-              taskId,
-              key: task?.displayId,
-              title: task?.title ?? 'Task',
-              status: entry.status,
-              finalValue: entry.finalValue,
-              consensusReached: entry.consensusReached,
-              voteSpread: entry.voteSpread
-            }
-          })}
+          sprintName={sprintName}
+          completedAt={lastCompletedPokerSession.completedAt ?? lastCompletedPokerSession.updatedAt}
         />
       )}
     </div>
@@ -1104,20 +1161,20 @@ function PlanningHeader({
       <div className="flex min-w-0 flex-col gap-2">
         <Link
           href={`/sprints/${sprintId}`}
-          className="flex w-fit items-center gap-1.5 text-[12px] text-[var(--plan-muted)] transition-colors hover:text-[var(--plan-text)]"
+          className="apple-type-subheadline flex w-fit items-center gap-1.5 rounded-[var(--apple-radius-pill)] font-medium text-[var(--plan-muted)] transition-colors hover:text-[var(--plan-text)]"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to {sprintName}
         </Link>
-        <h1 className="text-[30px] leading-tight text-[var(--plan-text)]">Sprint planning</h1>
+        <h1 className="apple-type-title1 font-bold text-[var(--plan-text)]">Sprint planning</h1>
         <div className="flex min-w-0 flex-col items-start gap-2">
-          <p className="max-w-[60ch] truncate text-[14px] text-[var(--plan-text)]">
+          <p className="apple-type-body max-w-[60ch] truncate text-[var(--plan-muted)]">
             {sprintName}
             {description && ` · ${description}`}
           </p>
           {sprintStatus && (
             <span
-              className="rounded-full px-2 py-1 text-[10px] font-bold uppercase leading-none"
+              className="apple-type-caption rounded-[var(--apple-radius-pill)] px-2.5 py-1 font-semibold uppercase tracking-[0.06em]"
               style={{ color: status.fg, backgroundColor: status.bg }}
             >
               {sprintStatus}
@@ -1142,12 +1199,17 @@ function StatTile({
   valueColor?: string
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-[7px] rounded-[16px] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-[18px]">
-      <p className="text-[11px] text-[var(--plan-muted)]">{label}</p>
-      <p className="text-[24px] leading-tight tabular-nums" style={{ color: valueColor ?? 'var(--plan-text)' }}>
+    <div className={cn(planCardClass, 'flex min-w-0 flex-col gap-1.5 p-[18px]')}>
+      <p className="apple-type-caption font-semibold uppercase tracking-[0.07em] text-[var(--plan-muted)]">
+        {label}
+      </p>
+      <p
+        className="apple-type-title2 font-bold tabular-nums"
+        style={{ color: valueColor ?? 'var(--plan-text)' }}
+      >
         {value}
       </p>
-      <p className="text-[11px] text-[var(--plan-muted)]">{detail}</p>
+      <p className="apple-type-footnote text-[var(--plan-muted)]">{detail}</p>
     </div>
   )
 }
@@ -1186,7 +1248,7 @@ function PlanningOverview({
         detail={
           <>
             {totals.taskCount} {totals.taskCount === 1 ? 'task' : 'tasks'} in sprint ·{' '}
-            <span className={cn(overCapacity && 'font-bold text-[var(--plan-warning)]')}>
+            <span className={cn(overCapacity && 'font-semibold text-[var(--plan-warning)]')}>
               {percent}%
             </span>{' '}
             of capacity
@@ -1225,20 +1287,6 @@ const LOAD_CONFIG: Record<LoadState, { label: string; color: string }> = {
   idle: { label: 'Idle', color: 'var(--plan-idle)' }
 }
 
-const AVATAR_COLORS = ['#7A5AF8', '#3478F6', '#2F9D68', '#D88A15', '#D9467A', '#1B9AAA']
-
-function avatarColor(seed: string): string {
-  let hash = 0
-  for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) | 0
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-}
-
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2)
-  return letters.toUpperCase()
-}
-
 /**
  * The workload board: every sprint member's pre-assigned load against their
  * own sprint capacity, sorted worst-first. Reads straight from the same
@@ -1274,17 +1322,11 @@ function TeamWorkload({ members }: { members: MemberLoad[] }) {
           return (
             <li
               key={member.id}
-              className="flex items-center gap-3 rounded-[12px] bg-[var(--plan-raised)] p-3 sm:gap-[14px]"
+              className="flex items-center gap-3 rounded-[var(--apple-radius-md)] bg-[var(--plan-raised)] p-3 sm:gap-[14px]"
             >
+              <PlanAvatar member={member} />
               <span
-                aria-hidden
-                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                style={{ backgroundColor: avatarColor(member.id || member.name) }}
-              >
-                {initialsOf(member.name)}
-              </span>
-              <span
-                className="w-24 shrink-0 truncate text-[12px] text-[var(--plan-text)] sm:w-[180px]"
+                className="apple-type-subheadline w-24 shrink-0 truncate font-medium text-[var(--plan-text)] sm:w-[180px]"
                 title={member.name}
               >
                 {member.name}
@@ -1295,20 +1337,20 @@ function TeamWorkload({ members }: { members: MemberLoad[] }) {
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(pct)}
-                className="h-[6px] min-w-0 flex-1 overflow-hidden rounded-[3px] bg-[var(--plan-border)]"
+                className="h-[6px] min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--plan-track)]"
               >
                 <span
-                  className="block h-full rounded-[3px] transition-[width] duration-300"
+                  className="block h-full rounded-full transition-[width] duration-300"
                   style={{
                     width: state === 'idle' ? '8px' : `${pct}%`,
                     backgroundColor: config.color
                   }}
                 />
               </span>
-              <span className="w-[76px] shrink-0 text-[11px] tabular-nums text-[var(--plan-muted)]">
+              <span className="apple-type-footnote w-[84px] shrink-0 text-right tabular-nums text-[var(--plan-muted)]">
                 {hours(member.assignedMinutes)} / {hours(member.capacityMinutes)} h
               </span>
-              <PlanPill color={config.color} className="w-[52px] shrink-0">
+              <PlanPill color={config.color} className="w-14 shrink-0">
                 {config.label}
               </PlanPill>
             </li>
@@ -1327,7 +1369,8 @@ function TaskPane({
   tasks,
   actionLabel,
   onAction,
-  busy
+  busy,
+  readOnly
 }: {
   id: string
   title: string
@@ -1337,28 +1380,41 @@ function TaskPane({
   actionLabel: string
   onAction: (taskId: string) => void
   busy: boolean
+  readOnly: boolean
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id })
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: readOnly })
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        'flex min-w-0 flex-col gap-[10px] rounded-[12px] bg-[var(--plan-raised)] p-[14px] ring-1 ring-transparent transition-shadow',
+        'flex min-w-0 flex-col gap-[10px] rounded-[var(--apple-radius-md)] bg-[var(--plan-raised)] p-[14px] ring-2 ring-transparent transition-shadow',
         isOver && 'ring-[var(--plan-accent)]'
       )}
     >
       <div className="flex flex-col">
-        <p className="text-[13px] font-bold text-[var(--plan-text)]">{title}</p>
-        <p className="text-[10px] text-[var(--plan-muted)]">{hint}</p>
+        <p className="apple-type-subheadline font-semibold text-[var(--plan-text)]">{title}</p>
+        {!readOnly && <p className="apple-type-caption text-[var(--plan-muted)]">{hint}</p>}
       </div>
-      <div className="-mx-1 flex max-h-[360px] flex-col gap-[10px] overflow-y-auto px-1 py-0.5">
+      {/* Fixed, not max, height: both panes stay the same size whatever they
+          hold, so the drop target never jumps and a long backlog scrolls in
+          place instead of pushing the rest of the page down. */}
+      <div className="plan-scroll -mr-1.5 flex h-[288px] flex-col gap-1.5 pr-1.5">
         {tasks.length === 0 ? (
-          <p className="rounded-[12px] border border-dashed border-[var(--plan-border)] p-4 text-center text-[12px] text-[var(--plan-muted)]">
+          <p className="apple-type-footnote rounded-[var(--apple-radius-md)] border border-dashed border-[var(--plan-border)] p-4 text-center text-[var(--plan-muted)]">
             {emptyMessage}
           </p>
         ) : (
-          tasks.map((task) => (
+          tasks.map((task) =>
+            readOnly ? (
+              <PlanTaskCard
+                key={task._id}
+                taskKey={task.displayId}
+                title={task.title}
+                meta={taskMeta(task)}
+                grip={false}
+              />
+            ) : (
             <DraggableTaskRow
               key={task._id}
               task={task}
@@ -1366,7 +1422,8 @@ function TaskPane({
               onAction={onAction}
               busy={busy}
             />
-          ))
+            )
+          )
         )}
       </div>
     </div>
@@ -1400,6 +1457,8 @@ function DraggableTaskRow({
         // NFR-A2 — every drag interaction needs a keyboard/click equivalent.
         // This button is that equivalent, not a leftover.
         <PlanButton
+          size="sm"
+          className={planTaskActionClass}
           disabled={busy}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
@@ -1417,14 +1476,14 @@ function DraggableTaskRow({
 function PlanningSkeleton() {
   return (
     <div className="flex flex-col gap-5" aria-busy>
-      <div className="h-[92px] animate-pulse rounded-[16px] bg-[var(--plan-surface)]" />
+      <div className="h-[92px] animate-pulse rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)]" />
       <div className="grid gap-[14px] sm:grid-cols-3">
         {[0, 1, 2].map((index) => (
-          <div key={index} className="h-[98px] animate-pulse rounded-[16px] bg-[var(--plan-surface)]" />
+          <div key={index} className="h-[98px] animate-pulse rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)]" />
         ))}
       </div>
       {[0, 1].map((index) => (
-        <div key={index} className="h-[200px] animate-pulse rounded-[16px] bg-[var(--plan-surface)]" />
+        <div key={index} className="h-[200px] animate-pulse rounded-[var(--apple-radius-lg)] bg-[var(--apple-tertiary-fill)]" />
       ))}
     </div>
   )

@@ -97,7 +97,7 @@ export default function SprintPlanningPage() {
     return (
       <MainLayout breadcrumbItems={breadcrumbItems}>
         <div className="p-6">
-          <p className="text-[13px] text-[var(--apple-secondary-label)]">
+          <p className="apple-type-subheadline text-[var(--apple-secondary-label)]">
             {error ?? 'That sprint could not be found.'}
           </p>
           <Button variant="outline" className="mt-4" onClick={() => router.push('/sprints')}>
@@ -110,10 +110,10 @@ export default function SprintPlanningPage() {
 
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
-      {/* Bleeds through <main>'s padding so the planning canvas fills the
-          content area edge to edge; the sidebar and breadcrumbs are untouched.
-          The workspace owns the header so its actions share the title row. */}
-      <div className="-m-3 min-h-full bg-[var(--plan-canvas)] px-4 pb-12 pt-6 sm:-m-4 sm:px-6 lg:-m-6 lg:px-[34px] lg:pt-7">
+      {/* Sits in <main>'s content column like every other page, on the app's
+          own background. The workspace owns the header so its actions share
+          the title row. */}
+      <div className="pb-12">
         <PermissionGate
           permission={Permission.SPRINT_VIEW}
           projectId={sprint.project?._id ?? sprint.project}
