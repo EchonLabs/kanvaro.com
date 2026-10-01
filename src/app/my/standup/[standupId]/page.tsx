@@ -51,7 +51,7 @@ interface MyStandupBoard {
   member: MyStandupMember
   poolTasks: MyStandupPoolTask[]
   allowSelfSelect: boolean
-  otherStandupsToday: StandupCandidate[]
+  standupsToday: StandupCandidate[]
   yesterday?: YesterdayPanelData
   variance?: VariancePanel
   carryForward?: CarryForwardPanelView
@@ -67,13 +67,15 @@ async function safeJson(response: Response): Promise<any> {
   }
 }
 
-async function fetchOtherStandupsToday(currentStandupId: string): Promise<StandupCandidate[]> {
+/** The full list, current stand-up included — the header's project switcher
+ *  renders it as the selected row, so filtering it out here would leave the
+ *  control unable to say which project the viewer is looking at. */
+async function fetchStandupsToday(): Promise<StandupCandidate[]> {
   try {
     const response = await fetch('/api/my/standup/candidates')
     if (!response.ok) return []
     const payload = await response.json()
-    const candidates: StandupCandidate[] = payload.data ?? []
-    return candidates.filter((candidate) => candidate.standupId !== currentStandupId)
+    return payload.data ?? []
   } catch {
     return []
   }
@@ -159,7 +161,7 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
           return
         }
 
-        const otherStandupsToday = await fetchOtherStandupsToday(standupId)
+        const standupsToday = await fetchStandupsToday()
 
         // Read-tolerant: a failure on any of these four leaves the field
         // `undefined`, and the section that needs it renders its own error
@@ -187,7 +189,7 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
             member: toMemberView(memberRow),
             poolTasks: board.pool?.unassigned ?? [],
             allowSelfSelect: true,
-            otherStandupsToday,
+            standupsToday,
             yesterday: yesterday?.data ?? yesterday,
             variance: variance?.data ?? variance,
             carryForward: carryForward?.data ?? carryForward,
@@ -325,7 +327,7 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
             meetingUrl={data.meetingUrl}
             sprintDayNumber={data.sprintDayNumber}
             totalSprintDays={data.totalSprintDays}
-            otherStandupsToday={data.otherStandupsToday}
+            standupsToday={data.standupsToday}
             yesterday={data.yesterday}
             variance={data.variance}
             carryForward={data.carryForward}

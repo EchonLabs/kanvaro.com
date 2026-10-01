@@ -267,24 +267,33 @@ describe('MyStandupScreen', () => {
   })
 
   /**
-   * A composition-level check, not a duplicate of `AlsoTodayBanner.test.tsx`:
-   * that file proves the banner itself renders correctly given candidates;
-   * this proves `MyStandupScreen` actually wires its `otherStandupsToday`
-   * prop through to it, fixing the redirector's old silent-drop end to end.
+   * A composition-level check, not a duplicate of `ProjectSwitcher.test.tsx`:
+   * that file proves the switcher itself behaves correctly given candidates;
+   * this proves `MyStandupScreen` actually wires `standupsToday` through to it,
+   * so a member on two projects' sprint teams can reach both stand-ups.
    */
-  it('renders the also-today banner when other candidates are passed through', () => {
+  it('renders the project switcher when more than one stand-up is passed through', () => {
     setup({
-      otherStandupsToday: [
+      projectId: 'p1',
+      projectName: 'Project Alpha',
+      standupsToday: [
+        {
+          standupId: 's1',
+          status: 'Ready',
+          scheduledStartAt: '2026-09-05T09:00:00.000Z',
+          projectId: 'p1',
+          projectName: 'Project Alpha'
+        },
         {
           standupId: 's2',
           status: 'Ready',
-          scheduledStartAt: '2026-09-05T09:00:00.000Z',
+          scheduledStartAt: '2026-09-05T09:30:00.000Z',
           projectId: 'p2',
           projectName: 'Project Beta'
         }
       ]
     })
-    expect(screen.getByRole('button', { name: 'View Stand-ups' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /switch project/i })).toBeInTheDocument()
   })
 
   describe('the "open full stand-up" button', () => {

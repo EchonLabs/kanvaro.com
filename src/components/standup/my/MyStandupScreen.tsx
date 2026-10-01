@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ExternalLink, Lock } from 'lucide-react'
 
+import { Button } from '@/components/ui/Button'
+
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { isOwnRowReadOnly, isSelfSelectDisabled } from '@/lib/standup/own-row'
@@ -19,7 +21,7 @@ import type { BlockerPanelRow } from '@/lib/standup/blocker-service'
 import type { StandupCandidate } from '@/lib/standup/my-standup-candidates'
 import type { RaiseBlockerSubmitInput } from '@/components/standup/run/RaiseBlockerModal'
 
-import { AlsoTodayBanner } from './sections/AlsoTodayBanner'
+import { ProjectSwitcher } from './sections/ProjectSwitcher'
 import { NextStandupStrip } from './sections/NextStandupStrip'
 import { CapacitySection } from './sections/CapacitySection'
 import { YesterdaySection } from './sections/YesterdaySection'
@@ -92,7 +94,9 @@ export interface MyStandupScreenProps {
   meetingUrl?: string
   sprintDayNumber?: number
   totalSprintDays?: number
-  otherStandupsToday?: StandupCandidate[]
+  /** Every open stand-up the viewer is expected at, this one included — the
+   *  header's project switcher is the control over them. */
+  standupsToday?: StandupCandidate[]
   yesterday?: YesterdayPanelData
   variance?: VariancePanel
   carryForward?: CarryForwardPanelView
@@ -123,7 +127,7 @@ export function MyStandupScreen({
   meetingUrl,
   sprintDayNumber,
   totalSprintDays,
-  otherStandupsToday = [],
+  standupsToday = [],
   yesterday,
   variance,
   carryForward,
@@ -191,54 +195,60 @@ export function MyStandupScreen({
 
   return (
     // The negative margins cancel `MainLayout`'s `<main>` padding (the same
-    // move the sprint planning page makes), so the design's own 40px gutter is
+    // move the sprint planning page makes), so this screen's own 40px gutter is
     // the only one.
-    <div className="my-standup -m-3 flex flex-col gap-6 bg-[var(--my-canvas)] px-4 py-6 sm:-m-4 sm:p-6 lg:-m-6 lg:p-10">
-      {/* `MainLayout` paints a pure-black backdrop behind every page; this one
-          sits over it so the design's canvas also fills the breadcrumb strip,
-          the space beside `max-w-7xl` on wide screens, and below short content. */}
-      <div aria-hidden className="fixed inset-0 -z-10 bg-[var(--my-canvas)]" />
+    //
+    // No canvas paint and no fixed backdrop underlay: those existed because the
+    // Figma palette's `#F8FAFC`/`#090A0F` canvas differed from the app's own
+    // page background and so had to be forced over `MainLayout`'s backdrop and
+    // the space beside `max-w-7xl`. This screen now sits on the app's own page
+    // background like every other one, so the token is gone with the paint.
+    <div className="my-standup -m-3 flex flex-col gap-6 px-4 py-6 sm:-m-4 sm:p-6 lg:-m-6 lg:p-10">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
-          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-[13px]">
+          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 apple-type-subheadline">
             <Link
               href="/dashboard"
               className="font-medium uppercase text-[var(--my-subtle)] hover:text-[var(--my-muted)]"
             >
               {standupStrings.my.breadcrumbRoot()}
             </Link>
-            {projectName ? (
+            {projectName || standupsToday.length > 0 ? (
               <>
                 <span aria-hidden className="text-[var(--my-subtle)]">
                   /
                 </span>
-                <span className="truncate font-medium text-[var(--my-blue)]">{projectName}</span>
+                <ProjectSwitcher
+                  currentStandupId={standupId}
+                  currentProjectId={projectId}
+                  currentProjectName={projectName}
+                  candidates={standupsToday}
+                  locale={locale}
+                />
               </>
             ) : null}
           </nav>
-          <h1 className="text-[28px] font-bold tracking-[-1px] text-[var(--my-text)] sm:text-[32px]">
+          <h1 className="apple-type-title1 font-bold text-[var(--my-text)]">
             {standupStrings.my.title()}
           </h1>
         </div>
         {canViewSchedule ? (
-          <button
+          <Button
             type="button"
             onClick={() => router.push(`/projects/${projectId}/sprints/${sprintId}/standups/${standupId}`)}
-            className="flex items-center gap-2 rounded-lg bg-[var(--my-blue)] px-4 py-2.5 text-[14px] font-semibold text-white hover:opacity-90"
+            className="gap-2 font-semibold"
           >
             <ExternalLink className="h-4 w-4" strokeWidth={2} aria-hidden />
             {standupStrings.my.openFullStandup()}
-          </button>
+          </Button>
         ) : null}
       </header>
 
       <div className="flex w-full flex-col gap-3">
-        <AlsoTodayBanner candidates={otherStandupsToday} />
-
         {notice ? (
           <p
             role="status"
-            className="flex w-full items-center gap-3 rounded-lg border border-[var(--my-amber)] bg-[var(--my-amber-tint)] px-4 py-3 text-[14px] text-[var(--my-text)]"
+            className="flex w-full items-center gap-3 rounded-[var(--apple-radius-sm)] border border-[var(--my-amber)] bg-[var(--my-amber-tint)] px-4 py-3 apple-type-callout text-[var(--my-text)]"
           >
             <AlertTriangle
               className="h-[18px] w-[18px] shrink-0 text-[var(--my-amber)]"
@@ -264,7 +274,7 @@ export function MyStandupScreen({
         />
 
         {readOnly ? (
-          <p className="flex w-full items-center gap-2.5 rounded-lg bg-[var(--my-raised)] px-4 py-2.5 text-[13px] text-[var(--my-muted)]">
+          <p className="flex w-full items-center gap-2.5 rounded-[var(--apple-radius-sm)] bg-[var(--my-raised)] px-4 py-2.5 apple-type-subheadline text-[var(--my-muted)]">
             <Lock className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
             {standupStrings.my.readOnlyBanner({ status })}
           </p>
@@ -273,13 +283,13 @@ export function MyStandupScreen({
 
       <div className="flex w-full flex-col gap-6">
         <div className="flex flex-col gap-2">
-          <p className="text-[13px] font-semibold uppercase text-[var(--my-subtle)]">
+          <p className="apple-type-subheadline font-semibold uppercase text-[var(--my-subtle)]">
             {standupStrings.my.journeyEyebrow()}
           </p>
-          <h2 className="text-[24px] font-bold tracking-[-1px] text-[var(--my-text)] sm:text-[28px]">
+          <h2 className="apple-type-title2 font-bold text-[var(--my-text)]">
             {standupStrings.my.journeyTitle()}
           </h2>
-          <p className="text-[14px] leading-5 text-[var(--my-muted)]">{standupStrings.my.journeyBody()}</p>
+          <p className="apple-type-callout text-[var(--my-muted)]">{standupStrings.my.journeyBody()}</p>
         </div>
 
         <YesterdaySection

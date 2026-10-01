@@ -14,7 +14,7 @@ describe('NextStandupStrip', () => {
         meetingUrl="https://meet.example/kanvaro"
       />
     )
-    expect(screen.getByRole('link', { name: /join/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Join Meeting' })).toHaveAttribute(
       'href',
       'https://meet.example/kanvaro'
     )

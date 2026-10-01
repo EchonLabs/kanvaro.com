@@ -1,6 +1,7 @@
 'use client'
 
 import { Clock, Globe, Hourglass, Video } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 import { Tag, type TagTone } from '../shared/Tag'
 import { standupStrings } from '@/lib/standup/strings'
 
@@ -41,7 +42,7 @@ function zoneName(instant: Date, timeZone: string, locale?: string): string {
 
 function TimeItem({ icon, children, className }: { icon: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <span className={`flex items-center gap-1.5 whitespace-nowrap text-[13px] ${className ?? ''}`}>
+    <span className={`flex items-center gap-1.5 whitespace-nowrap apple-type-subheadline ${className ?? ''}`}>
       {icon}
       {children}
     </span>
@@ -69,7 +70,7 @@ export function NextStandupStrip({
   const iconClass = 'h-3.5 w-3.5 shrink-0 text-[var(--my-muted)]'
 
   return (
-    <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--my-border)] bg-[var(--my-surface)] p-4">
+    <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-[var(--apple-radius-md)] border border-[var(--my-border)] bg-[var(--my-surface)] p-4">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <Tag tone={STATUS_TONE[status] ?? 'neutral'} className="uppercase">
           {standupStrings.schedule.status[status] ?? status}
@@ -95,10 +96,10 @@ export function NextStandupStrip({
           ) : null}
           {sprintDayNumber !== undefined && totalSprintDays !== undefined ? (
             <>
-              <span aria-hidden className="text-[13px] text-[var(--my-subtle)]">
+              <span aria-hidden className="apple-type-subheadline text-[var(--my-subtle)]">
                 |
               </span>
-              <span className="whitespace-nowrap text-[13px] font-medium text-[var(--my-blue)]">
+              <span className="whitespace-nowrap apple-type-subheadline font-medium text-[var(--my-blue)]">
                 {standupStrings.my.dayOf({ day: sprintDayNumber, total: totalSprintDays })}
               </span>
             </>
@@ -106,16 +107,16 @@ export function NextStandupStrip({
         </div>
       </div>
 
+      {/* A full pill button, not the tinted link this used to be: joining the
+          call is the one thing a member does from this strip, and the project's
+          Meeting URL setting is what fills it. Omitted entirely when unset. */}
       {meetingUrl ? (
-        <a
-          href={meetingUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1.5 rounded-md bg-[var(--my-green-tint)] px-3.5 py-2 text-[13px] font-semibold text-[var(--my-green)] hover:opacity-90"
-        >
-          <Video className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          {standupStrings.my.joinCall()}
-        </a>
+        <Button asChild size="sm" className="gap-1.5 font-semibold">
+          <a href={meetingUrl} target="_blank" rel="noreferrer">
+            <Video className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+            {standupStrings.my.joinMeeting()}
+          </a>
+        </Button>
       ) : null}
     </div>
   )
