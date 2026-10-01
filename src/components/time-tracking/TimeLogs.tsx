@@ -1194,6 +1194,10 @@ export function TimeLogs({
     if (!authResolving) {
       loadTimeEntries()
       loadActiveTimer()
+      const syncInterval = setInterval(() => {
+        loadActiveTimer()
+      }, 30000)
+      return () => clearInterval(syncInterval)
     }
   }, [authResolving, loadTimeEntries, loadActiveTimer, refreshKey])
 
