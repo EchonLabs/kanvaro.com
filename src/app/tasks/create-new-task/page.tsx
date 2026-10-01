@@ -591,12 +591,14 @@ export default function CreateTaskPage() {
   // Memoize filtered project members to avoid recalculating on every render
   const filteredProjectMembers = useMemo(() => {
     const activeMembers = projectMembers.filter(member => member.isActive !== false)
-    if (!assigneeQuery.trim()) return activeMembers
     const q = assigneeQuery.toLowerCase().trim()
-    return activeMembers.filter(u =>
-      `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q)
-    )
+    const list = q
+      ? activeMembers.filter(u =>
+          `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q)
+        )
+      : activeMembers
+    return list.slice().sort((a, b) => `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`))
   }, [projectMembers, assigneeQuery])
 
   // Word count for title validation
@@ -741,7 +743,7 @@ export default function CreateTaskPage() {
                               const q = storyQuery.toLowerCase().trim()
                               const filtered = stories.filter(s =>
                                 !q || s.title.toLowerCase().includes(q)
-                              )
+                              ).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
                               if (filtered.length === 0) {
                                 return (
@@ -833,7 +835,7 @@ export default function CreateTaskPage() {
 
                               const filtered = availableEpics.filter(e =>
                                 !q || e.title.toLowerCase().includes(q)
-                              )
+                              ).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
                               if (filtered.length === 0) {
                                 return (

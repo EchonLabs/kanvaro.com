@@ -54,10 +54,12 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
   const filteredParentSuites = parentSuites.filter(suite =>
     suite.name.toLowerCase().includes(parentSuiteQuery.toLowerCase())
   )
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
 
   const filteredProjects = projects.filter(project =>
     project.name.toLowerCase().includes(projectQuery.toLowerCase())
   )
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
 
   useEffect(() => {
     if (showProjectSelector || currentProjectId) {

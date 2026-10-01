@@ -473,14 +473,19 @@ export default function EditSprintPage() {
     
     // Then filter by search query if provided
     const query = teamMemberQuery.trim().toLowerCase()
-    if (!query) return unselectedMembers
-    
-    return unselectedMembers.filter((member) => {
-      const fullName = `${member.firstName} ${member.lastName}`.toLowerCase()
-      return (
-        fullName.includes(query) ||
-        (member.email ? member.email.toLowerCase().includes(query) : false)
-      )
+    const list = !query
+      ? unselectedMembers
+      : unselectedMembers.filter((member) => {
+          const fullName = `${member.firstName} ${member.lastName}`.toLowerCase()
+          return (
+            fullName.includes(query) ||
+            (member.email ? member.email.toLowerCase().includes(query) : false)
+          )
+        })
+    return [...list].sort((a, b) => {
+      const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+      const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
     })
   }, [activeAvailableMembers, teamMembers, teamMemberQuery])
 
@@ -594,6 +599,7 @@ export default function EditSprintPage() {
                           !projectQuery.trim() ||
                           p.name.toLowerCase().includes(projectQuery.toLowerCase())
                         )
+                        .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
                         .map((project) => (
                           <SelectItem key={project._id} value={project._id}>
                             {project.name}

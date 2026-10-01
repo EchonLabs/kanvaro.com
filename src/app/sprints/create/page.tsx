@@ -688,6 +688,11 @@ export default function CreateSprintPage() {
                                     (member.email ? member.email.toLowerCase().includes(query) : false)
                                   )
                                 })
+                                .sort((a, b) => {
+                                  const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+                                  const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+                                  return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+                                })
 
                                 if (filteredMembers.length === 0) {
                                   return (

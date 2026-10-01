@@ -1010,7 +1010,7 @@ export default function CreateTaskModal({
                               const q = storyQuery.toLowerCase().trim()
                               const filtered = stories.filter(s =>
                                 !q || s.title.toLowerCase().includes(q)
-                              )
+                              ).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
                               if (filtered.length === 0) {
                                 return (
@@ -1080,7 +1080,7 @@ export default function CreateTaskModal({
 
                               const filtered = availableEpics.filter(e =>
                                 !q || e.title.toLowerCase().includes(q)
-                              )
+                              ).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
                               if (filtered.length === 0) {
                                 return (

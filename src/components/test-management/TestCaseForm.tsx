@@ -71,8 +71,8 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
 
   const filteredTestSuites = useMemo(() => {
     const q = suiteQuery.trim().toLowerCase()
-    if (!q) return testSuites
-    return testSuites.filter(s => s.name.toLowerCase().includes(q))
+    const list = !q ? testSuites : testSuites.filter(s => s.name.toLowerCase().includes(q))
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [testSuites, suiteQuery])
 
   const stripHtml = (html: string): string => {

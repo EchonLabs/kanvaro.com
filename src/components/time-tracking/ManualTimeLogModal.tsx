@@ -170,14 +170,16 @@ export function ManualTimeLogModal({
 
   // Filtered lists based on search
   const filteredEmployees = useMemo(() => {
-    if (!employeeSearch.trim()) return employees
-    const searchLower = employeeSearch.toLowerCase()
-    return employees.filter(emp => {
-      const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
-      const email = emp.email?.toLowerCase() || ''
-      const memberId = emp.memberId?.toLowerCase() || ''
-      return fullName.includes(searchLower) || email.includes(searchLower) || memberId.includes(searchLower)
-    })
+    const searchLower = employeeSearch.toLowerCase().trim()
+    const list = searchLower
+      ? employees.filter(emp => {
+          const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
+          const email = emp.email?.toLowerCase() || ''
+          const memberId = emp.memberId?.toLowerCase() || ''
+          return fullName.includes(searchLower) || email.includes(searchLower) || memberId.includes(searchLower)
+        })
+      : employees
+    return list.slice().sort((a, b) => `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`))
   }, [employees, employeeSearch])
 
   const filteredProjects = useMemo(() => {
@@ -188,7 +190,7 @@ export function ManualTimeLogModal({
 
   const filteredTasks = useMemo(() => {
     // We now fetch tasks from the server based on search, so we display the server results directly
-    return tasks
+    return tasks.slice().sort((a, b) => (a.title || '').localeCompare(b.title || ''))
   }, [tasks])
 
   const selectedTask = useMemo(() =>

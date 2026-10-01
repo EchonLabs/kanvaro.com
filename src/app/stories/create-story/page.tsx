@@ -454,6 +454,7 @@ export default function CreateStoryPage() {
                                   !epicQuery.trim() ||
                                   epic.title.toLowerCase().includes(epicQuery.toLowerCase())
                                 )
+                                .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
                                 .map(epic => (
                                   <SelectItem key={epic._id} value={epic._id}>
                                     {epic.title}
@@ -512,6 +513,7 @@ export default function CreateStoryPage() {
                                   !sprintQuery.trim() ||
                                   sprint.name.toLowerCase().includes(sprintQuery.toLowerCase())
                                 )
+                                .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
                                 .map(sprint => (
                                   <SelectItem key={sprint._id} value={sprint._id}>
                                     {sprint.name}
