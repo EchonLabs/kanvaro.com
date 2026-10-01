@@ -184,6 +184,45 @@ export function withSprintPermission(
 }
 
 /**
+ * Stand-up-only fallback for a project member `PermissionService` fails to see.
+ *
+ * `PermissionService.getUserPermissions` still matches `Project.teamMembers`
+ * as a bare array of user ids, but the schema stores `{ memberId, hourlyRate }`
+ * entries — so a `team_member` added through the team list resolves to no
+ * project role at all, and (holding no org-wide `standup:*` grant by design)
+ * is refused every stand-up read, including their own My Stand-up screen.
+ *
+ * Fixing that inside `PermissionService` would change project-scoped
+ * permissions app-wide, so the fallback lives here instead and is kept narrow:
+ * only `standup:*` permissions, only those `PROJECT_MEMBER` is meant to hold,
+ * and only for a user actually listed on the stand-up's own project.
+ */
+async function isProjectMemberStandupGrant(
+  userId: string,
+  permission: Permission,
+  projectId: string | undefined
+): Promise<boolean> {
+  if (!projectId || !String(permission).startsWith('standup:')) return false
+
+  const { PROJECT_ROLE_PERMISSIONS, ProjectRole } = await import(
+    '@/lib/permissions/permission-definitions'
+  )
+  const memberGrants: Permission[] = PROJECT_ROLE_PERMISSIONS[ProjectRole.PROJECT_MEMBER] ?? []
+  if (!memberGrants.includes(permission)) return false
+
+  const { Project } = await import('@/models/Project')
+  try {
+    const onTeam = await Project.exists({ _id: projectId, 'teamMembers.memberId': userId })
+    return Boolean(onTeam)
+  } catch {
+    // A malformed id casts badly rather than matching nothing. This is only
+    // ever the *second* opinion on an access check the primary one already
+    // refused, so it fails closed: a broken lookup denies, it does not 500.
+    return false
+  }
+}
+
+/**
  * Like {@link withSprintPermission}, but keyed by **stand-up** id.
  *
  * `/api/standups/:id` carries neither a project nor a sprint id, so the
@@ -231,11 +270,13 @@ export function withStandupIdPermission(
 
       const projectId = (standup as any).project?.toString()
 
-      const allowed = await PermissionService.hasPermission(
-        authResult.user.id,
-        options.permission,
-        projectId
-      )
+      const allowed =
+        (await PermissionService.hasPermission(
+          authResult.user.id,
+          options.permission,
+          projectId
+        )) ||
+        (await isProjectMemberStandupGrant(authResult.user.id, options.permission, projectId))
 
       if (!allowed) {
         return NextResponse.json(

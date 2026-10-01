@@ -679,14 +679,18 @@ export const standupStrings = {
     addRejected: () => 'That task could not be added to your day.',
     /** A read-tolerant section (Yesterday, My position, Blockers) shown when its own fetch failed — the rest of the screen still renders. */
     sectionLoadFailed: () => 'Could not load this section.',
-    otherStandupsToday: ({ count }: { count: number }) =>
-      `You have ${standupStrings.my.otherStandupsPhrase({ count })} scheduled for today.`,
-    /** The highlighted part of `otherStandupsToday` — always a substring of it. */
-    otherStandupsPhrase: ({ count }: { count: number }) =>
-      count === 1 ? 'another project stand-up' : `${count} other project stand-ups`,
-    viewStandups: () => 'View Stand-ups',
+    /** The header's project switcher — a member on more than one project's
+     *  sprint team has more than one stand-up open at once, and the project is
+     *  what selects between them. Replaced the old collapsed "also today"
+     *  banner, which made the others findable but not obvious. */
+    switchProject: () => 'Switch project',
+    switchProjectHint: ({ count }: { count: number }) =>
+      `${count} stand-ups open for you`,
     dayOf: ({ day, total }: { day: number; total: number }) => `Day ${day} of ${total}`,
-    joinCall: () => 'Join call',
+    /** Deliberately not `run.joinCall`'s "Join call": this is a full button on
+     *  the member's screen rather than a strip link, and "Join Meeting" names
+     *  the thing the project's Meeting URL setting configures. */
+    joinMeeting: () => 'Join Meeting',
     breadcrumbRoot: () => 'Dashboard',
     localTime: ({ time }: { time: string }) => `Local: ${time}`,
     projectTime: ({ zone, time }: { zone: string; time: string }) => `Project ${zone}: ${time}`,
