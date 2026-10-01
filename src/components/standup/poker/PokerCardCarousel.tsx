@@ -20,21 +20,22 @@
  * `focusedIndex` (its rounded value) is what decides which single card is
  * "big" and which one settling reports as the candidate.
  */
-import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/lib/utils'
 
-const CARD_ASPECT = 1450 / 900
-const CARD_WIDTH = 108
-const CARD_PIVOT_RADIUS = 640
+import { PokerCard } from './PokerCard'
+
+const FOCUSED_CARD_WIDTH = 92
+const CARD_PIVOT_RADIUS = 620
 const ROTATION_DEG_PER_OFFSET = 8
-const ROTATION_MAX_DEG = 24
-const FOCUS_LIFT_PX = 14
+const ROTATION_MAX_DEG = 26
+const FOCUS_LIFT_PX = 10
 const DRAG_PX_PER_CARD = 90
 const WHEEL_UNITS_PER_CARD = 140
 const DRAG_CLICK_THRESHOLD_PX = 6
 const WHEEL_SETTLE_MS = 140
+const PANEL_HEIGHT = 232
 
 interface Props {
   cards: Array<string | number>
@@ -45,12 +46,15 @@ interface Props {
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
-/** Scale falls off with distance from center; beyond this it's fully cropped. */
+/**
+ * Scale falls off with distance from center; beyond this it's fully cropped.
+ * The steps match the design's own card widths (92 focused, then 76 / 74 / 70).
+ */
 function scaleForOffset(offset: number): number {
   const magnitude = Math.abs(offset)
   if (magnitude >= 3) return 0
-  if (magnitude >= 2) return 0.62
-  if (magnitude >= 1) return 0.78
+  if (magnitude >= 2) return 0.76
+  if (magnitude >= 1) return 0.82
   return 1
 }
 
@@ -65,15 +69,6 @@ function opacityForOffset(offset: number): number {
  * (already near-invisible) cards don't spin past a sane amount. */
 function rotationForOffset(offset: number): number {
   return clamp(offset * ROTATION_DEG_PER_OFFSET, -ROTATION_MAX_DEG, ROTATION_MAX_DEG)
-}
-
-/**
- * The '?' card's file is named `questionMark.png` — the symbol itself isn't a
- * legal filename — every other card (including 'coffee') is named after its
- * own card value.
- */
-function cardImageFile(card: string | number): string {
-  return card === '?' ? 'questionMark' : String(card)
 }
 
 function cardAltText(card: string | number): string {
@@ -156,78 +151,78 @@ export function PokerCardCarousel({ cards, selected, disabled, onPick }: Props) 
     onPick(card)
   }
 
-  const containerHeight = CARD_WIDTH * CARD_ASPECT + 40
+  /** Arrow keys browse the deck without a pointer (NFR-A2). */
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return
+    const step = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0
+    if (step === 0) return
+    event.preventDefault()
+    const next = clamp(focusedIndex + step, 0, cards.length - 1)
+    goTo(next)
+    onPick(cards[next])
+  }
 
   return (
-    <div className="space-y-2">
-      <div
-        role="listbox"
-        aria-label="Your card"
-        className="poker-carousel relative touch-none select-none overflow-hidden"
-        style={{ height: containerHeight }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-        onWheel={handleWheel}
-      >
-        {cards.map((card, index) => {
-          const offset = index - centerIndex
-          const isFocused = index === focusedIndex
-          const isSelected = card === selected
-          const scale = scaleForOffset(offset)
-          const opacity = opacityForOffset(offset)
-          const rotation = rotationForOffset(offset)
-          const lift = isFocused ? -FOCUS_LIFT_PX : 0
+    <div
+      role="listbox"
+      aria-label="Your card"
+      tabIndex={disabled ? -1 : 0}
+      onKeyDown={handleKeyDown}
+      className="poker-carousel relative w-full touch-none select-none overflow-hidden rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--plan-accent)]"
+      style={{ height: PANEL_HEIGHT }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onWheel={handleWheel}
+    >
+      {cards.map((card, index) => {
+        const offset = index - centerIndex
+        const isFocused = index === focusedIndex
+        const isSelected = card === selected
+        const scale = scaleForOffset(offset)
+        const opacity = opacityForOffset(offset)
+        const rotation = rotationForOffset(offset)
+        const lift = isFocused ? -FOCUS_LIFT_PX : 0
 
-          return (
-            <div
-              key={String(card)}
-              role="option"
-              aria-selected={isSelected}
-              aria-current={isFocused}
-              onClick={() => handleCardClick(index, card)}
-              className={cn(
-                'absolute left-1/2 top-1/2 cursor-pointer',
-                !dragging && 'poker-card-snap'
-              )}
-              style={{
-                width: CARD_WIDTH,
-                height: CARD_WIDTH * CARD_ASPECT,
-                marginLeft: -CARD_WIDTH / 2,
-                marginTop: (-CARD_WIDTH * CARD_ASPECT) / 2,
-                transformOrigin: `50% ${CARD_PIVOT_RADIUS}px`,
-                transform: `rotate(${rotation}deg) translateY(${lift}px) scale(${scale})`,
-                opacity,
-                zIndex: 100 - Math.round(Math.abs(offset) * 10),
-                pointerEvents: opacity <= 0 ? 'none' : 'auto'
-              }}
-            >
-              <div
-                className={cn(
-                  'apple-transition h-full w-full overflow-hidden rounded-[14px] bg-card',
-                  isFocused && 'ring-2 ring-[var(--apple-system-blue)] ring-offset-2 ring-offset-[var(--apple-secondary-system-background)]',
-                  isSelected && 'ring-2 ring-[var(--apple-system-blue)]'
-                )}
-              >
-                <Image
-                  src={`/poker-cards/${cardImageFile(card)}.png`}
-                  alt={cardAltText(card)}
-                  width={900}
-                  height={1450}
-                  draggable={false}
-                  className="h-full w-full object-cover"
-                  priority
-                />
-              </div>
-            </div>
-          )
-        })}
+        return (
+          <div
+            key={String(card)}
+            role="option"
+            aria-label={cardAltText(card)}
+            aria-selected={isSelected}
+            aria-current={isFocused}
+            onClick={() => handleCardClick(index, card)}
+            className={cn('absolute left-1/2 cursor-pointer', !dragging && 'poker-card-snap')}
+            style={{
+              // Anchored near the top of the panel rather than its centre: the
+              // arc sweeps downward from the focused card, so centring would
+              // push the outer cards off the bottom edge.
+              top: 30,
+              marginLeft: -FOCUSED_CARD_WIDTH / 2,
+              transformOrigin: `50% ${CARD_PIVOT_RADIUS}px`,
+              transform: `rotate(${rotation}deg) translateY(${lift}px) scale(${scale})`,
+              opacity,
+              zIndex: 100 - Math.round(Math.abs(offset) * 10),
+              pointerEvents: opacity <= 0 ? 'none' : 'auto'
+            }}
+          >
+            <PokerCard
+              card={card}
+              width={FOCUSED_CARD_WIDTH}
+              tone={isSelected || isFocused ? 'selected' : scale < 0.8 ? 'muted' : 'default'}
+            />
+          </div>
+        )
+      })}
+
+      {/* Marks the card a confirm would cast, directly under the arc's apex. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-3 flex flex-col items-center gap-1.5">
+        <span className="h-[3px] w-7 rounded-full bg-[var(--plan-accent)]" />
+        <span className="apple-type-caption font-semibold uppercase tracking-[0.06em] text-[var(--plan-accent)]">
+          {selected != null && cards[focusedIndex] === selected ? 'Selected' : 'Pick'}
+        </span>
       </div>
-
-      <p className="text-center text-[12px] text-[var(--apple-tertiary-label)]">
-        Scroll or drag to browse, then Confirm your card below
-      </p>
     </div>
   )
 }

@@ -17,7 +17,7 @@
  * `resolveVisibleTask`'s own fallback logic), so it could fetch reveal state
  * for the wrong task entirely.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import { PokerModal } from '../PokerModal'
 import { ToastProvider } from '@/components/ui/Toast'
@@ -102,7 +102,7 @@ describe('PokerModal — non-facilitator reveal polling', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       '/api/poker-sessions/session-1/tasks/t1/reveal-state'
     ))
-    await waitFor(() => expect(screen.getByText('Votes')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
 
     // Fetched reveal-state for `t1` — the task the modal actually renders —
     // not some separately-computed id.
@@ -135,7 +135,7 @@ describe('PokerModal — non-facilitator reveal polling', () => {
     renderModal()
 
     // Round 1: the voter sees the revealed spread, locked out of voting.
-    await waitFor(() => expect(screen.getByText('Votes')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
     expect(screen.queryByText('Your card')).not.toBeInTheDocument()
 
     // The facilitator revotes: the server now reports the same task back in
@@ -148,7 +148,7 @@ describe('PokerModal — non-facilitator reveal polling', () => {
       timeout: 6000,
       interval: 250
     })
-    expect(screen.queryByText('Votes')).not.toBeInTheDocument()
+    expect(screen.queryByText('The table has spoken')).not.toBeInTheDocument()
   }, 10000)
 })
 
@@ -182,9 +182,10 @@ describe('PokerModal — viewer mode for non-participants (PLN-11)', () => {
     expect(screen.queryByText('Your card')).not.toBeInTheDocument()
     expect(screen.getByText('You are not part of this vote. Watching the round.')).toBeInTheDocument()
 
-    // Not shown vote progress or a Reveal control either — that's facilitator-only.
+    // A watcher may see how far the round has got — those are counts, not
+    // cards — but never the control that ends it.
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/poker-sessions/session-1'))
-    expect(screen.queryByText(/Voted \d+ of \d+/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Reveal/i })).not.toBeInTheDocument()
   })
 
   it('gives a facilitator who opted out of voting the Reveal control once the poll reports progress', async () => {
@@ -210,7 +211,7 @@ describe('PokerModal — viewer mode for non-participants (PLN-11)', () => {
     expect(screen.queryByText('Your card')).not.toBeInTheDocument()
     expect(screen.getByText("You're facilitating this round without voting yourself.")).toBeInTheDocument()
 
-    await waitFor(() => expect(screen.getByText('Voted 2 of 2')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('2 of 2 voted')).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /Reveal/i })).toBeEnabled()
   })
 
@@ -259,6 +260,195 @@ describe('PokerModal — viewer mode for non-participants (PLN-11)', () => {
     renderModal()
 
     expect(screen.queryByText(/^Assigned to/)).not.toBeInTheDocument()
+  })
+})
+
+describe('PokerModal — task detail from the server', () => {
+  const originalFetch = global.fetch
+
+  afterEach(() => {
+    global.fetch = originalFetch
+    jest.clearAllMocks()
+  })
+
+  function fetchMockWithTask(queueEntry: Record<string, unknown>) {
+    return jest.fn((url: string) => {
+      if (url.includes('/reveal-state')) return jsonResponse({ revealed: false })
+      if (url === '/api/poker-sessions/session-1') {
+        return jsonResponse({
+          session: {
+            queue: [{ task: 't1', status: 'voting', roundCount: 1, ...queueEntry }],
+            currentTask: 't1',
+            status: 'open',
+            autoRevealOnAllVoted: false
+          }
+        })
+      }
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+  }
+
+  it('names the task from the session even when the opener passed no title', async () => {
+    // The regression: the queue is a snapshot the planning screen builds from
+    // whatever it has in `scope` when the round opens, and it is never
+    // rebuilt. A task missing from that snapshot rendered as "— Task" for the
+    // whole round.
+    global.fetch = fetchMockWithTask({
+      title: 'Add SSO to the workspace',
+      displayId: 'KAN-142',
+      description: null
+    }) as any
+
+    render(
+      <ToastProvider>
+        <PokerModal
+          open
+          onOpenChange={jest.fn()}
+          sessionId="session-1"
+          cards={[1, 2, 3, 5, 8]}
+          queue={[{ taskId: 't1', key: '', title: 'Task', status: 'voting' }]}
+          currentTaskId="t1"
+          isFacilitator={false}
+          isParticipant
+          pointsToHours={1}
+          estimationUnit="story_points"
+          onEstimated={jest.fn()}
+        />
+      </ToastProvider>
+    )
+
+    await waitFor(() =>
+      expect(screen.getByText('KAN-142 — Add SSO to the workspace')).toBeInTheDocument()
+    )
+    expect(screen.queryByText('— Task')).not.toBeInTheDocument()
+  })
+
+  it('collapses the description by default and expands it on click', async () => {
+    global.fetch = fetchMockWithTask({
+      title: 'Add SSO',
+      displayId: 'KAN-142',
+      description: '<p>Supports SAML and OIDC.</p><ul><li>Okta</li></ul>'
+    }) as any
+
+    renderModal()
+
+    const toggle = await screen.findByRole('button', { name: /Task description/i })
+    // The section renders before the first poll lands, so it starts disabled
+    // with nothing to show — wait for the description to arrive.
+    await waitFor(() => expect(toggle).toBeEnabled())
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText(/Supports SAML/)).not.toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    // HTML is flattened to text rather than injected as markup.
+    expect(screen.getByText(/Supports SAML and OIDC\./)).toBeInTheDocument()
+    expect(screen.getByText(/• Okta/)).toBeInTheDocument()
+  })
+
+  it('disables the toggle and says so when the task has no description', async () => {
+    global.fetch = fetchMockWithTask({
+      title: 'Add SSO',
+      displayId: 'KAN-142',
+      description: '   '
+    }) as any
+
+    renderModal()
+
+    const toggle = await screen.findByRole('button', { name: /Task description/i })
+    expect(toggle).toBeDisabled()
+    expect(within(toggle).getByText('None')).toBeInTheDocument()
+  })
+})
+
+describe('PokerModal — the roster panel', () => {
+  const originalFetch = global.fetch
+
+  afterEach(() => {
+    global.fetch = originalFetch
+    jest.clearAllMocks()
+  })
+
+  function fetchMockWithRoster(session: Record<string, unknown>) {
+    return jest.fn((url: string) => {
+      if (url.includes('/reveal-state')) return jsonResponse({ revealed: false })
+      if (url === '/api/poker-sessions/session-1') {
+        return jsonResponse({
+          session: {
+            queue: baseQueue.map((entry) => ({ task: entry.taskId, status: 'voting', roundCount: 1 })),
+            currentTask: 't1',
+            status: 'open',
+            autoRevealOnAllVoted: false,
+            ...session
+          }
+        })
+      }
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+  }
+
+  it('names every participant from the server, including a facilitator outside the project team', async () => {
+    // The regression this guards: participant ids were matched against the
+    // project roster the planning screen had loaded, which contains only
+    // `project.teamMembers`. `resolveParticipants` always appends the
+    // facilitator, so a PM facilitator fell through to a placeholder name and
+    // appeared as an unidentified extra voter.
+    global.fetch = fetchMockWithRoster({
+      participants: ['u1', 'u2', 'pm'],
+      participantProfiles: [
+        { memberId: 'u1', name: 'Kasun Perera' },
+        { memberId: 'u2', name: 'Maya Silva' },
+        { memberId: 'pm', name: 'Dilini Fernando' }
+      ],
+      progress: { round: 1, voted: 1, expected: 3, votedVoterIds: ['u1'] }
+    }) as any
+
+    renderModal()
+
+    await waitFor(() => expect(screen.getByText('Dilini Fernando')).toBeInTheDocument())
+    expect(screen.getByText('Kasun Perera')).toBeInTheDocument()
+    expect(screen.getByText('Maya Silva')).toBeInTheDocument()
+    expect(screen.queryByText('Teammate')).not.toBeInTheDocument()
+    expect(screen.getByText('3 voters')).toBeInTheDocument()
+  })
+
+  it('separates who has cast from who the round is still waiting on', async () => {
+    global.fetch = fetchMockWithRoster({
+      participants: ['u1', 'u2'],
+      participantProfiles: [
+        { memberId: 'u1', name: 'Kasun Perera' },
+        { memberId: 'u2', name: 'Maya Silva' }
+      ],
+      progress: { round: 1, voted: 1, expected: 2, votedVoterIds: ['u1'] }
+    }) as any
+
+    renderModal()
+
+    await waitFor(() => expect(screen.getByText('Voted')).toBeInTheDocument())
+    expect(screen.getByText('Choosing…')).toBeInTheDocument()
+    expect(screen.getByText('Waiting for Maya Silva to choose a card')).toBeInTheDocument()
+  })
+
+  it('names nobody when the round hides voter identity', async () => {
+    // `hideVoterIdentity` returns no profiles at all — a named roster would
+    // put back the identities the setting exists to withhold.
+    global.fetch = fetchMockWithRoster({
+      participants: ['u1', 'u2'],
+      participantProfiles: [],
+      progress: { round: 1, voted: 1, expected: 2, votedVoterIds: ['u1'] }
+    }) as any
+
+    renderModal()
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          '1 of 2 have voted. This round is anonymous, so voters are not named.'
+        )
+      ).toBeInTheDocument()
+    )
+    expect(screen.getByText('2 voters')).toBeInTheDocument()
   })
 })
 
@@ -322,7 +512,7 @@ describe('PokerModal — explicit Confirm, no vote-on-pick', () => {
     // Wait for the vote POST to actually resolve (not just for the button's
     // optimistic label/disabled state, which flips immediately on click,
     // before `busy` clears) — `progress` is only set once the response lands.
-    await waitFor(() => expect(screen.getByText('Voted 1 of 2')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('1 of 2 voted')).toBeInTheDocument())
 
     // Once cast, the button relabels to "Update vote" (matching the current
     // pick), and stays disabled since nothing new has been picked since.
@@ -337,7 +527,7 @@ describe('PokerModal — explicit Confirm, no vote-on-pick', () => {
 
     fireEvent.click(screen.getByRole('option', { name: 'Card 21' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
-    await waitFor(() => expect(screen.getByText('Voted 1 of 2')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('1 of 2 voted')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('option', { name: 'Card 13' }))
     const updateButton = screen.getByRole('button', { name: 'Update vote' })
@@ -391,7 +581,7 @@ describe('PokerModal — reveal layout (votes grid, median stat, quick-pick esti
 
     renderModal({ isFacilitator: false })
 
-    await waitFor(() => expect(screen.getByText('Votes')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
 
     expect(screen.getByTestId('poker-stat-min')).toHaveTextContent('2')
     expect(screen.getByTestId('poker-stat-median')).toHaveTextContent('3')
@@ -403,31 +593,58 @@ describe('PokerModal — reveal layout (votes grid, median stat, quick-pick esti
 
     renderModal({ isFacilitator: false })
 
-    await waitFor(() => expect(screen.getByText('Votes')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
 
-    const tile = screen.getByText('Kasun').closest('div') as HTMLElement
-    expect(tile).not.toBeNull()
+    const tile = screen.getByTestId('poker-vote-tile')
+    expect(tile).toHaveTextContent('Kasun')
     expect(tile).toHaveTextContent('5')
-    expect(tile).toHaveTextContent('outlier')
+    expect(tile).toHaveTextContent('Outlier')
   })
 
-  it('lets the facilitator quick-pick a deck value to fill the final estimate instead of typing', async () => {
+  it('sets the final estimate from the deck, and carries the pick into the footer action', async () => {
+    // The redesign drops the free-text number field: every legal estimate is
+    // a card on the deck, so the deck itself is the control. `suggestedValue`
+    // (the median) arrives preselected.
     global.fetch = fetchMockRevealed(true) as any
 
     renderModal({ isFacilitator: true })
 
-    await waitFor(() => expect(screen.getByText('Votes')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
 
+    expect(screen.getByRole('group', { name: 'Quick-pick estimate' })).toBeInTheDocument()
+
+    // revealedRound1.suggestedValue is 3.
     const input = screen.getByLabelText('Final estimate') as HTMLInputElement
-    expect(input.value).toBe('')
+    await waitFor(() => expect(input.value).toBe('3'))
+    expect(screen.getByRole('button', { name: '3' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Set estimate · 3' })).toBeEnabled()
 
     const chip = screen.getByRole('button', { name: '5' })
     expect(chip).toHaveAttribute('aria-pressed', 'false')
 
     fireEvent.click(chip)
 
-    expect(input.value).toBe('5')
     expect(chip).toHaveAttribute('aria-pressed', 'true')
+    expect(input.value).toBe('5')
+    expect(screen.getByRole('button', { name: 'Set estimate · 5' })).toBeEnabled()
+  })
+
+  it('still accepts an off-deck estimate typed into the field (E16)', async () => {
+    // The facilitator may set a value nobody voted — the deck is the usual
+    // answer, not the only legal one.
+    global.fetch = fetchMockRevealed(true) as any
+
+    renderModal({ isFacilitator: true })
+
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
+
+    const input = screen.getByLabelText('Final estimate') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '6.5' } })
+
+    expect(input.value).toBe('6.5')
+    // No deck chip claims it, and the footer action carries it regardless.
+    expect(screen.getByRole('button', { name: '5' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Set estimate · 6.5' })).toBeEnabled()
   })
 })
 
@@ -475,7 +692,9 @@ describe('PokerModal — Back/Next task preview', () => {
 
     expect(screen.getByText('Task 2 of 2 (preview)')).toBeInTheDocument()
     expect(screen.queryByText('Your card')).not.toBeInTheDocument()
-    expect(screen.getByText('KAN-2 — Payment webhook')).toBeInTheDocument()
+    // Named twice while previewing: once in the nav strip, once in the
+    // read-only panel that replaces the arc.
+    expect(screen.getAllByText('KAN-2 — Payment webhook').length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: /previous task/i }))
     expect(screen.getByText('Task 1 of 2')).toBeInTheDocument()

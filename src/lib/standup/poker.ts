@@ -266,6 +266,89 @@ export function voteProgress(
 const round2 = (value: number) => Math.round(value * 100) / 100
 
 /**
+ * The deck's numeric values, in card order.
+ *
+ * T-shirt sizes have no numeric face, so their points mapping stands in — it
+ * is already the order XS..XL is dealt in.
+ */
+export function deckScale(deckType: DeckType): number[] {
+  return deckType === 'tshirt'
+    ? Object.values(TSHIRT_POINTS)
+    : (deckCards(deckType).filter((card) => typeof card === 'number') as number[])
+}
+
+/**
+ * How far apart two estimates are **in cards dealt**, not in arithmetic.
+ *
+ * This is the distinction the spread label used to miss. On Fibonacci, 13 and
+ * 21 differ by 8 but sit next to each other on the deck — nobody disagreed,
+ * they picked neighbouring cards. 1 and 3 differ by only 2 yet skip a card, so
+ * that is the wider disagreement of the two. Ranking by `max - min` gets both
+ * backwards, and gets worse the further up the deck the round lands.
+ *
+ * Returns `null` when a value is not on the deck (a facilitator's off-deck
+ * override), since step distance is meaningless there.
+ */
+export function stepDistance(deckType: DeckType, low: number, high: number): number | null {
+  const scale = deckScale(deckType)
+  const lowIndex = scale.indexOf(low)
+  const highIndex = scale.indexOf(high)
+  if (lowIndex === -1 || highIndex === -1) return null
+  return Math.abs(highIndex - lowIndex)
+}
+
+export type AgreementKey = 'none' | 'single' | 'consensus' | 'near' | 'some' | 'wide'
+export type AgreementTone = 'neutral' | 'success' | 'warning' | 'danger'
+
+export interface Agreement {
+  key: AgreementKey
+  /** Short enough for a badge in a table cell. */
+  label: string
+  tone: AgreementTone
+  /** Cards between the lowest and highest estimate, or `null` when unknown. */
+  steps: number | null
+}
+
+/**
+ * What the room's votes actually say, as one label both poker screens use.
+ *
+ * Previously each screen decided this for itself, on `max - min`, with
+ * different thresholds — so the same round could read "Wide spread" during the
+ * reveal and "Some spread" in the results. Worse, a single vote counted as
+ * unanimous and was announced as a consensus, which is not something one
+ * person can reach.
+ */
+export function describeAgreement(
+  deckType: DeckType,
+  input: { min: number | null; max: number | null; numericCount: number }
+): Agreement {
+  const { min, max, numericCount } = input
+
+  if (numericCount === 0 || min === null || max === null) {
+    return { key: 'none', label: 'No estimates', tone: 'neutral', steps: null }
+  }
+
+  // One person cannot agree with anybody. Saying so is the honest reading,
+  // and it keeps "Consensus" meaning something.
+  if (numericCount === 1) {
+    return { key: 'single', label: 'Single estimate', tone: 'neutral', steps: 0 }
+  }
+
+  if (min === max) {
+    return { key: 'consensus', label: 'Consensus', tone: 'success', steps: 0 }
+  }
+
+  const steps = stepDistance(deckType, min, max)
+
+  // Off-deck values: fall back to saying only that they differ.
+  if (steps === null) return { key: 'some', label: 'Some spread', tone: 'warning', steps: null }
+
+  if (steps === 1) return { key: 'near', label: 'Near consensus', tone: 'success', steps }
+  if (steps === 2) return { key: 'some', label: 'Some spread', tone: 'warning', steps }
+  return { key: 'wide', label: 'Wide spread', tone: 'danger', steps }
+}
+
+/**
  * Who may cast a vote (PLN-10 `participantIds`, PLN-11).
  *
  * The sprint team is the default, but two people fall outside it and still

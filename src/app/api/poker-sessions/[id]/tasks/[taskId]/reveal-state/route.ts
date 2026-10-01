@@ -45,15 +45,26 @@ export const GET = withPokerPermission(
       (votes as any[]).map((vote) => ({ voterId: vote.voter.toString(), card: vote.card }))
     )
 
-    let names = new Map<string, string>()
+    // The identity fields travel with the name so the reveal can draw each
+    // voter's real avatar rather than initials in a coloured circle.
+    let people = new Map<
+      string,
+      { name: string; firstName?: string; lastName?: string; email?: string; avatar?: string }
+    >()
     if (!pokerSession.hideVoterIdentity) {
       const users = await User.find({ _id: { $in: (votes as any[]).map((vote) => vote.voter) } })
-        .select('firstName lastName email')
+        .select('firstName lastName email avatar')
         .lean()
-      names = new Map(
+      people = new Map(
         (users as any[]).map((user) => [
           user._id.toString(),
-          [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email
+          {
+            name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            avatar: user.avatar
+          }
         ])
       )
     }
@@ -69,13 +80,20 @@ export const GET = withPokerPermission(
       suggestedValue: result.suggestedValue,
       numericCount: result.numericCount,
       abstainCount: result.abstainCount,
-      votes: result.votes.map((vote) => ({
-        voterId: pokerSession.hideVoterIdentity ? null : vote.voterId,
-        voterName: pokerSession.hideVoterIdentity ? null : names.get(vote.voterId) ?? null,
-        card: vote.card,
-        value: vote.value,
-        isOutlier: vote.isOutlier
-      }))
+      votes: result.votes.map((vote) => {
+        const person = pokerSession.hideVoterIdentity ? undefined : people.get(vote.voterId)
+        return {
+          voterId: pokerSession.hideVoterIdentity ? null : vote.voterId,
+          voterName: person?.name ?? null,
+          firstName: person?.firstName,
+          lastName: person?.lastName,
+          email: person?.email,
+          avatar: person?.avatar,
+          card: vote.card,
+          value: vote.value,
+          isOutlier: vote.isOutlier
+        }
+      })
     })
   }
 )
