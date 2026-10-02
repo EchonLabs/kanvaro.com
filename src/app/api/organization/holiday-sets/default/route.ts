@@ -16,6 +16,7 @@ import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { recordAudit } from '@/lib/standup/audit'
 import { StandupError } from '@/lib/standup/errors'
+import { setOrganizationHolidaySubscription } from '@/lib/standup/organization-calendar'
 import { ok, readJson, withStandupPermission } from '@/lib/standup/route-helpers'
 
 export const PUT = withStandupPermission(
@@ -40,11 +41,7 @@ export const PUT = withStandupPermission(
       .select('subscribedHolidaySets')
       .lean()
 
-    await WorkingCalendar.updateOne(
-      { organization: organizationId, scope: 'organization' },
-      { $set: { subscribedHolidaySets: [holidaySetId] } },
-      { upsert: true }
-    )
+    await setOrganizationHolidaySubscription(organizationId, holidaySetId)
 
     await recordAudit({
       actor: { type: 'user', userId },

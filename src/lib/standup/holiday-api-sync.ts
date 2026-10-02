@@ -30,6 +30,7 @@ import { WorkingCalendar } from '@/models/WorkingCalendar'
 
 import { isIsoDate } from './calendar-dates'
 import { StandupError } from './errors'
+import { setOrganizationHolidaySubscription } from './organization-calendar'
 
 const API_BASE = 'https://induwara.lk/api/v1/holidays'
 /** Distinct from any hand-seeded "Sri Lanka Public Holidays" set, so the two can coexist. */
@@ -170,11 +171,7 @@ async function defaultIfNothingChosenYet(organizationId: string, setId: string):
 
   if (orgCalendar && (orgCalendar.subscribedHolidaySets?.length ?? 0) > 0) return
 
-  await WorkingCalendar.updateOne(
-    { organization: organizationId, scope: 'organization' },
-    { $set: { subscribedHolidaySets: [setId] } },
-    { upsert: true }
-  )
+  await setOrganizationHolidaySubscription(organizationId, setId)
 }
 
 export interface SyncHolidaysFromApiParams {
