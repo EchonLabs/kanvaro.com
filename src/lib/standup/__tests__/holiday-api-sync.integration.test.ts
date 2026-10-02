@@ -1,5 +1,6 @@
 import { Holiday } from '@/models/Holiday'
 import { HolidaySet } from '@/models/HolidaySet'
+import { Organization } from '@/models/Organization'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { revokeHoliday } from '@/lib/standup/holiday-admin'
 import { syncHolidaysFromApi } from '@/lib/standup/holiday-api-sync'
@@ -26,7 +27,7 @@ describe('syncHolidaysFromApi', () => {
   useMongo()
 
   beforeEach(async () => {
-    await syncIndexes(Holiday, HolidaySet, WorkingCalendar)
+    await syncIndexes(Holiday, HolidaySet, Organization, WorkingCalendar)
   })
 
   afterEach(() => {
@@ -181,6 +182,32 @@ describe('syncHolidaysFromApi', () => {
     expect(orgCalendar.subscribedHolidaySets.map((id: any) => id.toString())).not.toContain(
       first.setId
     )
+  })
+
+  it("creates the org calendar in the organisation's own timezone, not UTC", async () => {
+    // Regression: the org-scoped WorkingCalendar is created here, implicitly,
+    // and nothing in the UI can edit it afterwards. Letting it take the
+    // schema's `timezone` default moved every unconfigured project from the
+    // organisation's zone to UTC the first time an admin pressed refresh.
+    await Organization.create({ _id: ids.organization, name: 'Kanvaro', timezone: 'Asia/Colombo' })
+
+    mockApiResponse({
+      2026: [{ date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: true }],
+      2027: []
+    })
+
+    await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026, 2027]
+    })
+
+    const orgCalendar = await WorkingCalendar.findOne({
+      organization: ids.organization,
+      scope: 'organization'
+    }).lean<any>()
+
+    expect(orgCalendar.timezone).toBe('Asia/Colombo')
   })
 
   it('never touches a pre-existing manually-managed set of a similar name', async () => {
