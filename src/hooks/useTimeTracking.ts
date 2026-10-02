@@ -339,6 +339,7 @@ export function useTimeTracking(userId: string, organizationId: string) {
         body: JSON.stringify({
           userId,
           organizationId,
+          timezone: detectClientTimezone(),
           ...entryData
         })
       })

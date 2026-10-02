@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/Toast'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { detectClientTimezone } from '@/lib/timezone'
 import { useOrganization } from '@/hooks/useOrganization'
 import { Role } from '@/lib/permissions/permission-definitions'
 import { getOrgLocalDateString, getOrgLocalTimeString, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
@@ -531,7 +532,8 @@ export function ManualTimeLogModal({
           // re-deriving a date from the converted instant (which can land on the wrong day if
           // the browser's timezone differs from the organization's configured timezone).
           startDateOnly: formData.startDate,
-          isBillable: true
+          isBillable: true,
+          timezone: detectClientTimezone()
         })
       })
 
