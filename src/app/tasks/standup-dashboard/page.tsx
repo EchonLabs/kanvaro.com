@@ -74,6 +74,7 @@ export default function StandupDashboardPage() {
       const matchesStatus = status === 'all' || project.status === status
       return matchesSearch && matchesStatus
     })
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [debouncedSearch, projects, status])
 
   const activeCount = projects.filter((p) => p.status === 'active').length

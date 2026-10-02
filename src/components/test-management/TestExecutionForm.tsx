@@ -130,6 +130,7 @@ export function TestExecutionForm({
         const data = await res.json().catch(() => ({}))
         if (data?.success && Array.isArray(data.data)) {
           const suites = (data.data as Array<{ _id: string; name: string }>).map((s) => ({ _id: s._id, name: s.name }))
+            .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
           setTestSuites(suites)
         }
       } catch (e) {
@@ -183,7 +184,7 @@ export function TestExecutionForm({
         )
         const data = await res.json().catch(() => ({}))
         if (data?.success && Array.isArray(data.data)) {
-          setTestCases(data.data)
+          setTestCases([...data.data].sort((a: any, b: any) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true })))
         } else {
           setTestCases([])
         }
@@ -221,6 +222,7 @@ export function TestExecutionForm({
               name: p.name,
               version: p.version,
             }))
+              .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
           : []
 
         setAutoTestPlans(plans)

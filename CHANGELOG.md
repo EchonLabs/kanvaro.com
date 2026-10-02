@@ -1,3 +1,19 @@
+## [1.45.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.4...v1.45.5) (2026-10-02)
+
+
+### Bug Fixes
+
+* add periodic timer sync ([e173e8a](https://github.com/EchonLabs/kanvaro.com/commit/e173e8a02f9a33b2f3538a92c3628ac9ebe3c741))
+
+## [1.45.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.3...v1.45.4) (2026-10-02)
+
+
+### Bug Fixes
+
+* add alphabetical sorting with natural ordering to all project dropdowns ([63c9cc5](https://github.com/EchonLabs/kanvaro.com/commit/63c9cc57546facf319ee41df65c8144ee39ba7e1))
+* fix column visibility in "All Projects" view ([012f67e](https://github.com/EchonLabs/kanvaro.com/commit/012f67e8110f5da02df1729709d8705819115866))
+* sort dropdown options alphabetically across the application ([bc066a1](https://github.com/EchonLabs/kanvaro.com/commit/bc066a122eb1a882ec0342f221ca5db7d93bbb02))
+
 ## [1.45.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.2...v1.45.3) (2026-09-30)
 
 

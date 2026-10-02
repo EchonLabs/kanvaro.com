@@ -630,8 +630,8 @@ export default function TasksClient({
 
     const filteredProjectOptions = useMemo(() => {
         const query = projectFilterQuery.trim().toLowerCase()
-        if (!query) return projectOptions
-        return projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+        const list = !query ? projectOptions : projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+        return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
     }, [projectOptions, projectFilterQuery])
 
     const filteredAssignedToOptions = useMemo(() => {
@@ -640,11 +640,15 @@ export default function TasksClient({
             let options = assignedToOptions.filter(opt => opt._id === user.id)
             
             const query = assignedToFilterQuery.trim().toLowerCase()
-            if (!query) return options
-            return options.filter((member) =>
+            const list = !query ? options : options.filter((member) =>
                 `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
                 member.email.toLowerCase().includes(query)
             )
+            return [...list].sort((a, b) => {
+                const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+                const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+                return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+            })
         }
 
         // For non-QA users, apply normal filtering including project members
@@ -666,11 +670,15 @@ export default function TasksClient({
         }
 
         const query = assignedToFilterQuery.trim().toLowerCase()
-        if (!query) return options
-        return options.filter((member) =>
+        const list = !query ? options : options.filter((member) =>
             `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
             member.email.toLowerCase().includes(query)
         )
+        return [...list].sort((a, b) => {
+            const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+            const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+        })
     }, [assignedToOptions, assignedToFilterQuery, selectedProjectDetails, isQAEngineer, user])
 
     const filteredCreatedByOptions = useMemo(() => {
@@ -679,11 +687,15 @@ export default function TasksClient({
             let options = createdByOptions.filter(opt => opt._id === user.id)
             
             const query = createdByFilterQuery.trim().toLowerCase()
-            if (!query) return options
-            return options.filter((member) =>
+            const list = !query ? options : options.filter((member) =>
                 `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
                 member.email.toLowerCase().includes(query)
             )
+            return [...list].sort((a, b) => {
+                const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+                const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+                return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+            })
         }
 
         // For non-QA users, apply normal filtering including project members
@@ -705,11 +717,15 @@ export default function TasksClient({
         }
 
         const query = createdByFilterQuery.trim().toLowerCase()
-        if (!query) return options
-        return options.filter((member) =>
+        const list = !query ? options : options.filter((member) =>
             `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
             member.email.toLowerCase().includes(query)
         )
+        return [...list].sort((a, b) => {
+            const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+            const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+        })
     }, [createdByOptions, createdByFilterQuery, selectedProjectDetails, isQAEngineer, user])
 
     // Fetch project details when project filter changes
