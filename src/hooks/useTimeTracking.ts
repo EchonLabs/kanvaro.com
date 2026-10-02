@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { detectClientTimezone } from '@/lib/timezone'
 
 interface TimeTrackingSettings {
   allowTimeTracking: boolean
@@ -75,7 +76,8 @@ export function useTimeTracking(userId: string, organizationId: string) {
   // Load active timer
   const loadActiveTimer = useCallback(async () => {
     try {
-      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}`)
+      const tz = detectClientTimezone()
+      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}&timezone=${encodeURIComponent(tz)}`)
       const data = await response.json()
       
       if (response.ok) {
@@ -147,6 +149,7 @@ export function useTimeTracking(userId: string, organizationId: string) {
         body: JSON.stringify({
           userId,
           organizationId,
+          timezone: detectClientTimezone(),
           ...timerData
         })
       })
