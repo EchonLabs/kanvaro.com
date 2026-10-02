@@ -5,7 +5,7 @@ import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { revokeHoliday } from '@/lib/standup/holiday-admin'
 import { syncHolidaysFromApi } from '@/lib/standup/holiday-api-sync'
 
-import { ids, syncIndexes, useMongo } from './helpers/mongo'
+import { anyId, ids, syncIndexes, useMongo } from './helpers/mongo'
 
 function mockApiResponse(byYear: Record<number, Array<Record<string, unknown>>>) {
   return jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
@@ -97,6 +97,85 @@ describe('syncHolidaysFromApi', () => {
 
     const count = await Holiday.countDocuments({ holidaySet: first.setId })
     expect(count).toBe(1)
+  })
+
+  it('reports only genuinely changed rows as updated', async () => {
+    // Regression: `updated` came from bulkWrite's modifiedCount, and Mongoose's
+    // `timestamps` injects updatedAt into every $set — so modifiedCount could
+    // never be 0 and the refresh toast claimed every row had changed, every
+    // time. The number is there to tell an admin a gazette correction landed.
+    mockApiResponse({
+      2026: [
+        { date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: true },
+        { date: '2026-02-04', name: 'Independence Day', public: true }
+      ],
+      2027: []
+    })
+
+    await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026, 2027]
+    })
+
+    // Nothing changed upstream.
+    const unchanged = await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026, 2027]
+    })
+    expect(unchanged.inserted).toBe(0)
+    expect(unchanged.updated).toBe(0)
+
+    // One row is reclassified upstream; only that one counts as updated.
+    mockApiResponse({
+      2026: [
+        { date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: true },
+        { date: '2026-02-04', name: 'Independence Day', public: false }
+      ],
+      2027: []
+    })
+
+    const changed = await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026, 2027]
+    })
+    expect(changed.inserted).toBe(0)
+    expect(changed.updated).toBe(1)
+
+    const row = await Holiday.findOne({ date: '2026-02-04' }).lean<any>()
+    expect(row.type).toBe('optional')
+  })
+
+  it('keeps the original importer on a row a later refresh touches', async () => {
+    // createdBy was in the $set, so every refresh reattributed every holiday
+    // to whoever pressed the button last.
+    mockApiResponse({
+      2026: [{ date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: true }],
+      2027: []
+    })
+
+    await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026, 2027]
+    })
+
+    const laterAdmin = anyId()
+    mockApiResponse({
+      2026: [{ date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: false }],
+      2027: []
+    })
+
+    await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: laterAdmin.toString(),
+      years: [2026, 2027]
+    })
+
+    const row = await Holiday.findOne({ date: '2026-01-03' }).lean<any>()
+    expect(row.createdBy.toString()).toBe(ids.user.toString())
   })
 
   it('never resurrects a holiday an admin withdrew', async () => {
@@ -317,6 +396,75 @@ describe('syncHolidaysFromApi', () => {
 
     expect(second.setId).toBe(first.setId)
     expect(await HolidaySet.countDocuments({ organization: ids.organization, source: 'api' })).toBe(1)
+  })
+
+  it('bounds every request so a hung API cannot hold the refresh open', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({ ok: true, data: { year: 2026, holidays: [] } })
+        }) as Response
+    )
+
+    await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026]
+    })
+
+    const init = fetchSpy.mock.calls[0][1] as RequestInit
+    expect(init.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('reports a timed-out API as an unreachable one, naming the year', async () => {
+    jest.spyOn(global, 'fetch').mockImplementation(async () => {
+      // What AbortSignal.timeout rejects a fetch with once it fires.
+      throw Object.assign(new Error('The operation was aborted due to timeout'), {
+        name: 'TimeoutError'
+      })
+    })
+
+    await expect(
+      syncHolidaysFromApi({
+        organizationId: ids.organization.toString(),
+        userId: ids.user.toString(),
+        years: [2026]
+      })
+    ).rejects.toThrow(/did not respond within .* for year 2026/)
+  })
+
+  it('recovers when a concurrent refresh created the API set first', async () => {
+    // Two admins pressing the button together: both find-or-creates look,
+    // both miss, both insert, and the unique partial index on
+    // {organization, source, apiProvider} rejects the loser — which used to
+    // surface as a bare 500 rather than simply reusing the set that won.
+    mockApiResponse({
+      2026: [{ date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: true }],
+      2027: []
+    })
+
+    const winner = await HolidaySet.create({
+      organization: ids.organization,
+      name: 'Sri Lanka Public Holidays (API)',
+      createdBy: ids.user,
+      source: 'api',
+      apiProvider: 'induwara'
+    })
+
+    // Our request looked before the winner's insert landed.
+    jest.spyOn(HolidaySet, 'findOne').mockImplementationOnce((() =>
+      Promise.resolve(null)) as any)
+
+    const summary = await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026, 2027]
+    })
+
+    expect(summary.setId).toBe(winner._id.toString())
+    expect(await HolidaySet.countDocuments({ organization: ids.organization })).toBe(1)
+    expect(await Holiday.countDocuments({ holidaySet: winner._id })).toBe(1)
   })
 
   it('throws only when every requested year fails', async () => {
