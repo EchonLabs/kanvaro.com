@@ -35,6 +35,13 @@ import { setOrganizationHolidaySubscription } from './organization-calendar'
 const API_BASE = 'https://induwara.lk/api/v1/holidays'
 /** Distinct from any hand-seeded "Sri Lanka Public Holidays" set, so the two can coexist. */
 const API_SET_NAME = 'Sri Lanka Public Holidays (API)'
+/**
+ * Per-year request budget. Generous for two small JSON documents, short
+ * enough that an unreachable provider fails the button rather than the
+ * request — the years are fetched concurrently, so this bounds the whole
+ * refresh, not each year in turn.
+ */
+const REQUEST_TIMEOUT_MS = 10_000
 
 interface ApiHolidayRow {
   date: string
@@ -68,9 +75,23 @@ export interface ApiSyncSummary {
 }
 
 async function fetchYear(year: number, apiKey?: string): Promise<ApiHolidayRow[]> {
-  const response = await fetch(`${API_BASE}?year=${year}`, {
-    headers: apiKey ? { 'X-API-Key': apiKey } : undefined
-  })
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE}?year=${year}`, {
+      headers: apiKey ? { 'X-API-Key': apiKey } : undefined,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    })
+  } catch (error) {
+    // A refresh is a foreground action with an admin watching a spinner, so a
+    // silent third party must not be able to hold the request open until the
+    // platform's own limit kills it with no explanation.
+    if ((error as Error)?.name === 'TimeoutError') {
+      throw new Error(
+        `induwara.lk did not respond within ${REQUEST_TIMEOUT_MS / 1000}s for year ${year}`
+      )
+    }
+    throw error
+  }
 
   if (!response.ok) {
     throw new Error(`induwara.lk returned ${response.status} for year ${year}`)
@@ -146,14 +167,33 @@ async function findOrCreateApiSet(organizationId: string, userId: string) {
   })
   if (existing) return existing
 
-  return HolidaySet.create({
-    organization: organizationId,
-    name: API_SET_NAME,
-    countryCode: 'LK',
-    createdBy: userId,
-    source: 'api',
-    apiProvider: 'induwara'
-  })
+  try {
+    return await HolidaySet.create({
+      organization: organizationId,
+      name: API_SET_NAME,
+      countryCode: 'LK',
+      createdBy: userId,
+      source: 'api',
+      apiProvider: 'induwara'
+    })
+  } catch (error) {
+    // Two admins pressing refresh together: both looked, both missed, and the
+    // unique index rejected the loser. The set it wanted now exists, so read
+    // it back instead of failing a button that did nothing wrong. Rethrown if
+    // the collision was something else — notably a manually-managed set that
+    // already holds this exact name, which is a real conflict for an admin to
+    // resolve rather than a race to absorb.
+    if ((error as { code?: number })?.code !== 11000) throw error
+
+    const winner = await HolidaySet.findOne({
+      organization: organizationId,
+      source: 'api',
+      apiProvider: 'induwara'
+    })
+    if (!winner) throw error
+
+    return winner
+  }
 }
 
 /**
@@ -199,42 +239,65 @@ export async function syncHolidaysFromApi(
         holidaySet: set._id,
         $or: rows.map((row) => ({ date: row.date, name: row.name }))
       },
-      { date: 1, name: 1, status: 1 }
-    ).lean()) as unknown as Array<{ date: string; name: string; status: string }>
+      { date: 1, name: 1, status: 1, type: 1 }
+    ).lean()) as unknown as Array<{
+      date: string
+      name: string
+      status: string
+      type: HolidayType
+    }>
 
-    const revokedKeys = new Set(
-      existing.filter((row) => row.status === 'revoked').map((row) => `${row.date}|${row.name}`)
-    )
+    const existingByKey = new Map(existing.map((row) => [`${row.date}|${row.name}`, row]))
 
-    const ops = rows
-      .filter((row) => !revokedKeys.has(`${row.date}|${row.name}`))
-      .map((row) => ({
+    const ops: any[] = []
+
+    for (const row of rows) {
+      const current = existingByKey.get(`${row.date}|${row.name}`)
+
+      if (current?.status === 'revoked') {
+        skippedRevoked++
+        continue
+      }
+
+      // An unchanged row is left entirely alone rather than written back
+      // identically. Mongoose's `timestamps` injects `updatedAt` into every
+      // `$set`, so a no-op write still counts as a modification — which is
+      // what made `updated` report the whole set on every refresh and told
+      // the admin nothing. Skipping also makes a repeat click genuinely free.
+      if (current && current.type === row.type) continue
+
+      // Only a row that already existed can be an update; the rest are
+      // inserts, and MongoDB counts those itself.
+      if (current) updated++
+
+      ops.push({
         updateOne: {
           filter: { holidaySet: set._id, date: row.date, name: row.name },
           update: {
-            $set: {
-              organization: params.organizationId,
-              type: row.type,
-              isFullDay: true,
-              createdBy: params.userId
-            },
+            // `type` is the only thing a refresh may change on a row that
+            // already exists — the gazette reclassifying a date is exactly
+            // the correction this sync is for.
+            $set: { type: row.type },
             $setOnInsert: {
               holidaySet: set._id,
+              organization: params.organizationId,
               date: row.date,
               name: row.name,
-              status: 'active'
+              isFullDay: true,
+              status: 'active',
+              // Insert-only, so a refresh never reattributes a holiday
+              // someone else imported to whoever pressed the button last.
+              createdBy: params.userId
             }
           },
           upsert: true
         }
-      }))
-
-    skippedRevoked = rows.length - ops.length
+      })
+    }
 
     if (ops.length > 0) {
       const result = await Holiday.bulkWrite(ops, { ordered: false })
       inserted = result.upsertedCount ?? 0
-      updated = result.modifiedCount ?? 0
     }
   }
 
