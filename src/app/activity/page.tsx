@@ -333,8 +333,8 @@ export default function ActivityPage() {
 
   const filteredProjectOptions = useMemo(() => {
     const q = projectFilterQuery.trim().toLowerCase()
-    if (!q) return projects
-    return projects.filter((p) => p.name.toLowerCase().includes(q))
+    const list = q ? projects.filter((p) => p.name?.toLowerCase().includes(q)) : projects
+    return list.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectFilterQuery])
 
   const hasActiveFilters = useMemo(() => {

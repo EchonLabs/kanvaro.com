@@ -823,8 +823,8 @@ const [searchQuery, setSearchQuery] = useState('')
   // Filter project options based on search query
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
-    if (!query) return projectOptions
-    return projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+    const list = !query ? projectOptions : projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projectOptions, projectFilterQuery])
 
   // Server handles all filtering — sprints returned are already filtered

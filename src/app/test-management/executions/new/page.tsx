@@ -74,8 +74,8 @@ export default function NewTestExecutionPage() {
 
   const filteredProjects = useMemo(() => {
     const q = projectQuery.trim().toLowerCase()
-    if (!q) return projects
-    return projects.filter((p) => (p.name || '').toLowerCase().includes(q))
+    if (!q) return [...projects].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
+    return projects.filter((p) => (p.name || '').toLowerCase().includes(q)).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectQuery])
 
   const handleSave = async (executionData: any) => {

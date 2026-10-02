@@ -179,20 +179,22 @@ export function TimeLogs({
     const result = filterProjects.filter(project =>
       project.name?.toLowerCase().includes(projectSearch.toLowerCase())
     )
-    return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    return result.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [filterProjects, projectSearch])
 
   const filteredTasks = useMemo(() => {
+    const q = taskSearch.trim().toLowerCase()
+    const list = !q ? filterTasks : filterTasks.filter(task => (task.title || '').toLowerCase().includes(q))
     // Apply smart truncation with capital letter detection
-    return filterTasks.map(task => {
+    return list.map(task => {
       const { truncated, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
       return {
         ...task,
         truncated,
         isTruncated
       }
-    }).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
-  }, [filterTasks])
+    }).sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
+  }, [filterTasks, taskSearch])
 
   const filteredEmployees = useMemo(() => {
     const result = filterEmployees.filter(employee => {

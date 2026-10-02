@@ -327,7 +327,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
     if (!projectSearch) return true
     const searchLower = projectSearch.toLowerCase()
     return project.name.toLowerCase().includes(searchLower)
-  }).sort((a, b) => a.name.localeCompare(b.name))
+  }).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
 
   const filteredTimers = timers.filter(timer => !timer.isPaused)
 

@@ -1104,22 +1104,28 @@ export default function BacklogPage() {
       })
     }
   
-    return filtered
+    return filtered.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [sprints, sprintQuery, selectedTaskIds, selectedStoryIds, sprintModalProjectId, backlogItems])
 
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
-    if (!query) return projectOptions
-    return projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+    const list = !query ? projectOptions : projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projectOptions, projectFilterQuery])
 
   const filteredAssignedToOptions = useMemo(() => {
     const query = assignedToFilterQuery.trim().toLowerCase()
-    if (!query) return assignedToOptions
-    return assignedToOptions.filter((member) =>
-      `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
-      member.email.toLowerCase().includes(query)
-    )
+    const list = !query
+      ? assignedToOptions
+      : assignedToOptions.filter((member) =>
+          `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+          member.email.toLowerCase().includes(query)
+        )
+    return [...list].sort((a, b) => {
+      const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+      const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+    })
   }, [assignedToOptions, assignedToFilterQuery])
 
   const filteredAssignedByOptions = useMemo(() => {

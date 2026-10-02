@@ -786,7 +786,7 @@ export default function CreateTaskModal({
                           className="mb-2"
                         />
                         <div className="max-h-56 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                          {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).sort((a, b) => a.name.localeCompare(b.name)).map((p) => (
+                          {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true })).map((p) => (
                             <SelectItem key={p._id} value={p._id}>
                               <span className="truncate block">{p.name}</span>
                             </SelectItem>
@@ -1010,7 +1010,7 @@ export default function CreateTaskModal({
                               const q = storyQuery.toLowerCase().trim()
                               const filtered = stories.filter(s =>
                                 !q || s.title.toLowerCase().includes(q)
-                              )
+                              ).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
                               if (filtered.length === 0) {
                                 return (
@@ -1080,7 +1080,7 @@ export default function CreateTaskModal({
 
                               const filtered = availableEpics.filter(e =>
                                 !q || e.title.toLowerCase().includes(q)
-                              )
+                              ).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
                               if (filtered.length === 0) {
                                 return (

@@ -61,6 +61,7 @@ export default function NewTestPlanPage() {
         const options: ProjectOption[] = list
           .filter((p) => p?._id && p?.name)
           .map((p) => ({ _id: String(p._id), name: String(p.name) }))
+          .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
 
         setProjects(options)
       } catch (e) {

@@ -446,7 +446,7 @@ export default function CreateSprintPage() {
                             className="mb-2 w-full"
                           />
                           <div className="max-h-56 overflow-y-auto">
-                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).map((project) => (
+                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true })).map((project) => (
                               <SelectItem key={project._id} value={project._id} title={project.name}>
                                 <div className="truncate max-w-xs" title={project.name}>
                                   {project.name}
@@ -687,6 +687,11 @@ export default function CreateSprintPage() {
                                     fullName.includes(query) ||
                                     (member.email ? member.email.toLowerCase().includes(query) : false)
                                   )
+                                })
+                                .sort((a, b) => {
+                                  const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+                                  const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+                                  return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
                                 })
 
                                 if (filteredMembers.length === 0) {

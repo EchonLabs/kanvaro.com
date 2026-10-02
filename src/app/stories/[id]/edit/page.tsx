@@ -286,9 +286,9 @@ export default function EditStoryPage() {
   }, [storyId, fetchStory])
 
   const filteredProjects = useMemo(() => {
-    if (!projectQuery.trim()) return projects
-    const q = projectQuery.toLowerCase()
-    return projects.filter(p => p.name.toLowerCase().includes(q))
+    const q = projectQuery.trim().toLowerCase()
+    const list = !q ? [...projects] : projects.filter(p => p.name.toLowerCase().includes(q))
+    return list.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectQuery])
 
   const addCriteria = () => {
@@ -565,7 +565,9 @@ export default function EditStoryPage() {
                       </div>
                     ) : (
                       <>
-                        {epics.map((epic) => (
+                        {[...epics]
+                          .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
+                          .map((epic) => (
                           <SelectItem key={epic._id} value={epic._id}>
                             {epic.title}
                           </SelectItem>
@@ -603,7 +605,9 @@ export default function EditStoryPage() {
                       <SelectItem value="none">No Sprint</SelectItem>
                     ) : (
                       <>
-                        {sprints.map((sprint) => (
+                        {[...sprints]
+                          .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
+                          .map((sprint) => (
                           <SelectItem key={sprint._id} value={sprint._id}>
                             {sprint.name}
                           </SelectItem>

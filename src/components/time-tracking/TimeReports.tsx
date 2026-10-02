@@ -453,8 +453,8 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
-    if (!query) return projects.slice().sort((a, b) => a.name.localeCompare(b.name))
-    return projects.filter((project) => project.name.toLowerCase().includes(query)).sort((a, b) => a.name.localeCompare(b.name))
+    if (!query) return projects.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
+    return projects.filter((project) => project.name.toLowerCase().includes(query)).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectFilterQuery])
 
   const filteredAssignedToOptions = useMemo(() => {
