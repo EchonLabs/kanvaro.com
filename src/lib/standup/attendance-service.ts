@@ -22,7 +22,7 @@
  * field an absent member holding six hours renders identically to an empty day.
  */
 import { Allocation, type IAllocation } from '@/models/Allocation'
-import { Standup } from '@/models/Standup'
+import { ATTENDANCE_STATES, Standup } from '@/models/Standup'
 import { Task } from '@/models/Task'
 
 import { createAllocation, unclaimedDetachedMinutes } from './allocation-service'
@@ -89,6 +89,15 @@ export async function setAttendance(
       { memberId: input.memberId }
     )
   }
+
+  // Before anything is written. The state arrives as an unvalidated string
+  // from the route, and the model's `enum` cannot catch it: the write below is
+  // a `$push` through `updateOne`, which runs no schema validators. Left
+  // unchecked the value persisted, the version bumped, and `recompute` then
+  // threw `RangeError` from `computeCapacity` — a 500 that told the caller the
+  // write had failed after it had already succeeded, leaving a stand-up whose
+  // capacity board, checks and completion all threw the same error.
+  assertKnownState(input.state)
 
   // The nominal day, needed to bound the partial entry. Computed with no
   // attendance override so it reports the day the member would otherwise have.
@@ -357,6 +366,21 @@ async function loadMutableContext(
   }
 
   return context
+}
+
+/**
+ * RUN-6's four states and nothing else. Narrows the unvalidated string the
+ * route hands over, so every later branch — `ABSENT_STATES`, the `partial`
+ * check, `computeCapacity`'s precedence table — is reasoning about a value it
+ * actually has a case for.
+ */
+function assertKnownState(value: AttendanceStatus): void {
+  if (!(ATTENDANCE_STATES as readonly string[]).includes(value)) {
+    throw new StandupError('VALIDATION_FAILED', 'That is not an attendance state.', {
+      state: value,
+      allowed: ATTENDANCE_STATES
+    })
+  }
 }
 
 /**
