@@ -49,7 +49,19 @@ export const STANDUP_ERROR_CODES = {
   /** The addressed record does not exist. */
   NOT_FOUND: 404,
   /** A third-party integration (e.g. the holiday API) failed or was unreachable. */
-  EXTERNAL_SERVICE_ERROR: 502
+  EXTERNAL_SERVICE_ERROR: 502,
+  /**
+   * The caller is authenticated but not allowed to do this.
+   *
+   * Distinct from `OVERRIDE_NOT_PERMITTED`, which is specifically "that
+   * completion check is a hard block and cannot be overridden" (O6–O10).
+   * Reusing that code for ordinary authorisation — reading another member's
+   * estimate debt, say — tells the client something untrue about *why*, in a
+   * contract whose whole purpose is letting the UI pick the right response.
+   * This is the code the route helpers already put in the envelope for a failed
+   * permission check, named here so services can throw it too.
+   */
+  FORBIDDEN: 403
 } as const
 
 export type StandupErrorCode = keyof typeof STANDUP_ERROR_CODES
