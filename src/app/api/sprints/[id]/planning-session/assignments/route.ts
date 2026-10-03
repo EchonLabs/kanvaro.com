@@ -44,7 +44,7 @@ export const POST = withSprintPermission(
     )
     if (!canAssign) {
       throw new StandupError(
-        'OVERRIDE_NOT_PERMITTED',
+        'FORBIDDEN',
         'You do not have permission to assign tasks.'
       )
     }

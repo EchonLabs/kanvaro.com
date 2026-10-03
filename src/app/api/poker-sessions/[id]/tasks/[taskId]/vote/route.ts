@@ -48,7 +48,7 @@ export const POST = withPokerPermission(
       (participant: any) => participant.toString() === userId
     )
     if (!isParticipant) {
-      throw new StandupError('OVERRIDE_NOT_PERMITTED', 'You are not a participant in this session.')
+      throw new StandupError('FORBIDDEN', 'You are not a participant in this session.')
     }
 
     if (body.card === undefined || body.card === null) {

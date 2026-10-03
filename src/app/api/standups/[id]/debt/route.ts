@@ -47,7 +47,7 @@ export const GET = withStandupIdPermission(
     const memberId = requested ?? userId
     if (!canViewAnyone && memberId !== userId) {
       throw new StandupError(
-        'OVERRIDE_NOT_PERMITTED',
+        'FORBIDDEN',
         "You can only see your own estimate debt.",
         { memberId }
       )

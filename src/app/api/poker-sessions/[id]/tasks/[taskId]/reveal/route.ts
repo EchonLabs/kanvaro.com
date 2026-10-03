@@ -21,7 +21,7 @@ export const POST = withPokerPermission(
 
     if (pokerSession.facilitator.toString() !== userId) {
       throw new StandupError(
-        'OVERRIDE_NOT_PERMITTED',
+        'FORBIDDEN',
         'Only the facilitator can reveal the votes.'
       )
     }
