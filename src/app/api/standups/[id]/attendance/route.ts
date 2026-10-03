@@ -16,7 +16,8 @@
  */
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { reassignDetached, setAttendance } from '@/lib/standup/attendance-service'
-import { minutes } from '@/lib/standup/minutes'
+import { StandupError } from '@/lib/standup/errors'
+import { minutes, type Minutes } from '@/lib/standup/minutes'
 import {
   ok,
   readJson,
@@ -47,7 +48,7 @@ export const PATCH = withStandupIdPermission(
         state: body.state as any,
         ...(body.partialMinutes === undefined
           ? {}
-          : { partialMinutes: minutes(Number(body.partialMinutes)) }),
+          : { partialMinutes: parsePartialMinutes(body.partialMinutes) }),
         ...(body.reason ? { reason: body.reason } : {}),
         ...(body.note ? { note: body.note } : {}),
         expectedVersion,
@@ -56,6 +57,25 @@ export const PATCH = withStandupIdPermission(
     )
   }
 )
+
+/**
+ * `minutes()` throws `RangeError` on a non-finite value, which surfaces as a
+ * 500 rather than naming the field — so the "is this a number at all?" question
+ * is answered here, before branding. Everything about *which* numbers are
+ * allowed stays in `assertPartialMinutes`, which owns the fifteen-minute floor
+ * and the whole-day ceiling and can phrase both in terms of the member's day.
+ */
+function parsePartialMinutes(raw: unknown): Minutes {
+  const value = Number(raw)
+  if (!Number.isFinite(value)) {
+    throw new StandupError(
+      'VALIDATION_FAILED',
+      'Enter how many hours this person is available today.',
+      { partialMinutes: raw }
+    )
+  }
+  return minutes(value)
+}
 
 interface ReassignBody {
   fromMemberId: string
