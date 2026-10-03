@@ -103,7 +103,7 @@ describe('POST /api/standups/:id/reopen', () => {
     standupFindById.mockReset().mockReturnValue({
       lean: () =>
         Promise.resolve({
-          _id: 'standup-1',
+          _id: '5f00000000000000000000d1',
           organization: 'org-1',
           project: 'project-1',
           sprint: 'sprint-1',
@@ -120,7 +120,7 @@ describe('POST /api/standups/:id/reopen', () => {
 
     const response = await reopenRoute.POST(
       buildRequest({ reason: 'Logged hours were wrong for two members yesterday' }),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(response.status).toBe(200)
@@ -129,7 +129,7 @@ describe('POST /api/standups/:id/reopen', () => {
 
     expect(reopenStandupMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        standupId: 'standup-1',
+        standupId: '5f00000000000000000000d1',
         reopenedBy: 'user-1',
         organizationId: 'org-1',
         projectId: 'project-1',
@@ -147,7 +147,7 @@ describe('POST /api/standups/:id/reopen', () => {
 
     await reopenRoute.POST(
       buildRequest({ reason: 'Logged hours were wrong for two members yesterday' }),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(reopenStandupMock).toHaveBeenCalledWith(
@@ -161,7 +161,7 @@ describe('POST /api/standups/:id/reopen', () => {
 
     await reopenRoute.POST(
       buildRequest({ reason: 'Logged hours were wrong for two members yesterday' }),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(reopenStandupMock).toHaveBeenCalledWith(
@@ -175,7 +175,7 @@ describe('POST /api/standups/:id/reopen', () => {
 
     await reopenRoute.POST(
       buildRequest({ reason: 'Logged hours were wrong for two members yesterday' }),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(reopenStandupMock).toHaveBeenCalledWith(
@@ -189,7 +189,7 @@ describe('POST /api/standups/:id/reopen', () => {
 
     const response = await reopenRoute.POST(
       buildRequest({ reason: 'Logged hours were wrong for two members yesterday' }),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(response.status).toBe(403)
@@ -201,7 +201,7 @@ describe('POST /api/standups/:id/reopen', () => {
   it('requires the stand-up version header, refusing with VALIDATION_FAILED when it is missing', async () => {
     const response = await reopenRoute.POST(
       buildRequest({ reason: 'Logged hours were wrong for two members yesterday' }, null),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(response.status).toBe(422)
@@ -215,7 +215,7 @@ describe('POST /api/standups/:id/reopen', () => {
 
     const response = await reopenRoute.POST(
       buildRequest({ reason: 'Logged hours were wrong for two members yesterday' }),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(response.status).toBe(403)
@@ -230,7 +230,7 @@ describe('POST /api/standups/:id/reopen', () => {
 
     const response = await reopenRoute.POST(
       buildRequest({ reason: 'Logged hours were wrong for two members yesterday' }),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(response.status).toBe(403)
@@ -242,7 +242,7 @@ describe('POST /api/standups/:id/reopen', () => {
     standupFindById.mockReturnValue({
       lean: () =>
         Promise.resolve({
-          _id: 'standup-1',
+          _id: '5f00000000000000000000d1',
           organization: 'org-2',
           project: 'project-1',
           sprint: 'sprint-1',
@@ -252,7 +252,7 @@ describe('POST /api/standups/:id/reopen', () => {
 
     const response = await reopenRoute.POST(
       buildRequest({ reason: 'Logged hours were wrong for two members yesterday' }),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(response.status).toBe(404)

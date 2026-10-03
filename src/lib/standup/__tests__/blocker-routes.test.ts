@@ -190,7 +190,7 @@ describe('invoking GET for real, with the wrapper wired to mocked auth/db/servic
     standupFindById.mockReset().mockReturnValue({
       lean: () =>
         Promise.resolve({
-          _id: 'standup-1',
+          _id: '5f00000000000000000000d1',
           organization: 'org-1',
           project: 'project-1',
           sprint: 'sprint-1'
@@ -199,20 +199,20 @@ describe('invoking GET for real, with the wrapper wired to mocked auth/db/servic
   })
 
   it('returns 200 with the panel rows from loadBlockerPanel', async () => {
-    const rows = [{ blockerId: 'blocker-1', status: 'open' }]
+    const rows = [{ blockerId: '5f00000000000000000000e1', status: 'open' }]
     loadBlockerPanelMock.mockResolvedValue(rows)
 
-    const response = await blockersRoute.GET(buildRequest(), { params: { id: 'standup-1' } })
+    const response = await blockersRoute.GET(buildRequest(), { params: { id: '5f00000000000000000000d1' } })
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ success: true, data: rows })
-    expect(loadBlockerPanelMock).toHaveBeenCalledWith('standup-1')
+    expect(loadBlockerPanelMock).toHaveBeenCalledWith('5f00000000000000000000d1')
   })
 
   it('checks the permission against the project the stand-up carries, using standup:view not blocker_raise', async () => {
     loadBlockerPanelMock.mockResolvedValue([])
 
-    await blockersRoute.GET(buildRequest(), { params: { id: 'standup-1' } })
+    await blockersRoute.GET(buildRequest(), { params: { id: '5f00000000000000000000d1' } })
 
     expect(hasPermission).toHaveBeenCalledWith('user-1', Permission.STANDUP_VIEW, 'project-1')
   })
@@ -220,7 +220,7 @@ describe('invoking GET for real, with the wrapper wired to mocked auth/db/servic
   it('refuses with a plain 403 when the caller lacks standup:view, without ever calling loadBlockerPanel', async () => {
     hasPermission.mockResolvedValue(false)
 
-    const response = await blockersRoute.GET(buildRequest(), { params: { id: 'standup-1' } })
+    const response = await blockersRoute.GET(buildRequest(), { params: { id: '5f00000000000000000000d1' } })
 
     expect(response.status).toBe(403)
     expect(loadBlockerPanelMock).not.toHaveBeenCalled()
@@ -231,7 +231,7 @@ describe('invoking GET for real, with the wrapper wired to mocked auth/db/servic
       new StandupError('NOT_FOUND', 'That stand-up no longer exists.')
     )
 
-    const response = await blockersRoute.GET(buildRequest(), { params: { id: 'standup-1' } })
+    const response = await blockersRoute.GET(buildRequest(), { params: { id: '5f00000000000000000000d1' } })
 
     expect(response.status).toBe(404)
     const body = await response.json()
@@ -259,7 +259,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
     standupFindById.mockReset().mockReturnValue({
       lean: () =>
         Promise.resolve({
-          _id: 'standup-1',
+          _id: '5f00000000000000000000d1',
           organization: 'org-1',
           project: 'project-1',
           sprint: 'sprint-1'
@@ -268,11 +268,11 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
   })
 
   it('returns 201 with the created blocker, and calls raiseBlocker with the request-derived fields', async () => {
-    const created = { _id: 'blocker-1', status: 'open' }
+    const created = { _id: '5f00000000000000000000e1', status: 'open' }
     raiseBlockerMock.mockResolvedValue(created)
 
     const response = await blockersRoute.POST(buildRequest(validBody), {
-      params: { id: 'standup-1' }
+      params: { id: '5f00000000000000000000d1' }
     })
 
     expect(response.status).toBe(201)
@@ -280,7 +280,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
 
     expect(raiseBlockerMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        standupId: 'standup-1',
+        standupId: '5f00000000000000000000d1',
         sprintId: 'sprint-1',
         projectId: 'project-1',
         organizationId: 'org-1',
@@ -293,7 +293,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
   })
 
   it('checks the permission against the project the stand-up carries', async () => {
-    await blockersRoute.POST(buildRequest(validBody), { params: { id: 'standup-1' } })
+    await blockersRoute.POST(buildRequest(validBody), { params: { id: '5f00000000000000000000d1' } })
 
     expect(hasPermission).toHaveBeenCalledWith('user-1', Permission.STANDUP_BLOCKER_RAISE, 'project-1')
   })
@@ -302,7 +302,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
     hasPermission.mockResolvedValue(false)
 
     const response = await blockersRoute.POST(buildRequest(validBody), {
-      params: { id: 'standup-1' }
+      params: { id: '5f00000000000000000000d1' }
     })
 
     expect(response.status).toBe(403)
@@ -316,7 +316,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
 
     const response = await blockersRoute.POST(
       buildRequest({ ...validBody, description: 'too short' }),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(response.status).toBe(422)
@@ -339,34 +339,34 @@ describe('invoking PATCH for real, with withBlockerPermission wired to mocked au
     blockerFindById.mockReset().mockReturnValue({
       lean: () =>
         Promise.resolve({
-          _id: 'blocker-1',
+          _id: '5f00000000000000000000e1',
           organization: 'org-1',
           project: 'project-1',
-          standup: 'standup-1'
+          standup: '5f00000000000000000000d1'
         })
     })
   })
 
   it('resolves a blocker: returns 200 with the updated blocker, and calls updateBlocker with the request-derived fields', async () => {
-    const updated = { _id: 'blocker-1', status: 'resolved' }
+    const updated = { _id: '5f00000000000000000000e1', status: 'resolved' }
     updateBlockerMock.mockResolvedValue(updated)
 
     const response = await blockerRoute.PATCH(buildRequest({
       status: 'resolved',
       resolutionNote: 'Vendor sandbox came back online this morning.'
-    }), { params: { id: 'blocker-1' } })
+    }), { params: { id: '5f00000000000000000000e1' } })
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual(updated)
 
     expect(updateBlockerMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        blockerId: 'blocker-1',
+        blockerId: '5f00000000000000000000e1',
         // Critical 1's fix threads a `standupId` through every caller of
         // `updateBlocker`, this route included — here it comes from the
         // blocker `withBlockerPermission` already loaded and org-scoped by
         // its own id, not from the URL (this route has no stand-up segment).
-        standupId: 'standup-1',
+        standupId: '5f00000000000000000000d1',
         updatedBy: 'user-1',
         organizationId: 'org-1',
         projectId: 'project-1',
@@ -378,7 +378,7 @@ describe('invoking PATCH for real, with withBlockerPermission wired to mocked au
 
   it('checks the permission against the project the blocker carries', async () => {
     await blockerRoute.PATCH(buildRequest({ status: 'in_progress' }), {
-      params: { id: 'blocker-1' }
+      params: { id: '5f00000000000000000000e1' }
     })
 
     expect(hasPermission).toHaveBeenCalledWith('user-1', Permission.STANDUP_BLOCKER_RAISE, 'project-1')
@@ -388,7 +388,7 @@ describe('invoking PATCH for real, with withBlockerPermission wired to mocked au
     hasPermission.mockResolvedValue(false)
 
     const response = await blockerRoute.PATCH(buildRequest({ status: 'in_progress' }), {
-      params: { id: 'blocker-1' }
+      params: { id: '5f00000000000000000000e1' }
     })
 
     expect(response.status).toBe(403)
@@ -404,7 +404,7 @@ describe('invoking PATCH for real, with withBlockerPermission wired to mocked au
     )
 
     const response = await blockerRoute.PATCH(buildRequest({ status: 'resolved' }), {
-      params: { id: 'blocker-1' }
+      params: { id: '5f00000000000000000000e1' }
     })
 
     expect(response.status).toBe(422)
@@ -416,14 +416,14 @@ describe('invoking PATCH for real, with withBlockerPermission wired to mocked au
     blockerFindById.mockReturnValue({
       lean: () =>
         Promise.resolve({
-          _id: 'blocker-1',
+          _id: '5f00000000000000000000e1',
           organization: 'org-2',
           project: 'project-1'
         })
     })
 
     const response = await blockerRoute.PATCH(buildRequest({ status: 'in_progress' }), {
-      params: { id: 'blocker-1' }
+      params: { id: '5f00000000000000000000e1' }
     })
 
     expect(response.status).toBe(404)
@@ -434,7 +434,7 @@ describe('invoking PATCH for real, with withBlockerPermission wired to mocked au
     blockerFindById.mockReturnValue({ lean: () => Promise.resolve(null) })
 
     const response = await blockerRoute.PATCH(buildRequest({ status: 'in_progress' }), {
-      params: { id: 'missing-blocker' }
+      params: { id: '5f00000000000000000000e9' }
     })
 
     expect(response.status).toBe(404)

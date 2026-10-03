@@ -40,6 +40,19 @@ const { Permission } = require('@/lib/permissions/permission-definitions')
 
 const request = (url: string) => new NextRequest(new URL(url, 'http://localhost'))
 
+/**
+ * Real ObjectId shapes, not `'project-1'` placeholders.
+ *
+ * The helper now refuses a project id that could never name a project, because
+ * handing one to `PermissionService` casts it against `Project` and threw a
+ * `CastError` the route reported as a 500. Every project id in production comes
+ * from an ObjectId path segment or query value, so a placeholder here would be
+ * testing a request the app cannot receive — and would mask that guard.
+ */
+const PROJECT_1 = '5f00000000000000000000c1'
+const PROJECT_2 = '5f00000000000000000000c2'
+const PROJECT_9 = '5f00000000000000000000c9'
+
 describe('withStandupPermission resolves the project from the query', () => {
   beforeEach(() => {
     hasPermission.mockReset().mockResolvedValue(true)
@@ -55,15 +68,15 @@ describe('withStandupPermission resolves the project from the query', () => {
     )
 
   it('checks the permission against the project in ?projectId=', async () => {
-    await route()(request('/api/standup/health?projectId=project-1'), {})
+    await route()(request(`/api/standup/health?projectId=${PROJECT_1}`), {})
 
-    expect(hasPermission).toHaveBeenCalledWith('user-1', Permission.STANDUP_VIEW, 'project-1')
+    expect(hasPermission).toHaveBeenCalledWith('user-1', Permission.STANDUP_VIEW, PROJECT_1)
   })
 
   it('verifies project access as well as the permission', async () => {
-    await route()(request('/api/standup/health?projectId=project-1'), {})
+    await route()(request(`/api/standup/health?projectId=${PROJECT_1}`), {})
 
-    expect(requireProjectAccess).toHaveBeenCalledWith('user-1', 'project-1')
+    expect(requireProjectAccess).toHaveBeenCalledWith('user-1', PROJECT_1)
   })
 
   it('passes the project on to the handler', async () => {
@@ -76,16 +89,16 @@ describe('withStandupPermission resolves the project from the query', () => {
       }
     )
 
-    await capturing(request('/api/standup/health?projectId=project-1'), {})
+    await capturing(request(`/api/standup/health?projectId=${PROJECT_1}`), {})
 
-    expect(captured[0].projectId).toBe('project-1')
+    expect(captured[0].projectId).toBe(PROJECT_1)
   })
 
   it('refuses when the caller holds the permission on some other project', async () => {
     // What a team member looks like: the grant exists, but not here.
     hasPermission.mockResolvedValue(false)
 
-    const response = await route()(request('/api/standup/health?projectId=project-2'), {})
+    const response = await route()(request(`/api/standup/health?projectId=${PROJECT_2}`), {})
 
     expect(response.status).toBe(403)
     expect(requireProjectAccess).not.toHaveBeenCalled()
@@ -106,11 +119,11 @@ describe('withStandupPermission resolves the project from the query', () => {
 
     // A caller must not be able to widen their own check by appending a
     // ?projectId= they do happen to have access to.
-    await paramRoute(request('/api/projects/project-1/x?projectId=project-9'), {
-      params: { id: 'project-1' }
+    await paramRoute(request(`/api/projects/${PROJECT_1}/x?projectId=${PROJECT_9}`), {
+      params: { id: PROJECT_1 }
     })
 
-    expect(hasPermission).toHaveBeenCalledWith('user-1', Permission.STANDUP_VIEW, 'project-1')
+    expect(hasPermission).toHaveBeenCalledWith('user-1', Permission.STANDUP_VIEW, PROJECT_1)
   })
 })
 

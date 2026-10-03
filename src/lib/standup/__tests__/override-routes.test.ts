@@ -147,7 +147,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
     findById.mockReset().mockReturnValue({
       lean: () =>
         Promise.resolve({
-          _id: 'standup-1',
+          _id: '5f00000000000000000000d1',
           organization: 'org-1',
           project: 'project-1',
           sprint: 'sprint-1'
@@ -160,7 +160,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
     issueOverrideMock.mockResolvedValue(created)
 
     const response = await overridesRoute.POST(buildRequest(validBody), {
-      params: { id: 'standup-1' }
+      params: { id: '5f00000000000000000000d1' }
     })
 
     expect(response.status).toBe(201)
@@ -168,7 +168,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
 
     expect(issueOverrideMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        standupId: 'standup-1',
+        standupId: '5f00000000000000000000d1',
         sprintId: 'sprint-1',
         projectId: 'project-1',
         organizationId: 'org-1',
@@ -183,7 +183,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
   })
 
   it('checks the permission against the project the stand-up carries', async () => {
-    await overridesRoute.POST(buildRequest(validBody), { params: { id: 'standup-1' } })
+    await overridesRoute.POST(buildRequest(validBody), { params: { id: '5f00000000000000000000d1' } })
 
     expect(hasPermission).toHaveBeenCalledWith('user-1', Permission.STANDUP_OVERRIDE, 'project-1')
   })
@@ -192,7 +192,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
     hasPermission.mockResolvedValue(false)
 
     const response = await overridesRoute.POST(buildRequest(validBody), {
-      params: { id: 'standup-1' }
+      params: { id: '5f00000000000000000000d1' }
     })
 
     expect(response.status).toBe(403)
@@ -210,7 +210,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
 
     const response = await overridesRoute.POST(
       buildRequest({ ...validBody, type: 'unestimated_task_allocation' }),
-      { params: { id: 'standup-1' } }
+      { params: { id: '5f00000000000000000000d1' } }
     )
 
     expect(response.status).toBe(403)
@@ -224,7 +224,7 @@ describe('invoking POST for real, with the wrapper wired to mocked auth/db/servi
     )
 
     const response = await overridesRoute.POST(buildRequest(validBody), {
-      params: { id: 'standup-1' }
+      params: { id: '5f00000000000000000000d1' }
     })
 
     expect(response.status).toBe(422)
