@@ -86,10 +86,23 @@ export const POST = withStandupIdPermission(
       // A member with only STANDUP_ALLOCATE_OWN may act on their own row
       // (self-select, or their own top-up once ALO-22 opens that to members —
       // it does not yet, so topUp still requires STANDUP_ALLOCATE).
-      if (!isOwnRow || body.topUp) {
+      //
+      // Two refusals, two messages. These were one `if` throwing the first
+      // message, so a member topping up their own row was told it was not their
+      // row — true of the other branch, and nonsense about a day that is
+      // theirs. A message that misnames the reason also hides the remedy: the
+      // row is fine, the top-up is the part that needs a PM.
+      if (!isOwnRow) {
         throw new StandupError(
           'VALIDATION_FAILED',
           'You can only add work to your own day.',
+          { memberId: body.memberId }
+        )
+      }
+      if (body.topUp) {
+        throw new StandupError(
+          'VALIDATION_FAILED',
+          'Only a project manager can top up a stand-up after it is completed.',
           { memberId: body.memberId }
         )
       }
@@ -110,8 +123,10 @@ export const POST = withStandupIdPermission(
       if (standup.status !== 'Ready' && standup.status !== 'Completed') {
         throw new StandupError(
           'VALIDATION_FAILED',
-          'Your own row can only be edited while the stand-up is Ready.',
-          { status: standup.status }
+          // Both statuses this condition admits, because naming only `Ready`
+          // denied the Completed self-select the line above deliberately allows.
+          'You can only change your own row before the stand-up starts, or once it is Completed.',
+          { status: standup.status, editableIn: ['Ready', 'Completed'] }
         )
       }
     }
