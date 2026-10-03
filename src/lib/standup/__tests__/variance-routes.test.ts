@@ -138,7 +138,11 @@ describe('NFR-13 — individual debt is not retrievable by a Stakeholder', () =>
 
   it('refuses one member reading another member with view_own_debt only', () => {
     expect(debt).toContain("memberId !== userId")
-    expect(debt).toContain('OVERRIDE_NOT_PERMITTED')
+    // A plain authorisation refusal, not an override refusal: this route has
+    // no overridable check in it, and a client switching on the code needs to
+    // tell "you may not see this" from "that check cannot be overridden".
+    expect(debt).toContain('FORBIDDEN')
+    expect(debt).not.toContain('OVERRIDE_NOT_PERMITTED')
   })
 
   it('lets a project manager read anybody on the project', () => {

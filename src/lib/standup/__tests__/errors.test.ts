@@ -46,7 +46,9 @@ const SPEC_CODES: Record<string, number> = {
 const ADDITIONS: Record<string, number> = {
   COMPLETION_INTERRUPTED: 409,
   VALIDATION_FAILED: 422,
-  NOT_FOUND: 404
+  NOT_FOUND: 404,
+  EXTERNAL_SERVICE_ERROR: 502,
+  FORBIDDEN: 403
 }
 
 describe('§17.2 catalogue', () => {
@@ -60,9 +62,25 @@ describe('§17.2 catalogue', () => {
     }
   })
 
-  it('adds exactly the three generic codes and no others', () => {
+  it('adds exactly the generic codes listed above and no others', () => {
     const extra = Object.keys(STANDUP_ERROR_CODES).filter((code) => !(code in SPEC_CODES))
     expect(extra.sort()).toEqual(Object.keys(ADDITIONS).sort())
+  })
+
+  /**
+   * `OVERRIDE_NOT_PERMITTED` was being thrown for plain authorisation
+   * refusals that have nothing to do with overriding a completion check —
+   * reading another member's estimate debt, for one. A client switching on the
+   * code to decide between "explain the override rules" and "you may not see
+   * this" cannot tell those apart, and 403 was the only hint.
+   *
+   * `FORBIDDEN` is the code the route helpers already return in that envelope,
+   * so this names what they do rather than inventing a parallel vocabulary.
+   */
+  it('separates a plain authorisation refusal from an override refusal', () => {
+    expect(STANDUP_ERROR_CODES.FORBIDDEN).toBe(403)
+    expect(STANDUP_ERROR_CODES.OVERRIDE_NOT_PERMITTED).toBe(403)
+    expect('FORBIDDEN' in STANDUP_ERROR_CODES).toBe(true)
   })
 
   it.each(Object.entries(ADDITIONS))('%s maps to HTTP %i', (code, status) => {
