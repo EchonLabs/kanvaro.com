@@ -47,10 +47,22 @@ const StandupBlockerSchema = new Schema<IStandupBlocker>(
       required: true,
       minlength: [10, 'A blocker description needs at least 10 characters.']
     },
-    blockerType: { type: String, enum: BLOCKER_TYPES, required: true },
+    // Authored messages, not Mongoose's default. `toErrorResponse` forwards a
+    // validator message to the client on purpose — it is the only text saying
+    // what to fix — which makes the default ("`x` is not a valid enum value for
+    // path `y`") user-facing copy naming an internal path and no valid value.
+    blockerType: {
+      type: String,
+      enum: { values: BLOCKER_TYPES, message: 'Choose a blocker type from the list.' },
+      required: true
+    },
     owner: { type: Schema.Types.ObjectId, ref: 'User' },
     targetResolutionDate: { type: Date },
-    severity: { type: String, enum: BLOCKER_SEVERITIES, required: true },
+    severity: {
+      type: String,
+      enum: { values: BLOCKER_SEVERITIES, message: 'Severity must be low, medium, high or critical.' },
+      required: true
+    },
     status: { type: String, enum: BLOCKER_STATUSES, required: true, default: 'open' },
     resolutionNote: {
       type: String,
