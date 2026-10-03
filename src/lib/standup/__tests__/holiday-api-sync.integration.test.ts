@@ -178,6 +178,47 @@ describe('syncHolidaysFromApi', () => {
     expect(row.createdBy.toString()).toBe(ids.user.toString())
   })
 
+  it("does not reset an admin's half-day edit on a row it reclassifies", async () => {
+    // A refresh may correct a date's classification, but everything else on
+    // an existing row belongs to whoever curated it. CSV import accepts
+    // isFullDay=false with partial hours, so a half-day can legitimately
+    // exist inside the API-backed set.
+    mockApiResponse({
+      2026: [{ date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: true }],
+      2027: []
+    })
+
+    await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026, 2027]
+    })
+
+    await Holiday.updateOne(
+      { date: '2026-01-03' },
+      { $set: { isFullDay: false, minutesIfPartial: 240 } }
+    )
+
+    // Reclassified upstream, so this row *is* written — the half-day still
+    // has to survive it.
+    mockApiResponse({
+      2026: [{ date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: false }],
+      2027: []
+    })
+
+    const summary = await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026, 2027]
+    })
+    expect(summary.updated).toBe(1)
+
+    const row = await Holiday.findOne({ date: '2026-01-03' }).lean<any>()
+    expect(row.type).toBe('optional')
+    expect(row.isFullDay).toBe(false)
+    expect(row.minutesIfPartial).toBe(240)
+  })
+
   it('never resurrects a holiday an admin withdrew', async () => {
     mockApiResponse({
       2026: [{ date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: true }],
@@ -211,6 +252,49 @@ describe('syncHolidaysFromApi', () => {
 
     const after = await Holiday.findById(holiday._id).lean<any>()
     expect(after.status).toBe('revoked')
+  })
+
+  it('leaves a withdrawn holiday alone even when upstream reclassifies it', async () => {
+    // The revoked check has to come before the changed/unchanged comparison.
+    // Reversed, a withdrawn date whose classification moved upstream would be
+    // written again - still revoked, but silently re-typed and missing from
+    // skippedRevoked.
+    mockApiResponse({
+      2026: [{ date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: true }],
+      2027: []
+    })
+
+    const first = await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026, 2027]
+    })
+
+    const holiday = await Holiday.findOne({ holidaySet: first.setId }).lean<any>()
+    await revokeHoliday({
+      holidayId: holiday._id.toString(),
+      organizationId: ids.organization.toString(),
+      actorId: ids.user.toString(),
+      reason: REASON
+    })
+
+    mockApiResponse({
+      2026: [{ date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', public: false }],
+      2027: []
+    })
+
+    const second = await syncHolidaysFromApi({
+      organizationId: ids.organization.toString(),
+      userId: ids.user.toString(),
+      years: [2026, 2027]
+    })
+
+    expect(second.skippedRevoked).toBe(1)
+    expect(second.updated).toBe(0)
+
+    const after = await Holiday.findById(holiday._id).lean<any>()
+    expect(after.status).toBe('revoked')
+    expect(after.type).toBe('public')
   })
 
   it('does not re-default the org calendar once an admin has chosen anything', async () => {
