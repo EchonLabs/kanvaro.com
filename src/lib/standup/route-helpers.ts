@@ -50,6 +50,25 @@ type Handler = (
 ) => Promise<NextResponse> | NextResponse
 
 /**
+ * Whether a path segment could name a record at all.
+ *
+ * `findById` casts, and a string that cannot be an ObjectId makes it *throw*
+ * rather than return nothing — a 500 for what is only ever a stale link or a
+ * typo'd client request. Every id-keyed helper below checks this first and
+ * answers its own `missing` response instead.
+ *
+ * Deliberately not `mongoose.Types.ObjectId.isValid`, which accepts any
+ * 12-character string (`'twelveChars!'`) and casts it from its bytes — so that
+ * check would wave through an id that silently addresses a different record.
+ * Only the 24-character hex form a real id is ever serialised as passes here.
+ */
+const OBJECT_ID = /^[0-9a-f]{24}$/i
+
+export function isAddressableId(value: unknown): value is string {
+  return typeof value === 'string' && OBJECT_ID.test(value)
+}
+
+/**
  * Wraps a route handler with connection setup, authentication, a server-side
  * permission check and catalogue-aware error mapping.
  */
@@ -69,6 +88,15 @@ export function withStandupPermission(options: HandlerOptions, handler: Handler)
         : options.projectIdQuery
           ? (request.nextUrl.searchParams.get(options.projectIdQuery) ?? undefined)
           : undefined
+
+      // A project id that cannot name a project is refused here rather than
+      // cast against `Project` inside `PermissionService` (a 500). It must not
+      // fall through to the org-wide check either: that check passes only for a
+      // role holding the permission organisation-wide, so a typo'd id would
+      // quietly answer a broader question than the caller asked.
+      if (projectId !== undefined && !isAddressableId(projectId)) {
+        throw new StandupError('VALIDATION_FAILED', 'That is not a project id.', { projectId })
+      }
 
       const allowed = await PermissionService.hasPermission(
         authResult.user.id,
@@ -133,15 +161,17 @@ export function withSprintPermission(
       const params = routeContext?.params ?? {}
       const sprintId = params[options.sprintIdParam ?? 'id']
 
+      const absent = NextResponse.json(
+        { error: { code: 'NOT_FOUND', message: 'That sprint no longer exists.' } },
+        { status: 404 }
+      )
+
+      if (!isAddressableId(sprintId)) return absent
+
       const { Sprint } = await import('@/models/Sprint')
       const sprint = await Sprint.findById(sprintId).lean()
 
-      if (!sprint) {
-        return NextResponse.json(
-          { error: { code: 'NOT_FOUND', message: 'That sprint no longer exists.' } },
-          { status: 404 }
-        )
-      }
+      if (!sprint) return absent
 
       // Org isolation before anything else: a sprint in another organisation
       // must look absent, not forbidden.
@@ -250,13 +280,15 @@ export function withStandupIdPermission(
       const params = routeContext?.params ?? {}
       const standupId = params[options.standupIdParam ?? 'id']
 
-      const { Standup } = await import('@/models/Standup')
-      const standup = await Standup.findById(standupId).lean()
-
       const missing = NextResponse.json(
         { error: { code: 'NOT_FOUND', message: 'That stand-up no longer exists.' } },
         { status: 404 }
       )
+
+      if (!isAddressableId(standupId)) return missing
+
+      const { Standup } = await import('@/models/Standup')
+      const standup = await Standup.findById(standupId).lean()
 
       if (!standup) return missing
 
@@ -328,13 +360,15 @@ export function withPokerPermission(
       const params = routeContext?.params ?? {}
       const sessionId = params[options.sessionIdParam ?? 'id']
 
-      const { PokerSession } = await import('@/models/PokerSession')
-      const pokerSession = await PokerSession.findById(sessionId)
-
       const missing = NextResponse.json(
         { error: { code: 'NOT_FOUND', message: 'That poker session no longer exists.' } },
         { status: 404 }
       )
+
+      if (!isAddressableId(sessionId)) return missing
+
+      const { PokerSession } = await import('@/models/PokerSession')
+      const pokerSession = await PokerSession.findById(sessionId)
 
       if (!pokerSession) return missing
       if (pokerSession.organization?.toString() !== authResult.user.organization?.toString()) return missing
@@ -396,13 +430,15 @@ export function withCarryForwardItemPermission(
       const params = routeContext?.params ?? {}
       const itemId = params[options.itemIdParam ?? 'itemId']
 
-      const { CarryForwardItem } = await import('@/models/CarryForwardItem')
-      const item = await CarryForwardItem.findById(itemId).lean()
-
       const missing = NextResponse.json(
         { error: { code: 'NOT_FOUND', message: 'That carry-forward item no longer exists.' } },
         { status: 404 }
       )
+
+      if (!isAddressableId(itemId)) return missing
+
+      const { CarryForwardItem } = await import('@/models/CarryForwardItem')
+      const item = await CarryForwardItem.findById(itemId).lean()
 
       if (!item) return missing
 
@@ -467,13 +503,15 @@ export function withBlockerPermission(
       const params = routeContext?.params ?? {}
       const blockerId = params[options.blockerIdParam ?? 'id']
 
-      const { StandupBlocker } = await import('@/models/StandupBlocker')
-      const blocker = await StandupBlocker.findById(blockerId).lean()
-
       const missing = NextResponse.json(
         { error: { code: 'NOT_FOUND', message: 'That blocker no longer exists.' } },
         { status: 404 }
       )
+
+      if (!isAddressableId(blockerId)) return missing
+
+      const { StandupBlocker } = await import('@/models/StandupBlocker')
+      const blocker = await StandupBlocker.findById(blockerId).lean()
 
       if (!blocker) return missing
 
