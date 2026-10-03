@@ -43,6 +43,38 @@ describe('StandupBlocker model', () => {
     )
   })
 
+  /**
+   * `toErrorResponse` forwards a validator's message straight to the client,
+   * deliberately — it is "the only text that says what to fix", and it is safe
+   * precisely because these messages are authored in the schema. `description`
+   * holds up its end. The two enums did not, so they fell through to Mongoose's
+   * default, and a bad severity reached the user as
+   * `` `nuclear` is not a valid enum value for path `severity`. `` — ODM
+   * vocabulary, naming an internal path, and not saying what the valid values
+   * are. That is the one case the surfacing decision does not cover.
+   */
+  describe('enum rejections read as authored copy, not as Mongoose internals', () => {
+    const cases = [
+      { field: 'severity', bad: 'nuclear', expected: /low, medium, high or critical/i },
+      { field: 'blockerType', bad: 'interpretive_dance', expected: /blocker type/i }
+    ]
+
+    it.each(cases)('$field names the values it will accept', async ({ field, bad, expected }) => {
+      await expect(
+        StandupBlocker.create(baseBlocker({ [field]: bad }))
+      ).rejects.toThrow(expected)
+    })
+
+    it.each(cases)('$field does not leak `path` or backticks', async ({ field, bad }) => {
+      const error = await StandupBlocker.create(baseBlocker({ [field]: bad })).catch((e) => e)
+      const message = error.errors[field].message
+
+      expect(message).not.toMatch(/`/)
+      expect(message).not.toMatch(/\bpath\b/i)
+      expect(message).not.toMatch(/enum value/i)
+    })
+  })
+
   it('defaults status to open', async () => {
     const blocker = await StandupBlocker.create(baseBlocker())
     expect(blocker.status).toBe('open')
