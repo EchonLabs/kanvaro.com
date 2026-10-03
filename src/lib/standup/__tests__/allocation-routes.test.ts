@@ -419,7 +419,11 @@ describe('POST /api/standups/:id/allocations — self-select and top-up (ALO-22/
     const payload = await response.json()
 
     expect(response.status).toBe(422)
-    expect(payload.error.message).toBe('You can only add work to your own day.')
+    // Not the own-row message: the row *is* theirs, and the top-up is the part
+    // that needs `standup:allocate`.
+    expect(payload.error.message).toBe(
+      'Only a project manager can top up a stand-up after it is completed.'
+    )
   })
 
   it('lets a PM allocate an ordinary task to a different member end to end', async () => {
@@ -525,7 +529,7 @@ describe('POST /api/standups/:id/allocations — a member cannot escape their ow
     const payload = await response.json()
 
     expect(response.status).toBe(422)
-    expect(payload.error.message).toMatch(/only be edited while the stand-up is Ready/i)
+    expect(payload.error.message).toMatch(/before the stand-up starts, or once it is Completed/i)
     expect(await Allocation.countDocuments({ standup: standup._id })).toBe(0)
   })
 
@@ -624,7 +628,7 @@ describe('POST /api/standups/:id/allocations — E31 self-select after completio
     const payload = await response.json()
 
     expect(response.status).toBe(422)
-    expect(payload.error.message).toMatch(/only be edited while the stand-up is Ready/i)
+    expect(payload.error.message).toMatch(/before the stand-up starts, or once it is Completed/i)
     expect(await Allocation.countDocuments({ standup: standup._id })).toBe(0)
   })
 })
@@ -727,6 +731,10 @@ describe('PATCH /api/standups/:id/allocations/:allocationId — own-row hours', 
     const payload = await response.json()
 
     expect(response.status).toBe(422)
+    // Ready-only here, and the message says so accurately: unlike the POST
+    // route, this one does not admit `Completed`. ALO-22 is "additions only"
+    // for the member surface, and E31's post-completion case is an addition —
+    // so editing an existing row stays shut once the stand-up starts.
     expect(payload.error.message).toMatch(/only be edited while the stand-up is Ready/i)
     const after = await Allocation.findById(allocation._id).lean()
     expect(after!.plannedMinutes).toBe(60)
@@ -777,5 +785,110 @@ describe('PATCH /api/standups/:id/allocations/:allocationId — own-row hours', 
 
     expect(response.status).toBe(404)
     expect(payload.error.code).toBe('NOT_FOUND')
+  })
+})
+
+/**
+ * What the refusal *says* (Finding 3).
+ *
+ * The own-row gate is one `if` covering two unrelated refusals —
+ * `!isOwnRow || body.topUp` — and it threw a single message written for the
+ * first of them. A member topping up their own row was therefore told "you can
+ * only add work to your own day" about the day that *is* theirs: true of the
+ * other branch, nonsense here, and it names nothing the member could do
+ * instead. A top-up is refused because topping up needs the full
+ * `standup:allocate`, which is a different fact.
+ *
+ * The status lock below had the mirror problem: it said the row is editable only
+ * while the stand-up is `Ready`, while the condition it guards admits `Ready`
+ * *or* `Completed` — so the message denied a thing the code permits, on the one
+ * screen where a member might be looking for exactly that.
+ */
+describe('POST /api/standups/:id/allocations — why the refusal was refused', () => {
+  useMongo()
+
+  beforeAll(() => {
+    mockMemberId2 = mem2
+    mockOrgId2 = org2
+  })
+
+  /** Holds `allocate_own` (so the handler runs) but not the wider `allocate`. */
+  beforeEach(() => {
+    hasPermission2
+      .mockReset()
+      .mockImplementation(async (_userId: unknown, permission: unknown) =>
+        permission !== Permission.STANDUP_ALLOCATE
+      )
+  })
+
+  it('does not tell a member topping up their own row that it is not their row', async () => {
+    const { standup, task } = await seedSelfSelectFixture()
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(mem2),
+        taskId: String(task._id),
+        topUp: { reason: 'Extra work done, forgot to log it' }
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(payload.error.message).not.toMatch(/your own day/i)
+  })
+
+  it('tells a member topping up that a top-up is the part they may not do', async () => {
+    const { standup, task } = await seedSelfSelectFixture()
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(mem2),
+        taskId: String(task._id),
+        topUp: { reason: 'Extra work done, forgot to log it' }
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(payload.error.message).toMatch(/top.?up/i)
+  })
+
+  it('still tells a member writing to somebody else that it is not their row', async () => {
+    const { standup, task } = await seedSelfSelectFixture({
+      expectedAttendees: [mem2, ids.otherMember]
+    })
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(ids.otherMember),
+        taskId: String(task._id)
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(payload.error.message).toMatch(/your own day/i)
+  })
+
+  it('does not claim Ready is the only status an own row may be edited in', async () => {
+    const { standup, task } = await seedSelfSelectFixture({
+      status: 'In_Progress',
+      version: 0
+    })
+
+    const response = await boardRouteLive.POST(
+      buildPost(`/api/standups/${standup._id}/allocations`, {
+        memberId: String(mem2),
+        taskId: String(task._id)
+      }),
+      { params: { id: String(standup._id) } }
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(422)
+    // `Completed` is admitted by the very condition this message explains.
+    expect(payload.error.message).toMatch(/completed/i)
   })
 })
