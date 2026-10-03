@@ -510,6 +510,66 @@ describe('setAttendance', () => {
         })
       ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
     })
+
+    /**
+     * An unrecognised state used to reach the database. `$push` through
+     * `updateOne` runs no schema validators, so `ATTENDANCE_STATES` on the
+     * model never saw the value; the row persisted and the version bumped,
+     * and only then did `recompute` fail — `computeCapacity` has no branch
+     * for an unknown state, so it reached `addMinutes` with `NaN` and threw
+     * `RangeError`, which the route reported as a 500.
+     *
+     * The caller was therefore told the write had failed while it had in fact
+     * succeeded, and the stand-up was left unreadable: `/allocations`,
+     * `/checks` and `/sprint-close` all threw the same `RangeError`, so the
+     * run screen's capacity board would not load and the stand-up could not
+     * be completed. Nothing in the UI could clear it, because the board it
+     * would be cleared from was the board that no longer rendered.
+     *
+     * These three tests pin the whole failure: refused, not written, and the
+     * version left alone so another PM's open screen stays valid.
+     */
+    it('refuses a state that is not one of RUN-6’s four', async () => {
+      await expect(
+        setAttendance({
+          standupId,
+          memberId: String(member),
+          state: 'banana' as any,
+          expectedVersion: 0,
+          actor
+        })
+      ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+    })
+
+    it('does not record an unrecognised state', async () => {
+      await expect(
+        setAttendance({
+          standupId,
+          memberId: String(member),
+          state: 'banana' as any,
+          expectedVersion: 0,
+          actor
+        })
+      ).rejects.toThrow()
+
+      const standup = await Standup.findById(standupId).lean<any>()
+      expect(standup.attendance).toEqual([])
+    })
+
+    it('does not bump the version when the state is unrecognised', async () => {
+      await expect(
+        setAttendance({
+          standupId,
+          memberId: String(member),
+          state: 'banana' as any,
+          expectedVersion: 0,
+          actor
+        })
+      ).rejects.toThrow()
+
+      const standup = await Standup.findById(standupId).lean<any>()
+      expect(standup.version).toBe(0)
+    })
   })
 
   describe('the prompt', () => {
