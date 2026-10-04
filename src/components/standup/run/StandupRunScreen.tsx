@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { RefreshCw, Video } from 'lucide-react'
+import { AlertTriangle, Info, RefreshCw, Video, XCircle } from 'lucide-react'
 
 import type { QuickAddTask } from '@/components/standup/primitives/QuickAddCombobox'
 import { AttendancePanel, type ReassignPromptView } from './AttendancePanel'
@@ -25,15 +25,17 @@ import { UnassignedPool } from './UnassignedPool'
 import { SprintCloseReadinessPanel } from './SprintCloseReadinessPanel'
 import { useStandupShortcuts } from './useStandupShortcuts'
 import {
-  Badge,
-  Banner,
-  INSET_CLASSES,
-  PRIMARY_BUTTON_CLASSES,
-  SECONDARY_BUTTON_CLASSES,
-  SECTION_SUBTITLE_CLASSES,
-  SECTION_TITLE_CLASSES,
-  type Tone
-} from './ui'
+  PlanBanner,
+  planButtonClass,
+  planFieldClass,
+  planInsetClass,
+  planPillClass,
+  type PlanPillTone
+} from '../planning/ui'
+
+/** A section heading above a group of cards. */
+const SECTION_TITLE_CLASSES = 'apple-type-headline font-semibold text-[var(--plan-text)]'
+const SECTION_SUBTITLE_CLASSES = 'apple-type-subheadline text-[var(--plan-muted)]'
 import { cn } from '@/lib/utils'
 import {
   evaluateFinalDayCarryForwardDisposition,
@@ -441,16 +443,16 @@ export interface RunScreenApi {
 
 /** Mirrors `StandupSchedule.tsx`'s `STATUS_TONE` convention so a stand-up's
  * status reads the same color on the schedule hub and here. */
-const STATUS_TONE: Record<string, Tone> = {
+const STATUS_TONE: Record<string, PlanPillTone> = {
   Scheduled: 'neutral',
-  Ready: 'blue',
-  In_Progress: 'blue',
-  Completed: 'green',
-  Reopened: 'amber',
+  Ready: 'accent',
+  In_Progress: 'accent',
+  Completed: 'success',
+  Reopened: 'warning',
   // Three of the model's eight legal statuses previously fell back to the
   // generic neutral styling, which reads identically to `Scheduled` — a PM
   // who lands here on a `Missed` day had no visual signal anything was wrong.
-  Missed: 'red',
+  Missed: 'danger',
   Skipped_Holiday: 'neutral',
   Cancelled: 'neutral'
 }
@@ -989,10 +991,10 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     elapsedRatio >= 1.3 ? 'timer-red' : elapsedRatio >= 1 ? 'timer-amber' : 'timer-neutral'
   const timerToneClass =
     timerTone === 'timer-red'
-      ? 'border-[var(--sur-red)] text-[var(--sur-red)]'
+      ? 'border-[var(--plan-danger)] text-[var(--plan-danger)]'
       : timerTone === 'timer-amber'
-        ? 'border-[var(--sur-amber)] text-[var(--sur-amber)]'
-        : 'border-[var(--sur-border)] text-[var(--sur-muted)]'
+        ? 'border-[var(--plan-warning)] text-[var(--plan-warning)]'
+        : 'border-[var(--plan-border)] text-[var(--plan-muted)]'
 
   const [completing, setCompleting] = useState(false)
 
@@ -1222,15 +1224,15 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
 
   const planTone =
     planPercent === null
-      ? 'text-[var(--sur-muted)]'
+      ? 'text-[var(--plan-muted)]'
       : planPercent > 100
-        ? 'text-[var(--sur-red)]'
+        ? 'text-[var(--plan-danger)]'
         : planPercent >= 90
-          ? 'text-[var(--sur-green)]'
-          : 'text-[var(--sur-amber)]'
+          ? 'text-[var(--plan-success)]'
+          : 'text-[var(--plan-warning)]'
 
   const attendanceTone =
-    presentCount === board.members.length ? 'text-[var(--sur-green)]' : 'text-[var(--sur-amber)]'
+    presentCount === board.members.length ? 'text-[var(--plan-success)]' : 'text-[var(--plan-warning)]'
 
   /**
    * §15.8.10: on day one the pool takes the primary position and the board
@@ -1243,13 +1245,13 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           <h3 id="panel-5-heading" className={SECTION_TITLE_CLASSES}>
             {standupStrings.run.panel5()}
           </h3>
-          {board.sprintName && <Badge tone="blue">{board.sprintName}</Badge>}
+          {board.sprintName && <span className={planPillClass('accent')}>{board.sprintName}</span>}
         </div>
         <p className={SECTION_SUBTITLE_CLASSES}>{standupStrings.run.allocationSubtitle()}</p>
       </div>
 
       {isDayOne && board.dayOne && (
-        <div className={cn(INSET_CLASSES, 'flex flex-col gap-1 px-4 py-3 text-[13px] text-[var(--sur-text)]')}>
+        <div className={cn(planInsetClass, 'flex flex-col gap-1 px-4 py-3 apple-type-subheadline text-[var(--plan-text)]')}>
           <p data-testid="day-one-progress">
             {standupStrings.run.dayOneProgress({
               assigned: board.dayOne.assignedTasks,
@@ -1262,7 +1264,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           </p>
           {/* ALO-21 — soft. It never blocks completion. */}
           {board.dayOne.stillUnassigned ? (
-            <p className="text-[11px] font-semibold text-[var(--sur-amber)]">
+            <p className="apple-type-caption font-semibold text-[var(--plan-warning)]">
               {standupStrings.run.dayOneUnassignedWarning({
                 count: board.dayOne.stillUnassigned
               })}
@@ -1310,13 +1312,13 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
    */
   return (
     <div className="standup-run flex min-w-0 flex-col gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--sur-radius-card)] border border-[var(--sur-border)] bg-[var(--sur-surface)] px-5 py-4 sm:px-8">
+      <header className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-5 py-4 sm:px-8">
         <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <p className="text-[11px] text-[var(--sur-muted)]">
+            <p className="apple-type-caption text-[var(--plan-muted)]">
               {standupStrings.run.summaryEyebrow()}
             </p>
-            <h2 className="text-[17px] font-semibold text-[var(--sur-text)]">
+            <h2 className="apple-type-headline font-semibold text-[var(--plan-text)]">
               {board.scheduledStartAt && board.viewerTimeZone && board.projectTimeZone
                 ? formatDualTimezone({
                     instant: new Date(board.scheduledStartAt),
@@ -1327,21 +1329,21 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
             </h2>
           </div>
 
-          <span aria-hidden="true" className="hidden h-8 w-px bg-[var(--sur-border)] sm:block" />
+          <span aria-hidden="true" className="hidden h-8 w-px bg-[var(--plan-border)] sm:block" />
 
-          <dl className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
+          <dl className="flex flex-wrap items-center gap-x-4 gap-y-2 apple-type-subheadline">
             <div className="flex items-center gap-2">
               <dt className="sr-only">Status</dt>
               <dd>
-                <Badge tone={STATUS_TONE[board.status] ?? 'neutral'}>
+                <span className={planPillClass(STATUS_TONE[board.status] ?? 'neutral')}>
                   {standupStrings.schedule.status[board.status] ?? board.status}
-                </Badge>
+                </span>
               </dd>
             </div>
 
             <div className="flex items-center gap-2">
               <dt className="sr-only">Sprint day</dt>
-              <dd className="font-semibold text-[var(--sur-secondary)]">
+              <dd className="font-semibold text-[var(--plan-secondary)]">
                 {standupStrings.run.dayOf({
                   day: board.sprintDayNumber,
                   total: board.totalSprintDays
@@ -1350,7 +1352,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
             </div>
 
             <div className="flex items-center gap-2">
-              <dt className="text-[var(--sur-secondary)]">{standupStrings.run.summaryAttendance()}</dt>
+              <dt className="text-[var(--plan-secondary)]">{standupStrings.run.summaryAttendance()}</dt>
               <dd className={cn('font-semibold', attendanceTone)}>
                 {standupStrings.run.summaryAttendanceValue({
                   present: presentCount,
@@ -1361,7 +1363,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
 
             {planPercent !== null && (
               <div className="flex items-center gap-2">
-                <dt className="text-[var(--sur-secondary)]">{standupStrings.run.summaryPlan()}</dt>
+                <dt className="text-[var(--plan-secondary)]">{standupStrings.run.summaryPlan()}</dt>
                 <dd data-testid="plan-status" className={cn('font-semibold tabular-nums', planTone)}>
                   {standupStrings.run.summaryPlanValue({ percent: planPercent })}
                 </dd>
@@ -1370,7 +1372,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
 
             <div className="flex items-center gap-2">
               <dt className="sr-only">Facilitator</dt>
-              <dd className="text-[var(--sur-secondary)]">
+              <dd className="text-[var(--plan-secondary)]">
                 {standupStrings.run.facilitator({ name: board.facilitatorName })}
               </dd>
             </div>
@@ -1387,7 +1389,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
                       duration: durationMinutes
                     })}
                     className={cn(
-                      'inline-flex rounded-[var(--sur-radius-control)] border px-2 py-[3px] text-[11px] font-semibold tabular-nums',
+                      'inline-flex rounded-[var(--apple-radius-sm)] border px-2 py-[3px] apple-type-caption font-semibold tabular-nums',
                       timerToneClass
                     )}
                   >
@@ -1401,12 +1403,12 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
 
         <div className="flex flex-wrap items-center gap-3">
           {board.meetingUrl && (
-            <a href={board.meetingUrl} className={SECONDARY_BUTTON_CLASSES}>
+            <a href={board.meetingUrl} className={planButtonClass('secondary')}>
               <Video className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
               {standupStrings.run.joinCall()}
             </a>
           )}
-          <button type="button" onClick={() => void reload()} className={SECONDARY_BUTTON_CLASSES}>
+          <button type="button" onClick={() => void reload()} className={planButtonClass('secondary')}>
             <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
             {standupStrings.run.refresh()}
           </button>
@@ -1415,7 +1417,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
               type="button"
               onClick={() => void onStart()}
               disabled={starting}
-              className={PRIMARY_BUTTON_CLASSES}
+              className={planButtonClass('primary')}
             >
               {standupStrings.run.start()}
             </button>
@@ -1428,13 +1430,13 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
             <button
               type="button"
               onClick={() => setBackfilling(true)}
-              className={cn(PRIMARY_BUTTON_CLASSES, 'bg-[var(--sur-red-solid)]')}
+              className={planButtonClass('danger')}
             >
               {standupStrings.run.backfill()}
             </button>
           )}
           {board.status === 'Completed' && summaryHref && (
-            <a href={summaryHref} className={PRIMARY_BUTTON_CLASSES}>
+            <a href={summaryHref} className={planButtonClass('primary')}>
               {standupStrings.run.viewSummary()}
             </a>
           )}
@@ -1444,37 +1446,43 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
       {/* RUN-25's rollback notice, and the RUN-23 reload. `status` rather than
           `alert`: it reports what already happened, it does not interrupt. */}
       {notice && (
-        <Banner tone="blue" lead={standupStrings.run.noticeLead()} data-testid="run-notice">
-          {notice}
-        </Banner>
+        <div data-testid="run-notice">
+          <PlanBanner tone="info" bordered icon={<Info strokeWidth={2} />}>
+            <span className="font-semibold">{standupStrings.run.noticeLead()} </span>
+            {notice}
+          </PlanBanner>
+        </div>
       )}
 
       {readOnly && (
-        <Banner tone="amber" lead={standupStrings.run.lockedLead()}>
+        <PlanBanner tone="warning" bordered icon={<AlertTriangle strokeWidth={2} />}>
+          <span className="font-semibold">{standupStrings.run.lockedLead()} </span>
           {standupStrings.run.lockedForMembers()}
-        </Banner>
+        </PlanBanner>
       )}
 
       {/* R2's blocking banner: a previous /complete call died mid-saga.
           Non-dismissible — resuming (a plain re-POST) is the only way past
           it, so there is nothing for a dismiss action to safely do. */}
       {board.completionState && (
-        <Banner
-          tone="red"
+        <PlanBanner
+          tone="danger"
+          bordered
           role="alert"
-          action={
+          icon={<XCircle strokeWidth={2} />}
+          actions={
             <button
               type="button"
               onClick={() => void onComplete()}
               disabled={completing}
-              className={cn(PRIMARY_BUTTON_CLASSES, 'h-8 bg-[var(--sur-red-solid)] px-3 text-[13px]')}
+              className={planButtonClass('danger', undefined, 'sm')}
             >
               {standupStrings.run.completionInterruptedResume()}
             </button>
           }
         >
           {standupStrings.run.completionInterruptedBanner()}
-        </Banner>
+        </PlanBanner>
       )}
 
       {isDayOne && panelFive}
@@ -1645,22 +1653,22 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           onClose={() => (backfillSubmitting ? undefined : setBackfilling(false))}
           labelledBy="backfill-title"
         >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-5">
+          <div className="flex w-full max-w-sm flex-col gap-4 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-5">
             <div>
-              <h3 id="backfill-title" className="text-[15px] font-semibold text-[var(--apple-label)]">
+              <h3 id="backfill-title" className="apple-type-body font-semibold text-[var(--plan-text)]">
                 {standupStrings.run.backfillTitle()}
               </h3>
-              <p className="mt-1 text-[13px] text-[var(--apple-secondary-label)]">
+              <p className="mt-1 apple-type-subheadline text-[var(--plan-secondary)]">
                 {standupStrings.run.backfillDescription()}
               </p>
             </div>
 
-            <label className="flex flex-col gap-1.5 text-[13px] text-[var(--apple-label)]">
+            <label className="flex flex-col gap-1.5 apple-type-subheadline text-[var(--plan-text)]">
               {standupStrings.run.backfillNotesLabel()}
               <textarea
                 value={backfillNotes}
                 onChange={(event) => setBackfillNotes(event.target.value)}
-                className="min-h-20 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background px-2.5 py-2 text-[13px]"
+                className={cn(planFieldClass, 'h-auto min-h-20 px-2.5 py-2')}
                 disabled={backfillSubmitting}
               />
             </label>
@@ -1670,7 +1678,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
                 type="button"
                 onClick={() => setBackfilling(false)}
                 disabled={backfillSubmitting}
-                className="apple-transition rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] px-3.5 h-9 text-[13px] font-medium text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
+                className={planButtonClass('secondary')}
               >
                 {standupStrings.run.backfillCancel()}
               </button>
@@ -1678,7 +1686,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
                 type="button"
                 onClick={() => void onBackfill()}
                 disabled={backfillSubmitting}
-                className="apple-transition rounded-[var(--apple-radius-md)] bg-[var(--apple-system-red)] px-3.5 h-9 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40"
+                className={planButtonClass('danger')}
               >
                 {standupStrings.run.backfillConfirm()}
               </button>

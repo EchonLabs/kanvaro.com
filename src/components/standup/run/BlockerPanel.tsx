@@ -8,19 +8,15 @@ import type { Minutes } from '@/lib/standup/minutes'
 import { cn } from '@/lib/utils'
 
 import {
-  Badge,
-  CARD_CLASSES,
-  CARD_TITLE_CLASSES,
-  EMPTY_CLASSES,
-  IssueCount,
-  LINK_BUTTON_CLASSES,
-  RowHead,
-  SCROLL_CLASSES,
-  SCROLL_MAX,
-  TEXT_META,
-  TINT_BUTTON_CLASSES,
-  type Tone
-} from './ui'
+  PLAN_SCROLL_MAX,
+  PlanCard,
+  PlanCount,
+  PlanRow,
+  planEmptyClass,
+  planLinkClass,
+  planPillClass,
+  type PlanPillTone
+} from '../planning/ui'
 
 /**
  * Panel 6 — blockers (§13, RUN-14..18).
@@ -60,10 +56,10 @@ export interface BlockerPanelProps {
   className?: string
 }
 
-const SEVERITY_TONE: Record<BlockerRow['severity'], Tone> = {
-  critical: 'red',
-  high: 'red',
-  medium: 'amber',
+const SEVERITY_TONE: Record<BlockerRow['severity'], PlanPillTone> = {
+  critical: 'danger',
+  high: 'danger',
+  medium: 'warning',
   low: 'neutral'
 }
 
@@ -76,26 +72,29 @@ export function BlockerPanel({ blockers, onRaise, onResolve, className }: Blocke
   const issues = sorted.length
 
   return (
-    <section
+    <PlanCard
       id="panel-6"
       aria-labelledby="panel-6-heading"
-      className={cn('scroll-mt-6 flex flex-col gap-4', CARD_CLASSES, className)}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <h3 id="panel-6-heading" className={CARD_TITLE_CLASSES}>
-            {standupStrings.run.panel6()}
-          </h3>
-          <IssueCount count={issues} label={standupStrings.blocker.openCount({ count: issues })} />
+      title={standupStrings.run.panel6()}
+      headingLevel="h3"
+      headingId="panel-6-heading"
+      className={className}
+      aside={
+        <div className="flex items-center gap-2">
+          <PlanCount count={issues} label={standupStrings.blocker.openCount({ count: issues })} />
+          <button
+            type="button"
+            onClick={onRaise}
+            className={planPillClass('accent', 'apple-transition gap-1 hover:opacity-80 disabled:opacity-40')}
+          >
+            <Plus className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
+            {standupStrings.blocker.raise()}
+          </button>
         </div>
-        <button type="button" onClick={onRaise} className={cn(TINT_BUTTON_CLASSES, 'gap-1')}>
-          <Plus className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
-          {standupStrings.blocker.raise()}
-        </button>
-      </div>
-
+      }
+    >
       {sorted.length === 0 && (
-        <p className={EMPTY_CLASSES}>{standupStrings.blocker.empty()}</p>
+        <p className={planEmptyClass}>{standupStrings.blocker.empty()}</p>
       )}
 
       {/* The register has no natural ceiling — a bad sprint puts a dozen rows
@@ -103,8 +102,8 @@ export function BlockerPanel({ blockers, onRaise, onResolve, className }: Blocke
           an unbounded list drags the Complete button off screen. */}
       <ul
         className={cn(
-          'flex flex-col divide-y divide-[var(--sur-border)]',
-          sorted.length > 0 && `${SCROLL_CLASSES} ${SCROLL_MAX}`
+          'flex flex-col divide-y divide-[var(--plan-border)]',
+          sorted.length > 0 && `plan-scroll ${PLAN_SCROLL_MAX}`
         )}
       >
         {sorted.map((row) => {
@@ -129,20 +128,20 @@ export function BlockerPanel({ blockers, onRaise, onResolve, className }: Blocke
                 'flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0',
                 // RUN-18: overdue is the one row that must not blend in.
                 row.overdue &&
-                  'rounded-[var(--sur-radius-inset)] border-y-0 bg-[var(--sur-red-tint)] px-3 first:pt-3 last:pb-3 text-[var(--sur-red)]'
+                  'rounded-[var(--apple-radius-md)] border-y-0 bg-[var(--plan-danger-bg)] px-3 first:pt-3 last:pb-3 text-[var(--plan-danger)]'
               )}
             >
-              <RowHead
+              <PlanRow
                 title={
                   <span className="inline-flex items-start gap-1.5">
                     {row.overdue && (
                       <AlertTriangle
-                        className="mt-[2px] h-3.5 w-3.5 shrink-0 text-[var(--sur-red)]"
+                        className="mt-[2px] h-3.5 w-3.5 shrink-0 text-[var(--plan-danger)]"
                         strokeWidth={2}
                         aria-hidden="true"
                       />
                     )}
-                    <span className={cn(row.overdue && 'text-[var(--sur-red)]')}>
+                    <span className={cn(row.overdue && 'text-[var(--plan-danger)]')}>
                       {row.description}
                     </span>
                   </span>
@@ -150,16 +149,18 @@ export function BlockerPanel({ blockers, onRaise, onResolve, className }: Blocke
                 meta={meta}
                 badge={
                   <>
-                    {row.overdue && <Badge tone="red">{standupStrings.blocker.overdue()}</Badge>}
-                    <Badge tone={SEVERITY_TONE[row.severity]}>
+                    {row.overdue && (
+                      <span className={planPillClass('danger')}>{standupStrings.blocker.overdue()}</span>
+                    )}
+                    <span className={planPillClass(SEVERITY_TONE[row.severity])}>
                       {standupStrings.blocker.severity({ severity: row.severity })}
-                    </Badge>
+                    </span>
                   </>
                 }
               />
 
               {row.freedMinutes !== undefined && (
-                <span className={cn(TEXT_META, 'text-[var(--sur-secondary)]')}>
+                <span className="apple-type-caption text-[var(--plan-secondary)]">
                   {freedCapacityMessage(row.freedMinutes, row.blockerLabel)}
                 </span>
               )}
@@ -168,7 +169,7 @@ export function BlockerPanel({ blockers, onRaise, onResolve, className }: Blocke
                 <button
                   type="button"
                   onClick={() => onResolve(row.blockerId)}
-                  className={cn(LINK_BUTTON_CLASSES, 'self-start')}
+                  className={cn(planLinkClass, 'self-start')}
                 >
                   {standupStrings.blocker.resolve()}
                 </button>
@@ -177,6 +178,6 @@ export function BlockerPanel({ blockers, onRaise, onResolve, className }: Blocke
           )
         })}
       </ul>
-    </section>
+    </PlanCard>
   )
 }

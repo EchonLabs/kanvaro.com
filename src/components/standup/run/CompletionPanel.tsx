@@ -8,14 +8,12 @@ import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
 import {
-  CARD_CLASSES,
-  CARD_TITLE_CLASSES,
-  IssueCount,
-  SCROLL_CLASSES,
-  SCROLL_MAX_NESTED,
-  TEXT_BODY,
-  TEXT_META
-} from './ui'
+  PLAN_SCROLL_MAX_NESTED,
+  PlanCard,
+  PlanCount,
+  planButtonClass,
+  planLinkClass
+} from '../planning/ui'
 
 /**
  * Panel 7 — the completion checks (§15.8.9). Sits in the run screen's closing
@@ -55,10 +53,10 @@ export interface CompletionPanelProps {
 }
 
 const ICON_TONE: Record<CompletionCheckResult['status'], string> = {
-  pass: 'text-[var(--sur-green)]',
-  fail: 'text-[var(--sur-red)]',
-  warn: 'text-[var(--sur-amber)]',
-  not_evaluated: 'text-[var(--sur-disabled)]'
+  pass: 'text-[var(--plan-success)]',
+  fail: 'text-[var(--plan-danger)]',
+  warn: 'text-[var(--plan-warning)]',
+  not_evaluated: 'text-[var(--plan-disabled)]'
 }
 
 const ICON_FOR: Record<CompletionCheckResult['status'], typeof CheckCircle2> = {
@@ -118,7 +116,7 @@ function CheckRow({
       {/* The blueprint's row: the message, then its actions inline after it
           ("Liam J. is overallocated by 2h  Fix"). A long message wraps and
           the actions follow it rather than squeezing it. */}
-      <p className={cn(TEXT_BODY, 'min-w-0 flex-1 leading-snug text-[var(--sur-secondary)]')}>
+      <p className="apple-type-subheadline min-w-0 flex-1 leading-snug text-[var(--plan-secondary)]">
         <span className="mr-2">
           {check.status === 'not_evaluated'
             ? standupStrings.run.checkNotEvaluated({ phase: check.ownedBy ?? '' })
@@ -129,7 +127,7 @@ function CheckRow({
         {needsAttention && check.entities.length > 0 && (
           <a
             href={`#${anchorFor(check.checkId)}`}
-            className="mr-2 font-semibold text-[var(--sur-blue)] underline underline-offset-2"
+            className={cn(planLinkClass, 'mr-2')}
           >
             {standupStrings.run.jumpToFailure()}
           </a>
@@ -141,7 +139,7 @@ function CheckRow({
           <button
             type="button"
             onClick={() => onOverride(check)}
-            className="font-semibold text-[var(--sur-amber)] underline underline-offset-2"
+            className="font-semibold text-[var(--plan-warning)] underline underline-offset-2"
           >
             {standupStrings.run.override()}
           </button>
@@ -171,35 +169,35 @@ export function CompletionPanel({
   const failedCount = checks.filter((check) => check.status === 'fail').length
 
   return (
-    <section
+    <PlanCard
       id="panel-7"
       aria-labelledby="panel-7-heading"
-      className={cn('scroll-mt-20 flex flex-col gap-4', CARD_CLASSES, className)}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <h3 id="panel-7-heading" className={CARD_TITLE_CLASSES}>
-            {standupStrings.run.completionTitle()}
-          </h3>
+      title={standupStrings.run.completionTitle()}
+      headingLevel="h3"
+      headingId="panel-7-heading"
+      className={cn('scroll-mt-20', className)}
+      aside={
+        <div className="flex items-center gap-2">
           {/* Only the failing checks count as issues. A `warn` is advisory —
               it never blocks completion — so folding warnings in here would
               put a red number beside a checklist the PM can sign off as is. */}
-          <IssueCount
+          <PlanCount
             count={failedCount}
             label={standupStrings.run.failingCheckCount({ count: failedCount })}
           />
+          {checks.length > 0 && (
+            <span className="apple-type-caption tabular-nums text-[var(--plan-muted)]">
+              {passedCount}/{checks.length}
+            </span>
+          )}
         </div>
-        {checks.length > 0 && (
-          <span className={cn(TEXT_META, 'tabular-nums text-[var(--sur-muted)]')}>
-            {passedCount}/{checks.length}
-          </span>
-        )}
-      </div>
+      }
+    >
 
       {checksUnavailable ? (
         <p
           role="alert"
-          className="rounded-[var(--sur-radius-inset)] border border-[var(--sur-amber)] bg-[var(--sur-amber-tint)] px-4 py-3 text-[13px] text-[var(--sur-text)]"
+          className="rounded-[var(--apple-radius-md)] border border-[var(--plan-warning)] bg-[var(--plan-warning-bg)] px-4 py-3 apple-type-subheadline text-[var(--plan-text)]"
         >
           {standupStrings.run.checksUnavailable()}
         </p>
@@ -209,14 +207,14 @@ export function CompletionPanel({
             /* Eleven checks can all need attention at once on a bad day, and
                this panel closes the page — the Complete button below it must
                stay reachable without scrolling past the reasons it is off. */
-            <ul className={cn('flex flex-col gap-2', SCROLL_CLASSES, SCROLL_MAX_NESTED)}>
+            <ul className={cn('flex flex-col gap-2', 'plan-scroll', PLAN_SCROLL_MAX_NESTED)}>
               {needsAttention.map((check) => (
                 <CheckRow key={check.checkId} check={check} onOverride={onOverride} />
               ))}
             </ul>
           ) : (
-            <p className={cn(TEXT_BODY, 'flex items-center gap-2 text-[var(--sur-secondary)]')}>
-              <CheckCircle2 className="h-3.5 w-3.5 text-[var(--sur-green)]" strokeWidth={2.25} aria-hidden="true" />
+            <p className="apple-type-subheadline flex items-center gap-2 text-[var(--plan-secondary)]">
+              <CheckCircle2 className="h-3.5 w-3.5 text-[var(--plan-success)]" strokeWidth={2.25} aria-hidden="true" />
               {standupStrings.run.everythingChecksOut()}
             </p>
           )}
@@ -227,10 +225,7 @@ export function CompletionPanel({
                 type="button"
                 onClick={() => setShowAll((current) => !current)}
                 aria-expanded={showAll}
-                className={cn(
-                  TEXT_META,
-                  'apple-transition flex items-center gap-1 self-start font-semibold text-[var(--sur-muted)] hover:text-[var(--sur-text)]'
-                )}
+                className="apple-type-caption apple-transition flex items-center gap-1 self-start font-semibold text-[var(--plan-muted)] hover:text-[var(--plan-text)]"
               >
                 <ChevronDown
                   className={cn('h-3 w-3 apple-transition', showAll && 'rotate-180')}
@@ -242,7 +237,7 @@ export function CompletionPanel({
               </button>
 
               {showAll && (
-                <ul className={cn('flex flex-col gap-2', SCROLL_CLASSES, SCROLL_MAX_NESTED)}>
+                <ul className={cn('flex flex-col gap-2', 'plan-scroll', PLAN_SCROLL_MAX_NESTED)}>
                   {settled.map((check) => (
                     <CheckRow key={check.checkId} check={check} onOverride={onOverride} />
                   ))}
@@ -262,7 +257,7 @@ export function CompletionPanel({
           onClick={onComplete}
           disabled={disabled || blocking.length > 0}
           aria-describedby="complete-reason"
-          className="apple-transition w-full rounded-[var(--sur-radius-control)] bg-[var(--sur-blue-solid)] p-3 text-[15px] font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[var(--sur-neutral-tint)] disabled:text-[var(--sur-disabled)] disabled:hover:opacity-100"
+          className={planButtonClass('primary', 'w-full')}
         >
           {standupStrings.run.complete()}
         </button>
@@ -270,7 +265,7 @@ export function CompletionPanel({
         {/* Always rendered, so the button's accessible description is stable
             whether or not anything blocks — a description that appears and
             disappears is announced as a new element each time. */}
-        <span id="complete-reason" className={cn(TEXT_META, 'text-[var(--sur-muted)]')}>
+        <span id="complete-reason" className="apple-type-caption text-[var(--plan-muted)]">
           {checksUnavailable
             ? standupStrings.run.checksUnavailable()
             : firstBlocker
@@ -278,6 +273,6 @@ export function CompletionPanel({
               : standupStrings.run.completeReady()}
         </span>
       </div>
-    </section>
+    </PlanCard>
   )
 }

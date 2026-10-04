@@ -8,19 +8,17 @@ import { cn } from '@/lib/utils'
 import type { VarianceOutcome } from '@/models/AllocationVariance'
 
 import {
-  Badge,
-  CARD_CLASSES,
-  CARD_TITLE_CLASSES,
-  INSET_CLASSES,
-  IssueCount,
-  LINK_BUTTON_CLASSES,
-  RowHead,
-  RUN_FIELD_CLASSES,
-  SCROLL_CLASSES,
-  SCROLL_MAX,
-  SCROLL_MAX_NESTED,
-  type Tone as BadgeTone
-} from './ui'
+  PLAN_SCROLL_MAX,
+  PLAN_SCROLL_MAX_NESTED,
+  PlanCard,
+  PlanCount,
+  PlanRow,
+  planFieldClass,
+  planInsetClass,
+  planLinkClass,
+  planPillClass,
+  type PlanPillTone
+} from '../planning/ui'
 
 /**
  * Panel 3 — variance and estimate debt (§15.8.5).
@@ -112,40 +110,37 @@ export function VariancePanel({
   ).length
 
   return (
-    <section
+    <PlanCard
       id="panel-3"
       aria-labelledby="panel-3-heading"
-      className={cn('scroll-mt-6 flex flex-col gap-4', CARD_CLASSES, className)}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <h3
-            id="panel-3-heading"
-            className={CARD_TITLE_CLASSES}
-          >
-            {standupStrings.run.panel3()}
-          </h3>
-          <IssueCount
+      title={standupStrings.run.panel3()}
+      headingLevel="h3"
+      headingId="panel-3-heading"
+      className={className}
+      aside={
+        <div className="flex flex-wrap items-center gap-3">
+          <PlanCount
             count={issues}
             label={standupStrings.run.varianceIssueCount({ count: issues })}
           />
-        </div>
 
-        <label className="flex items-center gap-2 text-[11px] text-[var(--sur-muted)]" htmlFor="variance-sort">
-          Sort
-          <select
-            id="variance-sort"
-            aria-label="Sort"
-            value={sort}
-            onChange={(event) => setSort(event.target.value as VarianceSort)}
-            className={RUN_FIELD_CLASSES}
-          >
-            <option value="member">Member</option>
-            <option value="task_key">Task</option>
-            <option value="day_variance">Day variance</option>
-          </select>
-        </label>
-      </div>
+          <label className="flex items-center gap-2 apple-type-caption text-[var(--plan-muted)]" htmlFor="variance-sort">
+            Sort
+            <select
+              id="variance-sort"
+              aria-label="Sort"
+              value={sort}
+              onChange={(event) => setSort(event.target.value as VarianceSort)}
+              className={planFieldClass}
+            >
+              <option value="member">Member</option>
+              <option value="task_key">Task</option>
+              <option value="day_variance">Day variance</option>
+            </select>
+          </label>
+        </div>
+      }
+    >
 
       {/* VAR-13 — the member roll-up strip, as the blueprint's per-member
           "estimate debt" tiles. */}
@@ -154,8 +149,8 @@ export function VariancePanel({
       <ul
         className={cn(
           'grid grid-cols-1 gap-2 sm:grid-cols-2',
-          SCROLL_CLASSES,
-          SCROLL_MAX_NESTED,
+          'plan-scroll',
+          PLAN_SCROLL_MAX_NESTED,
           'p-0.5'
         )}
       >
@@ -163,24 +158,24 @@ export function VariancePanel({
           <li
             key={member.memberId}
             data-testid={`variance-rollup-${member.memberId}`}
-            className={cn(INSET_CLASSES, 'flex flex-col gap-1 px-3 py-2.5 text-[11px] text-[var(--sur-muted)]')}
+            className={cn(planInsetClass, 'flex flex-col gap-1 px-3 py-2.5 apple-type-caption text-[var(--plan-muted)]')}
           >
-            <span className="text-[13px] font-semibold text-[var(--sur-text)]">{member.memberName}</span>
+            <span className="apple-type-subheadline font-semibold text-[var(--plan-text)]">{member.memberName}</span>
             <span>
               {standupStrings.variance.rollUpPlanned()}{' '}
-              <span data-testid="planned-total" className="tabular-nums text-[var(--sur-text)]">
+              <span data-testid="planned-total" className="tabular-nums text-[var(--plan-text)]">
                 {formatMinutesAsHours(member.plannedMinutes, { locale })}
               </span>
             </span>
             <span>
               {standupStrings.variance.rollUpLogged()}{' '}
-              <span data-testid="logged-total" className="tabular-nums text-[var(--sur-text)]">
+              <span data-testid="logged-total" className="tabular-nums text-[var(--plan-text)]">
                 {formatMinutesAsHours(member.loggedMinutesOnDay, { locale })}
               </span>
             </span>
             <span>
               {standupStrings.variance.rollUpDayVariance()}{' '}
-              <span data-testid="net-day-variance" className="tabular-nums text-[var(--sur-text)]">
+              <span data-testid="net-day-variance" className="tabular-nums text-[var(--plan-text)]">
                 {formatMinutesAsHours(member.dayVarianceMinutes, { locale, signed: true })}
               </span>
             </span>
@@ -189,7 +184,7 @@ export function VariancePanel({
               className={cn(
                 member.surplusMinutes === 0 &&
                   member.outstandingDebtMinutes > 0 &&
-                  'font-semibold text-[var(--sur-red)]'
+                  'font-semibold text-[var(--plan-danger)]'
               )}
             >
               {member.surplusMinutes > 0
@@ -206,7 +201,7 @@ export function VariancePanel({
             <button
               type="button"
               onClick={() => onViewLedger(member.memberId)}
-              className={cn(LINK_BUTTON_CLASSES, 'mt-0.5 self-start text-[11px]')}
+              className={cn(planLinkClass, 'mt-0.5 self-start apple-type-caption')}
             >
               {standupStrings.debt.ledgerTitle()}
             </button>
@@ -216,8 +211,8 @@ export function VariancePanel({
 
       <ul
         className={cn(
-          'flex flex-col divide-y divide-[var(--sur-border)]',
-          rows.length > 0 && `${SCROLL_CLASSES} ${SCROLL_MAX}`
+          'flex flex-col divide-y divide-[var(--plan-border)]',
+          rows.length > 0 && `plan-scroll ${PLAN_SCROLL_MAX}`
         )}
       >
         {rows.map((row) => {
@@ -231,7 +226,7 @@ export function VariancePanel({
               data-testid={`variance-row-${row.taskKey ?? row.taskId}`}
               className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0"
             >
-              <RowHead
+              <PlanRow
                 title={
                   <>
                     {row.taskKey && <span>{row.taskKey} </span>}
@@ -254,42 +249,49 @@ export function VariancePanel({
                 badge={
                   <>
                     {row.chronicSpill && (
-                      <Badge tone="red" data-testid="chronic-spill">
+                      <span className={planPillClass('danger')} data-testid="chronic-spill">
                         {standupStrings.variance.chronicSpill({ chainLength: row.spillChainLength })}
-                      </Badge>
+                      </span>
                     )}
                     {needsRevision && (
-                      <Badge tone="red">{standupStrings.variance.revisionRequiredBadge()}</Badge>
+                      <span className={planPillClass('danger')}>
+                        {standupStrings.variance.revisionRequiredBadge()}
+                      </span>
                     )}
                     {needsReason && (
-                      <Badge tone="amber">{standupStrings.variance.reasonRequiredBadge()}</Badge>
+                      <span className={planPillClass('warning')}>
+                        {standupStrings.variance.reasonRequiredBadge()}
+                      </span>
                     )}
                     {/* NFR-A2: the word is part of the content, not a tooltip. */}
-                    <Badge tone={TONE_BADGE[tone]} data-testid={`day-variance-${tone}`}>
+                    <span
+                      className={planPillClass(TONE_BADGE[tone])}
+                      data-testid={`day-variance-${tone}`}
+                    >
                       {formatMinutesAsHours(row.dayVarianceMinutes, { locale, signed: true })}{' '}
                       {TONE_WORD[tone]()}
-                    </Badge>
+                    </span>
                   </>
                 }
               />
 
               {/* VAR-11, second line: the task. */}
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--sur-muted)]">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 apple-type-caption text-[var(--plan-muted)]">
                 <span data-testid="original-estimate">
                   Original estimate{' '}
-                  <span className="tabular-nums text-[var(--sur-secondary)]">{formatMinutesAsHours(row.originalEstimateMinutes, { locale })}</span>
+                  <span className="tabular-nums text-[var(--plan-secondary)]">{formatMinutesAsHours(row.originalEstimateMinutes, { locale })}</span>
                 </span>
                 <span data-testid="total-logged">
                   Total logged{' '}
-                  <span className="tabular-nums text-[var(--sur-secondary)]">{formatMinutesAsHours(row.totalLoggedMinutesOnTask, { locale })}</span>
+                  <span className="tabular-nums text-[var(--plan-secondary)]">{formatMinutesAsHours(row.totalLoggedMinutesOnTask, { locale })}</span>
                 </span>
                 <span data-testid="task-variance">
-                  <span className="tabular-nums text-[var(--sur-secondary)]">{formatMinutesAsHours(row.taskVarianceMinutes, { locale, signed: true })}</span>{' '}
+                  <span className="tabular-nums text-[var(--plan-secondary)]">{formatMinutesAsHours(row.taskVarianceMinutes, { locale, signed: true })}</span>{' '}
                   against estimate
                 </span>
               </div>
 
-              <p data-testid={`variance-explanation-${row.taskKey ?? row.taskId}`} className="text-[11px] text-[var(--sur-secondary)]">
+              <p data-testid={`variance-explanation-${row.taskKey ?? row.taskId}`} className="apple-type-caption text-[var(--plan-secondary)]">
                 {row.explanation}
               </p>
 
@@ -301,7 +303,7 @@ export function VariancePanel({
                       disabled={disabled}
                       onClick={() => onRevise(row)}
                       aria-label={`Revise ${row.taskKey ?? row.taskId}`}
-                      className={LINK_BUTTON_CLASSES}
+                      className={planLinkClass}
                     >
                       {standupStrings.variance.reviseTitle()}
                     </button>
@@ -313,7 +315,7 @@ export function VariancePanel({
                       disabled={disabled}
                       onClick={() => onGiveReason(row)}
                       aria-label={`Give a reason for ${row.taskKey ?? row.taskId}`}
-                      className={LINK_BUTTON_CLASSES}
+                      className={planLinkClass}
                     >
                       Give a reason
                     </button>
@@ -324,7 +326,7 @@ export function VariancePanel({
           )
         })}
       </ul>
-    </section>
+    </PlanCard>
   )
 }
 
@@ -338,10 +340,10 @@ const TONE_WORD: Record<Tone, () => string> = {
 }
 
 /** VAR-12's palette. Under is blue — informational, not "good". */
-const TONE_BADGE: Record<Tone, BadgeTone> = {
-  over: 'red',
-  under: 'blue',
-  'on-estimate': 'green',
+const TONE_BADGE: Record<Tone, PlanPillTone> = {
+  over: 'danger',
+  under: 'accent',
+  'on-estimate': 'success',
   'not-started': 'neutral'
 }
 

@@ -10,22 +10,19 @@ import type { BucketedRows, YesterdayBucket, YesterdayRow } from '@/lib/standup/
 import { cn } from '@/lib/utils'
 
 import {
-  Badge,
-  CARD_CLASSES,
-  CARD_TITLE_CLASSES,
+  PLAN_SCROLL_MAX_NESTED,
+  PlanCard,
+  PlanCount,
+  PlanRow,
   initialsOf,
-  INSET_CLASSES,
-  IssueCount,
-  LINK_BUTTON_CLASSES,
-  RowHead,
-  RUN_FIELD_CLASSES,
-  SCROLL_CLASSES,
-  SCROLL_MAX_NESTED,
-  SECONDARY_BUTTON_CLASSES,
-  TEXT_BODY,
-  TEXT_META,
-  type Tone
-} from './ui'
+  planButtonClass,
+  planFieldClass,
+  planInsetClass,
+  planLinkClass,
+  planPillClass,
+  type PlanPillTone
+} from '../planning/ui'
+
 
 /**
  * Panel 2 — yesterday's review (§15.8.4, RUN-9..RUN-13).
@@ -180,32 +177,29 @@ export function YesterdayPanel({
     ) + data.addedAfterCompletion.length
 
   return (
-    <section
+    <PlanCard
       id="panel-2"
       aria-labelledby="panel-2-heading"
-      className={cn('scroll-mt-6 flex flex-col gap-4', CARD_CLASSES, className)}
-    >
-      <div className="flex items-center gap-2">
-        <h3
-          id="panel-2-heading"
-          className={CARD_TITLE_CLASSES}
-        >
-          {standupStrings.yesterday.title()}
-        </h3>
-        {hasYesterday && (
-          <IssueCount
+      title={standupStrings.yesterday.title()}
+      headingLevel="h3"
+      headingId="panel-2-heading"
+      className={className}
+      aside={
+        hasYesterday && (
+          <PlanCount
             count={issues}
             label={standupStrings.run.yesterdayIssueCount({ count: issues })}
           />
-        )}
-      </div>
+        )
+      }
+    >
 
       {toast && (
         <p
           role="alert"
           className={cn(
-            TEXT_BODY,
-            'rounded-[var(--sur-radius-inset)] border border-[var(--sur-red)] bg-[var(--sur-red-tint)] px-4 py-3 text-[var(--sur-red)]'
+            'apple-type-subheadline',
+            'rounded-[var(--apple-radius-md)] border border-[var(--plan-danger)] bg-[var(--plan-danger-bg)] px-4 py-3 text-[var(--plan-danger)]'
           )}
         >
           {toast}
@@ -213,7 +207,7 @@ export function YesterdayPanel({
       )}
 
       {!hasYesterday && (
-        <p className={cn(TEXT_BODY, 'text-[var(--sur-secondary)]')}>
+        <p className="apple-type-subheadline text-[var(--plan-secondary)]">
           {standupStrings.yesterday.noPreviousStandup()}
         </p>
       )}
@@ -236,10 +230,10 @@ export function YesterdayPanel({
                     [bucket.bucket]: !isCollapsed
                   }))
                 }
-                className="apple-transition flex items-center gap-1.5 self-start text-left text-[13px] font-semibold text-[var(--sur-text)]"
+                className="apple-transition flex items-center gap-1.5 self-start text-left apple-type-subheadline font-semibold text-[var(--plan-text)]"
               >
                 <ChevronDown
-                  className={cn('h-3.5 w-3.5 shrink-0 text-[var(--sur-muted)] apple-transition', isCollapsed && '-rotate-90')}
+                  className={cn('h-3.5 w-3.5 shrink-0 text-[var(--plan-muted)] apple-transition', isCollapsed && '-rotate-90')}
                   strokeWidth={2}
                   aria-hidden="true"
                 />
@@ -254,11 +248,11 @@ export function YesterdayPanel({
                     // Roughly three rows before it scrolls. The four buckets
                     // stack inside one card, so an unbounded in-progress
                     // bucket on a large team buries the three below it.
-                    bucket.rows.length > 0 && `${SCROLL_CLASSES} ${SCROLL_MAX_NESTED} p-0.5`
+                    bucket.rows.length > 0 && `plan-scroll ${PLAN_SCROLL_MAX_NESTED} p-0.5`
                   )}
                 >
                   {bucket.rows.length === 0 && (
-                    <li className="rounded-[var(--sur-radius-inset)] border border-dashed border-[var(--sur-border)] px-3 py-2.5 text-[13px] text-[var(--sur-muted)]">
+                    <li className="rounded-[var(--apple-radius-md)] border border-dashed border-[var(--plan-border)] px-3 py-2.5 apple-type-subheadline text-[var(--plan-muted)]">
                       {standupStrings.yesterday.emptyBucket()}
                     </li>
                   )}
@@ -267,11 +261,11 @@ export function YesterdayPanel({
                     <li
                       key={row.allocationId ?? `${row.memberId}:${row.taskId}`}
                       data-testid={`yesterday-row-${row.taskKey ?? row.taskId}`}
-                      className={cn(INSET_CLASSES, 'flex flex-col gap-3 p-3')}
+                      className={cn(planInsetClass, 'flex flex-col gap-3 p-3')}
                     >
                       {/* The blueprint's row head: "ARD-410 Base LLM Wiring",
                           "Sarah K. · Planned 4h / Logged 4.5h", variance badge. */}
-                      <RowHead
+                      <PlanRow
                         title={
                           <>
                             <span>{row.taskKey ?? row.taskId}</span> {row.title}
@@ -292,23 +286,26 @@ export function YesterdayPanel({
                         badge={
                           <>
                             {row.ageInStandups > 1 && (
-                              <Badge tone="neutral" data-testid="age-badge">
+                              <span className={planPillClass('neutral')} data-testid="age-badge">
                                 {standupStrings.yesterday.ageBadge({ standups: row.ageInStandups })}
-                              </Badge>
+                              </span>
                             )}
 
                             {row.unplanned && (
-                              <Badge tone="amber" title={standupStrings.yesterday.unplannedHint()}>
+                              <span
+                                className={planPillClass('warning')}
+                                title={standupStrings.yesterday.unplannedHint()}
+                              >
                                 {standupStrings.yesterday.unplannedBadge()}
-                              </Badge>
+                              </span>
                             )}
 
-                            <Badge tone={varianceTone(row.dayVarianceMinutes)}>
+                            <span className={planPillClass(varianceTone(row.dayVarianceMinutes))}>
                               <span data-testid="day-variance" className="tabular-nums">
                                 {formatMinutesAsHours(row.dayVarianceMinutes, { locale, signed: true })}
                               </span>
                               &nbsp;{standupStrings.yesterday.varianceBadge()}
-                            </Badge>
+                            </span>
                           </>
                         }
                       />
@@ -319,17 +316,17 @@ export function YesterdayPanel({
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <div
                           data-testid="previous-status"
-                          className="flex flex-col gap-0.5 rounded-[var(--sur-radius-control)] bg-[var(--sur-surface)] px-2 py-1.5"
+                          className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--plan-surface)] px-2 py-1.5"
                         >
-                          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--sur-muted)]">
+                          <span className="apple-type-caption font-semibold uppercase tracking-wide text-[var(--plan-muted)]">
                             {standupStrings.yesterday.previousStatus()}
                           </span>
-                          <span className="text-[13px] text-[var(--sur-text)]">{row.previousStatus}</span>
+                          <span className="apple-type-subheadline text-[var(--plan-text)]">{row.previousStatus}</span>
                         </div>
 
-                        <div className="flex flex-col gap-0.5 rounded-[var(--sur-radius-control)] bg-[var(--sur-surface)] px-2 py-1">
+                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--plan-surface)] px-2 py-1">
                           <label
-                            className="text-[11px] font-semibold uppercase tracking-wide text-[var(--sur-muted)]"
+                            className="apple-type-caption font-semibold uppercase tracking-wide text-[var(--plan-muted)]"
                             htmlFor={`status-${row.taskId}`}
                           >
                             {standupStrings.yesterday.currentStatus()}
@@ -341,7 +338,7 @@ export function YesterdayPanel({
                             value={statusOf(row)}
                             disabled={disabled}
                             onChange={(event) => changeStatus(row, event.target.value)}
-                            className="h-6 w-full rounded-[var(--sur-radius-control)] border-0 bg-transparent p-0 text-[13px] text-[var(--sur-text)]"
+                            className="h-6 w-full rounded-[var(--apple-radius-sm)] border-0 bg-transparent p-0 apple-type-subheadline text-[var(--plan-text)]"
                           >
                             {statusOptions.map((option) => (
                               <option key={option} value={option}>
@@ -351,11 +348,11 @@ export function YesterdayPanel({
                           </select>
                         </div>
 
-                        <div className="flex flex-col gap-0.5 rounded-[var(--sur-radius-control)] bg-[var(--sur-surface)] px-2 py-1.5">
-                          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--sur-muted)]">
+                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--plan-surface)] px-2 py-1.5">
+                          <span className="apple-type-caption font-semibold uppercase tracking-wide text-[var(--plan-muted)]">
                             Remaining
                           </span>
-                          <span data-testid="remaining" className="text-[13px] tabular-nums text-[var(--sur-text)]">
+                          <span data-testid="remaining" className="apple-type-subheadline tabular-nums text-[var(--plan-text)]">
                             {formatMinutesAsHours(row.remainingEstimateMinutes, { locale })}
                           </span>
                         </div>
@@ -386,7 +383,7 @@ export function YesterdayPanel({
                               commitLoggedHours(row)
                             }
                           }}
-                          className={cn(RUN_FIELD_CLASSES, 'w-20 shrink-0 text-right tabular-nums')}
+                          className={cn(planFieldClass, 'w-20 shrink-0 text-right tabular-nums')}
                         />
 
                         <label className="sr-only" htmlFor={`note-${row.taskId}`}>
@@ -414,14 +411,14 @@ export function YesterdayPanel({
                               submitNote(row)
                             }
                           }}
-                          className={cn(RUN_FIELD_CLASSES, 'min-w-[10rem] flex-1 px-2.5')}
+                          className={cn(planFieldClass, 'min-w-[10rem] flex-1 px-2.5')}
                         />
                         <button
                           type="button"
                           data-testid="note-save"
                           disabled={disabled || !((noteDraft[row.taskId] ?? '').trim())}
                           onClick={() => submitNote(row)}
-                          className={cn(LINK_BUTTON_CLASSES, 'shrink-0')}
+                          className={cn(planLinkClass, 'shrink-0')}
                         >
                           {noteStatus[row.taskId] === 'saved'
                             ? standupStrings.yesterday.noteSaved()
@@ -433,7 +430,7 @@ export function YesterdayPanel({
                             type="button"
                             onClick={() => api.reviseEstimate(row)}
                             disabled={disabled}
-                            className="apple-transition text-[13px] font-semibold text-[var(--sur-secondary)] hover:text-[var(--sur-text)] hover:underline"
+                            className={planLinkClass}
                           >
                             {standupStrings.variance.reviseTitle()}
                           </button>
@@ -441,7 +438,7 @@ export function YesterdayPanel({
                           <button
                             type="button"
                             onClick={() => api.openTask(row.taskId)}
-                            className="apple-transition text-[13px] font-semibold text-[var(--sur-secondary)] hover:text-[var(--sur-text)] hover:underline"
+                            className={planLinkClass}
                           >
                             {`Open ${row.taskKey ?? row.taskId}`}
                           </button>
@@ -460,7 +457,7 @@ export function YesterdayPanel({
                   onClick={() =>
                     api.confirmCompleted({ taskIds: bucket.rows.map((row) => row.taskId) })
                   }
-                  className={cn(SECONDARY_BUTTON_CLASSES, 'h-8 self-start px-3 text-[13px]')}
+                  className={planButtonClass('secondary', 'h-8 self-start px-3')}
                 >
                   {standupStrings.yesterday.markAllConfirmed()}
                 </button>
@@ -476,23 +473,23 @@ export function YesterdayPanel({
           is not an "always all four" section). */}
       {hasYesterday && data.addedAfterCompletion.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h4 className="text-[13px] font-semibold text-[var(--sur-text)]">
+          <h4 className="apple-type-subheadline font-semibold text-[var(--plan-text)]">
             {standupStrings.yesterday.bucketCount({
               label: standupStrings.yesterday.addedAfterCompletion(),
               count: data.addedAfterCompletion.length
             })}
           </h4>
-          <ul className={cn('flex flex-col gap-2.5', SCROLL_CLASSES, SCROLL_MAX_NESTED, 'p-0.5')}>
+          <ul className={cn('flex flex-col gap-2.5', 'plan-scroll', PLAN_SCROLL_MAX_NESTED, 'p-0.5')}>
             {data.addedAfterCompletion.map((row) => (
               <li
                 key={row.allocationId ?? `${row.memberId}:${row.taskId}`}
                 data-testid={`yesterday-added-row-${row.taskKey ?? row.taskId}`}
-                className={cn(INSET_CLASSES, 'flex flex-wrap items-center gap-3 p-3 text-[13px]')}
+                className={cn(planInsetClass, 'flex flex-wrap items-center gap-3 p-3 apple-type-subheadline')}
               >
-                <span className={cn(TEXT_META, 'font-semibold text-[var(--sur-muted)]')}>
+                <span className="apple-type-caption font-semibold text-[var(--plan-muted)]">
                   {row.taskKey ?? row.taskId}
                 </span>
-                <span className="min-w-0 flex-1 truncate font-semibold text-[var(--sur-text)]">{row.title}</span>
+                <span className="min-w-0 flex-1 truncate font-semibold text-[var(--plan-text)]">{row.title}</span>
                 {/* A real `Avatar`, not a styled `<span>`: this is the only row
                     on the panel that names a person, and it used to be the one
                     place their photo could never appear. `AvatarImage` is only
@@ -502,17 +499,17 @@ export function YesterdayPanel({
                   {row.avatarUrl && (
                     <AvatarImage src={row.avatarUrl} alt="" className="object-cover" />
                   )}
-                  <AvatarFallback className="bg-[var(--sur-neutral-tint)] text-[11px] font-semibold text-[var(--sur-secondary)]">
+                  <AvatarFallback className="bg-[var(--plan-track)] apple-type-caption font-semibold text-[var(--plan-secondary)]">
                     {initialsOf(row.memberName)}
                   </AvatarFallback>
                 </Avatar>
-                <span data-testid="added-current-status" className="shrink-0 text-[var(--sur-secondary)]">
+                <span data-testid="added-current-status" className="shrink-0 text-[var(--plan-secondary)]">
                   {standupStrings.yesterday.currentStatus()} {row.currentStatus}
                 </span>
-                <span data-testid="planned" className="shrink-0 tabular-nums text-[var(--sur-text)]">
+                <span data-testid="planned" className="shrink-0 tabular-nums text-[var(--plan-text)]">
                   {formatMinutesAsHours(row.plannedMinutes, { locale })}
                 </span>
-                <span data-testid="logged" className="shrink-0 tabular-nums text-[var(--sur-text)]">
+                <span data-testid="logged" className="shrink-0 tabular-nums text-[var(--plan-text)]">
                   {formatMinutesAsHours(row.loggedMinutes, { locale })}
                 </span>
               </li>
@@ -520,7 +517,7 @@ export function YesterdayPanel({
           </ul>
         </div>
       )}
-    </section>
+    </PlanCard>
   )
 }
 
@@ -529,10 +526,10 @@ function hoursText(value: Minutes): string {
 }
 
 /** Over is amber (the blueprint's "+0.5h variance"), under blue, on-plan green. */
-function varianceTone(minutesOver: number): Tone {
-  if (minutesOver > 0) return 'amber'
-  if (minutesOver < 0) return 'blue'
-  return 'green'
+function varianceTone(minutesOver: number): PlanPillTone {
+  if (minutesOver > 0) return 'warning'
+  if (minutesOver < 0) return 'accent'
+  return 'success'
 }
 
 export type { YesterdayRow, Minutes }

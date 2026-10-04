@@ -46,7 +46,7 @@ describe('BlockerPanel (Panel 6)', () => {
 
     const rows = screen.getAllByTestId('blocker-row')
     expect(rows).toHaveLength(1)
-    expect(rows[0].className).toContain('sur-red')
+    expect(rows[0].className).toContain('plan-danger')
   })
 
   it('does not mark a non-overdue row as destructive', () => {
@@ -55,7 +55,7 @@ describe('BlockerPanel (Panel 6)', () => {
     )
 
     const rows = screen.getAllByTestId('blocker-row')
-    expect(rows[0].className).not.toContain('sur-red')
+    expect(rows[0].className).not.toContain('plan-danger')
   })
 
   it('renders the freed-capacity line when freedMinutes is set', () => {

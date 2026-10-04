@@ -10,17 +10,15 @@ import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
 import {
-  badgeClass,
+  PLAN_SCROLL_MAX,
+  PlanBanner,
+  PlanCount,
   initialsOf,
-  IssueCount,
-  PRIMARY_BUTTON_CLASSES,
-  RUN_FIELD_CLASSES,
-  SCROLL_CLASSES,
-  SCROLL_MAX,
-  TEXT_BODY,
-  TEXT_META,
-  type Tone
-} from './ui'
+  planButtonClass,
+  planFieldClass,
+  planPillClass,
+  type PlanPillTone
+} from '../planning/ui'
 
 /**
  * Panel 1 — attendance, and RUN-7's prompt (§15.8.3).
@@ -128,8 +126,8 @@ export function AttendancePanel({
           below the fold, and until this line existed nothing at the top of the
           section said so. */}
       {issues > 0 && (
-        <p className={cn(TEXT_BODY, 'flex items-center gap-2 font-semibold text-[var(--sur-red)]')}>
-          <IssueCount
+        <p className="apple-type-subheadline flex items-center gap-2 font-semibold text-[var(--plan-danger)]">
+          <PlanCount
             count={issues}
             decorative
             label={standupStrings.run.attendanceIssueCount({ count: issues })}
@@ -145,8 +143,8 @@ export function AttendancePanel({
       <ul
         className={cn(
           'grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3',
-          SCROLL_CLASSES,
-          SCROLL_MAX,
+          'plan-scroll',
+          PLAN_SCROLL_MAX,
           'p-0.5'
         )}
       >
@@ -162,10 +160,10 @@ export function AttendancePanel({
               key={member.memberId}
               data-testid={`attendance-card-${member.memberId}`}
               className={cn(
-                'flex flex-col gap-3 rounded-[var(--sur-radius-card)] border p-4',
+                'flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border p-4',
                 absent
-                  ? 'border-[var(--sur-red)] bg-[var(--sur-red-tint)]'
-                  : 'border-[var(--sur-border)] bg-[var(--sur-surface)]'
+                  ? 'border-[var(--plan-danger)] bg-[var(--plan-danger-bg)]'
+                  : 'border-[var(--plan-border)] bg-[var(--plan-surface)]'
               )}
             >
               <div className="flex items-center gap-4">
@@ -176,7 +174,7 @@ export function AttendancePanel({
                     <AvatarImage src={member.avatarUrl} alt="" className="object-cover" />
                   )}
                   <AvatarFallback
-                    className={cn('text-[13px] font-semibold', AVATAR_TONE[tone])}
+                    className={cn('apple-type-subheadline font-semibold', AVATAR_TONE[tone])}
                   >
                     {initialsOf(member.name)}
                   </AvatarFallback>
@@ -185,7 +183,7 @@ export function AttendancePanel({
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex items-center justify-between gap-2">
                     <label
-                      className="truncate text-[15px] font-semibold text-[var(--sur-text)]"
+                      className="truncate apple-type-body font-semibold text-[var(--plan-text)]"
                       htmlFor={`att-${member.memberId}`}
                     >
                       {member.name}
@@ -211,8 +209,8 @@ export function AttendancePanel({
                           }
                         }}
                         className={cn(
-                          badgeClass(tone),
-                          'apple-transition cursor-pointer appearance-none border-0 py-[5px] pl-2 pr-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sur-blue)] disabled:cursor-default disabled:opacity-60'
+                          planPillClass(tone),
+                          'apple-transition cursor-pointer appearance-none border-0 py-[5px] pl-2 pr-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--plan-accent)] disabled:cursor-default disabled:opacity-60'
                         )}
                       >
                         {STATES.map((option) => (
@@ -233,12 +231,12 @@ export function AttendancePanel({
                   </div>
 
                   {needsReassign ? (
-                    <p className={cn(TEXT_META, 'flex items-center gap-1 font-semibold text-[var(--sur-red)]')}>
+                    <p className={cn('apple-type-caption flex items-center gap-1 font-semibold text-[var(--plan-danger)]')}>
                       <AlertTriangle className="h-3 w-3 shrink-0" strokeWidth={2.5} aria-hidden="true" />
                       {standupStrings.run.attendanceReassignRequired()}
                     </p>
                   ) : (
-                    <p className={cn(TEXT_META, 'truncate text-[var(--sur-secondary)]')}>
+                    <p className={cn('apple-type-caption truncate text-[var(--plan-secondary)]')}>
                       {capacityLine(member, state, locale)}
                     </p>
                   )}
@@ -267,7 +265,7 @@ export function AttendancePanel({
                       partialMinutes: hoursToMinutes(hours)
                     })
                   }}
-                  className={cn(RUN_FIELD_CLASSES, 'w-full')}
+                  className={cn(planFieldClass, 'w-full')}
                 />
               )}
 
@@ -282,7 +280,7 @@ export function AttendancePanel({
                     if (!reason) return
                     onSetAttendance({ memberId: member.memberId, state, reason })
                   }}
-                  className={cn(RUN_FIELD_CLASSES, 'w-full')}
+                  className={cn(planFieldClass, 'w-full')}
                 />
               )}
             </li>
@@ -294,83 +292,82 @@ export function AttendancePanel({
           bulk action attached — the whole point is that the PM answers it now,
           in the meeting, rather than discovering it at completion. */}
       {prompt && promptMember && (
-        <div
+        <PlanBanner
+          tone="warning"
+          bordered
           role="alert"
-          className={cn(
-            TEXT_BODY,
-            'flex flex-wrap items-center gap-2 rounded-[var(--sur-radius-inset)] border border-[var(--sur-amber)] bg-[var(--sur-amber-tint)] px-4 py-3'
-          )}
+          icon={<AlertTriangle strokeWidth={2} />}
+          actions={
+            <>
+              <label className="sr-only" htmlFor="reassign-to">
+                {standupStrings.run.reassignTo()}
+              </label>
+              <select
+                id="reassign-to"
+                aria-label={standupStrings.run.reassignTo()}
+                value={reassignTo}
+                onChange={(event) => setReassignTo(event.target.value)}
+                className={planFieldClass}
+              >
+                <option value="">{standupStrings.run.reassignTo()}</option>
+                {members
+                  .filter((member) => member.memberId !== prompt.memberId)
+                  .map((member) => (
+                    <option key={member.memberId} value={member.memberId}>
+                      {member.name}
+                    </option>
+                  ))}
+              </select>
+
+              <button
+                type="button"
+                disabled={!reassignTo}
+                onClick={() => onReassign(prompt.memberId, reassignTo)}
+                className={planButtonClass('primary', cn('h-8', !reassignTo && 'opacity-40'))}
+              >
+                {standupStrings.run.reassignConfirm()}
+              </button>
+              <button
+                type="button"
+                onClick={onDismissPrompt}
+                className={planButtonClass('secondary', undefined, 'sm')}
+              >
+                {standupStrings.run.reassignDismiss()}
+              </button>
+            </>
+          }
         >
-          <p className="flex min-w-[12rem] flex-1 items-center gap-2 text-[var(--sur-text)]">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--sur-amber)]" strokeWidth={2} aria-hidden="true" />
-            {standupStrings.run.reassignPrompt({
-              name: promptMember.name,
-              count: prompt.taskCount
-            })}
-          </p>
-
-          <label className="sr-only" htmlFor="reassign-to">
-            {standupStrings.run.reassignTo()}
-          </label>
-          <select
-            id="reassign-to"
-            aria-label={standupStrings.run.reassignTo()}
-            value={reassignTo}
-            onChange={(event) => setReassignTo(event.target.value)}
-            className={RUN_FIELD_CLASSES}
-          >
-            <option value="">{standupStrings.run.reassignTo()}</option>
-            {members
-              .filter((member) => member.memberId !== prompt.memberId)
-              .map((member) => (
-                <option key={member.memberId} value={member.memberId}>
-                  {member.name}
-                </option>
-              ))}
-          </select>
-
-          <button
-            type="button"
-            disabled={!reassignTo}
-            onClick={() => onReassign(prompt.memberId, reassignTo)}
-            className={cn(PRIMARY_BUTTON_CLASSES, 'h-8', !reassignTo && 'opacity-40')}
-          >
-            {standupStrings.run.reassignConfirm()}
-          </button>
-          <button
-            type="button"
-            onClick={onDismissPrompt}
-            className="apple-transition h-8 rounded-[var(--sur-radius-control)] px-3 text-[13px] font-semibold text-[var(--sur-secondary)] hover:text-[var(--sur-text)]"
-          >
-            {standupStrings.run.reassignDismiss()}
-          </button>
-        </div>
+          {standupStrings.run.reassignPrompt({
+            name: promptMember.name,
+            count: prompt.taskCount
+          })}
+        </PlanBanner>
       )}
     </section>
   )
 }
 
-const TONE_FOR: Record<AttendanceStatus, Tone> = {
-  present: 'green',
-  partial: 'amber',
-  absent_planned: 'red',
-  absent_unplanned: 'red'
+const TONE_FOR: Record<AttendanceStatus, PlanPillTone> = {
+  present: 'success',
+  partial: 'warning',
+  absent_planned: 'danger',
+  absent_unplanned: 'danger'
 }
 
-const AVATAR_TONE: Record<Tone, string> = {
-  green: 'bg-[var(--sur-green-tint)] text-[var(--sur-green)]',
-  amber: 'bg-[var(--sur-amber-tint)] text-[var(--sur-amber)]',
-  red: 'bg-[var(--sur-surface)] text-[var(--sur-red)]',
-  blue: 'bg-[var(--sur-blue-tint)] text-[var(--sur-blue)]',
-  neutral: 'bg-[var(--sur-neutral-tint)] text-[var(--sur-muted)]'
+const AVATAR_TONE: Record<PlanPillTone, string> = {
+  success: 'bg-[var(--plan-success-bg)] text-[var(--plan-success)]',
+  warning: 'bg-[var(--plan-warning-bg)] text-[var(--plan-warning)]',
+  danger: 'bg-[var(--plan-surface)] text-[var(--plan-danger)]',
+  accent: 'bg-[var(--plan-info-bg)] text-[var(--plan-accent-ink)]',
+  neutral: 'bg-[var(--plan-track)] text-[var(--plan-muted)]'
 }
 
-const CHEVRON_TONE: Record<Tone, string> = {
-  green: 'text-[var(--sur-green)]',
-  amber: 'text-[var(--sur-amber)]',
-  red: 'text-[var(--sur-red)]',
-  blue: 'text-[var(--sur-blue)]',
-  neutral: 'text-[var(--sur-muted)]'
+const CHEVRON_TONE: Record<PlanPillTone, string> = {
+  success: 'text-[var(--plan-success)]',
+  warning: 'text-[var(--plan-warning)]',
+  danger: 'text-[var(--plan-danger)]',
+  accent: 'text-[var(--plan-accent-ink)]',
+  neutral: 'text-[var(--plan-muted)]'
 }
 
 /**

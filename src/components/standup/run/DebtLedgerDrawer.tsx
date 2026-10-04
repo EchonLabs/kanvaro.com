@@ -6,6 +6,8 @@ import { WRITEOFF_REASON_MIN_LENGTH, type DebtPosition } from '@/lib/standup/deb
 import { formatMinutesAsHours, hoursToMinutes, type Minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 
+import { planButtonClass, planFieldClass, planCardClass } from '../planning/ui'
+
 /**
  * The estimate-debt ledger, and the write-off dialog (§15.8.5, VAR-5, VAR-8).
  *
@@ -58,23 +60,23 @@ export function DebtLedgerDrawer({
   return (
     <aside
       aria-labelledby="debt-ledger-title"
-      className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4"
+      className={`${planCardClass} flex flex-col gap-3 p-4`}
     >
-      <h3 id="debt-ledger-title" className="text-sm font-semibold">
+      <h3 id="debt-ledger-title" className="apple-type-body font-semibold text-[var(--plan-text)]">
         {standupStrings.debt.ledgerTitle()} — {memberName}
       </h3>
 
       {/* VAR-6 / E42: a negative balance is surplus and says so. */}
-      <p data-testid="debt-balance" className="text-sm">
+      <p data-testid="debt-balance" className="apple-type-subheadline text-[var(--plan-text)]">
         {position.surplusMinutes > 0
           ? standupStrings.variance.surplus({ minutes: position.surplusMinutes, locale })
           : standupStrings.debt.outstanding({ minutes: position.outstandingMinutes, locale })}
       </p>
 
       {entries.length === 0 ? (
-        <p className="text-xs text-muted-foreground">{standupStrings.debt.empty()}</p>
+        <p className="apple-type-caption text-[var(--plan-muted)]">{standupStrings.debt.empty()}</p>
       ) : (
-        <ul className="flex flex-col gap-1 text-sm">
+        <ul className="apple-type-subheadline flex flex-col gap-1 text-[var(--plan-text)]">
           {entries.map((entry) => (
             <li
               key={entry.entryId}
@@ -95,15 +97,15 @@ export function DebtLedgerDrawer({
         <button
           type="button"
           onClick={() => setWritingOff(true)}
-          className="self-start rounded-md border border-border px-2 py-1 text-xs"
+          className={planButtonClass('secondary', 'self-start', 'sm')}
         >
           {standupStrings.debt.writeOff()}
         </button>
       )}
 
       {canWriteOff && writingOff && (
-        <div className="flex flex-col gap-2 rounded-md border border-border p-3">
-          <label className="flex flex-col gap-1 text-sm" htmlFor="writeoff-hours">
+        <div className="flex flex-col gap-2 rounded-[var(--apple-radius-md)] border border-[var(--plan-border)] p-3">
+          <label className="apple-type-subheadline flex flex-col gap-1 text-[var(--plan-text)]" htmlFor="writeoff-hours">
             Hours to write off
             <input
               id="writeoff-hours"
@@ -112,20 +114,20 @@ export function DebtLedgerDrawer({
               step={0.25}
               value={hours}
               onChange={(event) => setHours(event.target.value)}
-              className="h-8 w-24 rounded-md border border-border bg-background px-2"
+              className={`${planFieldClass} w-24`}
             />
           </label>
 
-          <div className="flex flex-col gap-1 text-sm">
+          <div className="apple-type-subheadline flex flex-col gap-1 text-[var(--plan-text)]">
             <label htmlFor="writeoff-reason">{standupStrings.debt.writeOffReasonLabel()}</label>
             <textarea
               id="writeoff-reason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               aria-describedby="writeoff-hint"
-              className="min-h-16 rounded-md border border-border bg-background px-2 py-1 text-sm"
+              className={`${planFieldClass} h-auto min-h-16 py-1`}
             />
-            <span id="writeoff-hint" className="text-xs text-muted-foreground">
+            <span id="writeoff-hint" className="apple-type-caption text-[var(--plan-muted)]">
               {standupStrings.debt.writeOffReasonTooShort({
                 minLength: WRITEOFF_REASON_MIN_LENGTH
               })}
@@ -136,7 +138,7 @@ export function DebtLedgerDrawer({
             <button
               type="button"
               onClick={() => setWritingOff(false)}
-              className="rounded-md border border-border px-3 py-1 text-sm"
+              className={planButtonClass('secondary', undefined, 'sm')}
             >
               Cancel
             </button>
@@ -144,7 +146,7 @@ export function DebtLedgerDrawer({
               type="button"
               disabled={!canSubmit}
               onClick={() => amount !== null && onWriteOff({ minutes: amount, reason: reason.trim() })}
-              className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground disabled:opacity-50"
+              className={planButtonClass('primary', undefined, 'sm')}
             >
               {standupStrings.debt.writeOffConfirm()}
             </button>
@@ -152,7 +154,7 @@ export function DebtLedgerDrawer({
         </div>
       )}
 
-      <button type="button" onClick={onClose} className="self-start text-xs underline">
+      <button type="button" onClick={onClose} className="apple-type-caption self-start text-[var(--plan-secondary)] underline">
         Close
       </button>
     </aside>

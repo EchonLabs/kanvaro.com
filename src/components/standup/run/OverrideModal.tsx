@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { Button } from '@/components/ui/Button'
+import { PlanButton } from '../planning/ui'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -34,7 +34,7 @@ import { standupStrings } from '@/lib/standup/strings'
  */
 
 const SELECT_CLASS =
-  'h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] px-2.5 text-[13px] text-[var(--apple-label)] transition-all focus-visible:border-[var(--apple-system-blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]/40 disabled:cursor-not-allowed disabled:opacity-50'
+  'h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-raised)] px-2.5 apple-type-subheadline text-[var(--plan-text)] transition-all focus-visible:border-[var(--plan-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--plan-accent)]/40 disabled:cursor-not-allowed disabled:opacity-50'
 
 export type OverridableType =
   | 'under_allocation'
@@ -75,11 +75,11 @@ export function OverrideModal({ type, affected, onCancel, onSubmit }: OverrideMo
 
   return (
     <div className="flex w-full flex-col gap-4 p-5">
-      <h2 id="override-modal-title" className="text-[15px] font-semibold text-[var(--apple-label)]">
+      <h2 id="override-modal-title" className="apple-type-body font-semibold text-[var(--plan-text)]">
         {standupStrings.override.title({ type })}
       </h2>
 
-      <ul className="flex flex-col gap-1 text-[13px] text-[var(--apple-secondary-label)]">
+      <ul className="flex flex-col gap-1 apple-type-subheadline text-[var(--plan-secondary)]">
         {affected.map((member) => (
           <li key={member.memberId}>{standupStrings.override.gapLine(member)}</li>
         ))}
@@ -113,7 +113,7 @@ export function OverrideModal({ type, affected, onCancel, onSubmit }: OverrideMo
       </div>
 
       {!validation.valid && justification.length > 0 && (
-        <p role="alert" className="text-[11px] text-[var(--apple-system-red)]">
+        <p role="alert" className="apple-type-caption text-[var(--plan-danger)]">
           {standupStrings.override.validationError({
             code: validation.code,
             minLength: JUSTIFICATION_MIN_LENGTH
@@ -122,7 +122,7 @@ export function OverrideModal({ type, affected, onCancel, onSubmit }: OverrideMo
       )}
 
       {requiresAcknowledgement && (
-        <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-[var(--apple-label)]">
+        <label className="flex cursor-pointer items-center gap-2.5 apple-type-subheadline text-[var(--plan-text)]">
           <Checkbox
             checked={acknowledged}
             onCheckedChange={setAcknowledged}
@@ -131,13 +131,13 @@ export function OverrideModal({ type, affected, onCancel, onSubmit }: OverrideMo
         </label>
       )}
 
-      <p className="text-[11px] text-[var(--apple-tertiary-label)]">{standupStrings.override.attributionNotice()}</p>
+      <p className="apple-type-caption text-[var(--plan-muted)]">{standupStrings.override.attributionNotice()}</p>
 
       <div className="flex justify-end gap-2 pt-1">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <PlanButton tone="secondary" onClick={onCancel}>
           {standupStrings.override.cancel()}
-        </Button>
-        <Button
+        </PlanButton>
+        <PlanButton tone="primary"
           type="button"
           disabled={!canSubmit}
           onClick={() =>
@@ -145,7 +145,7 @@ export function OverrideModal({ type, affected, onCancel, onSubmit }: OverrideMo
           }
         >
           {standupStrings.override.submit()}
-        </Button>
+        </PlanButton>
       </div>
     </div>
   )

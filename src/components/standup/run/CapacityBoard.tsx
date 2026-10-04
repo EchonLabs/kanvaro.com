@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { XCircle } from 'lucide-react'
 
 import { Drawer } from '@/components/standup/primitives/Drawer'
 import { HourStepper } from '@/components/standup/primitives/HourStepper'
@@ -14,6 +14,8 @@ import type { CapacityAdjustment, CapacityBreakdown } from '@/lib/standup/capaci
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
+
+import { PlanBanner, planButtonClass, planPillClass } from '../planning/ui'
 
 /**
  * The capacity board (§15.8.7) — Panel 5's right half, and the phase's visible
@@ -113,7 +115,7 @@ export function MemberRunAlerts({
       {hasDebt && (
         <span
           data-testid="debt-badge"
-          className="self-start rounded-full bg-[var(--apple-system-orange)]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--apple-system-orange)]"
+          className={planPillClass('warning', 'self-start')}
         >
           {standupStrings.allocation.debtBadge({
             minutes: capacity.outstandingDebtMinutes,
@@ -123,7 +125,7 @@ export function MemberRunAlerts({
       )}
 
       {reduced && (
-        <p className="text-[11px] text-[var(--apple-secondary-label)]">
+        <p className="apple-type-caption text-[var(--plan-secondary)]">
           {standupStrings.variance.capacityReduced({
             nominal: capacity.adjustedMinutes,
             effective: capacity.effectiveMinutes,
@@ -137,25 +139,26 @@ export function MemberRunAlerts({
           somebody who cannot do them today, and the day is not finished until
           they belong to somebody else. */}
       {capacity.strandedMinutes > 0 && (
-        <div
+        <PlanBanner
+          tone="danger"
+          bordered
           role="alert"
-          className="flex flex-col gap-2 rounded-[var(--apple-radius-md)] border border-[var(--apple-system-red)]/30 bg-[var(--apple-system-red)]/[0.06] p-2.5 text-[13px]"
+          icon={<XCircle strokeWidth={2} />}
+          actions={
+            <button
+              type="button"
+              onClick={() => onReassignStranded(member.memberId)}
+              className={planButtonClass('secondary', undefined, 'sm')}
+            >
+              {standupStrings.capacity.strandedAllocationsAction()}
+            </button>
+          }
         >
-          <p className="flex items-start gap-1.5 text-[var(--apple-system-red)]">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} />
-            {standupStrings.capacity.strandedAllocations({
-              minutes: capacity.strandedMinutes,
-              locale
-            })}
-          </p>
-          <button
-            type="button"
-            onClick={() => onReassignStranded(member.memberId)}
-            className="apple-transition self-start rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 py-1 text-[11px] font-semibold hover:bg-[var(--apple-quaternary-fill)]"
-          >
-            {standupStrings.capacity.strandedAllocationsAction()}
-          </button>
-        </div>
+          {standupStrings.capacity.strandedAllocations({
+            minutes: capacity.strandedMinutes,
+            locale
+          })}
+        </PlanBanner>
       )}
     </div>
   )
@@ -183,11 +186,11 @@ export function MemberAllocationRow({
   locale?: string
 }) {
   return (
-    <div className="flex items-start justify-between gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 py-1.5">
+    <div className="flex items-start justify-between gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-2 py-1.5">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] text-[var(--apple-label)]">
+        <p className="truncate apple-type-subheadline text-[var(--plan-text)]">
           {allocation.taskKey ? (
-            <span className="font-apple-mono text-[11px] text-[var(--apple-tertiary-label)]">
+            <span className="font-apple-mono apple-type-caption text-[var(--plan-muted)]">
               {allocation.taskKey}{' '}
             </span>
           ) : null}
@@ -195,7 +198,7 @@ export function MemberAllocationRow({
         </p>
         <span
           data-testid={`source-${allocation.allocationId}`}
-          className="text-[11px] text-[var(--apple-secondary-label)]"
+          className="apple-type-caption text-[var(--plan-secondary)]"
         >
           {standupStrings.allocation.source[allocation.source]()}
         </span>
@@ -217,7 +220,7 @@ export function MemberAllocationRow({
         aria-label={standupStrings.allocation.removeRow({
           task: allocation.taskKey ?? allocation.title
         })}
-        className="apple-transition shrink-0 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-1 text-[11px] text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-[var(--apple-system-red)] disabled:opacity-40"
+        className="apple-transition shrink-0 rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] px-2 py-1 apple-type-caption text-[var(--plan-secondary)] hover:bg-[var(--plan-raised)] hover:text-[var(--plan-danger)] disabled:opacity-40"
       >
         ✕
       </button>
@@ -270,7 +273,7 @@ export function MemberRunDetails({
         onClick={() => setBreakdownOpen(true)}
         aria-label={standupStrings.allocation.breakdownTrigger({ name: member.name })}
         className={cn(
-          'apple-transition font-apple-mono self-start rounded-full border border-[var(--apple-separator)] px-2 py-0.5 text-[11px] tabular-nums text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)]'
+          'apple-transition font-apple-mono self-start rounded-full border border-[var(--plan-border)] px-2 py-0.5 apple-type-caption tabular-nums text-[var(--plan-secondary)] hover:bg-[var(--plan-raised)]'
         )}
       >
         {formatMinutesAsHours(capacity.effectiveMinutes, { locale })}
@@ -314,18 +317,18 @@ function CapacityBreakdownList({
   locale?: string
 }) {
   return (
-    <div className="flex flex-col gap-2 text-[13px]">
+    <div className="flex flex-col gap-2 apple-type-subheadline">
       <div className="flex justify-between">
-        <span className="text-[var(--apple-secondary-label)]">
+        <span className="text-[var(--plan-secondary)]">
           {standupStrings.allocation.breakdownNominal()}
         </span>
-        <span className="font-apple-mono tabular-nums text-[var(--apple-label)]">
+        <span className="font-apple-mono tabular-nums text-[var(--plan-text)]">
           {formatMinutesAsHours(nominalMinutes, { locale })}
         </span>
       </div>
 
       {adjustments.length === 0 ? (
-        <p className="text-[var(--apple-secondary-label)]">
+        <p className="text-[var(--plan-secondary)]">
           {standupStrings.allocation.breakdownNoAdjustments()}
         </p>
       ) : (
@@ -339,8 +342,8 @@ function CapacityBreakdownList({
               data-testid={`adjustment-${adjustment.type}`}
               className="flex justify-between gap-2"
             >
-              <span className="truncate text-[var(--apple-label)]">{adjustment.label}</span>
-              <span className="font-apple-mono shrink-0 tabular-nums text-[var(--apple-secondary-label)]">
+              <span className="truncate text-[var(--plan-text)]">{adjustment.label}</span>
+              <span className="font-apple-mono shrink-0 tabular-nums text-[var(--plan-secondary)]">
                 −{formatMinutesAsHours(adjustment.minutes, { locale })}
               </span>
             </li>
@@ -348,7 +351,7 @@ function CapacityBreakdownList({
         </ul>
       )}
 
-      <div className="flex justify-between border-t border-[var(--apple-separator)] pt-2 font-semibold text-[var(--apple-label)]">
+      <div className="flex justify-between border-t border-[var(--plan-border)] pt-2 font-semibold text-[var(--plan-text)]">
         <span>{standupStrings.allocation.breakdownEffective()}</span>
         <span className="font-apple-mono tabular-nums">
           {formatMinutesAsHours(effectiveMinutes, { locale })}
@@ -358,7 +361,7 @@ function CapacityBreakdownList({
       {/* OB-10. Without this, a full day on a day holding a two-hour review
           reads as a defect rather than as the project's setting. */}
       {!ceremoniesConsumeCapacity && (
-        <p className="rounded-[var(--apple-radius-sm)] bg-[var(--apple-tertiary-fill)] p-2 text-[11px] text-[var(--apple-secondary-label)]">
+        <p className="rounded-[var(--apple-radius-sm)] bg-[var(--plan-raised)] p-2 apple-type-caption text-[var(--plan-secondary)]">
           {standupStrings.capacity.ceremoniesNotDeducted()}
         </p>
       )}

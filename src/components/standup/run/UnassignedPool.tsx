@@ -12,20 +12,17 @@ import {
   type AssignableMemberView,
   type AssignableTaskView
 } from '../shared/AssignableTask'
-import {
-  FIELD_CLASSES,
-  TaskAssignmentSplitScreen
-} from '../shared/TaskAssignmentSplitScreen'
+import { planButtonClass, planFieldClass } from '../planning/ui'
+import { TaskAssignmentSplitScreen } from '../shared/TaskAssignmentSplitScreen'
 
 import type { BoardMemberView } from './CapacityBoard'
-import { CARD_TITLE_CLASSES } from './ui'
 
 /**
  * Panel 5's assignment surface (§15.8.7) — ALO-13 … ALO-17.
  *
  * The file is still called `UnassignedPool` because the pool is still what
  * drives it, but since Task 8 it is the whole of Panel 5: the pool's two tabs,
- * and the shared `TaskAssignmentSplitScreen` that sprint planning also uses,
+ * and the shared `TaskAssignmentSplitScreen`,
  * with the team's cards down its right-hand side. The bespoke pool list, its
  * own drag wiring and the separate capacity column are gone; what is left here
  * is the run screen's own business.
@@ -165,16 +162,13 @@ export function UnassignedPool({
         {/* D-K — the pool paginates rather than loading an unbounded sprint.
             Distinct from the split screen's own "showing N of M", which
             counts what the filters left of the tab currently open. */}
-        <div className="flex items-center gap-2 text-[11px] text-[var(--sur-muted)]">
+        <div className="apple-type-caption flex items-center gap-2 text-[var(--plan-muted)]">
           <span>{standupStrings.pool.showingCount({ shown, total: totalCount })}</span>
           {onShowMore && shown < totalCount && (
             <button
               type="button"
               onClick={onShowMore}
-              className={cn(
-                FIELD_CLASSES,
-                'apple-transition h-7 hover:bg-[var(--apple-quaternary-fill)]'
-              )}
+              className={planButtonClass('secondary', undefined, 'sm')}
             >
               {standupStrings.pool.showMore()}
             </button>
@@ -188,7 +182,7 @@ export function UnassignedPool({
         className="grid-cols-[minmax(0,1fr)] gap-5"
         repositoryTitle={standupStrings.run.allocationBacklogTitle()}
         teamTitle={standupStrings.run.allocationBoardTitle()}
-        headingClassName={CARD_TITLE_CLASSES}
+        headingClassName="apple-type-body font-semibold text-[var(--plan-text)]"
         panelClassName="p-5"
         sprintLabel={sprintLabel}
         tasks={tasks}
@@ -244,10 +238,10 @@ function PoolTab({
       onClick={() => onSelect(id)}
       onKeyDown={onKeyDown}
       className={cn(
-        'apple-transition rounded-[var(--sur-radius-control)] px-2.5 py-1 text-[11px] font-semibold',
+        'apple-transition apple-type-caption rounded-[var(--apple-radius-sm)] px-2.5 py-1 font-semibold',
         selected
-          ? 'bg-[var(--sur-blue-tint)] text-[var(--sur-blue)]'
-          : 'text-[var(--sur-muted)] hover:bg-[var(--sur-surface)] hover:text-[var(--sur-text)]'
+          ? 'bg-[var(--plan-info-bg)] text-[var(--plan-accent-ink)]'
+          : 'text-[var(--plan-muted)] hover:bg-[var(--plan-surface)] hover:text-[var(--plan-text)]'
       )}
     >
       {label}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { Button } from '@/components/ui/Button'
+import { PlanButton } from '../planning/ui'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { MIN_REVISION_DETAIL_LENGTH, REVISION_REASONS, type RevisionReason } from '@/lib/standup/estimates'
@@ -36,7 +36,7 @@ import { standupStrings } from '@/lib/standup/strings'
  */
 
 const SELECT_CLASS =
-  'h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] px-2.5 text-[13px] text-[var(--apple-label)] transition-all focus-visible:border-[var(--apple-system-blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]/40 disabled:cursor-not-allowed disabled:opacity-50'
+  'h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-raised)] px-2.5 apple-type-subheadline text-[var(--plan-text)] transition-all focus-visible:border-[var(--plan-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--plan-accent)]/40 disabled:cursor-not-allowed disabled:opacity-50'
 
 export interface ReviseEstimateTarget {
   allocationId: string
@@ -82,31 +82,31 @@ export function ReviseEstimateModal({
   const projectedTotal = minutes(target.totalLoggedMinutesOnTask + remaining)
 
   return (
-    <div className="flex w-full flex-col gap-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-5 shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
+    <div className="flex w-full flex-col gap-4 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-5 shadow-[var(--plan-shadow)]">
       <div>
-        <h3 id="revise-title" className="text-[15px] font-semibold text-[var(--apple-label)]">
+        <h3 id="revise-title" className="apple-type-body font-semibold text-[var(--plan-text)]">
           {standupStrings.variance.reviseTitle()}
         </h3>
-        <p className="mt-1 text-[13px] text-[var(--apple-secondary-label)]">
-          <span className="font-medium text-[var(--apple-label)]">{target.taskKey}</span> {target.title}
+        <p className="mt-1 apple-type-subheadline text-[var(--plan-secondary)]">
+          <span className="font-medium text-[var(--plan-text)]">{target.taskKey}</span> {target.title}
         </p>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-3 text-[13px]">
-        <dt className="text-[var(--apple-tertiary-label)]">Original estimate</dt>
-        <dd data-testid="revise-original" className="text-right font-apple-mono tabular-nums text-[var(--apple-label)]">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-[var(--apple-radius-md)] border border-[var(--plan-border)] bg-[var(--plan-raised)] p-3 apple-type-subheadline">
+        <dt className="text-[var(--plan-muted)]">Original estimate</dt>
+        <dd data-testid="revise-original" className="text-right font-apple-mono tabular-nums text-[var(--plan-text)]">
           {formatMinutesAsHours(target.originalEstimateMinutes, { locale })}
         </dd>
-        <dt className="text-[var(--apple-tertiary-label)]">Total logged so far</dt>
-        <dd data-testid="revise-logged" className="text-right font-apple-mono tabular-nums text-[var(--apple-label)]">
+        <dt className="text-[var(--plan-muted)]">Total logged so far</dt>
+        <dd data-testid="revise-logged" className="text-right font-apple-mono tabular-nums text-[var(--plan-text)]">
           {formatMinutesAsHours(target.totalLoggedMinutesOnTask, { locale })}
         </dd>
         {target.taskVarianceMinutes > 0 && (
           <>
-            <dt className="text-[var(--apple-system-orange)]">Currently over by</dt>
+            <dt className="text-[var(--plan-warning)]">Currently over by</dt>
             <dd
               data-testid="revise-over"
-              className="text-right font-apple-mono tabular-nums text-[var(--apple-system-orange)]"
+              className="text-right font-apple-mono tabular-nums text-[var(--plan-warning)]"
             >
               {formatMinutesAsHours(target.taskVarianceMinutes, { locale })}
             </dd>
@@ -156,7 +156,7 @@ export function ReviseEstimateModal({
             onChange={(event) => setDetail(event.target.value)}
             aria-describedby="revise-detail-hint"
           />
-          <span id="revise-detail-hint" className="text-[11px] text-[var(--apple-tertiary-label)]">
+          <span id="revise-detail-hint" className="apple-type-caption text-[var(--plan-muted)]">
             {standupStrings.variance.reviseDetailRequired({
               minLength: MIN_REVISION_DETAIL_LENGTH
             })}
@@ -164,12 +164,12 @@ export function ReviseEstimateModal({
         </div>
       )}
 
-      <p className="text-[11px] text-[var(--apple-tertiary-label)]">
+      <p className="apple-type-caption text-[var(--plan-muted)]">
         {standupStrings.variance.reviseOriginalUnchanged()}
       </p>
 
       {hasHours && (
-        <p data-testid="revise-projected" className="text-[13px] text-[var(--apple-label)]">
+        <p data-testid="revise-projected" className="apple-type-subheadline text-[var(--plan-text)]">
           {standupStrings.variance.reviseProjectedTotal({
             name: target.memberName,
             total: projectedTotal,
@@ -179,10 +179,10 @@ export function ReviseEstimateModal({
       )}
 
       <div className="flex justify-end gap-2 pt-1">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <PlanButton tone="secondary" onClick={onCancel}>
           Cancel
-        </Button>
-        <Button
+        </PlanButton>
+        <PlanButton tone="primary"
           type="button"
           disabled={!canSave}
           onClick={() =>
@@ -195,7 +195,7 @@ export function ReviseEstimateModal({
           }
         >
           Save
-        </Button>
+        </PlanButton>
       </div>
     </div>
   )

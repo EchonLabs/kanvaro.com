@@ -4,8 +4,9 @@ import { standupStrings } from '@/lib/standup/strings'
 import { formatMinutesAsHours } from '@/lib/standup/minutes'
 import type { OpenTaskReadiness, ProjectedOutcome, CarryForwardDispositionRow } from '@/lib/standup/sprint-close'
 import { cn } from '@/lib/utils'
+import { AlertTriangle } from 'lucide-react'
 
-import { IssueCount, SCROLL_CLASSES, SCROLL_MAX } from './ui'
+import { PLAN_SCROLL_MAX, PlanBanner, PlanCard, PlanCount, planFieldClass } from '../planning/ui'
 
 /**
  * §15.8.11 — the panel inserted between Panel 5 and Panel 6 on the sprint's
@@ -36,9 +37,9 @@ const OUTCOME_LABEL: Record<ProjectedOutcome, () => string> = {
 }
 
 const OUTCOME_TONE: Record<ProjectedOutcome, string> = {
-  will_finish: 'text-[var(--apple-system-green)]',
-  at_risk: 'text-[var(--apple-system-orange)]',
-  cannot_finish: 'text-[var(--apple-system-red)]'
+  will_finish: 'text-[var(--plan-success)]',
+  at_risk: 'text-[var(--plan-warning)]',
+  cannot_finish: 'text-[var(--plan-danger)]'
 }
 
 export interface SprintCloseReadinessPanelProps {
@@ -57,33 +58,40 @@ export function SprintCloseReadinessPanel({
   locale
 }: SprintCloseReadinessPanelProps) {
   return (
-    <section
+    <PlanCard
       id="panel-5-5"
       aria-labelledby="panel-5-5-heading"
-      className="scroll-mt-6 flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/[0.03] p-4"
-    >
-      <div className="flex items-center gap-2">
-        <h3 id="panel-5-5-heading" className="apple-section-label text-[var(--apple-system-orange)]">
-          {standupStrings.run.sprintCloseTitle()}
-        </h3>
-        <IssueCount
+      title={standupStrings.run.sprintCloseTitle()}
+      headingLevel="h3"
+      headingId="panel-5-5-heading"
+      // `color-mix()` rather than the `/N` opacity modifier: in Tailwind 3 an
+      // alpha modifier on a `var()` colour emits no CSS at all, so the panel
+      // would have neither tint nor warning border. Same precedent as the
+      // note in WorkingCalendarSettings.tsx. The `color:` type hint is
+      // required too: without it tailwind-merge reads the border as a WIDTH
+      // and drops the card's `border` class (no border at all), and keeps the
+      // card's surface fill, which then wins the cascade over the tint.
+      className="border-[color:color-mix(in_srgb,var(--plan-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--plan-warning)_6%,transparent)]"
+      aside={
+        <PlanCount
           count={openTasks.length}
           label={standupStrings.run.sprintCloseIssueCount({ count: openTasks.length })}
         />
-      </div>
+      }
+    >
 
       {/* On the final day this table is every task still open in the sprint, so
           it is the one panel whose length is bounded by nothing at all. It keeps
           its horizontal scroll (six columns on a narrow window) and gains a
           vertical one. */}
       <div className={cn(
-        'overflow-x-auto rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background',
-        SCROLL_CLASSES,
-        SCROLL_MAX
+        'overflow-x-auto rounded-[var(--apple-radius-md)] border border-[var(--plan-border)] bg-[var(--plan-surface)]',
+        'plan-scroll',
+        PLAN_SCROLL_MAX
       )}>
-        <table className="w-full min-w-[36rem] text-[13px]">
+        <table className="w-full min-w-[36rem] apple-type-subheadline">
           <thead>
-            <tr className="border-b border-[var(--apple-separator)] text-left text-[11px] uppercase tracking-wide text-[var(--apple-tertiary-label)]">
+            <tr className="border-b border-[var(--plan-border)] text-left apple-type-caption uppercase tracking-wide text-[var(--plan-muted)]">
               <th className="py-2 pl-3 pr-2 font-medium">Task</th>
               <th className="py-2 pr-2 font-medium">Owner</th>
               <th className="py-2 pr-2 font-medium">Remaining</th>
@@ -96,20 +104,20 @@ export function SprintCloseReadinessPanel({
             {openTasks.map((task) => {
               const labelId = `disposition-label-${task.taskId}`
               return (
-                <tr key={task.taskId} className="border-b border-[var(--apple-separator)] last:border-0">
-                  <td className="py-2 pl-3 pr-2 font-apple-mono text-[11px] text-[var(--apple-label)]">
+                <tr key={task.taskId} className="border-b border-[var(--plan-border)] last:border-0">
+                  <td className="py-2 pl-3 pr-2 font-apple-mono apple-type-caption text-[var(--plan-text)]">
                     {task.taskKey ?? task.taskId}
                   </td>
-                  <td className="py-2 pr-2 text-[13px] text-[var(--apple-secondary-label)]">
+                  <td className="py-2 pr-2 apple-type-subheadline text-[var(--plan-secondary)]">
                     {task.ownerName ?? '—'}
                   </td>
-                  <td className="py-2 pr-2 font-apple-mono text-[13px] tabular-nums text-[var(--apple-secondary-label)]">
+                  <td className="py-2 pr-2 font-apple-mono apple-type-subheadline tabular-nums text-[var(--plan-secondary)]">
                     {formatMinutesAsHours(task.remainingEstimateMinutes, { locale })}
                   </td>
-                  <td className="py-2 pr-2 font-apple-mono text-[13px] tabular-nums text-[var(--apple-secondary-label)]">
+                  <td className="py-2 pr-2 font-apple-mono apple-type-subheadline tabular-nums text-[var(--plan-secondary)]">
                     {formatMinutesAsHours(task.hoursAvailableTodayMinutes, { locale })}
                   </td>
-                  <td className={`py-2 pr-2 text-[13px] font-medium ${OUTCOME_TONE[task.projectedOutcome]}`}>
+                  <td className={`py-2 pr-2 apple-type-subheadline font-medium ${OUTCOME_TONE[task.projectedOutcome]}`}>
                     {OUTCOME_LABEL[task.projectedOutcome]()}
                   </td>
                   <td className="py-2 pr-3">
@@ -126,7 +134,7 @@ export function SprintCloseReadinessPanel({
                       onChange={(event) =>
                         onSetDisposition(task.taskId, event.target.value as DispositionType)
                       }
-                      className="h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-[13px] text-[var(--apple-label)]"
+                      className={planFieldClass}
                     >
                       <option value="" disabled>
                         {standupStrings.run.sprintCloseNoDisposition()}
@@ -146,18 +154,18 @@ export function SprintCloseReadinessPanel({
       </div>
 
       {carryForwardOffenders.length > 0 && (
-        <div className="rounded-[var(--apple-radius-md)] border border-[var(--apple-system-orange)]/30 bg-[var(--apple-system-orange)]/[0.06] p-3 text-[13px]">
-          <p className="font-medium text-[var(--apple-label)]">{standupStrings.run.sprintCloseCarryForwardTitle()}</p>
-          <ul className="list-disc pl-4 text-[var(--apple-label)]">
+        <PlanBanner tone="warning" bordered role="presentation" icon={<AlertTriangle strokeWidth={2} />}>
+          <p className="font-medium text-[var(--plan-text)]">{standupStrings.run.sprintCloseCarryForwardTitle()}</p>
+          <ul className="list-disc pl-4 text-[var(--plan-text)]">
             {carryForwardOffenders.map((item) => (
               <li key={item.itemId}>{item.taskKey ?? item.itemId}</li>
             ))}
           </ul>
-          <p className="mt-1 text-[var(--apple-secondary-label)]">
+          <p className="mt-1 text-[var(--plan-secondary)]">
             {standupStrings.run.sprintCloseCarryForwardHint()}
           </p>
-        </div>
+        </PlanBanner>
       )}
-    </section>
+    </PlanCard>
   )
 }

@@ -1404,11 +1404,11 @@ describe('Panels 2 and 3 — the review row (side by side)', () => {
   it('gives each panel its own card shell rather than a sub-heading inside one', () => {
     renderScreen(reviewData())
 
-    // `CARD_CLASSES` carries the surface token; an embedded panel has no
+    // `PlanCard` carries the surface token; an embedded panel has no
     // background of its own. This is the one thing that tells a reader the
     // two panels are peers.
-    expect(document.getElementById('panel-2')!.className).toContain('--sur-surface')
-    expect(document.getElementById('panel-3')!.className).toContain('--sur-surface')
+    expect(document.getElementById('panel-2')!.className).toContain('--plan-surface')
+    expect(document.getElementById('panel-3')!.className).toContain('--plan-surface')
   })
 
   it('no longer renders the rule that separated the stacked panels', () => {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { Button } from '@/components/ui/Button'
+import { PlanButton } from '../planning/ui'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { standupStrings } from '@/lib/standup/strings'
@@ -21,7 +21,7 @@ import { standupStrings } from '@/lib/standup/strings'
  */
 
 const SELECT_CLASS =
-  'h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] px-2.5 text-[13px] text-[var(--apple-label)] transition-all focus-visible:border-[var(--apple-system-blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]/40 disabled:cursor-not-allowed disabled:opacity-50'
+  'h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-raised)] px-2.5 apple-type-subheadline text-[var(--plan-text)] transition-all focus-visible:border-[var(--plan-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--plan-accent)]/40 disabled:cursor-not-allowed disabled:opacity-50'
 
 const BLOCKER_TYPES = [
   'dependency',
@@ -68,7 +68,7 @@ export function RaiseBlockerModal({ tasks, onSubmit, onCancel }: RaiseBlockerMod
 
   return (
     <div className="flex w-full flex-col gap-4 p-5">
-      <h2 id="raise-blocker-title" className="text-[15px] font-semibold text-[var(--apple-label)]">
+      <h2 id="raise-blocker-title" className="apple-type-body font-semibold text-[var(--plan-text)]">
         {standupStrings.blocker.raise()}
       </h2>
 
@@ -134,10 +134,10 @@ export function RaiseBlockerModal({ tasks, onSubmit, onCancel }: RaiseBlockerMod
       </div>
 
       <div className="flex justify-end gap-2 pt-1">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <PlanButton tone="secondary" onClick={onCancel}>
           Cancel
-        </Button>
-        <Button
+        </PlanButton>
+        <PlanButton tone="primary"
           type="button"
           disabled={!canSubmit}
           onClick={() => {
@@ -152,7 +152,7 @@ export function RaiseBlockerModal({ tasks, onSubmit, onCancel }: RaiseBlockerMod
           }}
         >
           {standupStrings.blocker.raise()}
-        </Button>
+        </PlanButton>
       </div>
     </div>
   )
