@@ -29,7 +29,6 @@ import {
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
-import { ArrowLeftRight } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
@@ -40,6 +39,7 @@ import {
   type ScopeTask
 } from './types'
 import {
+  MovePicker,
   PlanAvatar,
   PlanCard,
   PlanDragOverlay,
@@ -49,9 +49,6 @@ import {
 } from './ui'
 
 const UNASSIGNED_LANE = 'unassigned'
-
-/** Says out loud that picking one of these people changes the sprint roster. */
-const QA_GROUP_LABEL = 'QA — will be added to the sprint team'
 
 export interface AssignmentBoardProps {
   tasks: ScopeTask[]
@@ -341,68 +338,5 @@ function DraggableAssignmentCard({
       className="cursor-grab"
       action={picker}
     />
-  )
-}
-
-/**
- * The card's move button is a native select dressed as an icon button, so
- * the keyboard path gets the platform picker for free and QA can be offered
- * under a group label that says what choosing them does.
- */
-function MovePicker({
-  task,
-  value,
-  teamOptions,
-  qaOptions,
-  busy,
-  onChange
-}: {
-  task: ScopeTask
-  value: string | null
-  teamOptions: AssignableMember[]
-  qaOptions: AssignableMember[]
-  busy: boolean
-  onChange: (memberId: string | null) => void
-}) {
-  return (
-    <label
-      title="Move to another owner"
-      className={planButtonClass(
-        'secondary',
-        cn(
-          planTaskActionClass,
-          'relative w-7 cursor-pointer px-0 focus-within:ring-2 focus-within:ring-[var(--plan-accent)]'
-        ),
-        'sm'
-      )}
-      // Stops the card's drag listener from claiming the pointer.
-      onPointerDown={(event) => event.stopPropagation()}
-      onKeyDown={(event) => event.stopPropagation()}
-    >
-      <ArrowLeftRight aria-hidden />
-      <select
-        aria-label={`Assign ${task.title} to`}
-        value={value ?? ''}
-        disabled={busy}
-        onChange={(event) => onChange(event.target.value || null)}
-        className="absolute inset-0 cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
-      >
-        <option value="">Unassigned</option>
-        {teamOptions.map((member) => (
-          <option key={member.memberId} value={member.memberId}>
-            {member.name}
-          </option>
-        ))}
-        {qaOptions.length > 0 && (
-          <optgroup label={QA_GROUP_LABEL}>
-            {qaOptions.map((member) => (
-              <option key={member.memberId} value={member.memberId}>
-                {member.name}
-              </option>
-            ))}
-          </optgroup>
-        )}
-      </select>
-    </label>
   )
 }
