@@ -750,6 +750,11 @@
   --apple-card-gradient:  #FF7A00;
   --primary: 29 100% 50%;
   --ring:    29 100% 50%;
+  --plan-accent-ink: #BD5A00;            /* 4.54:1 on #FFFFFF */
+}
+
+.dark[data-theme="orange"] {
+  --plan-accent-ink: #FF7A00;            /* 6.51:1 on #1C1C1E */
 }
 
 [data-theme="purple"] {
@@ -761,8 +766,21 @@
   --apple-card-gradient:  #9B5FE8;
   --primary: 270 72% 63%;
   --ring:    270 72% 63%;
+  --plan-accent-ink: #8854CC;            /* 5.02:1 on #FFFFFF */
 }
 
+.dark[data-theme="purple"] {
+  --plan-accent-ink: #A067E9;            /* 4.55:1 on #1C1C1E */
+}
+
+/* Red is stepped much harder than the 4.5:1 floor on purpose. At the floor
+   the ink lands on #E3282B, which is 1.18:1 against --plan-danger #D70015 —
+   a failing check and a link would render the same colour. Colour cannot fix
+   this fully (both must be red and both must clear 4.5:1 on one surface,
+   which traps them in a narrow band); this takes the ~1.7:1 that is
+   available and leaves danger the brighter of the two, so errors shout
+   louder than links. The real guarantee is that no danger state relies on
+   colour alone. */
 [data-theme="red"] {
   --apple-chart-from:     #FF2D30;
   --apple-chart-to:       #FF2D30;
@@ -772,6 +790,11 @@
   --apple-card-gradient:  #FF2D30;
   --primary: 357 100% 59%;
   --ring:    357 100% 59%;
+  --plan-accent-ink: #8E1018;            /* 9.39:1 on #FFFFFF; 1.74:1 vs --plan-danger */
+}
+
+.dark[data-theme="red"] {
+  --plan-accent-ink: #FF8085;            /* 7.03:1 on #1C1C1E; 1.41:1 vs --plan-danger */
 }
 
 /* Task description formatting */
@@ -852,8 +875,8 @@
 
 /* Sprint planning surface.
 
-   Derived from the app's Apple HIG tokens, as the run screen's `--sur-*`
-   palette is, rather than the Figma "Dark sprint planning" hexes it started
+   Derived from the app's Apple HIG tokens, as the stand-up run screen
+   now is, rather than the Figma "Dark sprint planning" hexes it started
    from — those were a parallel design system that made planning look like a
    different product to the sprint page it is reached from.
 
@@ -872,6 +895,19 @@
   --plan-text: var(--apple-label);
   --plan-muted: var(--apple-secondary-label);
   --plan-accent: var(--apple-card-gradient);
+  /* Accent as *text*. The themeable accent fails AA as ink in all four
+     themes (blue 3.23:1, orange 2.61:1, purple 4.04:1, red 3.70:1 on white),
+     so each theme carries a stepped ink beside the fill — the same technique
+     the --viz-* chart palette uses, for the same reason. Overridden in each
+     [data-theme] block; blue is the default and lives here. */
+  --plan-accent-ink: #0A6CFF;            /* 4.56:1 on #FFFFFF */
+  --plan-secondary: #48484E;             /* 9.08:1 — the step between text and muted */
+  --plan-disabled: var(--apple-tertiary-label);
+  /* The one vivid fill the module needs: the issue-count pill and the
+     Backfill / Resume buttons carry white text on red. Accent fills use
+     --plan-accent directly, which is already solid and should follow the
+     user's theme. */
+  --plan-danger-solid: var(--apple-system-red);
   --plan-danger: #D70015;
   --plan-warning: #A66300;
   --plan-success: #22843A;
@@ -888,11 +924,13 @@
   --plan-danger: var(--apple-system-red);
   --plan-warning: var(--apple-system-orange);
   --plan-success: var(--apple-system-green);
+  --plan-accent-ink: #3D8EFF;            /* 5.28:1 on #1C1C1E */
+  --plan-secondary: #D1D1D6;             /* 11.18:1 on #1C1C1E */
   --plan-shadow: none;
 }
 
 /* A fixed-height task list on the planning screen: the scope panes and the
-   assignment lanes. Same reasoning as the run screen's `.sur-scroll` — the
+   assignment lanes. Same reasoning as the stand-up run screen's lists — the
    global hairline scrollbar gives no signal that a clipped list has more
    below — so these get a visible track. Opt-in by class. */
 .plan-scroll {
@@ -923,10 +961,20 @@
   background-clip: padding-box;
 }
 
+/* A printed page has no scrollbars: a capped scroll box must print in full
+   rather than clipped to whatever height the screen chose. Scoped to the
+   summary, which is the surface anyone prints. */
+@media print {
+  .standup-summary .plan-scroll {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
 /* My Stand-up surface.
 
-   Derived from the app's Apple HIG tokens, exactly as the run screen's
-   `--sur-*` and sprint planning's `--plan-*` are, rather than the Figma "My
+   Derived from the app's Apple HIG tokens, exactly as sprint planning
+   `--plan-*` is, rather than the Figma "My
    Stand-up page redesign" hexes it started from — those were a Tailwind
    slate/blue-600 ramp, and slate's blue cast plus a `#2563EB` accent made this
    screen read as a different, bluer product than the sprint planning screen a
@@ -1020,158 +1068,4 @@
 
 .standup-oversight {
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
-
-/* Stand-up run screen (facilitator).
-
-   The palette is *derived from the app's Apple HIG tokens*, not from the
-   Figma comp's slate hexes. The comp's values were a second, parallel design
-   system — Tailwind slate surfaces, a #2563EB blue, an Inter typeface — which
-   meant the run screen looked like a different product to every other page in
-   Kanvaro. Each `--sur-*` below now points at an `--apple-*` token, or at a
-   stepped shade of the matching Apple system colour where the vivid system
-   colour cannot carry 11-13px text.
-
-   Two tokens per accent, because the run screen uses each accent both ways:
-     · `--sur-<hue>`        — the ink. Stepped until it clears 4.5:1 as text
-                              against `--sur-surface` (measured ratios noted).
-     · `--sur-<hue>-solid`  — the vivid Apple system colour, for filled
-                              surfaces carrying white text (the Complete
-                              button, the Start button) where the ink step
-                              would read as muddy.
-   Apple's own systemGreen (2.22:1 on white) and systemOrange (2.20:1) are the
-   reason the pair exists; the Figma comp's #10B981 green was 2.3:1, i.e. the
-   old palette had the same hole.
-
-   The typeface is *not* overridden here. The scope used to set Inter, which
-   fought `body`'s 'Nunito Sans' everywhere else in the app; the run screen now
-   inherits it like every other page.
-
-   Radius tokens are likewise no longer downgraded. The scope previously
-   re-pointed `--apple-radius-sm/md/lg` to 6/8/12px, which quietly reshaped the
-   shared task repository, member cards and modals that sprint planning also
-   renders. The run screen now reads the app's 10/14/16px through
-   `--sur-radius-*`. */
-/* The summary screen shares this scope rather than defining a third palette:
-   it is the same module's read-only face, its Figma redesign draws the same
-   surfaces, tints and badges, and a summary whose greens and greys drifted
-   from the run screen it summarises would read as a different product. */
-.standup-run,
-.standup-summary {
-  /* No `--sur-canvas`: the page's own background comes from `MainLayout`, and
-     the comp's canvas token was never read by anything in the scope. */
-  --sur-surface: var(--apple-system-background);
-  --sur-inset: var(--apple-quaternary-fill);
-  --sur-border: var(--apple-separator);
-  --sur-track: var(--apple-tertiary-fill);
-
-  /* Ink hierarchy. Apple's alpha labels give 10.9 / 2.3 / 1.5 against white —
-     usable for the top step only — so the middle two are explicit shades of
-     the same rgba(60,60,67) ink, chosen to keep three visibly distinct steps
-     that all clear AA at 11px. */
-  --sur-text: var(--apple-label);
-  --sur-secondary: #48484E;              /* 9.08:1 on #FFFFFF */
-  --sur-muted: #6A6A70;                  /* 5.37:1 */
-  --sur-disabled: var(--apple-tertiary-label);
-
-  --sur-blue: #0A6CFF;                   /* 4.56:1 — systemBlue, one step down */
-  --sur-blue-solid: var(--apple-system-blue);
-  --sur-green: #22843A;                  /* 4.74:1 — systemGreen, stepped */
-  --sur-green-solid: var(--apple-system-green);
-  --sur-amber: #A66300;                  /* 4.77:1 — systemOrange, stepped */
-  --sur-amber-solid: var(--apple-system-orange);
-  --sur-red: #D70015;                    /* 5.38:1 — Apple accessibleSystemRed */
-  --sur-red-solid: var(--apple-system-red);
-
-  /* Tints at 12%, matching the badge tints the rest of the app uses. Mixed
-     from the *solid* colour, so a tint stays the recognisable Apple hue while
-     the text on it is the stepped ink. */
-  --sur-blue-tint: color-mix(in srgb, var(--sur-blue-solid) 12%, transparent);
-  --sur-green-tint: color-mix(in srgb, var(--sur-green-solid) 12%, transparent);
-  --sur-amber-tint: color-mix(in srgb, var(--sur-amber-solid) 12%, transparent);
-  --sur-red-tint: color-mix(in srgb, var(--sur-red-solid) 12%, transparent);
-  --sur-neutral-tint: var(--apple-tertiary-fill);
-
-  --sur-radius-card: var(--apple-radius-lg);       /* 16px */
-  --sur-radius-inset: var(--apple-radius-md);      /* 14px */
-  --sur-radius-control: var(--apple-radius-sm);    /* 10px */
-  --sur-radius-pill: var(--apple-radius-pill);
-
-  color: var(--sur-text);
-}
-
-.dark .standup-run,
-.dark .standup-summary {
-  /* The two surface steps swap: on Apple dark, a card is the *secondary*
-     background (#1C1C1E) sitting on true black, which is also what the app's
-     shadcn `--card` resolves to — so the run screen's cards and the shared
-     `bg-card` pieces inside them stay the same colour. */
-  --sur-surface: var(--apple-secondary-system-background);
-  --sur-inset: var(--apple-tertiary-system-background);
-
-  --sur-secondary: #D1D1D6;              /* 11.18:1 on #1C1C1E */
-  --sur-muted: #98989F;                  /* 5.94:1 */
-
-  /* Every dark systemColour already clears AA on #1C1C1E (blue 4.66, green
-     8.42, orange 8.28, red 4.99), so ink and solid are the same value here
-     and the `-solid` tokens inherit from the block above. */
-  --sur-blue: var(--apple-system-blue);
-  --sur-green: var(--apple-system-green);
-  --sur-amber: var(--apple-system-orange);
-  --sur-red: var(--apple-system-red);
-}
-
-/* A growable region inside the run screen: the member grid, a yesterday
-   bucket, the carry-forward register, the blocker list. The app's global
-   scrollbar is a 5px transparent-track hairline, which on a clipped panel
-   gives a reader no signal that there is more content below — so these boxes
-   get a visible track. Opt-in by class, never on the page scroller.
-
-   The summary screen shares it, for the same reason it shares the palette:
-   its sections list the same rows, grow with the same sprint, and a clipped
-   list there needs the same "there is more below" signal. The selectors are
-   spelled out per scope rather than dropping the prefix, so the class stays
-   opt-in to these two surfaces and cannot leak onto an unrelated page. */
-.standup-run .sur-scroll,
-.standup-summary .sur-scroll {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--apple-fill) var(--sur-track);
-}
-
-.standup-run .sur-scroll::-webkit-scrollbar,
-.standup-summary .sur-scroll::-webkit-scrollbar {
-  width: 10px;
-}
-
-.standup-run .sur-scroll::-webkit-scrollbar-track,
-.standup-summary .sur-scroll::-webkit-scrollbar-track {
-  background: var(--sur-track);
-  border-radius: var(--apple-radius-pill);
-}
-
-.standup-run .sur-scroll::-webkit-scrollbar-thumb,
-.standup-summary .sur-scroll::-webkit-scrollbar-thumb {
-  background: var(--apple-fill);
-  border-radius: var(--apple-radius-pill);
-  /* A 2px transparent ring so the thumb reads as inset in the track rather
-     than filling it edge to edge. */
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.standup-run .sur-scroll::-webkit-scrollbar-thumb:hover,
-.standup-summary .sur-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--apple-secondary-fill);
-  background-clip: padding-box;
-}
-
-/* A printed summary has no scrollbars: every section prints in full rather
-   than clipped to whatever the screen's cap was. */
-@media print {
-  .standup-summary .sur-scroll {
-    max-height: none !important;
-    overflow: visible !important;
-  }
 }

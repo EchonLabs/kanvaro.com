@@ -526,7 +526,7 @@ export const standupStrings = {
       'The stand-up has started, so your own row is now read-only.',
 
     /**
-     * The red counters beside each panel heading (`IssueCount` in `run/ui.tsx`).
+     * The red counters beside each panel heading (`PlanCount` in `planning/ui.tsx`).
      * Text-only labels: the number itself is rendered visually and hidden from
      * assistive tech, so these carry the whole meaning for a screen reader and
      * must name *what* is being counted, not just repeat the digit.
