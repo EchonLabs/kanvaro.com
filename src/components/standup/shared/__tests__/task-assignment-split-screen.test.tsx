@@ -381,3 +381,24 @@ describe('TaskAssignmentSplitScreen — the right panel', () => {
     expect(screen.getByText('Extra for Nimal Silva')).toBeInTheDocument()
   })
 })
+
+describe('TaskAssignmentSplitScreen — the planning visual language', () => {
+  it('rests with a transparent ring, so the highlight appearing shifts nothing', () => {
+    renderScreen()
+    expect(screen.getByLabelText('Task repository').className).toContain('ring-transparent')
+  })
+
+  it('reaches every member through the shared picker rather than a bare select', () => {
+    renderScreen()
+    // MovePicker wraps its select in a titled icon button.
+    const picker = screen.getAllByTitle('Move to another owner')[0]
+    expect(picker).toBeInTheDocument()
+  })
+
+  it('refuses picker changes while the surface is locked', () => {
+    renderScreen({ busy: true })
+    for (const select of screen.getAllByLabelText(/^Assign .* to$/)) {
+      expect(select).toBeDisabled()
+    }
+  })
+})

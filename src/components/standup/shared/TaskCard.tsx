@@ -20,11 +20,11 @@
  */
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
 
-import { Badge } from '@/components/ui/Badge'
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import { cn } from '@/lib/utils'
+
+import { MovePicker, PlanTaskCard, planPillClass, type PlanPillTone } from '../planning/ui'
 
 import type { AssignableTaskView } from './AssignableTask'
 
@@ -56,23 +56,14 @@ export function readOnlyTaskDraggableId(scopeId: string, taskId: string): string
 }
 
 /**
- * Apple-theme tones for priority.
- *
- * The brief pointed at `UnassignedPool`'s `PoolCard` for an existing mapping,
- * but that card renders priority as plain secondary-label text with no colour
- * at all, and the only coloured mapping in the codebase (`KanbanBoard`'s
- * `getPriorityColor`) is raw Tailwind palette classes that predate the Apple
- * tokens. So this follows `CapacityMeter`'s `TONE` convention instead — the
- * established way this module expresses severity — rather than importing a
- * non-theme palette into the redesign.
- *
- * Colour is never the only carrier: the word itself is the badge's content.
+ * Most urgent reads as danger, least as neutral. Never colour alone: the chip
+ * always carries the priority's name as text.
  */
-const PRIORITY_BADGE: Record<NonNullable<AssignableTaskView['priority']>, string> = {
-  critical: 'bg-[var(--apple-system-red)]/15 text-[var(--apple-system-red)]',
-  high: 'bg-[var(--apple-system-orange)]/15 text-[var(--apple-system-orange)]',
-  medium: 'bg-[var(--apple-system-blue)]/15 text-[var(--apple-system-blue)]',
-  low: 'bg-[var(--apple-secondary-fill)] text-[var(--apple-secondary-label)]'
+const PRIORITY_TONE: Record<string, PlanPillTone> = {
+  critical: 'danger',
+  high: 'warning',
+  medium: 'accent',
+  low: 'neutral'
 }
 
 export interface AssignOption {
@@ -109,10 +100,12 @@ export interface TaskCardProps {
   /** The keyboard equivalent of a drop. `null` clears the assignment. */
   onAssignVia?: (memberId: string | null) => void
   /**
-   * An option with a `group` is rendered inside an `<optgroup>` of that label,
-   * after the ungrouped ones. Planning uses it for people who are not on the
-   * sprint team yet — picking them changes the roster, so the picker says so
-   * instead of listing them beside everyone else.
+   * Options with a `group` are listed after the ungrouped ones, flattened into
+   * `MovePicker`'s single QA optgroup — the group's own label is not used, and
+   * `MovePicker` currently supports only that one group label. Planning uses
+   * it for people who are not on the sprint team yet — picking them changes
+   * the roster, so the picker says so instead of listing them beside everyone
+   * else.
    */
   assignOptions?: AssignOption[]
   /**
@@ -127,8 +120,6 @@ export interface TaskCardProps {
    * namespaced id — see `readOnlyTaskDraggableId` for why.
    */
   dragId?: string
-  /** Tighter row used inside an expanded member card. */
-  compact?: boolean
   disabled?: boolean
   locale?: string
   className?: string
@@ -141,7 +132,6 @@ export function TaskCard({
   assignOptions,
   draggable = true,
   dragId,
-  compact = false,
   disabled = false,
   locale,
   className
@@ -162,162 +152,82 @@ export function TaskCard({
   const dragging = isDragging || dragActive
   const showPicker = Boolean(onAssignVia && assignOptions && assignOptions.length > 0)
   const { ungrouped, groups } = groupAssignOptions(assignOptions ?? [])
+  // `AssignOption` carries { id, name }; MovePicker needs only an id and a name.
+  const teamOptions = ungrouped.map((o) => ({ memberId: o.id, name: o.name }))
+  const qaOptions = groups
+    .flatMap((group) => group.options)
+    .map((o) => ({ memberId: o.id, name: o.name }))
 
   return (
-    <div
+    <PlanTaskCard
       ref={setNodeRef}
+      {...(draggable && !disabled ? { ...listeners, ...attributes } : {})}
       data-testid="task-card"
       data-drag-id={draggableId}
       style={{
         transform: transform ? CSS.Translate.toString(transform) : undefined,
-        touchAction: draggable ? 'none' : undefined
+        touchAction: draggable && !disabled ? 'none' : undefined
       }}
+      taskKey={task.displayId}
+      title={task.title}
+      grip={draggable && !disabled}
+      dragging={dragging}
       className={cn(
-        'apple-transition group flex items-start gap-2 rounded-[var(--apple-radius-md)] border border-[var(--apple-separator)] bg-background text-[13px]',
-        compact ? 'p-2' : 'p-2.5',
-        draggable &&
-          !disabled &&
-          'hover:border-[var(--apple-system-blue)]/40 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)]',
-        dragging && 'z-50 opacity-50 shadow-[0_8px_24px_rgba(0,0,0,0.18)]',
+        'apple-transition',
+        draggable && !disabled && 'cursor-grab',
+        dragging && 'z-50 shadow-[0_8px_24px_rgba(0,0,0,0.18)]',
         className
       )}
-    >
-      {draggable && (
-        <span
-          {...listeners}
-          {...attributes}
-          className={cn(
-            'mt-0.5 shrink-0',
-            disabled ? 'cursor-default' : 'cursor-grab'
-          )}
-        >
-          <GripVertical
-            className="h-3.5 w-3.5 text-[var(--apple-tertiary-label)] opacity-0 group-hover:opacity-100"
-            aria-hidden="true"
+      action={
+        showPicker ? (
+          <MovePicker
+            task={{ _id: task.id, title: task.title }}
+            value={task.assigneeId ?? null}
+            teamOptions={teamOptions}
+            qaOptions={qaOptions}
+            busy={disabled}
+            onChange={(memberId) => {
+              if (memberId === (task.assigneeId ?? null)) return
+              onAssignVia!(memberId)
+            }}
           />
-        </span>
-      )}
-
-      <div className="min-w-0 flex-1">
-        {/* Key and title stay separate elements so each is independently
-            queryable — a single text node containing both matches neither. */}
-        <p className="truncate text-[var(--apple-label)]" title={task.title}>
-          {task.displayId && (
-            <span className="font-apple-mono text-[11px] text-[var(--apple-tertiary-label)]">
-              {task.displayId}{' '}
-            </span>
-          )}
-          <span>{task.title}</span>
-        </p>
-
-        {(task.priority || task.estimateMinutes !== undefined) && (
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        ) : undefined
+      }
+      footer={
+        task.priority || task.estimateMinutes !== undefined || task.skills?.length ? (
+          <>
             {task.priority && (
-              <Badge
+              <span
                 data-testid="task-priority"
-                className={cn('capitalize', PRIORITY_BADGE[task.priority])}
+                className={planPillClass(PRIORITY_TONE[task.priority] ?? 'neutral', 'capitalize')}
               >
                 {task.priority}
-              </Badge>
+              </span>
             )}
             {task.estimateMinutes !== undefined && (
               <span
                 data-testid="task-estimate"
-                className="font-apple-mono text-[11px] tabular-nums text-[var(--apple-secondary-label)]"
+                className="apple-type-caption tabular-nums text-[var(--plan-muted)]"
               >
                 {formatMinutesAsHours(task.estimateMinutes as Minutes, { locale })}
               </span>
             )}
-          </div>
-        )}
-
-        {task.skills && task.skills.length > 0 && (
-          <ul
-            data-testid="task-skills"
-            className="mt-1 flex flex-wrap gap-1"
-            aria-label="Required skills"
-          >
-            {task.skills.map((skill) => (
-              <li key={skill}>
-                <Badge variant="outline" className="px-2 py-0 text-[11px]">
-                  {skill}
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* The keyboard path to the same result as a drag, matching
-          `AssignmentBoard`'s per-row picker. */}
-      {showPicker && (
-        <>
-          <label className="sr-only" htmlFor={`assign-${task.id}`}>
-            Assign {task.title} to
-          </label>
-          <select
-            id={`assign-${task.id}`}
-            disabled={disabled}
-            value={task.assigneeId ?? ''}
-            onPointerDown={(event) => event.stopPropagation()}
-            onChange={(event) => {
-              const next = event.target.value || null
-              if (next === (task.assigneeId ?? null)) return
-              onAssignVia!(next)
-            }}
-            className="h-7 max-w-[8rem] shrink-0 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-transparent px-1.5 text-[11px] text-[var(--apple-label)]"
-          >
-            <option value="">Unassigned</option>
-            {ungrouped.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-            {groups.map((group) => (
-              <optgroup key={group.label} label={group.label}>
-                {group.options.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
+            {task.skills && task.skills.length > 0 && (
+              <ul
+                data-testid="task-skills"
+                className="flex flex-wrap gap-1"
+                aria-label="Required skills"
+              >
+                {task.skills.map((skill) => (
+                  <li key={skill}>
+                    <span className={planPillClass('neutral')}>{skill}</span>
+                  </li>
                 ))}
-              </optgroup>
-            ))}
-          </select>
-        </>
-      )}
-    </div>
-  )
-}
-
-/** The ghost rendered inside `DragOverlay` while a card is in flight. */
-export function TaskCardPreview({
-  task,
-  locale
-}: {
-  task: AssignableTaskView
-  locale?: string
-}) {
-  return (
-    <div className="flex items-center gap-2 rounded-[var(--apple-radius-md)] border border-[var(--apple-system-blue)]/40 bg-card px-2.5 py-2 text-[13px] shadow-[0_10px_28px_rgba(0,0,0,0.22)]">
-      <GripVertical
-        className="h-3.5 w-3.5 shrink-0 text-[var(--apple-system-blue)]"
-        aria-hidden="true"
-      />
-      <div className="min-w-0">
-        <p className="truncate text-[var(--apple-label)]">
-          {task.displayId && (
-            <span className="font-apple-mono text-[11px] text-[var(--apple-tertiary-label)]">
-              {task.displayId}{' '}
-            </span>
-          )}
-          <span>{task.title}</span>
-        </p>
-        {task.estimateMinutes !== undefined && (
-          <span className="font-apple-mono text-[11px] tabular-nums text-[var(--apple-secondary-label)]">
-            {formatMinutesAsHours(task.estimateMinutes as Minutes, { locale })}
-          </span>
-        )}
-      </div>
-    </div>
+              </ul>
+            )}
+          </>
+        ) : null
+      }
+    />
   )
 }

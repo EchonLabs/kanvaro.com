@@ -5,9 +5,12 @@
  *
  * Left: the task repository — search, filters, sort, a scrollable list of
  * draggable `TaskCard`s. Right: the team as expandable cards, each one a drop
- * target. One layout, built once, used by both sprint planning and the
- * stand-up run (wired in Tasks 7-8) through `AssignableTaskView` /
- * `AssignableMemberView`.
+ * target. Its only consumer is `run/UnassignedPool.tsx`; sprint planning
+ * renders its own `planning/AssignmentBoard.tsx`. This surface keeps its
+ * pool-left / members-right layout, because a member card here carries a
+ * capacity meter, debt badges and per-allocation steppers a one-line lane
+ * cannot hold, but it shares planning's visual vocabulary: the same task
+ * card, move picker, drag preview and accent-ring drop highlight.
  *
  * Three decisions worth stating.
  *
@@ -32,7 +35,6 @@ import {
   closestCorners,
   defaultDropAnimation,
   DndContext,
-  DragOverlay,
   PointerSensor,
   useDroppable,
   useSensor,
@@ -43,31 +45,26 @@ import {
 } from '@dnd-kit/core'
 import { Inbox, Users } from 'lucide-react'
 
+import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import { cn } from '@/lib/utils'
+
+import {
+  PlanDragOverlay,
+  planEmptyClass,
+  planFieldClass,
+  PlanTaskCard
+} from '../planning/ui'
 
 import type { AssignableMemberView, AssignableTaskView } from './AssignableTask'
 import { ExpandableMemberCard, memberIdFromDroppableId } from './ExpandableMemberCard'
 import {
   TaskCard,
-  TaskCardPreview,
   taskIdFromDraggableId,
   type AssignOption
 } from './TaskCard'
 
 /** The pool's own droppable — dropping here clears an assignment. */
 export const POOL_DROPPABLE_ID = 'assignment-pool'
-
-/**
- * The filter-control styling for this surface and the run screen's tab strip
- * around it.
- *
- * It used to exist byte-identically here and in `UnassignedPool.tsx`; now that
- * the run screen renders this component, one of the two copies would have been
- * styling nothing. Exported rather than moved to a constants file because this
- * is the only surface that has these controls.
- */
-export const FIELD_CLASSES =
-  'h-8 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-[13px] text-[var(--apple-label)]'
 
 const PRIORITIES = ['critical', 'high', 'medium', 'low'] as const
 
@@ -183,8 +180,9 @@ export interface TaskAssignmentSplitScreenProps {
   /**
    * Overrides the per-card picker's options, which default to every member
    * shown on the right. Planning narrows and groups them: only the sprint team
-   * plus QA who would be admitted by the assignment, the latter under their own
-   * optgroup. Drop targets are unaffected — every member card still takes one.
+   * plus QA who would be admitted by the assignment; grouped options are
+   * flattened into `MovePicker`'s single QA optgroup (it supports only one
+   * group label, so each `group`'s own label is not shown). Drop targets are unaffected — every member card still takes one.
    */
   assignOptions?: AssignOption[]
   renderMemberExpanded?: (member: AssignableMemberView) => React.ReactNode
@@ -218,7 +216,7 @@ export interface TaskAssignmentSplitScreenProps {
   panelClassName?: string
 }
 
-const DEFAULT_HEADING_CLASSES = 'apple-section-label text-[var(--apple-tertiary-label)]'
+const DEFAULT_HEADING_CLASSES = 'apple-section-label text-[var(--plan-muted)]'
 
 export function TaskAssignmentSplitScreen({
   sprintLabel,
@@ -330,6 +328,11 @@ export function TaskAssignmentSplitScreen({
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
+        // Off, as on the planning board: dnd-kit's edge auto-scroll drives the
+        // page scroller whenever the preview nears its edge, accelerating,
+        // and both columns here are fixed-height scroll boxes, so the drop
+        // target is always on screen anyway.
+        autoScroll={false}
         onDragStart={(event: DragStartEvent) => {
           const taskId = taskIdFromDraggableId(String(event.active.id))
           setActiveTask(tasks.find((task) => task.id === taskId) ?? null)
@@ -374,24 +377,24 @@ export function TaskAssignmentSplitScreen({
         <section
           aria-label="Team assignment"
           className={cn(
-            'flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card',
+            'flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)]',
             panelClassName
           )}
         >
           <div className="flex items-baseline justify-between gap-2">
             <h3 className={headingClassName}>{teamTitle}</h3>
-            <span className="font-apple-mono text-[11px] tabular-nums text-[var(--apple-tertiary-label)]">
+            <span className="apple-type-caption tabular-nums text-[var(--plan-muted)]">
               {members.length}
             </span>
           </div>
 
           {members.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] p-5 text-center text-[13px] text-[var(--apple-secondary-label)]">
-              <Users className="h-5 w-5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+            <div className={cn(planEmptyClass, 'flex flex-col items-center gap-1.5 p-5')}>
+              <Users className="h-5 w-5 text-[var(--plan-muted)]" strokeWidth={1.5} />
               <p>No team members to assign to yet.</p>
             </div>
           ) : (
-            <ul role="list" className="flex max-h-[34rem] flex-col gap-2.5 overflow-y-auto pr-0.5">
+            <ul role="list" className="plan-scroll flex max-h-[34rem] flex-col gap-2.5 overflow-y-auto pr-0.5">
               {members.map((member) => (
                 <li key={member.id}>
                   <ExpandableMemberCard
@@ -420,9 +423,20 @@ export function TaskAssignmentSplitScreen({
             portal. `dropAnimation` is what carries the card into the member
             card it landed on — the "animate into the member" half of the
             brief, with no custom transform maths. */}
-        <DragOverlay dropAnimation={DROP_ANIMATION}>
-          {activeTask ? <TaskCardPreview task={activeTask} locale={locale} /> : null}
-        </DragOverlay>
+        <PlanDragOverlay dropAnimation={DROP_ANIMATION}>
+          {activeTask ? (
+            <PlanTaskCard
+              taskKey={activeTask.displayId}
+              title={activeTask.title}
+              meta={
+                activeTask.estimateMinutes !== undefined
+                  ? formatMinutesAsHours(activeTask.estimateMinutes as Minutes, { locale })
+                  : ''
+              }
+              className="cursor-grabbing shadow-[0_8px_28px_rgba(0,0,0,0.18)]"
+            />
+          ) : null}
+        </PlanDragOverlay>
       </DndContext>
     </div>
   )
@@ -496,17 +510,15 @@ function TaskRepository({
       ref={setNodeRef}
       aria-label="Task repository"
       className={cn(
-        'apple-transition flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border bg-card',
+        'apple-transition flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] ring-2 ring-transparent',
         panelClassName,
-        isOver
-          ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/5'
-          : 'border-[var(--apple-separator)]'
+        isOver && 'ring-[var(--plan-accent)]'
       )}
     >
       <div className="flex items-baseline justify-between gap-2">
         <h3 className={headingClassName}>{title}</h3>
         {sprintLabel && (
-          <span className="truncate text-[11px] text-[var(--apple-secondary-label)]">
+          <span className="apple-type-caption truncate text-[var(--plan-muted)]">
             {sprintLabel}
           </span>
         )}
@@ -521,7 +533,7 @@ function TaskRepository({
             placeholder="Search by key or title…"
             value={search}
             onChange={(event) => onSearch(event.target.value)}
-            className={cn(FIELD_CLASSES, 'w-full')}
+            className={cn(planFieldClass, 'w-full')}
           />
         </label>
 
@@ -533,7 +545,7 @@ function TaskRepository({
             aria-label="Priority"
             value={priority}
             onChange={(event) => onPriority(event.target.value)}
-            className={FIELD_CLASSES}
+            className={planFieldClass}
           >
             <option value="">Priority</option>
             {priorityOptions.map((value) => (
@@ -551,7 +563,7 @@ function TaskRepository({
             aria-label="Type"
             value={type}
             onChange={(event) => onType(event.target.value)}
-            className={FIELD_CLASSES}
+            className={planFieldClass}
           >
             <option value="">Type</option>
             {typeOptions.map((value) => (
@@ -570,7 +582,7 @@ function TaskRepository({
             aria-label="Skill"
             value={skill}
             onChange={(event) => onSkill(event.target.value)}
-            className={FIELD_CLASSES}
+            className={planFieldClass}
           >
             <option value="">Skill</option>
             {skillOptions.map((value) => (
@@ -585,7 +597,7 @@ function TaskRepository({
           aria-label="Sort"
           value={sort}
           onChange={(event) => onSort(event.target.value as AssignableSort)}
-          className={FIELD_CLASSES}
+          className={planFieldClass}
         >
           <option value="priority">Priority</option>
           <option value="estimate_asc">Smallest first</option>
@@ -600,7 +612,7 @@ function TaskRepository({
           onClearFilters={onClearFilters}
         />
       ) : (
-        <ul role="list" className="flex max-h-[34rem] flex-col gap-2 overflow-y-auto pr-0.5">
+        <ul role="list" className="plan-scroll flex max-h-[34rem] flex-col gap-2 overflow-y-auto pr-0.5">
           {tasks.map((task) => (
             <li key={task.id}>
               <TaskCard
@@ -615,7 +627,7 @@ function TaskRepository({
         </ul>
       )}
 
-      <p className="text-[11px] text-[var(--apple-secondary-label)]">
+      <p className="apple-type-caption text-[var(--plan-muted)]">
         Showing {tasks.length} of {totalCount}
       </p>
     </section>
@@ -637,12 +649,12 @@ function EmptyRepository({
 }) {
   if (filtersActive) {
     return (
-      <div className="flex flex-col items-start gap-2 rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] p-3 text-[13px] text-[var(--apple-secondary-label)]">
+      <div className={cn(planEmptyClass, 'flex flex-col items-start gap-2 text-left')}>
         <p>No task matches these filters.</p>
         <button
           type="button"
           onClick={onClearFilters}
-          className="apple-transition rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-1 text-[13px] hover:bg-[var(--apple-quaternary-fill)]"
+          className="apple-transition apple-type-subheadline rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] px-2 py-1 text-[var(--plan-text)] hover:bg-[var(--plan-track)]"
         >
           Clear filters
         </button>
@@ -651,8 +663,8 @@ function EmptyRepository({
   }
 
   return (
-    <div className="flex flex-col items-center gap-1.5 rounded-[var(--apple-radius-md)] border border-dashed border-[var(--apple-separator)] p-5 text-center text-[13px] text-[var(--apple-secondary-label)]">
-      <Inbox className="h-5 w-5 text-[var(--apple-tertiary-label)]" strokeWidth={1.5} />
+    <div className={cn(planEmptyClass, 'flex flex-col items-center gap-1.5 p-5')}>
+      <Inbox className="h-5 w-5 text-[var(--plan-muted)]" strokeWidth={1.5} />
       <p>{emptyPoolMessage ?? 'Every task has an owner.'}</p>
     </div>
   )

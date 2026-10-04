@@ -12,8 +12,8 @@
  *
  * The card is the drop zone, not a list inside it, so the whole surface is a
  * target — including the collapsed state, which is the state most drops land
- * on. The highlight matches `AssignmentBoard`'s `Lane` and `CapacityBoard`'s
- * member card: blue border, faint blue wash.
+ * on. The highlight matches `AssignmentBoard`'s `Lane`: an accent ring drawn
+ * outside the box, so nothing reflows as a card passes over.
  *
  * Expansion is the caller's business (`expanded` + `onToggle`), modelled on
  * `CapacityBoard`'s `breakdownOpen` useState disclosure — no accordion
@@ -28,6 +28,7 @@ import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import { cn } from '@/lib/utils'
 
 import { CapacityMeter } from '../primitives/CapacityMeter'
+import { initialsOf } from '../planning/ui'
 
 import type { AssignableMemberView, AssignableTaskView } from './AssignableTask'
 import { readOnlyTaskDraggableId, TaskCard } from './TaskCard'
@@ -46,8 +47,6 @@ export interface ExpandableMemberCardProps {
   member: AssignableMemberView
   expanded: boolean
   onToggle: () => void
-  /** Forced highlight, for callers that resolve hover themselves. */
-  isOver?: boolean
   disabled?: boolean
   /** Context-specific content appended to the expanded body (Tasks 7-8). */
   renderExpandedExtra?: (member: AssignableMemberView) => React.ReactNode
@@ -75,7 +74,6 @@ export function ExpandableMemberCard({
   member,
   expanded,
   onToggle,
-  isOver = false,
   disabled = false,
   renderExpandedExtra,
   renderAlways,
@@ -89,7 +87,7 @@ export function ExpandableMemberCard({
     disabled
   })
 
-  const highlighted = isOver || hovered
+  const highlighted = hovered
   const bodyId = `member-card-body-${member.id}`
 
   const assignedMinutes = member.assignedMinutes ?? 0
@@ -104,10 +102,8 @@ export function ExpandableMemberCard({
       data-testid="member-card"
       data-member-id={member.id}
       className={cn(
-        'apple-transition flex flex-col gap-2.5 rounded-[var(--apple-radius-lg)] border bg-card p-3',
-        highlighted
-          ? 'border-[var(--apple-system-blue)] bg-[var(--apple-system-blue)]/5 shadow-[0_0_0_3px_color-mix(in_srgb,var(--apple-system-blue)_15%,transparent)]'
-          : 'border-[var(--apple-separator)]',
+        'apple-transition flex flex-col gap-2.5 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-3 ring-2 ring-transparent',
+        highlighted && 'ring-[var(--plan-accent)]',
         className
       )}
     >
@@ -118,7 +114,7 @@ export function ExpandableMemberCard({
               steps here were the one place this card stepped outside the app's
               Apple tokens, so it read as a different blue to everything around
               it — including the run screen, which restyles this card. */}
-          <AvatarFallback className="bg-[var(--apple-tertiary-fill)] text-[11px] font-semibold text-[var(--apple-secondary-label)]">
+          <AvatarFallback className="bg-[var(--plan-track)] apple-type-caption font-semibold text-[var(--plan-muted)]">
             {initialsOf(member.name)}
           </AvatarFallback>
         </Avatar>
@@ -126,12 +122,12 @@ export function ExpandableMemberCard({
         <div className="min-w-0 flex-1">
           <p
             data-testid="member-name"
-            className="truncate text-[13px] font-semibold text-[var(--apple-label)]"
+            className="apple-type-subheadline truncate font-semibold text-[var(--plan-text)]"
             title={member.name}
           >
             {member.name}
           </p>
-          <p className="truncate text-[11px] text-[var(--apple-secondary-label)]">
+          <p className="apple-type-caption truncate text-[var(--plan-secondary)]">
             {member.role ? <span className="capitalize">{formatRole(member.role)}</span> : null}
             {member.role ? ' · ' : ''}
             {member.tasks.length === 1 ? '1 task' : `${member.tasks.length} tasks`}
@@ -139,7 +135,7 @@ export function ExpandableMemberCard({
                 before the drop, not after it. Absent (rather than false)
                 means the context has no roster concept at all. */}
             {member.onSprintTeam === false && (
-              <span className="text-[var(--apple-tertiary-label)]"> · not on sprint team</span>
+              <span className="text-[var(--plan-muted)]"> · not on sprint team</span>
             )}
           </p>
         </div>
@@ -152,7 +148,7 @@ export function ExpandableMemberCard({
           aria-label={
             expanded ? `Collapse ${member.name}'s details` : `Expand ${member.name}'s details`
           }
-          className="apple-transition shrink-0 rounded-full border border-[var(--apple-separator)] p-1 text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)]"
+          className="apple-transition shrink-0 rounded-full border border-[var(--plan-border)] p-1 text-[var(--plan-muted)] hover:bg-[var(--plan-track)]"
         >
           <ChevronDown
             aria-hidden="true"
@@ -177,7 +173,7 @@ export function ExpandableMemberCard({
         />
       ) : capacityMinutes > 0 ? (
         <div className="flex flex-col gap-1">
-          <span className="font-apple-mono text-[11px] tabular-nums text-[var(--apple-secondary-label)]">
+          <span className="apple-type-caption font-apple-mono tabular-nums text-[var(--plan-secondary)]">
             {formatMinutesAsHours(assignedMinutes as Minutes, { locale })} of{' '}
             {formatMinutesAsHours(capacityMinutes as Minutes, { locale })} ·{' '}
             {overCapacity
@@ -186,12 +182,12 @@ export function ExpandableMemberCard({
           </span>
           <GradientProgress
             value={percent}
-            gradient={overCapacity ? 'var(--apple-system-orange)' : 'var(--apple-chart-gradient)'}
-            glow={overCapacity ? 'var(--apple-system-orange)' : 'var(--apple-chart-glow)'}
+            gradient={overCapacity ? 'var(--plan-warning)' : 'var(--apple-chart-gradient)'}
+            glow={overCapacity ? 'var(--plan-warning)' : 'var(--apple-chart-glow)'}
           />
         </div>
       ) : (
-        <p className="text-[11px] text-[var(--apple-tertiary-label)]">
+        <p className="apple-type-caption text-[var(--plan-muted)]">
           No capacity figure for this member.
         </p>
       )}
@@ -203,10 +199,10 @@ export function ExpandableMemberCard({
       {!expanded && member.tasks.length === 0 && (
         <p
           className={cn(
-            'apple-transition rounded-[var(--apple-radius-md)] border border-dashed px-2.5 py-2 text-center text-[11px]',
+            'apple-transition apple-type-caption rounded-[var(--apple-radius-md)] border border-dashed border-[var(--plan-border)] px-2.5 py-2 text-center',
             highlighted
-              ? 'border-[var(--apple-system-blue)] text-[var(--apple-system-blue)]'
-              : 'border-[var(--apple-separator)] text-[var(--apple-tertiary-label)]'
+              ? 'border-[var(--plan-accent)] text-[var(--plan-accent-ink)]'
+              : 'text-[var(--plan-muted)]'
           )}
         >
           Drop a task here
@@ -215,13 +211,13 @@ export function ExpandableMemberCard({
 
       <div id={bodyId} hidden={!expanded}>
         {expanded && (
-          <div className="flex flex-col gap-3 border-t border-[var(--apple-separator)] pt-2.5">
+          <div className="flex flex-col gap-3 border-t border-[var(--plan-border)] pt-2.5">
             <section className="flex flex-col gap-1.5">
-              <h5 className="apple-section-label text-[var(--apple-tertiary-label)]">
+              <h5 className="apple-section-label text-[var(--plan-muted)]">
                 Assigned work
               </h5>
               {member.tasks.length === 0 ? (
-                <p className="text-[11px] text-[var(--apple-tertiary-label)]">
+                <p className="apple-type-caption text-[var(--plan-muted)]">
                   Nothing assigned yet.
                 </p>
               ) : (
@@ -240,7 +236,6 @@ export function ExpandableMemberCard({
                           task={task}
                           draggable={false}
                           dragId={readOnlyTaskDraggableId(member.id, task.id)}
-                          compact
                           locale={locale}
                         />
                       )}
@@ -251,11 +246,11 @@ export function ExpandableMemberCard({
             </section>
 
             <section className="flex flex-col gap-1">
-              <h5 className="apple-section-label text-[var(--apple-tertiary-label)]">
+              <h5 className="apple-section-label text-[var(--plan-muted)]">
                 Daily workload
               </h5>
               {member.capacityBreakdown ? (
-                <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                <dl className="apple-type-caption grid grid-cols-2 gap-x-3 gap-y-0.5">
                   <WorkloadRow
                     label="Nominal"
                     minutes={member.capacityBreakdown.nominalMinutes}
@@ -279,7 +274,7 @@ export function ExpandableMemberCard({
                   />
                 </dl>
               ) : (
-                <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                <dl className="apple-type-caption grid grid-cols-2 gap-x-3 gap-y-0.5">
                   <WorkloadRow
                     label="Assigned"
                     minutes={assignedMinutes as Minutes}
@@ -318,20 +313,12 @@ function WorkloadRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-[var(--apple-secondary-label)]">{label}</dt>
-      <dd className="font-apple-mono tabular-nums text-[var(--apple-label)]">
+      <dt className="text-[var(--plan-secondary)]">{label}</dt>
+      <dd className="font-apple-mono tabular-nums text-[var(--plan-text)]">
         {formatMinutesAsHours(minutes, { locale, signed })}
       </dd>
     </div>
   )
-}
-
-/** Matches the two-letter fallback the team reports already render. */
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase()
 }
 
 /** Roles arrive as enum-ish snake_case (`project_qa_lead`) in the planning context. */
