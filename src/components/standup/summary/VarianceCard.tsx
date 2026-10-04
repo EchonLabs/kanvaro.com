@@ -1,13 +1,17 @@
 import { Activity } from 'lucide-react'
 
-import { Badge, INSET_CLASSES, TEXT_BODY, TEXT_META, type Tone } from '@/components/standup/run/ui'
+import {
+  PlanAvatar,
+  planInsetClass,
+  planPillClass,
+  type PlanPillTone
+} from '@/components/standup/planning/ui'
 import { formatMinutesAsHours } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
-import { MemberAvatar } from './MemberAvatar'
 import { SummarySection } from './SummarySection'
-import { asMinutes, field } from './rows'
+import { asMinutes, avatarMember, field } from './rows'
 import type { LooseRow } from './types'
 
 const s = standupStrings.summary
@@ -17,9 +21,9 @@ const s = standupStrings.summary
  * a hue per outcome would bury the rows that ran over among the ones that
  * went fine.
  */
-function outcomeTone(outcome: string): Tone {
+function outcomeTone(outcome: string): PlanPillTone {
   const lower = outcome.toLowerCase()
-  return lower.includes('over') || lower.includes('blocked') ? 'red' : 'neutral'
+  return lower.includes('over') || lower.includes('blocked') ? 'danger' : 'neutral'
 }
 
 /** How yesterday's estimates held up, task by task. */
@@ -44,23 +48,27 @@ export function VarianceCard({ rows }: { rows: LooseRow[] }) {
             <li
               key={index}
               data-testid="variance-row"
-              className={cn(INSET_CLASSES, 'flex flex-wrap items-center justify-between gap-3 px-4 py-2.5')}
+              className={cn(planInsetClass, 'flex flex-wrap items-center justify-between gap-3 px-4 py-2.5')}
             >
               <div className="flex min-w-0 items-center gap-2.5">
-                {name && <MemberAvatar member={row} size={24} />}
+                {name && (
+                  <span data-testid="member-avatar" title={name} className="inline-flex shrink-0">
+                    <PlanAvatar member={avatarMember(row, name)} size={24} />
+                  </span>
+                )}
                 <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className={cn(TEXT_BODY, 'font-apple-mono truncate font-semibold text-[var(--sur-text)]')}>
+                  <span className={'apple-type-subheadline font-apple-mono truncate font-semibold text-[var(--plan-text)]'}>
                     {taskKey}
                   </span>
-                  {name && <span className={cn(TEXT_META, 'text-[var(--sur-muted)]')}>{name}</span>}
+                  {name && <span className="apple-type-caption text-[var(--plan-muted)]">{name}</span>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {outcome && <Badge tone={outcomeTone(outcome)} className="normal-case">{outcome}</Badge>}
+                {outcome && <span className={planPillClass(outcomeTone(outcome), 'capitalize')}>{outcome}</span>}
                 <span
                   className={cn(
-                    'font-apple-mono text-[13px] font-semibold tabular-nums',
-                    variance > 0 ? 'text-[var(--sur-red)]' : 'text-[var(--sur-text)]'
+                    'apple-type-subheadline font-apple-mono font-semibold tabular-nums',
+                    variance > 0 ? 'text-[var(--plan-danger)]' : 'text-[var(--plan-text)]'
                   )}
                 >
                   {formatMinutesAsHours(variance, { signed: true })}

@@ -1,13 +1,7 @@
 import Link from 'next/link'
 import { ClipboardCopy, ExternalLink, Printer } from 'lucide-react'
 
-import {
-  BADGE_CLASSES,
-  CARD_CLASSES,
-  PRIMARY_BUTTON_CLASSES,
-  SECONDARY_BUTTON_CLASSES,
-  TEXT_BODY
-} from '@/components/standup/run/ui'
+import { planButtonClass, planCardClass, planPillClass } from '@/components/standup/planning/ui'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
@@ -56,28 +50,28 @@ export function SummaryHero({
   return (
     <div
       className={cn(
-        CARD_CLASSES,
-        'flex flex-wrap items-center justify-between gap-4 rounded-[var(--apple-radius-xl)] p-7'
+        planCardClass,
+        'flex flex-wrap items-center justify-between gap-4 p-5 sm:p-7'
       )}
     >
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-[var(--sur-text)]">
+          <h1 className="apple-type-title1 font-bold text-[var(--plan-text)]">
             {heading}
           </h1>
-          <span className={cn(BADGE_CLASSES, 'bg-[var(--sur-blue-tint)] text-[var(--sur-blue)] normal-case')}>
+          <span className={planPillClass('accent')}>
             {s.dayOf({ day: headerFacts.dayNumber, total: headerFacts.totalDays })}
           </span>
         </div>
-        <p className={cn(TEXT_BODY, 'flex flex-wrap items-center gap-2 text-[var(--sur-muted)]')}>
+        <p className="apple-type-subheadline flex flex-wrap items-center gap-2 text-[var(--plan-muted)]">
           <span>
             Facilitator:{' '}
-            <span className="font-semibold text-[var(--sur-text)]">{headerFacts.facilitatorName}</span>
+            <span className="font-semibold text-[var(--plan-text)]">{headerFacts.facilitatorName}</span>
           </span>
-          <span aria-hidden="true" className="h-1 w-1 rounded-full bg-[var(--sur-muted)]" />
+          <span aria-hidden="true" className="h-1 w-1 rounded-full bg-[var(--plan-muted)]" />
           <span>
             Duration:{' '}
-            <span className="font-semibold text-[var(--sur-text)]">
+            <span className="font-semibold text-[var(--plan-text)]">
               {s.duration({ minutes: headerFacts.durationMinutes })}
             </span>
           </span>
@@ -86,15 +80,15 @@ export function SummaryHero({
 
       {/* Hidden from print: a printed summary has nothing to click. */}
       <div className="standup-summary-no-print flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onCopy} className={cn(SECONDARY_BUTTON_CLASSES, 'rounded-[var(--sur-radius-pill)]')}>
+        <button type="button" onClick={onCopy} className={planButtonClass('secondary')}>
           <ClipboardCopy className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
           {s.copyAsText()}
         </button>
-        <Link href={standupHref} className={cn(SECONDARY_BUTTON_CLASSES, 'rounded-[var(--sur-radius-pill)]')}>
+        <Link href={standupHref} className={planButtonClass('secondary')}>
           <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
           View stand-up
         </Link>
-        <button type="button" onClick={onPrint} className={cn(PRIMARY_BUTTON_CLASSES, 'rounded-[var(--sur-radius-pill)]')}>
+        <button type="button" onClick={onPrint} className={planButtonClass('primary')}>
           <Printer className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
           {s.printOrSave()}
         </button>

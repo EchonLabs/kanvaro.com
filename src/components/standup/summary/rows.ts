@@ -1,6 +1,8 @@
 import { minutes as toMinutes, type Minutes } from '@/lib/standup/minutes'
 
-import type { LooseRow } from './types'
+import type { PlanAvatarMember } from '@/components/standup/planning/ui'
+
+import type { LooseRow, MemberIdentity } from './types'
 
 /**
  * How this screen reads the sections the schema stores as `Mixed` (variance,
@@ -27,4 +29,22 @@ export function field(row: LooseRow, key: string): string | undefined {
 export function asMinutes(value: unknown): Minutes {
   const n = typeof value === 'number' ? value : Number(value)
   return toMinutes(Number.isFinite(n) ? Math.round(n) : 0)
+}
+
+/**
+ * The `PlanAvatar` member for a summary row.
+ *
+ * Every row that names a person carries a `name` and, once `getSummary` has
+ * joined the user record, an identity. The caller passes the name already
+ * read as a string: the variance and debt rows are `Mixed`, so a historical
+ * document could hold anything there, and `PlanAvatar` splits it.
+ */
+export function avatarMember(row: MemberIdentity, name: string): PlanAvatarMember {
+  return {
+    name: String(name),
+    firstName: row.firstName,
+    lastName: row.lastName,
+    email: row.email,
+    avatar: row.avatar
+  }
 }

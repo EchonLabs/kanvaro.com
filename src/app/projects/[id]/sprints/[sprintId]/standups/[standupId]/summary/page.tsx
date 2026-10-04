@@ -42,7 +42,7 @@ import { SummaryStatGrid } from '@/components/standup/summary/SummaryStatGrid'
 import { VarianceCard } from '@/components/standup/summary/VarianceCard'
 import { summaryStats } from '@/components/standup/summary/stats'
 import type { SummaryPayload } from '@/components/standup/summary/types'
-import { CARD_CLASSES, TEXT_BODY } from '@/components/standup/run/ui'
+import { planCardClass } from '@/components/standup/planning/ui'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
@@ -127,25 +127,26 @@ export default function StandupSummaryPage({
           }
         }
       `}</style>
-      {/* The scope that supplies every `--sur-*` token the sections read —
-          shared with the run screen, so a summary and the stand-up it
-          summarises are the same surface. See `globals.css`. */}
+      {/* The `standup-summary` scope: the print rule above keys on it. The
+          sections read the `--plan-*` tokens, which resolve from the app's
+          theme, so a summary and the stand-up it summarises are the same
+          surface. */}
       <div className="standup-summary flex flex-col gap-6 p-4 md:p-8">
         {error && (
           <p
             role="alert"
-            className="rounded-[var(--sur-radius-card)] border border-[var(--sur-red)] bg-[var(--sur-red-tint)] p-3 text-[13px] text-[var(--sur-red)]"
+            className="rounded-[var(--apple-radius-lg)] border border-[var(--plan-danger)] bg-[var(--plan-danger-bg)] p-3 apple-type-subheadline text-[var(--plan-danger)]"
           >
             {error}
           </p>
         )}
 
         {notAvailable && (
-          <p className={cn(CARD_CLASSES, TEXT_BODY, 'text-[var(--sur-muted)]')}>{s.notAvailable()}</p>
+          <p className={cn(planCardClass, 'p-5 apple-type-subheadline', 'text-[var(--plan-muted)]')}>{s.notAvailable()}</p>
         )}
 
         {!summary && !error && !notAvailable && (
-          <p className={cn(TEXT_BODY, 'text-[var(--sur-muted)]')}>{s.loading()}</p>
+          <p className={cn('apple-type-subheadline', 'text-[var(--plan-muted)]')}>{s.loading()}</p>
         )}
 
         {summary && stats && (
@@ -158,7 +159,7 @@ export default function StandupSummaryPage({
             />
 
             {copyNotice && (
-              <p role="status" className={cn('standup-summary-no-print', TEXT_BODY, 'text-[var(--sur-muted)]')}>
+              <p role="status" className={cn('standup-summary-no-print', 'apple-type-subheadline', 'text-[var(--plan-muted)]')}>
                 {copyNotice}
               </p>
             )}
@@ -197,7 +198,7 @@ export default function StandupSummaryPage({
                  pushes the page's own footer arbitrarily far down. Capped and
                  scrolled like every list above it. */
               <SummarySection id="notes-section" title={s.sectionNotes()} icon={MessageSquare} scroll>
-                <p className={cn(TEXT_BODY, 'whitespace-pre-wrap text-[var(--sur-text)]')}>
+                <p className={cn('apple-type-subheadline', 'whitespace-pre-wrap text-[var(--plan-text)]')}>
                   {summary.pmNotes}
                 </p>
               </SummarySection>

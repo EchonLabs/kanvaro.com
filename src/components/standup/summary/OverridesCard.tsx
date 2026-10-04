@@ -1,6 +1,6 @@
 import { Settings } from 'lucide-react'
 
-import { Badge, INSET_CLASSES, TEXT_BODY, TEXT_META } from '@/components/standup/run/ui'
+import { planInsetClass, planPillClass } from '@/components/standup/planning/ui'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
@@ -33,24 +33,20 @@ export function OverridesCard({ rows }: { rows: LooseRow[] }) {
           const reasonCode = field(row, 'reasonCode')
 
           return (
-            <li key={index} data-testid="override-row" className={cn(INSET_CLASSES, 'flex flex-col gap-3 p-4')}>
+            <li key={index} data-testid="override-row" className={cn(planInsetClass, 'flex flex-col gap-3 p-4')}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex flex-wrap gap-1.5">
-                  <Badge tone="amber" className="normal-case">
-                    {field(row, 'type') ?? 'override'}
-                  </Badge>
+                  <span className={planPillClass('warning', 'capitalize')}>{field(row, 'type') ?? 'override'}</span>
                   {reasonCode && (
-                    <Badge tone="neutral" className="normal-case">
-                      {reasonCode}
-                    </Badge>
+                    <span className={planPillClass('neutral', 'capitalize')}>{reasonCode}</span>
                   )}
                 </span>
                 {approver && (
-                  <span className={cn(TEXT_META, 'text-[var(--sur-muted)]')}>Approved by {approver}</span>
+                  <span className="apple-type-caption text-[var(--plan-muted)]">Approved by {approver}</span>
                 )}
               </div>
               {field(row, 'justification') && (
-                <p className={cn(TEXT_BODY, 'text-[var(--sur-text)]')}>{field(row, 'justification')}</p>
+                <p className="apple-type-subheadline text-[var(--plan-text)]">{field(row, 'justification')}</p>
               )}
             </li>
           )

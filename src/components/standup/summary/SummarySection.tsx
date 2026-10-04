@@ -1,12 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 
-import {
-  CARD_CLASSES,
-  EMPTY_CLASSES,
-  SCROLL_CLASSES,
-  SCROLL_MAX,
-  TEXT_HEADING
-} from '@/components/standup/run/ui'
+import { PLAN_SCROLL_MAX, PlanCard, planEmptyClass } from '@/components/standup/planning/ui'
 import { cn } from '@/lib/utils'
 
 /**
@@ -24,7 +18,7 @@ import { cn } from '@/lib/utils'
  * as the sprint made them, and a stand-up with forty commitments otherwise
  * pushes every section below it off the screen — the stat grid's jump links
  * land somewhere the reader then has to scroll back from. Capping the body
- * and giving it the run screen's visible track (`SCROLL_CLASSES`) keeps the
+ * and giving it the planning screen's visible track (`plan-scroll`) keeps the
  * section headings a reachable table of contents. Opt-in, because the short
  * fixed-height sections have nothing to cap, and it wraps only `children` so
  * the heading and badge stay pinned above the box rather than scrolling away
@@ -38,7 +32,7 @@ export function SummarySection({
   isEmpty,
   emptyText,
   scroll = false,
-  scrollMax = SCROLL_MAX,
+  scrollMax = PLAN_SCROLL_MAX,
   children,
   className
 }: {
@@ -56,42 +50,40 @@ export function SummarySection({
   className?: string
 }) {
   return (
-    <section
+    <PlanCard
       id={id}
       data-testid="summary-section"
       /**
        * `scroll-mt` so a jump from the stat grid does not park the heading
        * underneath the app's sticky header.
        */
-      className={cn(CARD_CLASSES, 'flex scroll-mt-24 flex-col gap-4', className)}
+      className={cn('scroll-mt-24', className)}
       aria-labelledby={id ? `${id}-title` : undefined}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <h2
-          id={id ? `${id}-title` : undefined}
-          className={cn(TEXT_HEADING, 'flex items-center gap-2 font-semibold text-[var(--sur-text)]')}
-        >
+      headingId={id ? `${id}-title` : undefined}
+      title={
+        <span className="flex items-center gap-2">
           {Icon && (
             <Icon
-              className="h-[18px] w-[18px] shrink-0 text-[var(--sur-blue)]"
+              className="h-[18px] w-[18px] shrink-0 text-[var(--plan-accent-ink)]"
               strokeWidth={2}
               aria-hidden="true"
             />
           )}
           {title}
-        </h2>
-        {badge}
-      </div>
+        </span>
+      }
+      aside={badge}
+    >
       {isEmpty ? (
-        <p className={EMPTY_CLASSES}>{emptyText}</p>
+        <p className={planEmptyClass}>{emptyText}</p>
       ) : scroll ? (
         /* `pr-1.5` so the track sits beside the rows rather than on top of a
            row's right-hand badge, and `-mr-1.5` spends the card's own padding
            on it so the content width is unchanged. */
-        <div className={cn(SCROLL_CLASSES, scrollMax, '-mr-1.5 pr-1.5')}>{children}</div>
+        <div className={cn('plan-scroll', scrollMax, '-mr-1.5 pr-1.5')}>{children}</div>
       ) : (
         children
       )}
-    </section>
+    </PlanCard>
   )
 }

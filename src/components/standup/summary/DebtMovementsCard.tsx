@@ -1,13 +1,12 @@
 import { Wallet } from 'lucide-react'
 
-import { TEXT_BODY, TEXT_META } from '@/components/standup/run/ui'
+import { PlanAvatar } from '@/components/standup/planning/ui'
 import { formatMinutesAsHours } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
-import { MemberAvatar } from './MemberAvatar'
 import { SummarySection } from './SummarySection'
-import { asMinutes, field } from './rows'
+import { asMinutes, avatarMember, field } from './rows'
 import type { LooseRow } from './types'
 
 const s = standupStrings.summary
@@ -32,19 +31,19 @@ export function DebtMovementsCard({ rows }: { rows: LooseRow[] }) {
           <tr>
             <th
               scope="col"
-              className={cn(TEXT_META, 'sticky top-0 z-[1] bg-[var(--sur-surface)] pb-2 text-left font-bold uppercase tracking-wide text-[var(--sur-muted)]')}
+              className={'apple-type-caption sticky top-0 z-[1] bg-[var(--plan-surface)] pb-2 text-left font-bold uppercase tracking-wide text-[var(--plan-muted)]'}
             >
               Member
             </th>
             <th
               scope="col"
-              className={cn(TEXT_META, 'w-[80px] sticky top-0 z-[1] bg-[var(--sur-surface)] pb-2 text-right font-bold uppercase tracking-wide text-[var(--sur-muted)]')}
+              className={'apple-type-caption w-[80px] sticky top-0 z-[1] bg-[var(--plan-surface)] pb-2 text-right font-bold uppercase tracking-wide text-[var(--plan-muted)]'}
             >
               Debt
             </th>
             <th
               scope="col"
-              className={cn(TEXT_META, 'w-[80px] sticky top-0 z-[1] bg-[var(--sur-surface)] pb-2 text-right font-bold uppercase tracking-wide text-[var(--sur-muted)]')}
+              className={'apple-type-caption w-[80px] sticky top-0 z-[1] bg-[var(--plan-surface)] pb-2 text-right font-bold uppercase tracking-wide text-[var(--plan-muted)]'}
             >
               Surplus
             </th>
@@ -60,11 +59,13 @@ export function DebtMovementsCard({ rows }: { rows: LooseRow[] }) {
               <tr
                 key={index}
                 data-testid="debt-row"
-                className="border-b border-[var(--sur-border)] last:border-b-0"
+                className="border-b border-[var(--plan-border)] last:border-b-0"
               >
-                <td className={cn(TEXT_BODY, 'py-2.5 pr-3 font-medium text-[var(--sur-text)]')}>
+                <td className={'apple-type-subheadline py-2.5 pr-3 font-medium text-[var(--plan-text)]'}>
                   <span className="flex items-center gap-2">
-                    <MemberAvatar member={row} size={22} />
+                    <span data-testid="member-avatar" title={name} className="inline-flex shrink-0">
+                      <PlanAvatar member={avatarMember(row, name)} size={22} />
+                    </span>
                     <span className="min-w-0 truncate">{name}</span>
                   </span>
                 </td>
@@ -72,13 +73,13 @@ export function DebtMovementsCard({ rows }: { rows: LooseRow[] }) {
                     raise an alarm about a member who owes nothing. */}
                 <td
                   className={cn(
-                    'font-apple-mono py-2.5 text-right text-[13px] font-medium tabular-nums',
-                    debt > 0 ? 'text-[var(--sur-red)]' : 'text-[var(--sur-muted)]'
+                    'apple-type-subheadline font-apple-mono py-2.5 text-right font-medium tabular-nums',
+                    debt > 0 ? 'text-[var(--plan-danger)]' : 'text-[var(--plan-muted)]'
                   )}
                 >
                   {formatMinutesAsHours(debt)}
                 </td>
-                <td className="font-apple-mono py-2.5 text-right text-[13px] font-medium tabular-nums text-[var(--sur-muted)]">
+                <td className="apple-type-subheadline font-apple-mono py-2.5 text-right font-medium tabular-nums text-[var(--plan-muted)]">
                   {formatMinutesAsHours(surplus)}
                 </td>
               </tr>

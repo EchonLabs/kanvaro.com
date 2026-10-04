@@ -1,6 +1,6 @@
 import { CornerDownRight } from 'lucide-react'
 
-import { Badge, INSET_CLASSES, TEXT_BODY } from '@/components/standup/run/ui'
+import { planInsetClass, planPillClass } from '@/components/standup/planning/ui'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
@@ -45,24 +45,21 @@ export function CarryForwardCard({ rows }: { rows: LooseRow[] }) {
             <li
               key={index}
               data-testid="carry-forward-row"
-              className={cn(INSET_CLASSES, 'flex flex-wrap items-center justify-between gap-2 p-3')}
+              className={cn(planInsetClass, 'flex flex-wrap items-center justify-between gap-2 p-3')}
             >
-              <span className={cn(TEXT_BODY, 'min-w-0 truncate font-medium text-[var(--sur-text)]')}>
+              <span className={'apple-type-subheadline min-w-0 truncate font-medium text-[var(--plan-text)]'}>
                 {labelFor(row)}
               </span>
               <span className="flex shrink-0 flex-wrap gap-1.5">
                 {ageBand && (
-                  <Badge tone="neutral" className="normal-case">
-                    {ageBand}
-                  </Badge>
+                  <span className={planPillClass('neutral', 'capitalize')}>{ageBand}</span>
                 )}
                 {status && (
-                  <Badge
-                    tone={status.toLowerCase() === 'resolved' ? 'green' : 'neutral'}
-                    className="normal-case"
+                  <span
+                    className={planPillClass(status.toLowerCase() === 'resolved' ? 'success' : 'neutral', 'capitalize')}
                   >
                     {status}
-                  </Badge>
+                  </span>
                 )}
               </span>
             </li>

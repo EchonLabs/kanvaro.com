@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react'
 
-import { Badge, INSET_CLASSES, TEXT_BODY, TEXT_META } from '@/components/standup/run/ui'
+import { planInsetClass, planPillClass } from '@/components/standup/planning/ui'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
@@ -33,9 +33,9 @@ export function BlockersRaisedCard({ rows }: { rows: LooseRow[] }) {
             <li
               key={index}
               data-testid="blocker-raised-row"
-              className={cn(INSET_CLASSES, 'flex flex-col gap-3 p-3')}
+              className={cn(planInsetClass, 'flex flex-col gap-3 p-3')}
             >
-              <p className={cn(TEXT_BODY, 'text-[var(--sur-text)]')}>
+              <p className={'apple-type-subheadline text-[var(--plan-text)]'}>
                 {/* A blocker with no description is still a blocker — the
                     badges below carry what the record does know. */}
                 {description ?? 'Blocker'}
@@ -43,20 +43,14 @@ export function BlockersRaisedCard({ rows }: { rows: LooseRow[] }) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex flex-wrap gap-1.5">
                   {blockerType && (
-                    <Badge tone="red" className="normal-case">
-                      {blockerType}
-                    </Badge>
+                    <span className={planPillClass('danger', 'capitalize')}>{blockerType}</span>
                   )}
                   {severity && (
-                    <Badge tone="red" className="normal-case">
-                      {severity}
-                    </Badge>
+                    <span className={planPillClass('danger', 'capitalize')}>{severity}</span>
                   )}
                 </span>
                 {status && (
-                  <Badge tone={open ? 'amber' : 'green'} className="normal-case">
-                    {status}
-                  </Badge>
+                  <span className={planPillClass(open ? 'warning' : 'success', 'capitalize')}>{status}</span>
                 )}
               </div>
             </li>
@@ -86,15 +80,15 @@ export function BlockersResolvedCard({ rows }: { rows: LooseRow[] }) {
             <li
               key={index}
               data-testid="blocker-resolved-row"
-              className={cn(INSET_CLASSES, 'flex flex-col gap-2 p-3')}
+              className={cn(planInsetClass, 'flex flex-col gap-2 p-3')}
             >
-              <p className={cn(TEXT_BODY, 'text-[var(--sur-text)]')}>
+              <p className={'apple-type-subheadline text-[var(--plan-text)]'}>
                 {field(row, 'resolutionNote') ?? 'Resolved.'}
               </p>
               {resolver && (
-                <p className={cn(TEXT_META, 'flex items-center gap-1 text-[var(--sur-muted)]')}>
+                <p className={'apple-type-caption flex items-center gap-1 text-[var(--plan-muted)]'}>
                   <CheckCircle2
-                    className="h-3.5 w-3.5 shrink-0 text-[var(--sur-green)]"
+                    className="h-3.5 w-3.5 shrink-0 text-[var(--plan-success)]"
                     strokeWidth={2}
                     aria-hidden="true"
                   />

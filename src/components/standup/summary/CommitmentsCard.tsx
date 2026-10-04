@@ -1,12 +1,12 @@
 import { List } from 'lucide-react'
 
-import { INSET_CLASSES, TEXT_BODY, TEXT_META } from '@/components/standup/run/ui'
+import { PlanAvatar, planInsetClass } from '@/components/standup/planning/ui'
 import { formatMinutesAsHours, minutes as toMinutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
-import { MemberAvatar } from './MemberAvatar'
 import { SummarySection } from './SummarySection'
+import { avatarMember } from './rows'
 import type { MemberCommitment } from './types'
 
 const s = standupStrings.summary
@@ -39,9 +39,11 @@ export function CommitmentsCard({ members }: { members: MemberCommitment[] }) {
         {members.map((member) => (
           <div key={member.memberId} data-testid="commitment-group" className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <MemberAvatar member={member} size={22} />
+              <span data-testid="member-avatar" title={member.name} className="inline-flex shrink-0">
+                <PlanAvatar member={avatarMember(member, member.name)} size={22} />
+              </span>
               <span
-                className={cn(TEXT_META, 'font-bold uppercase tracking-wide text-[var(--sur-muted)]')}
+                className="apple-type-caption font-bold uppercase tracking-wide text-[var(--plan-muted)]"
               >
                 {member.name}
               </span>
@@ -57,35 +59,32 @@ export function CommitmentsCard({ members }: { members: MemberCommitment[] }) {
                   <li
                     key={`${member.memberId}-${allocation.taskId}-${index}`}
                     data-testid="commitment-row"
-                    className={cn(INSET_CLASSES, 'flex flex-wrap items-center gap-4 px-4 py-2.5')}
+                    className={cn(planInsetClass, 'flex flex-wrap items-center gap-4 px-4 py-2.5')}
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-2">
                       {allocation.taskKey && (
                         <span
-                          className={cn(
-                            TEXT_META,
-                            'font-apple-mono shrink-0 rounded-[var(--sur-radius-control)] bg-[var(--sur-neutral-tint)] px-2 py-0.5 font-bold text-[var(--sur-muted)]'
-                          )}
+                          className="apple-type-caption font-apple-mono shrink-0 rounded-[var(--apple-radius-sm)] bg-[var(--plan-track)] px-2 py-0.5 font-bold text-[var(--plan-muted)]"
                         >
                           {allocation.taskKey}
                         </span>
                       )}
-                      <span className={cn(TEXT_BODY, 'min-w-0 truncate text-[var(--sur-text)]')}>
+                      <span className={'apple-type-subheadline min-w-0 truncate text-[var(--plan-text)]'}>
                         {allocation.taskKey ?? allocation.taskId}
                       </span>
                     </div>
                     <div className="flex w-[180px] shrink-0 items-center gap-3">
                       <span
                         aria-hidden="true"
-                        className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--sur-track)]"
+                        className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--plan-track)]"
                       >
                         <span
                           data-testid="commitment-bar"
-                          className="block h-full rounded-full bg-[var(--sur-blue-solid)]"
+                          className="block h-full rounded-full bg-[var(--plan-accent)]"
                           style={{ width: `${width}%` }}
                         />
                       </span>
-                      <span className="font-apple-mono w-[52px] shrink-0 text-right text-[13px] font-semibold tabular-nums text-[var(--sur-text)]">
+                      <span className="apple-type-subheadline font-apple-mono w-[52px] shrink-0 text-right font-semibold tabular-nums text-[var(--plan-text)]">
                         {formatMinutesAsHours(planned)}
                       </span>
                     </div>

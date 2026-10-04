@@ -1,15 +1,19 @@
 import { AlertTriangle, Users } from 'lucide-react'
 
-import { Badge, SCROLL_CLASSES, SCROLL_MAX_NESTED, TEXT_META } from '@/components/standup/run/ui'
+import {
+  PLAN_SCROLL_MAX_NESTED,
+  PlanAvatar,
+  planPillClass,
+  type PlanPillTone
+} from '@/components/standup/planning/ui'
 import { RingGauge } from '@/components/standup/my/shared/RingGauge'
-import { StatusPill, type StatusPillTone } from '@/components/standup/my/shared/StatusPill'
 import { formatMinutesAsHours, minutes as toMinutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
-import { MemberAvatar } from './MemberAvatar'
 import { SummarySection } from './SummarySection'
 import { committedMinutesByMember, type SummaryStats } from './stats'
+import { avatarMember } from './rows'
 import type { AttendanceRow, MemberCommitment } from './types'
 
 const s = standupStrings.summary
@@ -24,17 +28,17 @@ const s = standupStrings.summary
  * than being dropped or relabelled: these are historical documents, and an
  * unrecognised value is information, not a bug to hide.
  */
-const STATUS: Record<string, { label: () => string; tone: StatusPillTone }> = {
-  present: { label: standupStrings.run.statePresent, tone: 'green' },
-  absent_planned: { label: standupStrings.run.stateAbsentPlanned, tone: 'orange' },
-  absent_unplanned: { label: standupStrings.run.stateAbsentUnplanned, tone: 'red' }
+const STATUS: Record<string, { label: () => string; tone: PlanPillTone }> = {
+  present: { label: standupStrings.run.statePresent, tone: 'success' },
+  absent_planned: { label: standupStrings.run.stateAbsentPlanned, tone: 'warning' },
+  absent_unplanned: { label: standupStrings.run.stateAbsentUnplanned, tone: 'danger' }
 }
 
 function statusLabel(status: string): string {
   return STATUS[status]?.label() ?? status
 }
 
-function statusTone(status: string): StatusPillTone {
+function statusTone(status: string): PlanPillTone {
   return STATUS[status]?.tone ?? 'neutral'
 }
 
@@ -79,42 +83,41 @@ function AttendanceMemberRow({
       className={cn(
         'flex items-center gap-3.5 rounded-[var(--apple-radius-lg)] border p-3.5',
         stranded
-          ? 'border-[var(--apple-system-red)]/40 bg-[var(--apple-system-red)]/5'
-          : 'border-[var(--apple-separator)] bg-card'
+          ? 'border-[var(--plan-danger)] bg-[var(--plan-danger-bg)]'
+          : 'border-[var(--plan-border)] bg-[var(--plan-surface)]'
       )}
     >
-      <MemberAvatar member={member} size={44} />
+      <span data-testid="member-avatar" title={member.name} className="inline-flex shrink-0">
+        <PlanAvatar member={avatarMember(member, member.name)} size={44} />
+      </span>
 
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate text-[15px] font-semibold text-[var(--apple-label)]">
+        <span className="apple-type-body truncate font-semibold text-[var(--plan-text)]">
           {member.name}
         </span>
         {stranded ? (
           <span
             data-testid="attendance-alert"
-            className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--apple-system-red)]"
+            className="flex items-center gap-1.5 apple-type-subheadline font-semibold text-[var(--plan-danger)]"
           >
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
             Reassignment required ({hours})
           </span>
         ) : (
-          <span className="truncate text-[13px] text-[var(--apple-secondary-label)]">{secondLine}</span>
+          <span className="apple-type-subheadline truncate text-[var(--plan-muted)]">{secondLine}</span>
         )}
       </span>
 
       {/* Colour is never the only carrier of meaning (NFR-A1) — the label is
           the message either way, the tone only reinforces it. */}
       {stranded ? (
-        <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--apple-system-red)]">
+        <span className="apple-type-caption shrink-0 font-bold uppercase tracking-[0.06em] text-[var(--plan-danger)]">
           {statusLabel(member.status)}
         </span>
       ) : (
-        <StatusPill
-          tone={statusTone(member.status)}
-          className="shrink-0 border-transparent text-[11px] font-bold uppercase tracking-[0.06em]"
-        >
+        <span className={planPillClass(statusTone(member.status))}>
           {statusLabel(member.status)}
-        </StatusPill>
+        </span>
       )}
     </li>
   )
@@ -142,28 +145,26 @@ export function AttendanceCard({
       emptyText={s.emptyAttendance()}
       badge={
         attendance.length > 0 ? (
-          <Badge data-testid="attendance-verdict" tone={stats.fullAttendance ? 'green' : 'amber'} className="normal-case">
+          <span
+            data-testid="attendance-verdict"
+            className={planPillClass(stats.fullAttendance ? 'success' : 'warning')}
+          >
             {stats.fullAttendance ? 'Full attendance' : `${absentCount} absent`}
-          </Badge>
+          </span>
         ) : undefined
       }
     >
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center gap-6">
-          {/* The app's stat figure, level with `SummaryStatGrid`'s tiles
-              directly above: same 22px bold mono on `--apple-label`. The ratio
-              used to run at 48px — a headline twice the size of the six tiles
-              above it, for a figure the "Full attendance" badge beside the
-              heading already states. */}
           <div className="flex flex-col gap-1">
-            <span className="apple-section-label text-[var(--apple-secondary-label)]">Attended</span>
+            <span className="apple-section-label text-[var(--plan-muted)]">Attended</span>
             <span
               data-testid="attendance-ratio"
-              className="font-apple-mono text-[22px] font-bold leading-none tabular-nums text-[var(--apple-label)]"
+              className="apple-type-title2 font-apple-mono font-bold leading-none tabular-nums text-[var(--plan-text)]"
             >
               {stats.presentCount}/{stats.attendanceTotal}
             </span>
-            <span className={cn(TEXT_META, 'text-[var(--sur-muted)]')}>
+            <span className="apple-type-caption text-[var(--plan-muted)]">
               {stats.fullAttendance
                 ? 'Everyone joined'
                 : `${absentCount} ${absentCount === 1 ? 'person' : 'people'} missing`}
@@ -178,7 +179,7 @@ export function AttendanceCard({
             size={72}
             strokeWidth={7}
           >
-            <span className={cn(TEXT_META, 'font-semibold text-[var(--sur-muted)]')}>
+            <span className="apple-type-caption font-semibold text-[var(--plan-muted)]">
               {stats.fullAttendance ? 'Full' : `${stats.attendancePercent}%`}
             </span>
           </RingGauge>
@@ -196,8 +197,8 @@ export function AttendanceCard({
             and should stay in view while it scrolls. */}
         <ul
           className={cn(
-            SCROLL_CLASSES,
-            SCROLL_MAX_NESTED,
+            'plan-scroll',
+            PLAN_SCROLL_MAX_NESTED,
             'grid grid-cols-1 gap-2.5 pr-1.5 xl:grid-cols-2'
           )}
         >
