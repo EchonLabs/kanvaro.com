@@ -1709,15 +1709,21 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           onResolve={(blockerId) => setResolvingBlockerId(blockerId)}
         />
 
-        <CompletionPanel
-          className="min-w-0"
-          checks={checks}
-          blocking={blocking}
-          disabled={completionPanelDisabled}
-          checksUnavailable={checksUnavailable}
-          onComplete={() => void onComplete()}
-          onOverride={onOverride}
-        />
+        {/* A completed stand-up is immutable: the saga would answer
+            STANDUP_ALREADY_COMPLETED, and "All checks passed" is a claim about
+            a gate that has already closed. The header's status pill and
+            "View summary" link already say it is done. */}
+        {board.status !== 'Completed' && (
+          <CompletionPanel
+            className="min-w-0"
+            checks={checks}
+            blocking={blocking}
+            disabled={completionPanelDisabled}
+            checksUnavailable={checksUnavailable}
+            onComplete={() => void onComplete()}
+            onOverride={onOverride}
+          />
+        )}
       </div>
 
       {raisingBlocker && (

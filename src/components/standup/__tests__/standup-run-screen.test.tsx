@@ -1716,4 +1716,19 @@ describe('StandupRunScreen — completion action by status', () => {
 
     expect(screen.getByRole('button', { name: standupStrings.run.complete() })).toBeEnabled()
   })
+
+  it('does not offer completion once the stand-up is completed', () => {
+    renderScreen({ status: 'Completed' })
+
+    expect(
+      screen.queryByRole('button', { name: standupStrings.run.complete() })
+    ).not.toBeInTheDocument()
+  })
+
+  it('does not hide the backfill action on a missed stand-up', () => {
+    const api = { ...okApi(), backfill: jest.fn() }
+    renderScreen({ status: 'Missed' }, api)
+
+    expect(screen.getByRole('button', { name: standupStrings.run.backfill() })).toBeEnabled()
+  })
 })
