@@ -6,6 +6,7 @@ import { Organization } from '@/models/Organization'
 import { applyRoundingRules } from '@/lib/utils'
 import { logActivity } from '@/lib/activity-logger'
 import mongoose from 'mongoose'
+import { zonedTimeToUtc } from 'date-fns-tz'
 
 const MINUTES_PER_HOUR = 60
 
@@ -83,11 +84,26 @@ export async function getEffectiveTimeTrackingSettings(
   return organization?.settings?.timeTracking ?? null
 }
 
-export async function getDailyHoursLogged(userId: string, organizationId: string): Promise<number> {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
+async function getHoursLoggedForTimezone(userId: string, organizationId: string, tz: string): Promise<number> {
+  let todayStr: string
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    })
+    todayStr = formatter.format(new Date())
+  } catch {
+    tz = 'UTC'
+    todayStr = new Date().toISOString().slice(0, 10)
+  }
+
+  const [year, month, day] = todayStr.split('-').map(Number)
+  const nextDayStr = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10)
+
+  const today = zonedTimeToUtc(`${todayStr} 00:00:00`, tz)
+  const tomorrow = zonedTimeToUtc(`${nextDayStr} 00:00:00`, tz)
 
   const result = await TimeEntry.aggregate([
     {
@@ -107,6 +123,29 @@ export async function getDailyHoursLogged(userId: string, organizationId: string
 
   const totalMinutes = result.length > 0 ? result[0].totalDuration : 0
   return totalMinutes / MINUTES_PER_HOUR
+}
+
+export async function getDailyHoursLogged(
+  userId: string,
+  organizationId: string,
+  deviceTimezone?: string
+): Promise<number> {
+  const org = await Organization.findById(organizationId).select('timezone').lean()
+  const orgTz = (org as any)?.timezone || 'UTC'
+
+  const orgHours = await getHoursLoggedForTimezone(userId, organizationId, orgTz)
+
+  if (deviceTimezone && deviceTimezone !== orgTz) {
+    try {
+      Intl.DateTimeFormat('en-US', { timeZone: deviceTimezone }).format()
+      const deviceHours = await getHoursLoggedForTimezone(userId, organizationId, deviceTimezone)
+      return Math.min(orgHours, deviceHours)
+    } catch {
+      return orgHours
+    }
+  }
+
+  return orgHours
 }
 
 export interface StopTimerOptions {

@@ -52,12 +52,14 @@ export async function GET(request: NextRequest) {
 
     const currentDuration = calculateCurrentDurationMinutes(activeTimer, new Date())
 
+    const clientTimezone = searchParams.get('timezone') || request.headers.get('x-timezone') || undefined
+
     // Calculate remaining daily minutes for the client
     const effectiveSettings = await getEffectiveTimeTrackingSettings(organizationId, null)
     let remainingDailyMinutes: number | null = null
     const MINUTES_PER_HOUR = 60
     if (effectiveSettings?.maxDailyHours && effectiveSettings.allowOvertime === false) {
-      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId, clientTimezone)
       const remainingHours = Math.max(0, effectiveSettings.maxDailyHours - dailyHoursLogged)
       remainingDailyMinutes = remainingHours * MINUTES_PER_HOUR
     }
@@ -83,8 +85,8 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json()
     
-    const { userId, organizationId, projectId, taskId, description, category, tags, isBillable, hourlyRate } = body
-    
+    const { userId, organizationId, projectId, taskId, description, category, tags, isBillable, hourlyRate, timezone } = body
+    const clientTimezone = timezone || request.headers.get('x-timezone') || undefined
 
     if (!userId || !organizationId || !projectId) {
    
@@ -163,7 +165,7 @@ export async function POST(request: NextRequest) {
 
     // Check daily hours limit before starting timer
     if (settings.allowOvertime === false && settings.maxDailyHours) {
-      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId, clientTimezone)
       if (dailyHoursLogged >= settings.maxDailyHours) {
         return NextResponse.json(
           { error: `Daily time limit reached. You have already logged ${dailyHoursLogged.toFixed(1)} hours today (maximum: ${settings.maxDailyHours} hours). You cannot start a new timer until tomorrow.` },
@@ -196,7 +198,7 @@ export async function POST(request: NextRequest) {
     // Calculate effective max session hours considering daily limit
     let effectiveMaxSession = settings.maxSessionHours
     if (settings.allowOvertime === false && settings.maxDailyHours) {
-      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId, clientTimezone)
       const remainingDailyHours = Math.max(0, settings.maxDailyHours - dailyHoursLogged)
       effectiveMaxSession = Math.min(settings.maxSessionHours, remainingDailyHours)
     }

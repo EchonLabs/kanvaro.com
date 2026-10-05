@@ -870,7 +870,9 @@ export function TimeLogs({
           description: manualLogData.description || undefined,
           startTime: start.toISOString(),
           endTime: end.toISOString(),
-          isBillable: getBillableFromTask(selectedTaskForLog) && timeTrackingSettings?.allowBillableTime
+          isBillable: getBillableFromTask(selectedTaskForLog) && timeTrackingSettings?.allowBillableTime,
+          startDateOnly: manualLogData.startDate,      
+          timezone: detectClientTimezone()
         })
       })
 

@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useToast } from '@/components/ui/Toast'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { detectClientTimezone } from '@/lib/timezone'
 import { cn } from '@/lib/utils'
 
 interface TimerProps {
@@ -171,7 +172,8 @@ export function Timer({
     }
 
     try {
-      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}`)
+      const tz = detectClientTimezone()
+      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}&timezone=${encodeURIComponent(tz)}`)
       const data = await response.json()
 
       if (response.ok) {
@@ -250,7 +252,7 @@ export function Timer({
       const response = await fetch('/api/time-tracking/timer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, organizationId, projectId, taskId, description, isBillable })
+        body: JSON.stringify({ userId, organizationId, projectId, taskId, description, isBillable, timezone: detectClientTimezone() })
       })
 
       const data = await response.json()

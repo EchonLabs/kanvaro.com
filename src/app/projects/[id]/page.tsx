@@ -63,6 +63,9 @@ import { TestSuiteForm } from '@/components/test-management/TestSuiteForm'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
 import { TestSuiteDetailDialog } from '@/components/test-management/TestSuiteDetailDialog'
 import { ProjectTeamTab } from '@/components/projects/ProjectTeamTab'
+import { ProjectViewHeader } from '@/components/projects/ProjectViewHeader'
+import { ProjectBudgetConsumptionCard } from '@/components/projects/ProjectBudgetConsumptionCard'
+import { ProjectInsightsTab } from '@/components/projects/ProjectInsightsTab'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { Permission } from '@/lib/permissions'
 import { usePermissions } from '@/lib/permissions/permission-context'
@@ -94,18 +97,31 @@ interface Project {
     firstName: string
     lastName: string
     email: string
+    avatar?: string
   }
+  projectRoles?: Array<{
+    user?: {
+      _id?: string
+      firstName?: string
+      lastName?: string
+      email?: string
+      avatar?: string
+    } | string
+    role?: string
+  }>
   teamMembers: Array<{
     _id?: string
     memberId?: {
       firstName: string
       lastName: string
       email: string
+      avatar?: string
       role?: string
     }
     firstName?: string
     lastName?: string
     email?: string
+    avatar?: string
     role?: string
     hourlyRate?: number
   }>
@@ -113,6 +129,7 @@ interface Project {
     firstName: string
     lastName: string
     email: string
+    avatar?: string
   }
   progress: {
     completionPercentage: number
@@ -140,6 +157,10 @@ interface Project {
       utilizationRate: number
       spent: number
       total: number
+      remaining?: number
+      actualSpend?: number
+      loggedHoursCost?: number
+      expensesSpent?: number
     }
     timeTracking?: {
       totalHours: number
@@ -260,6 +281,7 @@ export default function ProjectDetailPage() {
   // which would incorrectly show action buttons to team members during the loading phase.
   const FINANCIAL_MANAGER_ROLES = ['super_admin', 'admin', 'human_resource', 'project_manager']
   const canManageFinancials = !permissionsLoading && permissions !== null && FINANCIAL_MANAGER_ROLES.includes(permissions.userRole ?? '')
+  const isHrOrAdmin = !permissionsLoading && permissions !== null && ['super_admin', 'admin', 'human_resource'].includes(permissions.userRole ?? '')
   const canViewIncome = canManageFinancials || (!permissionsLoading && permissions !== null && hasPermission(Permission.FINANCIAL_VIEW_INCOME, projectId))
   const canCreateIncome = canManageFinancials
   const canManageExpense = canManageFinancials
@@ -275,6 +297,7 @@ export default function ProjectDetailPage() {
     { id: 'backlog', label: 'Backlog', order: 8 },
     ...(canManageTests ? [{ id: 'testing', label: 'Testing' }] : []),
     { id: 'reports', label: 'Reports' },
+    { id: 'insights', label: 'Insights' },
     { id: 'settings', label: 'Settings' },
   ].map((tab, idx) => ({ ...tab, order: idx + 1 }))
 
@@ -842,165 +865,36 @@ export default function ProjectDetailPage() {
 
   return (
     <TooltipProvider>
-      <MainLayout>
-        <div className="space-y-8 mt-4">
-          {/* Header */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 flex-1 min-w-0">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.back()}
-                className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto hidden sm:inline-flex"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
-                  <FolderOpen className="h-8 w-8 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--apple-card-gradient)' }} />
-                  <h1
-                    className="text-xl sm:text-2xl lg:text-3xl font-bold text-[var(--apple-label)] leading-tight tracking-tight line-clamp-2 max-w-full break-words"
-                    title={project.name}
-                  >
-                    {project.name}
-                  </h1>
-                  {typeof project.projectNumber !== 'undefined' && (
-                    <Badge variant="outline" className="flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent">#{project.projectNumber}</Badge>
-                  )}
-                  {project.isDraft && project.status !== 'draft' && (
-                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900 flex-shrink-0">
-                      Draft
-                    </Badge>
-                  )}
-                  <Badge className={getStatusColor(project.status) + ' flex-shrink-0'}>
-                    {getStatusIcon(project.status)}
-                    <span className="ml-1">{formatToTitleCase(project.status)}</span>
-                  </Badge>
-                </div>
-                <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words whitespace-normal" title={project.description || 'No description'}>
-                  {project.description || 'No description'}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col items-stretch gap-2 w-full sm:w-auto sm:justify-end">
-              <div className="flex flex-wrap items-stretch gap-2 sm:justify-end">
-                {canUpdateProject && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push(`/projects/create?edit=${projectId}`)}
-                    className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Project
-                  </Button>
-                )}
-                {canCreateTask && (
-                  <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Task
-                  </Button>
-                )}
-              </div>
-              {canCreateTask && (
-                <Button size="sm" variant="outline" onClick={() => setShowBulkUploadDialog(true)} className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm w-full sm:w-auto">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Bulk Upload
-                </Button>
-              )}
-            </div>
-          </div>
+      <MainLayout breadcrumbItems={[{ label: 'Projects', href: '/projects' }, { label: 'View Project' }]}>
+        <div className="space-y-6 mt-4">
+          {/* Project Header and Info Card */}
+          <ProjectViewHeader
+            project={project}
+            canUpdateProject={canUpdateProject}
+            canCreateTask={canCreateTask}
+            onBack={() => router.back()}
+            onAddTask={() => setShowCreateTaskModal(true)}
+            onBulkUpload={() => setShowBulkUploadDialog(true)}
+            onEditProject={() => router.push(`/projects/create?edit=${projectId}`)}
+            onGoToTeam={() => {
+              const newSearchParams = new URLSearchParams(searchParams.toString())
+              newSearchParams.set('tab', 'team')
+              router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
+            }}
+            onGoToReports={() => {
+              const newSearchParams = new URLSearchParams(searchParams.toString())
+              newSearchParams.set('tab', 'reports')
+              router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
+            }}
+            formatCurrency={formatCurrency}
+          />
 
-          {/* Project Stats */}
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-6">
-            {/* Progress */}
-            <div className="card-fade-in card-fade-in-delay-1 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
-              <div className="px-3 pt-3 pb-3">
-                <div className="mb-2">
-                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Progress</span>
-                </div>
-                <div className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-none mb-2" style={{ background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                  {project.progress?.completionPercentage || 0}%
-                </div>
-                <div className="h-[4px] w-full rounded-full bg-[var(--apple-tertiary-fill)] overflow-hidden mb-1.5">
-                  <div
-                    className="h-full rounded-full progress-bar-animated relative overflow-hidden"
-                    style={{
-                      width: `${project.progress?.completionPercentage || 0}%`,
-                      background: 'var(--apple-chart-gradient)',
-                      boxShadow: (project.progress?.completionPercentage || 0) > 2 ? '0 0 6px var(--apple-chart-glow)' : 'none',
-                    }}
-                  >
-                    {(project.progress?.completionPercentage || 0) > 2 && <span className="progress-shimmer absolute inset-0" />}
-                  </div>
-                </div>
-                <span className="text-[11px] text-[var(--apple-tertiary-label)]">
-                  {project.progress?.tasksCompleted || 0} of {project.progress?.totalTasks || 0} tasks
-                </span>
-              </div>
-            </div>
-
-            {/* Team Members */}
-            <div className="card-fade-in card-fade-in-delay-2 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
-              <div className="px-3 pt-3 pb-3">
-                <div className="mb-2">
-                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Team Members</span>
-                </div>
-                <div className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-none mb-1.5" style={{ background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                  {project.teamMembers.length}
-                </div>
-                <span className="text-[11px] text-[var(--apple-tertiary-label)]">
-                  {project.teamMembers.length === 1 ? 'member' : 'members'} assigned
-                </span>
-              </div>
-            </div>
-
-            {/* Duration */}
-            <div className="card-fade-in card-fade-in-delay-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
-              <div className="px-3 pt-3 pb-3">
-                <div className="mb-2">
-                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Duration</span>
-                </div>
-                {project.startDate && project.endDate ? (
-                  <>
-                    <div className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-none mb-1.5" style={{ background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                      {Math.ceil((new Date(project.endDate).getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24))}
-                    </div>
-                    <span className="text-[11px] text-[var(--apple-tertiary-label)]">days total</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-[18px] sm:text-[20px] font-bold tracking-tight leading-none mb-1.5" style={{ color: 'var(--apple-secondary-label)' }}>
-                      No due date
-                    </div>
-                    <span className="text-[11px] text-[var(--apple-tertiary-label)]">End date not set</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Budget */}
-            <div className="card-fade-in card-fade-in-delay-4 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none">
-              <div className="px-3 pt-3 pb-3">
-                <div className="mb-2">
-                  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--apple-secondary-label)]">Budget</span>
-                </div>
-                <div
-                  className="text-[18px] sm:text-[22px] font-bold tracking-tight leading-none mb-1.5 truncate"
-                  style={project.budget
-                    ? { background: 'var(--apple-chart-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
-                    : { color: 'var(--apple-secondary-label)' }
-                  }
-                >
-                  {project.budget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total) : 'No budget'}
-                </div>
-                <span className="text-[11px] text-[var(--apple-tertiary-label)]">
-                  {project.budget ? 'total budget' : 'Budget not set'}
-                </span>
-              </div>
-            </div>
-          </div>
+          {/* Project Budget Consumption Card */}
+          <ProjectBudgetConsumptionCard
+            totalBudget={project.stats?.budget?.total ?? project.budget?.total ?? 0}
+            actualSpend={project.stats?.budget?.actualSpend ?? project.stats?.budget?.spent ?? project.budget?.spent ?? 0}
+            formatCurrency={formatCurrency}
+          />
 
           <Tabs value={activeTab} onValueChange={(value) => {
             const newSearchParams = new URLSearchParams(searchParams.toString())
@@ -1062,7 +956,10 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             </div>
-            <TabsList className={'mt-2 hidden h-auto w-full gap-1 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-sm sm:grid ' + (canManageTests ? 'sm:grid-cols-11' : 'sm:grid-cols-10')}>
+            <TabsList
+              className="mt-2 hidden h-auto w-full gap-1 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-sm sm:grid"
+              style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+            >
               {tabs.map((tab) => (
                 <TabsTrigger key={tab.id} value={tab.id} className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-border/60 md:flex-row md:gap-2 md:px-3 md:py-2 md:text-sm">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-foreground ring-1 ring-border/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -2277,6 +2174,15 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="insights" className="space-y-6">
+              <ProjectInsightsTab
+                projectId={projectId}
+                formatCurrency={formatCurrency}
+                currency={orgCurrency}
+                canViewFinancials={isHrOrAdmin}
+              />
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-6">
