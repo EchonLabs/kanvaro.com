@@ -34,7 +34,9 @@
  * — the saga's own stale-version guard stays intact — it is only the
  * *client-supplied* version header that is skipped.
  */
-import { Standup } from '@/models/Standup'
+import mongoose from 'mongoose'
+
+import { ATTENDANCE_STATES, Standup, type AttendanceState } from '@/models/Standup'
 import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 
 import { addDays, isoOfStoredDate, todayInTimezone, type IsoDate } from './calendar-dates'
@@ -48,10 +50,23 @@ import { StandupError } from './errors'
 /** Mirrors `ProjectStandupSettings`'s own schema default for this field. */
 const DEFAULT_BACKFILL_WINDOW_WORKING_DAYS = 2
 
+/**
+ * One row of SCH-14's "full run payload": the room as the facilitator recalls
+ * it. `memberId` must be one of the stand-up's own `expectedAttendees`.
+ */
+export interface BackfillAttendanceEntry {
+  memberId: string
+  state: AttendanceState
+  /** Required when `state` is `partial` — stored as `attendance.partialMinutes`. */
+  minutes?: number
+}
+
 export interface BackfillStandupInput {
   standupId: string
   backfilledBy: string
   notes?: string
+  /** SCH-14's run payload. Fills gaps in `attendance`; never rewrites a record. */
+  attendance?: BackfillAttendanceEntry[]
   now?: Date
 }
 
@@ -95,6 +110,23 @@ export async function backfillStandup(
     )
   }
 
+  // SCH-14's "full run payload", and the only way CC-7 can ever be satisfied
+  // on a missed day. A `Missed` stand-up has no attendance by definition;
+  // `attendance-service` refuses to add any (its `MUTABLE_STATUSES` excludes
+  // `Missed`, correctly) and `reopen-service` admits only `Completed`, so
+  // without this the hard, non-overridable CC-7 makes backfill unreachable.
+  // Backfill is the one sanctioned exception — `Missed` stays immutable
+  // everywhere else.
+  //
+  // Written BEFORE `assembleCompletionContext`, and persisted rather than
+  // only mutated in memory: the context's own loaders (`loadAllocationBoard`)
+  // re-read the stand-up from the database, so an in-memory-only edit would
+  // leave the capacity board and CC-7 reading the pre-write room.
+  if (input.attendance?.length) {
+    applyBackfillAttendance(standup, input.attendance)
+    await standup.save()
+  }
+
   const ctx = await assembleCompletionContext({
     standupId: input.standupId,
     standup,
@@ -130,6 +162,60 @@ export async function backfillStandup(
   if (!reloaded) throw new StandupError('NOT_FOUND', 'Stand-up not found.')
 
   return { standup: reloaded, summaryId: result.summaryId }
+}
+
+/**
+ * Merges a backfill payload into a stand-up's `attendance`, mirroring
+ * `start-service`'s RUN-6 merge: a `Set` keyed on the stored user id, and a
+ * `push` only for members who have no record yet. The array is never rebuilt,
+ * so any pre-existing record — in any state, however it got there — survives
+ * untouched. Backfill fills the gaps a missed day left; it is not a back door
+ * for rewriting attendance somebody already recorded.
+ */
+function applyBackfillAttendance(
+  standup: InstanceType<typeof Standup>,
+  entries: BackfillAttendanceEntry[]
+): void {
+  const expected = new Set(standup.expectedAttendees.map((attendee) => String(attendee)))
+  const recorded = new Set(standup.attendance.map((entry) => String(entry.user)))
+
+  for (const entry of entries) {
+    // Mirrors `attendance-service`'s own two guards. The payload arrives from
+    // a route body, and the `$push`-free `save()` below would surface a bad
+    // state as a Mongoose validation error (a 500), not a 422.
+    if (!ATTENDANCE_STATES.includes(entry.state)) {
+      throw new StandupError('VALIDATION_FAILED', 'Unknown attendance state.', {
+        state: entry.state
+      })
+    }
+    if (!expected.has(entry.memberId)) {
+      throw new StandupError(
+        'VALIDATION_FAILED',
+        'That person is not expected at this stand-up.',
+        { memberId: entry.memberId }
+      )
+    }
+    if (entry.state === 'partial' && !(Number.isInteger(entry.minutes) && entry.minutes! > 0)) {
+      throw new StandupError(
+        'VALIDATION_FAILED',
+        'A partial day needs the whole number of minutes the member was available.',
+        { memberId: entry.memberId, minutes: entry.minutes }
+      )
+    }
+
+    if (recorded.has(entry.memberId)) continue
+
+    standup.attendance.push({
+      // Cast explicitly rather than leaning on Mongoose's own string coercion:
+      // the id was just matched against `expectedAttendees`, so it is a valid
+      // ObjectId, and the explicit construction keeps the pushed subdocument's
+      // shape identical to `start-service`'s.
+      user: new mongoose.Types.ObjectId(entry.memberId),
+      state: entry.state,
+      ...(entry.state === 'partial' ? { partialMinutes: entry.minutes } : {})
+    })
+    recorded.add(entry.memberId)
+  }
 }
 
 /**

@@ -16,14 +16,25 @@
 import { NextResponse } from 'next/server'
 
 import { Permission } from '@/lib/permissions/permission-definitions'
-import { backfillStandup } from '@/lib/standup/backfill-service'
+import {
+  backfillStandup,
+  type BackfillAttendanceEntry
+} from '@/lib/standup/backfill-service'
 import { toErrorResponse } from '@/lib/standup/errors'
 import { ok, readJson, withStandupIdPermission } from '@/lib/standup/route-helpers'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * SCH-14 and the route table both describe backfill as taking a **full run
+ * payload**; this body took only `notes`, which left the one thing a missed
+ * day is missing — attendance — unsendable, and the hard CC-7 check therefore
+ * unsatisfiable. `attendance` is validated by the service against the
+ * stand-up's own `expectedAttendees`, not here.
+ */
 interface BackfillBody {
   notes?: string
+  attendance?: BackfillAttendanceEntry[]
 }
 
 export const POST = withStandupIdPermission(
@@ -35,7 +46,8 @@ export const POST = withStandupIdPermission(
       const result = await backfillStandup({
         standupId,
         backfilledBy: userId,
-        notes: body.notes
+        notes: body.notes,
+        attendance: body.attendance
       })
 
       return ok({

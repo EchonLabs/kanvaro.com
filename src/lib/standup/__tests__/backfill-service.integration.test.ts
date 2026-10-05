@@ -211,6 +211,82 @@ describe('backfillStandup (SCH-14/E49)', () => {
     expect(reloaded!.wasBackfilled).toBe(false)
   })
 
+  /**
+   * A Missed stand-up with NO attendance — the state every genuinely missed
+   * day is in, and the one the fixture above deliberately avoids. Neither
+   * `setAttendance` (MUTABLE_STATUSES excludes `Missed`) nor `reopen`
+   * (admits only `Completed`) can record attendance on it, so backfill is
+   * the only entry point that can satisfy CC-7 here.
+   */
+  async function seedUnrecordedMissedStandup(standupDate: string) {
+    return seedMissedStandup(standupDate, { attendance: [] })
+  }
+
+  it('backfills a missed standup whose attendance was never recorded', async () => {
+    await seedSprint('2026-08-25', '2026-09-10')
+    await ProjectStandupSettings.create({
+      project,
+      organization,
+      backfillWindowWorkingDays: 2
+    })
+    const standup = await seedUnrecordedMissedStandup('2026-09-01')
+
+    const result = await backfillStandup({
+      standupId: String(standup._id),
+      backfilledBy: String(user),
+      attendance: [{ memberId: String(member), state: 'absent_planned' }],
+      now: new Date('2026-09-02T10:00:00.000Z')
+    })
+
+    expect(result.standup.status).toBe('Completed')
+    expect(result.standup.wasBackfilled).toBe(true)
+
+    const reloaded = await Standup.findById(standup._id).lean()
+    expect(reloaded!.attendance).toEqual([
+      expect.objectContaining({ user: member, state: 'absent_planned' })
+    ])
+
+    // The saga really ran against the just-written room.
+    expect(await StandupSummary.countDocuments({ standup: standup._id })).toBe(1)
+  })
+
+  it('refuses an attendance payload naming somebody who was not expected', async () => {
+    await seedSprint('2026-08-25', '2026-09-10')
+    const standup = await seedUnrecordedMissedStandup('2026-09-01')
+
+    await expect(
+      backfillStandup({
+        standupId: String(standup._id),
+        backfilledBy: String(user),
+        attendance: [{ memberId: String(new mongoose.Types.ObjectId()), state: 'present' }],
+        now: new Date('2026-09-02T10:00:00.000Z')
+      })
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+
+    const reloaded = await Standup.findById(standup._id).lean()
+    expect(reloaded!.status).toBe('Missed')
+    expect(reloaded!.attendance).toEqual([])
+  })
+
+  it('leaves an already-recorded attendance row untouched rather than rewriting it', async () => {
+    // The fixture already records `member` as absent_planned; a payload that
+    // claims otherwise must not overwrite it (start-service's merge rule).
+    await seedSprint('2026-08-25', '2026-09-10')
+    const standup = await seedMissedStandup('2026-09-01')
+
+    await backfillStandup({
+      standupId: String(standup._id),
+      backfilledBy: String(user),
+      attendance: [{ memberId: String(member), state: 'present' }],
+      now: new Date('2026-09-02T10:00:00.000Z')
+    })
+
+    const reloaded = await Standup.findById(standup._id).lean()
+    expect(reloaded!.attendance).toEqual([
+      expect.objectContaining({ user: member, state: 'absent_planned' })
+    ])
+  })
+
   // Pins: the existing backfill path must keep working once the service
   // starts accepting an attendance payload.
 
@@ -250,7 +326,7 @@ describe('backfillStandup (SCH-14/E49)', () => {
         backfilledBy: String(user),
         attendance: [{ memberId: String(member), state: 'present' }],
         now: new Date('2026-09-07T10:00:00.000Z')
-      } as Parameters<typeof backfillStandup>[0])
+      })
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
 
     const reloaded = await Standup.findById(standup._id).lean()
