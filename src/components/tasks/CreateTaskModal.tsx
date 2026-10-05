@@ -41,6 +41,7 @@ interface CreateTaskModalProps {
   onClose: () => void
   projectId: string
   onTaskCreated: () => void
+  onRefreshTasks?: () => void
   defaultStatus?: string
   availableStatuses?: Array<{ key: string; title: string }>
   stayOnCurrentPage?: boolean // If true, don't redirect after task creation
@@ -144,6 +145,7 @@ export default function CreateTaskModal({
   onClose,
   projectId,
   onTaskCreated,
+  onRefreshTasks,
   defaultStatus,
   availableStatuses,
   stayOnCurrentPage = false,
@@ -342,6 +344,16 @@ export default function CreateTaskModal({
     }
   }, [user])
 
+  const getCategoryTitle = useCallback((categoryKey?: string): string => {
+    if (!categoryKey) return ''
+    const found = categories.find(c =>
+      c.key === categoryKey ||
+      c.key.toLowerCase() === categoryKey.toLowerCase() ||
+      c.title.toLowerCase() === categoryKey.toLowerCase()
+    )
+    return found ? found.title : categoryKey
+  }, [categories])
+
   const fetchCategories = useCallback(async (projectIdParam: string | undefined) => {
     if (!projectIdParam) {
       setCategories([])
@@ -356,29 +368,44 @@ export default function CreateTaskModal({
 
       if (!response.ok || !data.success || !Array.isArray(data.data)) {
         setCategories([])
-        setFormData(prev => ({ ...prev, category: '' }))
         return
       }
 
       const sortedCategories = [...data.data].sort((a: TaskCategory, b: TaskCategory) => a.order - b.order)
       setCategories(sortedCategories)
-      setFormData(prev => sortedCategories.some(category => category.key === prev.category)
-        ? prev
-        : { ...prev, category: '' })
+      setFormData(prev => {
+        if (!prev.category) return prev
+        const match = sortedCategories.find(c =>
+          c.key === prev.category ||
+          c.key.toLowerCase() === prev.category.toLowerCase() ||
+          c.title.toLowerCase() === prev.category.toLowerCase()
+        )
+        return match ? { ...prev, category: match.key } : prev
+      })
     } catch (error) {
+      console.error('Failed to fetch task categories:', error)
       setCategories([])
-      setFormData(prev => ({ ...prev, category: '' }))
     } finally {
       setLoadingCategories(false)
     }
   }, [])
 
-  const handleCategoriesUpdated = useCallback((updatedCategories: TaskCategory[]) => {
+  const handleCategoriesUpdated = useCallback((updatedCategories: TaskCategory[], deleteInfo?: { deletedKey: string; targetKey?: string }) => {
     setCategories(updatedCategories)
-    setFormData(prev => updatedCategories.some(category => category.key === prev.category)
-      ? prev
-      : { ...prev, category: '' })
-  }, [])
+    const resolveNext = (current: string) => {
+      if (deleteInfo && (current === deleteInfo.deletedKey || current.toLowerCase() === deleteInfo.deletedKey.toLowerCase())) {
+        return deleteInfo.targetKey || ''
+      }
+      const match = updatedCategories.find(c =>
+        c.key === current ||
+        c.key.toLowerCase() === current.toLowerCase() ||
+        c.title.toLowerCase() === current.toLowerCase()
+      )
+      return match ? match.key : ''
+    }
+    setFormData(prev => ({ ...prev, category: resolveNext(prev.category) }))
+    onRefreshTasks?.()
+  }, [onRefreshTasks])
 
   // Fetch project members when modal opens or project selection changes
   useEffect(() => {
@@ -928,12 +955,17 @@ export default function CreateTaskModal({
                   </div>
                   <Select
                     value={formData.category}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                    onValueChange={(value) => {
+                      if (!value) return
+                      setFormData(prev => ({ ...prev, category: value }))
+                    }}
                     disabled={!effectiveProjectId || loadingCategories}
                     onOpenChange={(open) => { if (open) setCategoryQuery('') }}
                   >
                     <SelectTrigger className="mt-0 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
-                      <SelectValue placeholder={!effectiveProjectId ? 'Select a project first' : loadingCategories ? 'Loading categories...' : 'Select a category'} />
+                      <SelectValue placeholder={!effectiveProjectId ? 'Select a project first' : loadingCategories ? 'Loading categories...' : 'Select a category'}>
+                        {formData.category ? getCategoryTitle(formData.category) : undefined}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
                       <div className="p-2">

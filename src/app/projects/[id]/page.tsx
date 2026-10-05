@@ -509,9 +509,11 @@ export default function ProjectDetailPage() {
   const documentationShowingStart = documentationLinks.length ? docSliceStart + 1 : 0
   const documentationShowingEnd = documentationLinks.length ? Math.min(docSliceStart + linkPaginationSize, documentationLinks.length) : 0
 
-  const fetchProject = useCallback(async () => {
+  const fetchProject = useCallback(async (showLoadingSpinner = true) => {
     try {
-      setLoading(true)
+      if (showLoadingSpinner) {
+        setLoading(true)
+      }
       const response = await fetch(`/api/projects/${projectId}`)
       const data = await response.json()
 
@@ -523,7 +525,9 @@ export default function ProjectDetailPage() {
     } catch {
       setError('Failed to fetch project')
     } finally {
-      setLoading(false)
+      if (showLoadingSpinner) {
+        setLoading(false)
+      }
     }
   }, [projectId])
 
@@ -2587,9 +2591,15 @@ export default function ProjectDetailPage() {
             onTaskCreated={() => {
               setShowCreateTaskModal(false)
               // Refresh project data to update task counts
-              fetchProject()
+              fetchProject(false)
               // Refresh tasks list
               fetchTasks()
+              window.dispatchEvent(new CustomEvent('project-tasks-updated'))
+            }}
+            onRefreshTasks={() => {
+              fetchProject(false)
+              fetchTasks()
+              window.dispatchEvent(new CustomEvent('project-tasks-updated'))
             }}
           />
 
@@ -2606,13 +2616,15 @@ export default function ProjectDetailPage() {
                 setShowEditTaskModal(false)
                 setSelectedTask(null)
                 // Refresh project data to update task counts
-                fetchProject()
+                fetchProject(false)
                 // Refresh tasks list
                 fetchTasks()
+                window.dispatchEvent(new CustomEvent('project-tasks-updated'))
               }}
               onRefreshTasks={() => {
-                fetchProject()
+                fetchProject(false)
                 fetchTasks()
+                window.dispatchEvent(new CustomEvent('project-tasks-updated'))
               }}
             />
           )}
