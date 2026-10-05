@@ -482,6 +482,55 @@ describe('backfillStandup (SCH-14/E49)', () => {
     expect(await StandupSummary.countDocuments({ standup: standup._id })).toBe(0)
   })
 
+  /**
+   * Ruling 21's pin, and the one that matters most.
+   *
+   * A missed day had nothing allocated, so CC-1 — hard, overridable — fails
+   * for every member the facilitator records as `present`. Backfill must not
+   * quietly wave that through: this is the exact gate Task 8 closed (a
+   * stand-up completing with nobody allocated and every check green), and
+   * the override path added for Ruling 21 must stay opt-in. Omitting the
+   * acknowledgement must still refuse, naming CC-1.
+   *
+   * Note the other fixtures all record their one member `absent_planned`,
+   * whose capacity reads `unavailable` and which CC-1 therefore exempts —
+   * which is why this failure was invisible to every existing test and only
+   * surfaced in the browser.
+   */
+  it('still fails on CC-1 when a present member is unplanned and nothing is acknowledged', async () => {
+    await seedSprint('2026-08-25', '2026-09-10')
+    await ProjectStandupSettings.create({
+      project,
+      organization,
+      backfillWindowWorkingDays: 2
+    })
+    const standup = await seedUnrecordedMissedStandup('2026-09-01')
+
+    const error = await backfillStandup({
+      standupId: String(standup._id),
+      backfilledBy: String(user),
+      attendance: [{ memberId: String(member), state: 'present' }],
+      now: new Date('2026-09-02T10:00:00.000Z')
+    }).catch((caught) => caught)
+
+    expect(error).toMatchObject({ code: 'COMPLETION_CHECKS_FAILED' })
+    expect(error.details.failingChecks).toEqual([
+      expect.objectContaining({
+        checkId: 'CC-1',
+        hard: true,
+        overridable: true,
+        entities: [expect.objectContaining({ memberId: String(member) })]
+      })
+    ])
+
+    // Nothing completed, and no override invented on the facilitator's behalf.
+    const reloaded = await Standup.findById(standup._id).lean()
+    expect(reloaded!.status).toBe('Missed')
+    expect(reloaded!.wasBackfilled).toBe(false)
+    const { StandupOverride } = await import('@/models/StandupOverride')
+    expect(await StandupOverride.countDocuments({ standup: standup._id })).toBe(0)
+  })
+
   it('404s on a nonexistent standup', async () => {
     await expect(
       backfillStandup({
