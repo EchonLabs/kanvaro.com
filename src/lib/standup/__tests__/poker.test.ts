@@ -279,3 +279,45 @@ describe('voteProgress — hidden until reveal', () => {
     expect(progress.voted).toBe(1)
   })
 })
+
+describe('revealVotes — what the outlier rule must not disturb', () => {
+  it('still reports no outliers and consensus for a unanimous round', () => {
+    const result = revealVotes('fibonacci', 'median', [
+      { voterId: 'a', card: '5' },
+      { voterId: 'b', card: '5' },
+      { voterId: 'c', card: '5' }
+    ])
+
+    expect(result.unanimous).toBe(true)
+    expect(result.votes.every((vote) => !vote.isOutlier)).toBe(true)
+  })
+
+  // Abstentions are not estimates and are never outliers.
+  it('still excludes abstentions from numericCount and never marks them outliers', () => {
+    const result = revealVotes('fibonacci', 'median', [
+      { voterId: 'a', card: '3' },
+      { voterId: 'b', card: '13' },
+      { voterId: 'c', card: '?' },
+      { voterId: 'd', card: 'coffee' }
+    ])
+
+    expect(result.numericCount).toBe(2)
+    expect(result.abstainCount).toBe(2)
+    expect(result.votes.find((vote) => vote.voterId === 'c')!.isOutlier).toBe(false)
+    expect(result.votes.find((vote) => vote.voterId === 'd')!.isOutlier).toBe(false)
+  })
+
+  it('still computes min, max, median, spread and suggestedValue unchanged', () => {
+    const result = revealVotes('fibonacci', 'median', [
+      { voterId: 'a', card: '5' },
+      { voterId: 'b', card: '8' },
+      { voterId: 'c', card: '8' }
+    ])
+
+    expect(result.min).toBe(5)
+    expect(result.max).toBe(8)
+    expect(result.median).toBe(8)
+    expect(result.spread).toBe(3)
+    expect(result.suggestedValue).toBe(8)
+  })
+})
