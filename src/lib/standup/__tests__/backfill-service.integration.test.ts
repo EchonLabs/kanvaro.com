@@ -300,6 +300,79 @@ describe('backfillStandup (SCH-14/E49)', () => {
     expect(reloaded!.frozenAt).toBeTruthy()
   })
 
+  it('detaches on a retry, when an earlier attempt wrote the absence and died', async () => {
+    // The state a half-finished backfill leaves behind: the absence row is
+    // recorded, but its allocations were never detached. The merge correctly
+    // refuses to rewrite that row, so a detach keyed on "rows this call wrote"
+    // would do nothing and the saga would freeze the undetached state —
+    // permanently, since nothing else revisits it. Keying off the *stored*
+    // state makes the step idempotent; `detachAllocations` filters on
+    // `detachedReason: { $exists: false }`, so a re-run is a no-op.
+    await seedSprint('2026-08-25', '2026-09-10')
+    const standup = await seedMissedStandup('2026-09-01')
+
+    const { Task } = await import('@/models/Task')
+    const task = await Task.create({
+      title: 'Stranded by a half-finished backfill',
+      organization,
+      project,
+      sprint: sprintId,
+      createdBy: user,
+      taskNumber: 9103,
+      displayId: 'KAN-9103',
+      status: 'in_progress',
+      remainingEstimateMinutes: 60,
+      originalEstimateMinutes: 60,
+      assignedTo: [{ user: member }]
+    })
+    const allocation = await Allocation.create({
+      standup: standup._id,
+      sprint: sprintId,
+      project,
+      organization,
+      member,
+      task: task._id,
+      plannedMinutes: 60,
+      source: 'assigned_in_standup',
+      excludedFromCapacity: false,
+      createdBy: user
+    })
+
+    await backfillStandup({
+      standupId: String(standup._id),
+      backfilledBy: String(user),
+      attendance: [{ memberId: String(member), state: 'absent_planned' }],
+      now: new Date('2026-09-02T10:00:00.000Z')
+    })
+
+    const reloaded = await Allocation.findById(allocation._id).lean()
+    expect(reloaded!.detachedReason).toBe('owner_absent')
+    expect(reloaded!.excludedFromCapacity).toBe(true)
+
+    // The row itself is still the one the earlier attempt wrote — the retry
+    // detached its work without rewriting the claim.
+    const storedStandup = await Standup.findById(standup._id).lean()
+    expect(storedStandup!.attendance).toEqual([
+      expect.objectContaining({ user: member, state: 'absent_planned' })
+    ])
+
+    // And the audit says so: not reported as newly written, but the detach it
+    // performed is on the record.
+    const { ActivityLog } = await import('@/models/ActivityLog')
+    const entry = (await ActivityLog.findOne({
+      action: 'standup_backfilled',
+      entityId: String(standup._id)
+    }).lean()) as any
+    expect(entry.details.after.attendance).toEqual([])
+    expect(entry.details.after.detachedForAlreadyRecorded).toEqual([
+      expect.objectContaining({
+        memberId: String(member),
+        state: 'absent_planned',
+        detachedAllocationIds: [String(allocation._id)]
+      })
+    ])
+  })
+
   it('records the attendance it wrote in the backfill audit entry (SEC-3)', async () => {
     await seedSprint('2026-08-25', '2026-09-10')
     const standup = await seedUnrecordedMissedStandup('2026-09-01')

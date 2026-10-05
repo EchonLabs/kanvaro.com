@@ -73,6 +73,24 @@ interface RecordedBackfillAttendance {
   detachedAllocationIds: string[]
 }
 
+/**
+ * A member whose absence an *earlier* attempt recorded, and whose work this
+ * call detached. Kept apart from `recorded` so the audit never claims a row
+ * was written when it was not — see `applyBackfillAttendance`'s detach loop.
+ */
+interface DetachedForAlreadyRecorded {
+  memberId: string
+  state: AttendanceState
+  detachedAllocationIds: string[]
+}
+
+interface BackfillAttendanceOutcome {
+  /** Attendance rows this call wrote. */
+  recorded: RecordedBackfillAttendance[]
+  /** Absences an earlier attempt wrote, whose allocations this call detached. */
+  detachedForAlreadyRecorded: DetachedForAlreadyRecorded[]
+}
+
 export interface BackfillStandupInput {
   standupId: string
   backfilledBy: string
@@ -134,9 +152,9 @@ export async function backfillStandup(
   // only mutated in memory: the context's own loaders (`loadAllocationBoard`)
   // re-read the stand-up from the database, so an in-memory-only edit would
   // leave the capacity board and CC-7 reading the pre-write room.
-  const recordedAttendance = input.attendance?.length
+  const attendanceOutcome: BackfillAttendanceOutcome = input.attendance?.length
     ? await applyBackfillAttendance(standup, input.attendance)
-    : []
+    : { recorded: [], detachedForAlreadyRecorded: [] }
 
   const ctx = await assembleCompletionContext({
     standupId: input.standupId,
@@ -176,7 +194,12 @@ export async function backfillStandup(
       // The sanctioned path audits every per-member attendance write as
       // `standup_attendance_set`; this is the only record that a backfilled
       // room was ever asserted, by whom, and what it detached.
-      attendance: recordedAttendance
+      attendance: attendanceOutcome.recorded,
+      // Absent unless a retry finished a detach an earlier attempt started, so
+      // an ordinary backfill's entry keeps its existing shape.
+      ...(attendanceOutcome.detachedForAlreadyRecorded.length
+        ? { detachedForAlreadyRecorded: attendanceOutcome.detachedForAlreadyRecorded }
+        : {})
     }
   })
 
@@ -197,7 +220,7 @@ export async function backfillStandup(
 async function applyBackfillAttendance(
   standup: InstanceType<typeof Standup>,
   entries: BackfillAttendanceEntry[]
-): Promise<RecordedBackfillAttendance[]> {
+): Promise<BackfillAttendanceOutcome> {
   const expected = new Set(standup.expectedAttendees.map((attendee) => String(attendee)))
   const recorded = new Set(standup.attendance.map((entry) => String(entry.user)))
 
@@ -253,32 +276,63 @@ async function applyBackfillAttendance(
     })
   }
 
-  if (written.length === 0) return written
-
-  // `validateModifiedOnly` on purpose: the pushed subdocument still gets the
-  // schema's `enum`/`min` validators — the reason for saving rather than
-  // `updateOne`-ing — but one unrelated invalid field on a legacy stand-up
-  // does not turn a backfill into a 500.
-  await standup.save({ validateModifiedOnly: true })
+  if (written.length > 0) {
+    // `validateModifiedOnly` on purpose: the pushed subdocument still gets the
+    // schema's `enum`/`min` validators — the reason for saving rather than
+    // `updateOne`-ing — but one unrelated invalid field on a legacy stand-up
+    // does not turn a backfill into a 500.
+    await standup.save({ validateModifiedOnly: true })
+  }
 
   // RUN-7: an absence detaches that member's work, exactly as the live path
   // does. Without this, the allocations of somebody the record says was away
-  // stayed attached and counting toward their capacity, and the saga's
-  // `freeze-allocations` step froze that wrong state — silently, because an
+  // stay attached and counting toward their capacity, and the saga's
+  // `freeze-allocations` step freezes that wrong state — silently, because an
   // absent member's effective capacity is zero, so `allocationStatus` reads
   // `unavailable`, CC-1 exempts them and CC-6 only fires on an
   // over-allocation. Two of the backfill dialog's three options are absent
   // states, so this is the common path, not a corner.
   //
-  // Only rows this call wrote are acted on: a pre-existing record was left
-  // alone, so nothing about its allocations changed either.
-  for (const row of written) {
-    if (!ABSENT_STATES.has(row.state)) continue
-    const detached = await detachAllocations(String(standup._id), row.memberId)
-    row.detachedAllocationIds = detached.map((allocation) => allocation.allocationId)
+  // Driven by the payload against the **stored** state, not by the rows this
+  // call happened to write, so the step is idempotent. A first attempt that
+  // wrote the absence row and then died — in this loop, or later in the saga —
+  // leaves a retry's merge correctly skipping that row; keying the detach off
+  // `written` would then detach nothing and the saga would freeze the
+  // undetached state, which is the very defect this step exists to prevent,
+  // reached by a path that never self-heals. Re-running is a genuine no-op:
+  // `detachAllocations` filters on `detachedReason: { $exists: false }`.
+  const storedState = new Map(
+    standup.attendance.map((entry) => [String(entry.user), entry.state])
+  )
+  const detachedForAlreadyRecorded: DetachedForAlreadyRecorded[] = []
+  const visited = new Set<string>()
+
+  for (const entry of entries) {
+    if (visited.has(entry.memberId)) continue
+    visited.add(entry.memberId)
+
+    const stored = storedState.get(entry.memberId)
+    if (!stored || !ABSENT_STATES.has(stored)) continue
+
+    const detached = await detachAllocations(String(standup._id), entry.memberId)
+    const allocationIds = detached.map((allocation) => allocation.allocationId)
+
+    const row = written.find((candidate) => candidate.memberId === entry.memberId)
+    if (row) {
+      row.detachedAllocationIds = allocationIds
+    } else if (allocationIds.length > 0) {
+      // This call did not write the row, so the audit must not claim it did —
+      // but detaching its work is a real action this call took, and the trail
+      // has to show which attempt finally performed it.
+      detachedForAlreadyRecorded.push({
+        memberId: entry.memberId,
+        state: stored,
+        detachedAllocationIds: allocationIds
+      })
+    }
   }
 
-  return written
+  return { recorded: written, detachedForAlreadyRecorded }
 }
 
 /**
