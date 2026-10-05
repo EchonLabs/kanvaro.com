@@ -340,6 +340,16 @@ describe('Project role resolution', () => {
     await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_CLIENT);
   });
 
+  // The one precedence this change could silently invert: the client check at
+  // getUserProjectRole runs BEFORE the team-member check, so a client who is
+  // also listed in teamMembers must keep resolving to PROJECT_CLIENT rather
+  // than being promoted to PROJECT_MEMBER.
+  it('still resolves a client who is also a team member to client', async () => {
+    const project = projectWith({ client: USER, teamMembers: [{ memberId: USER }] });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_CLIENT);
+  });
+
   // The one assertion that proves nobody gains access they should not have.
   it('still resolves a non-member to viewer', async () => {
     const project = projectWith({ teamMembers: [{ memberId: OTHER }] });
@@ -475,6 +485,24 @@ describe('Project role resolution for team members (D8)', () => {
         project._id.toString()
       )
     ).resolves.toBe(false);
+  });
+
+  // Guards the reintroduction route for this exact defect: the day anyone adds
+  // `.populate('teamMembers.memberId')` to the Project.find in
+  // getUserPermissions, `memberId` becomes a user document and a comparison
+  // that only understands the unpopulated shape silently drops every team
+  // member back to PROJECT_VIEWER.
+  it('resolves a populated teamMembers.memberId to project member', async () => {
+    const project = projectWith({
+      teamMembers: [{ memberId: { _id: USER, firstName: 'Dev', email: 'dev@example.test' } }]
+    });
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    (Project.find as jest.Mock).mockResolvedValue([project]);
+
+    const permissions = await PermissionService.getUserPermissions(USER.toString());
+
+    expect(permissions.projectRoles.get(project._id.toString()))
+      .toBe(ProjectRole.PROJECT_MEMBER);
   });
 
   it('looks projects up by teamMembers.memberId, not by teamMembers', async () => {
