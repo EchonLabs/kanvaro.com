@@ -352,5 +352,9 @@ describe('revealVotes — outliers are deviations, not extremes', () => {
     expect(outliersOf(['5', '13'])).toEqual([])
     expect(outliersOf(['1', '21'])).toEqual(['a', 'b'])
     expect(outliersOf(['1', '5', '5', '13'])).toEqual(['a', 'd'])
+    // Separates averaging deck *positions* (2 and 5 -> 3.5, both flagged) from
+    // averaging card *values* (8 -> position 4, only the 3 flagged); the 1/5/5/13
+    // case above gives 5 either way.
+    expect(outliersOf(['3', '13'])).toEqual(['a', 'b'])
   })
 })
