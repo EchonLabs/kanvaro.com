@@ -92,6 +92,19 @@ export async function startStandup(input: StartStandupInput): Promise<StartStand
     now
   })
 
+  // RUN-6: every expected attendee defaults to present. This must be
+  // PERSISTED, not merely displayed — CC-7 requires attendance to be *set*
+  // for every attendee, so a display-only default leaves completion blocked
+  // on a room the UI shows as full. Existing records (any state) are never
+  // touched, and `present` is RUN-7's no-op state, so no cascade is needed.
+  const recorded = new Set(standup.attendance.map((entry) => String(entry.user)))
+  for (const attendee of standup.expectedAttendees) {
+    if (!recorded.has(String(attendee))) {
+      standup.attendance.push({ user: attendee, state: 'present' })
+      recorded.add(String(attendee))
+    }
+  }
+
   standup.status = 'In_Progress'
   standup.startedAt = now
   if (now.getTime() > standup.scheduledStartAt.getTime()) {
