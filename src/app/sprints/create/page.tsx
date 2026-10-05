@@ -580,7 +580,7 @@ export default function CreateSprintPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Capacity (hours)</label>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Planned capacity (hours, optional)</label>
                     <Input
                       type="number"
                       value={formData.capacity}

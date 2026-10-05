@@ -1445,9 +1445,13 @@ export default function SprintDetailPage() {
                 )}
 
                 <div className="flex items-center justify-between py-3">
-                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Capacity</span>
+                  <span className="text-[13px] text-[var(--apple-secondary-label)]">Planned capacity (manual)</span>
                   <span className="text-[13px] font-apple-mono font-medium text-[var(--apple-label)]">{sprint.capacity}h</span>
                 </div>
+                <p className="text-xs text-muted-foreground pb-3">
+                  A planning figure you entered. Stand-up capacity is computed
+                  from each member&apos;s working days.
+                </p>
 
                 <div className="flex items-center justify-between py-3">
                   <span className="text-[13px] text-[var(--apple-secondary-label)]">Velocity</span>
@@ -1827,7 +1831,7 @@ export default function SprintDetailPage() {
                           </div>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-sm text-foreground">Capacity (hours)</Label>
+                          <Label className="text-sm text-foreground">Planned capacity (hours, optional)</Label>
                           <Input
                             type="number"
                             min="0"
