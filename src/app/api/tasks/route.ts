@@ -16,7 +16,6 @@ import { logTaskActivity } from '@/lib/task-activity-logger'
 import { logActivity } from '@/lib/activity-logger'
 import { countWords, TASK_TITLE_MAX_WORDS } from '@/lib/text/word-limit'
 import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
-import { isProjectTeamMember } from '@/lib/permissions/project-team-membership'
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -565,7 +564,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify user has access to this project (quick check before permission check)
-    const isProjectMember = isProjectTeamMember(projectDoc, userId) || projectDoc.createdBy?.toString() === userId
+    const isProjectMember = projectDoc.teamMembers?.some((member: any) =>
+      member.toString() === userId || (typeof member === 'object' && member._id?.toString() === userId)
+    ) || projectDoc.createdBy?.toString() === userId
 
     if (!canCreateTask && !isProjectMember) {
       return NextResponse.json(

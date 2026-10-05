@@ -5,7 +5,6 @@ import { TestSuite, Project } from '@/models'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasTestPermission } from '@/lib/permissions/test-permission-helper'
 import { Permission } from '@/lib/permissions/permission-definitions'
-import { isProjectTeamMember } from '@/lib/permissions/project-team-membership'
 
 export async function GET(req: NextRequest) {
   try {
@@ -106,7 +105,9 @@ export async function POST(req: NextRequest) {
     const roleStr = (authResult.user.role || '').toString()
     const hasRolePerm = await hasTestPermission(userIdStr, roleStr, Permission.TEST_SUITE_CREATE)
     const createdByStr = project.createdBy?.toString?.()
-    const teamHasUser = isProjectTeamMember(project, userIdStr)
+    const teamHasUser = Array.isArray(project.teamMembers)
+      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
+      : false
     const roleHasUser = Array.isArray(project.projectRoles)
       ? project.projectRoles.some(
           (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
@@ -189,7 +190,9 @@ export async function PUT(req: NextRequest) {
     const roleStr = (authResult.user.role || '').toString()
     const hasRolePerm = await hasTestPermission(userIdStr, roleStr, Permission.TEST_SUITE_UPDATE)
     const createdByStr = project.createdBy?.toString?.()
-    const teamHasUser = isProjectTeamMember(project, userIdStr)
+    const teamHasUser = Array.isArray(project.teamMembers)
+      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
+      : false
     const roleHasUser = Array.isArray(project.projectRoles)
       ? project.projectRoles.some(
           (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
