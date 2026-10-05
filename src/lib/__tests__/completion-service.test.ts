@@ -23,7 +23,7 @@ describe('CompletionService', () => {
   describe('checkStoryCompletion', () => {
     it('should complete story when all tasks are done', async () => {
       const storyId = 'story123'
-      const mockStoryData = { _id: storyId, status: 'in_progress', sprint: 'sprint123' }
+      const mockStoryData = { _id: storyId, status: 'inprogress', sprint: 'sprint123' }
       const mockTasks = [
         { status: 'done' },
         { status: 'done' }
@@ -38,7 +38,7 @@ describe('CompletionService', () => {
       expect(mockStory.findByIdAndUpdate).toHaveBeenCalledWith(
         storyId,
         {
-          status: 'completed',
+          status: 'done',
           completedAt: expect.any(Date)
         }
       )
@@ -46,7 +46,7 @@ describe('CompletionService', () => {
 
     it('should not complete story when tasks are not all done', async () => {
       const storyId = 'story123'
-      const mockStoryData = { _id: storyId, status: 'in_progress' }
+      const mockStoryData = { _id: storyId, status: 'inprogress' }
       const mockTasks = [
         { status: 'done' },
         { status: 'in_progress' }
@@ -66,8 +66,8 @@ describe('CompletionService', () => {
       const sprintId = 'sprint123'
       const mockSprintData = { _id: sprintId, status: 'active' }
       const mockStories = [
-        { status: 'completed', epic: 'epic123' },
-        { status: 'completed', epic: 'epic123' }
+        { status: 'done', epic: 'epic123' },
+        { status: 'done', epic: 'epic123' }
       ]
 
       mockSprint.findById.mockResolvedValue(mockSprintData)
@@ -89,10 +89,10 @@ describe('CompletionService', () => {
   describe('checkEpicCompletion', () => {
     it('should complete epic when all sprints are completed', async () => {
       const epicId = 'epic123'
-      const mockEpicData = { _id: epicId, status: 'in_progress' }
+      const mockEpicData = { _id: epicId, status: 'inprogress' }
       const mockStories = [
-        { sprint: 'sprint123' },
-        { sprint: 'sprint123' }
+        { _id: 'story123', status: 'done', sprint: 'sprint123' },
+        { _id: 'story456', status: 'done', sprint: 'sprint123' }
       ]
       const mockSprints = [
         { status: 'completed' },
@@ -102,6 +102,8 @@ describe('CompletionService', () => {
       mockEpic.findById.mockResolvedValue(mockEpicData)
       mockStory.find.mockResolvedValue(mockStories)
       mockSprint.find.mockResolvedValue(mockSprints)
+      // checkEpicCompletion also requires every task in/under the epic to be done.
+      mockTask.find.mockResolvedValue([{ status: 'done' }])
       mockEpic.findByIdAndUpdate.mockResolvedValue(mockEpicData)
 
       await CompletionService.checkEpicCompletion(epicId)
@@ -109,7 +111,7 @@ describe('CompletionService', () => {
       expect(mockEpic.findByIdAndUpdate).toHaveBeenCalledWith(
         epicId,
         {
-          status: 'completed',
+          status: 'done',
           completedAt: expect.any(Date)
         }
       )
