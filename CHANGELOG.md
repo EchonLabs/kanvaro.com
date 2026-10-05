@@ -1,3 +1,116 @@
+## [1.45.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.4...v1.45.5) (2026-10-02)
+
+
+### Bug Fixes
+
+* add periodic timer sync ([e173e8a](https://github.com/EchonLabs/kanvaro.com/commit/e173e8a02f9a33b2f3538a92c3628ac9ebe3c741))
+
+## [1.45.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.3...v1.45.4) (2026-10-02)
+
+
+### Bug Fixes
+
+* add alphabetical sorting with natural ordering to all project dropdowns ([63c9cc5](https://github.com/EchonLabs/kanvaro.com/commit/63c9cc57546facf319ee41df65c8144ee39ba7e1))
+* fix column visibility in "All Projects" view ([012f67e](https://github.com/EchonLabs/kanvaro.com/commit/012f67e8110f5da02df1729709d8705819115866))
+* sort dropdown options alphabetically across the application ([bc066a1](https://github.com/EchonLabs/kanvaro.com/commit/bc066a122eb1a882ec0342f221ca5db7d93bbb02))
+
+## [1.45.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.2...v1.45.3) (2026-09-30)
+
+
+### Bug Fixes
+
+* resolve TypeScript errors and missing types in CreateTaskModal ([23e4fd3](https://github.com/EchonLabs/kanvaro.com/commit/23e4fd3ede5a4a23ad95d0473ee20182b59500be))
+
+## [1.45.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.1...v1.45.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* add default task categories for new projects ([f878dfe](https://github.com/EchonLabs/kanvaro.com/commit/f878dfe9c8a2e05b14221cb9cca51feb5fa0ad35))
+* add reordering for task categories ([88bb1c7](https://github.com/EchonLabs/kanvaro.com/commit/88bb1c7f2aeadc2639145b94e1b7a2315e35f1a1))
+* add total deleted count to notification cleanup ([e514984](https://github.com/EchonLabs/kanvaro.com/commit/e51498423f0df3aae2478512f0a96bce869e178c))
+* category title display and update on deletion ([4c8a7f4](https://github.com/EchonLabs/kanvaro.com/commit/4c8a7f4143a972cea35ec5c728203aad5c29283e))
+
+## [1.45.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.0...v1.45.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* refine email delivery for comment mentions and replies ([5100a48](https://github.com/EchonLabs/kanvaro.com/commit/5100a486448ad9457f6c9fbbf66b604302752a07))
+* resolve flase unassign notifcation and imporve status update formating ([f2ffc41](https://github.com/EchonLabs/kanvaro.com/commit/f2ffc41d40b0c1f03dc898178cab3073df049bdb))
+
+# [1.45.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.44.0...v1.45.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* add node-cron background schedulers for all tasks ([0367a75](https://github.com/EchonLabs/kanvaro.com/commit/0367a759f04ddb3287b56ee995742607e97bf33d))
+* filter overdue task notifications by 7-day window ([36e377e](https://github.com/EchonLabs/kanvaro.com/commit/36e377eb61a572e2d47463ef10034d9c2af5dd0c))
+* kanban board ui ([c029167](https://github.com/EchonLabs/kanvaro.com/commit/c029167b1447653f3c5c24849141f3030a2a94dd))
+* update task schema for notifications ([500ea26](https://github.com/EchonLabs/kanvaro.com/commit/500ea2616240046b627357aabaf53395391e410f))
+
+
+### Features
+
+* add due-date reminder notifications ([21e16b1](https://github.com/EchonLabs/kanvaro.com/commit/21e16b178581bc0f4084409ed49cbb665fbb2b62))
+
+# [1.44.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.43.0...v1.44.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* assignee notifications and add status transition details ([9d8116e](https://github.com/EchonLabs/kanvaro.com/commit/9d8116e1633e84ad70d4a09c43704cd3fd2ace89))
+* handle unassignment and prevent duplicate task notifications ([96a1add](https://github.com/EchonLabs/kanvaro.com/commit/96a1add500ec9e4dd0c40bab160deafed3818430))
+
+
+### Features
+
+* [@mention](https://github.com/mention) notifications from general assignee alerts ([a0c9f40](https://github.com/EchonLabs/kanvaro.com/commit/a0c9f40a4606838c1aa326ab6a28b34f609fed14))
+
+# [1.43.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.4...v1.43.0) (2026-09-28)
+
+
+### Features
+
+* implement task category filtering be ([de9ab34](https://github.com/EchonLabs/kanvaro.com/commit/de9ab347039b9e773dd704a45aa30db45c34cf62))
+* implement task category management ([5bab0d2](https://github.com/EchonLabs/kanvaro.com/commit/5bab0d26801e069353cf76d6e33c62e534fd12e7))
+* implement task category management FE ([7f08cf3](https://github.com/EchonLabs/kanvaro.com/commit/7f08cf3fc65ae14bfba23f1ea7bd9e2feb56063c))
+* interfact to create, rename, delete ([526c98a](https://github.com/EchonLabs/kanvaro.com/commit/526c98a83b505ca3572a1abf2f402c559131eb4c))
+
+## [1.42.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.3...v1.42.4) (2026-09-28)
+
+
+### Bug Fixes
+
+* Kanban board functionality ([82aaa4c](https://github.com/EchonLabs/kanvaro.com/commit/82aaa4c538c8a5bbece6ca830f50d4eb35fa21a3))
+* virtualized task card spacing and height ([eaf724c](https://github.com/EchonLabs/kanvaro.com/commit/eaf724cdfd2343472147fa5d25427ec97017fe0b))
+
+## [1.42.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.2...v1.42.3) (2026-09-10)
+
+
+### Bug Fixes
+
+* showing memo instead of task title in timelogs ([4968b09](https://github.com/EchonLabs/kanvaro.com/commit/4968b0982ac6165d751eae8f4fb025aabee7b3e9))
+
+## [1.42.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.1...v1.42.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* correct timer time-logging status response ([f2d1ea9](https://github.com/EchonLabs/kanvaro.com/commit/f2d1ea91ab57bdf52b1cf5fcfcca498b88449b58))
+* document preview, requires the mammoth npm package ([887dfcd](https://github.com/EchonLabs/kanvaro.com/commit/887dfcdfb939d588c3537994b96e31afa6722587))
+* sync package lockfile ([dcc4bb2](https://github.com/EchonLabs/kanvaro.com/commit/dcc4bb29566408393d34ec5cb63b2f24b616f59b))
+* update document templates route path ([888afd3](https://github.com/EchonLabs/kanvaro.com/commit/888afd38bf7c70c80f7de7dbdc5f57edd5b49868))
+
+## [1.42.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.0...v1.42.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* Kanban board dropdown alphabetically ([6532def](https://github.com/EchonLabs/kanvaro.com/commit/6532def4c3dd39495567c7ea4a874346ff7d2a21))
+* sort dropdowns alphabetically ([9cc1ebe](https://github.com/EchonLabs/kanvaro.com/commit/9cc1ebe967e75779e7a6b37c37bfdd3befdfa82d))
+* update kanban board dropdown ([e75bef1](https://github.com/EchonLabs/kanvaro.com/commit/e75bef12d7ca07c3cc874afde4cf1d9e7ff8f7a2))
+
 # [1.42.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.7...v1.42.0) (2026-08-07)
 
 

@@ -765,15 +765,15 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   // Optimized filter functions with memoization and debouncing
   const filteredProjects = useMemo(() => {
-    if (!debouncedProjectQuery.trim()) return projects
-    const query = debouncedProjectQuery.toLowerCase()
-    return projects.filter(p => p.name.toLowerCase().includes(query))
+    const query = debouncedProjectQuery.trim().toLowerCase()
+    const list = query ? projects.filter(p => p.name?.toLowerCase().includes(query)) : projects
+    return list.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, debouncedProjectQuery])
 
   const filteredSprints = useMemo(() => {
-    if (!debouncedSprintQuery.trim()) return sprints
-    const query = debouncedSprintQuery.toLowerCase()
-    return sprints.filter(s => s.name.toLowerCase().includes(query))
+    const query = debouncedSprintQuery.trim().toLowerCase()
+    const list = query ? sprints.filter(s => s.name?.toLowerCase().includes(query)) : sprints
+    return list.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [sprints, debouncedSprintQuery])
 
   const filteredEventTypes = useMemo(() => {
@@ -794,12 +794,14 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
   }, [users])
 
   const filteredUsers = useMemo(() => {
-    if (!debouncedAttendeeQuery.trim()) return activeUsers
-    const query = debouncedAttendeeQuery.toLowerCase()
-    return activeUsers.filter((u: User) => {
-      const fullName = `${u.firstName} ${u.lastName}`.toLowerCase()
-      return fullName.includes(query) || u.email.toLowerCase().includes(query)
-    })
+    const query = debouncedAttendeeQuery.trim().toLowerCase()
+    const list = query
+      ? activeUsers.filter((u: User) => {
+          const fullName = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase()
+          return fullName.includes(query) || (u.email ? u.email.toLowerCase().includes(query) : false)
+        })
+      : activeUsers
+    return list.slice().sort((a, b) => `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`))
   }, [activeUsers, debouncedAttendeeQuery])
 
   return (

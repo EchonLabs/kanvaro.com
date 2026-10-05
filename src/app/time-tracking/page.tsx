@@ -72,6 +72,10 @@ export default function TimeTrackingPage() {
     if (!authLoading && isAuthenticated && user) {
       setIsLoading(false)
       loadActiveTimer(user)
+      const syncInterval = setInterval(() => {
+        loadActiveTimer(user)
+      }, 30000)
+      return () => clearInterval(syncInterval)
     } else if (!authLoading && !isAuthenticated) {
       router.push('/login')
     }

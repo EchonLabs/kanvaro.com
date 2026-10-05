@@ -45,10 +45,12 @@ import {
   Layers,
   BookOpen,
   ListTodo,
-  X
+  X,
+  CheckSquare,
+  Square
 } from 'lucide-react'
 import {
-  StatusBadge, PriorityBadge, TypeBadge,
+  StatusBadge, PriorityBadge, TypeBadge, CategoryBadge,
   PageHeader, TasksEmptyState,
   PaginationBar, MetaChip, InlineLoader, FullPageLoader,
   cardShell, TASK_STATUS_CONFIG
@@ -87,6 +89,7 @@ interface BacklogItem {
   description: string
   type: 'epic' | 'story' | 'task'
   taskType?: string
+  category?: string
   priority: string
   status: string
   project?: ProjectSummary | null
@@ -143,6 +146,7 @@ function truncateText(value: string, maxLength = 20): string {
 const _backlogFilters = {
   searchQuery: '',
   typeFilter: 'all',
+  categoryFilter: 'all',
   priorityFilter: 'all',
   statusFilter: 'all',
   sortBy: 'created',
@@ -229,6 +233,9 @@ export default function BacklogPage() {
   const createdByFilterInputRef = useRef<HTMLInputElement | null>(null)
 
   const [typeFilter, setTypeFilter] = useState(_backlogFilters.typeFilter)
+  const [categoryFilter, setCategoryFilter] = useState(_backlogFilters.categoryFilter)
+  const [categoryFilterQuery, setCategoryFilterQuery] = useState('')
+  const [projectCategories, setProjectCategories] = useState<Record<string, Array<{ key: string; title: string; order: number }>>>({})
   const [priorityFilter, setPriorityFilter] = useState(_backlogFilters.priorityFilter)
   const [statusFilter, setStatusFilter] = useState(_backlogFilters.statusFilter)
   const [sortBy, setSortBy] = useState(_backlogFilters.sortBy)
@@ -293,9 +300,35 @@ export default function BacklogPage() {
     }
   }, [typeFilter, selectedProjectDetails])
 
+  const categoryOptions = useMemo(() => {
+      if (projectFilterValue !== 'all') {
+          const list = projectCategories[projectFilterValue]
+          if (!Array.isArray(list)) return [] as Array<{ key: string; title: string }>
+          return [...list]
+              .sort((a, b) => (a.order || 0) - (b.order || 0))
+              .map(c => ({ key: c.key, title: c.title }))
+      }
+      const merged = new Map<string, string>()
+      Object.values(projectCategories).forEach(list => {
+          list.forEach(c => {
+              if (!merged.has(c.key)) merged.set(c.key, c.title)
+          })
+      })
+      return Array.from(merged.entries())
+          .map(([key, title]) => ({ key, title }))
+          .sort((a, b) => a.title.localeCompare(b.title))
+  }, [projectFilterValue, projectCategories])
+
+  const filteredCategoryOptions = useMemo(() => {
+      const q = categoryFilterQuery.trim().toLowerCase()
+      if (!q) return categoryOptions
+      return categoryOptions.filter(c => c.title.toLowerCase().includes(q))
+  }, [categoryOptions, categoryFilterQuery])
+
   // Check if any filters are active
   const hasActiveFilters = searchQuery !== '' ||
     typeFilter !== 'all' ||
+    categoryFilter !== 'all' ||
     priorityFilter !== 'all' ||
     statusFilter !== 'all' ||
     projectFilterValue !== 'all' ||
@@ -311,6 +344,8 @@ export default function BacklogPage() {
     setSearchQuery('')
     setDebouncedSearchQuery('')
     setTypeFilter('all')
+    setCategoryFilter('all')
+    setCategoryFilterQuery('')
     setPriorityFilter('all')
     setStatusFilter('all')
     setProjectFilterValue('all')
@@ -330,6 +365,7 @@ export default function BacklogPage() {
   useEffect(() => {
     _backlogFilters.searchQuery = searchQuery
     _backlogFilters.typeFilter = typeFilter
+    _backlogFilters.categoryFilter = categoryFilter
     _backlogFilters.priorityFilter = priorityFilter
     _backlogFilters.statusFilter = statusFilter
     _backlogFilters.sortBy = sortBy
@@ -359,6 +395,14 @@ export default function BacklogPage() {
       setStatusFilter('all')
     }
   }, [availableStatusOptions, statusFilter])
+
+  useEffect(() => {
+      if (categoryFilter === 'all') return
+      if (!categoryOptions.some(c => c.key === categoryFilter)) {
+          setCategoryFilter('all')
+          setCategoryFilterQuery('')
+      }
+  }, [projectFilterValue, categoryOptions, categoryFilter])
 
   // Fetch project details when project filter changes
   useEffect(() => {
@@ -403,7 +447,7 @@ export default function BacklogPage() {
         setCurrentPage(1)
       }
     }
-  }, [debouncedSearchQuery, typeFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, createdByFilter, dateRangeFilter, createdDateRange, sortBy, sortOrder])
+  }, [debouncedSearchQuery, typeFilter, categoryFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, createdByFilter, dateRangeFilter, createdDateRange, sortBy, sortOrder])
 
   // Fetch when pagination changes
   useEffect(() => {
@@ -434,6 +478,7 @@ export default function BacklogPage() {
       // Add filters to API call - use debounced search query
       if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
       if (typeFilter !== 'all') params.set('type', typeFilter)
+      if (categoryFilter !== 'all') params.set('category', categoryFilter)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (projectFilterValue !== 'all') params.set('project', projectFilterValue)
@@ -570,6 +615,14 @@ export default function BacklogPage() {
               })
               // Use all projects from the API instead of just those in the current backlog results
               setProjectOptions(Array.from(allProjectsMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
+              const catMap: Record<string, Array<{ key: string; title: string; order: number }>> = {}
+              projectsData.data.forEach((p: any) => {
+                const cats = p.settings?.taskCategories
+                if (Array.isArray(cats)) {
+                  catMap[p._id] = cats
+                }
+              })
+              setProjectCategories(catMap)
             }
           }
         } catch (error) {
@@ -1051,22 +1104,28 @@ export default function BacklogPage() {
       })
     }
   
-    return filtered
+    return filtered.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [sprints, sprintQuery, selectedTaskIds, selectedStoryIds, sprintModalProjectId, backlogItems])
 
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
-    if (!query) return projectOptions
-    return projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+    const list = !query ? projectOptions : projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projectOptions, projectFilterQuery])
 
   const filteredAssignedToOptions = useMemo(() => {
     const query = assignedToFilterQuery.trim().toLowerCase()
-    if (!query) return assignedToOptions
-    return assignedToOptions.filter((member) =>
-      `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
-      member.email.toLowerCase().includes(query)
-    )
+    const list = !query
+      ? assignedToOptions
+      : assignedToOptions.filter((member) =>
+          `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+          member.email.toLowerCase().includes(query)
+        )
+    return [...list].sort((a, b) => {
+      const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+      const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+    })
   }, [assignedToOptions, assignedToFilterQuery])
 
   const filteredAssignedByOptions = useMemo(() => {
@@ -1239,36 +1298,29 @@ export default function BacklogPage() {
         return
       }
 
-      // Update backlog items state
+      // Update backlog items state: remove tasks that are now assigned to sprint
       setBacklogItems((prev) =>
-        prev.map((item) => {
-          // Update stories
-          if (item.type === 'story' && storyIdsForSprint.includes(item._id)) {
-            return {
-              ...item,
-              sprint: {
-                _id: sprint._id,
-                name: sprint.name,
-                status: sprint.status
-              },
-              status: 'in_progress'  // Match API update
+        prev
+          .filter((item) => !(item.type === 'task' && uniqueTaskIds.includes(item._id)))
+          .map((item) => {
+            // Update stories
+            if (item.type === 'story' && storyIdsForSprint.includes(item._id)) {
+              return {
+                ...item,
+                sprint: {
+                  _id: sprint._id,
+                  name: sprint.name,
+                  status: sprint.status
+                },
+                status: 'in_progress'  // Match API update
+              }
             }
-          }
-          // Update tasks
-          if (item.type === 'task' && uniqueTaskIds.includes(item._id)) {
-            return {
-              ...item,
-              sprint: {
-                _id: sprint._id,
-                name: sprint.name,
-                status: sprint.status
-              },
-              status: 'todo'  // Match API update
-            }
-          }
-          return item
-        })
+            return item
+          })
       )
+
+      // Refresh backlog items from server to keep counts and pagination accurate
+      fetchBacklogItems()
 
       // Build success message
       const parts: string[] = []
@@ -1409,6 +1461,9 @@ export default function BacklogPage() {
       const message = `${parts.join(' and ')} removed from sprint successfully.`
 
       notifySuccess({ title: 'Success', message: message })
+
+      // Refresh backlog items from server to keep counts and list accurate
+      fetchBacklogItems()
 
       setShowSprintModal(false)
       resetSprintModalState()
@@ -1551,8 +1606,9 @@ export default function BacklogPage() {
   }
 
   // When assigning work to a sprint, temporarily narrow items to the sprint's project
+  // Tasks assigned to sprints should not be displayed in the backlog module
   const displayedItems = useMemo(() => {
-    let items = backlogItems
+    let items = backlogItems.filter((item) => !(item.type === 'task' && item.sprint))
     if (selectedSprintId) {
       const selectedSprint = sprints.find((s) => s._id === selectedSprintId)
       if (selectedSprint?.project?._id) {
@@ -1833,6 +1889,38 @@ export default function BacklogPage() {
                 </SelectContent>
             </Select>
 
+            {/* Category */}
+            <Select
+              value={categoryFilter}
+              onValueChange={setCategoryFilter}
+              onOpenChange={(open) => { if (open) setCategoryFilterQuery('') }}
+            >
+              <SelectTrigger className="h-9 rounded-full border-[var(--apple-separator)] bg-background text-[13px]">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <Input
+                    value={categoryFilterQuery}
+                    onChange={(e) => setCategoryFilterQuery(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    placeholder="Search categories"
+                    className="mb-2 h-8 text-[13px]"
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {filteredCategoryOptions.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-[var(--apple-tertiary-label)]">No categories</div>
+                    ) : (
+                      filteredCategoryOptions.map((c) => (
+                        <SelectItem key={c.key} value={c.key}>{c.title}</SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
+
             {/* 3. Assignees */}
             <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery('') }} onOpenChange={(open) => {
               if (open) focusSearchInput(assignedToFilterInputRef.current)
@@ -2010,6 +2098,14 @@ export default function BacklogPage() {
                             <button onClick={() => setTypeFilter('all')} className="hover:opacity-70 ml-1"><X className="h-3 w-3" strokeWidth={1.5} /></button>
                         </Badge>
                     )}
+                    {categoryFilter !== 'all' && (
+                      <Badge variant="secondary" className="...">
+                        Category: {categoryOptions.find(c => c.key === categoryFilter)?.title ?? categoryFilter}
+                        <button onClick={() => { setCategoryFilter('all'); setCategoryFilterQuery('') }} className="hover:opacity-70 ml-1">
+                          <X className="h-3 w-3" strokeWidth={1.5} />
+                        </button>
+                      </Badge>
+                    )}
                     {statusFilter !== 'all' && (
                         <Badge variant="secondary" className="bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border-0 text-[12px] font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             Status: {formatToTitleCase(statusFilter.replace('_', ' '))}
@@ -2068,19 +2164,31 @@ export default function BacklogPage() {
               onClick={handleSelectModeToggle}
               disabled={!canManageSprints}
               title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
-              className="rounded-full h-9 text-[13px] border-[var(--apple-separator)]"
+              className={cn(
+                'rounded-full h-9 text-[13px] border-[var(--apple-separator)] px-3.5 transition-colors',
+                selectMode && 'bg-[var(--apple-secondary-fill)] text-[var(--apple-label)]'
+              )}
             >
-              <List className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+              {selectMode ? (
+                <X className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+              ) : (
+                <List className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+              )}
               {selectMode ? 'Cancel Selection' : 'Select Mode'}
             </Button>
             {selectMode && (
               <>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={allSelectableItemsSelected ? deselectAll : selectAll}
-                  className="rounded-full h-9 text-[13px] text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]"
+                  className="rounded-full h-9 text-[13px] border-[var(--apple-separator)] bg-card text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] px-3.5 transition-colors"
                 >
+                  {allSelectableItemsSelected ? (
+                    <Square className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+                  ) : (
+                    <CheckSquare className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+                  )}
                   {allSelectableItemsSelected ? 'Deselect All' : 'Select All'}
                 </Button>
                 {(selectedTaskCount > 0 || selectedStoryCount > 0) && (
@@ -2088,7 +2196,7 @@ export default function BacklogPage() {
                     size="sm"
                     onClick={() => handleOpenSprintModal(selectedTaskIds, selectedStoryIds)}
                     disabled={(selectedTaskCount === 0 && selectedStoryCount === 0) || assigningSprint}
-                    className="rounded-full h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px]"
+                    className="rounded-full h-9 bg-[var(--apple-system-blue)] text-white hover:opacity-90 text-[13px] px-3.5 transition-colors"
                   >
                     {assigningSprint ? (
                       <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -2102,7 +2210,7 @@ export default function BacklogPage() {
             )}
           </div>
           {selectMode && (
-            <div className="text-[13px] text-[var(--apple-secondary-label)] sm:ml-auto">
+            <div className="sm:ml-auto flex items-center">
               {(() => {
                 const parts: string[] = []
                 if (selectedStoryCount > 0) {
@@ -2111,13 +2219,23 @@ export default function BacklogPage() {
                 if (selectedTaskCount > 0) {
                   parts.push(`${selectedTaskCount} task${selectedTaskCount !== 1 ? 's' : ''}`)
                 }
-                return parts.length > 0 ? parts.join(' and ') + ' selected' : 'No items selected'
+                const hasSelection = parts.length > 0
+                return (
+                  <span className={cn(
+                    'text-[12px] font-medium px-2.5 py-1 rounded-full transition-colors',
+                    hasSelection
+                      ? 'bg-[var(--apple-system-blue)]/10 text-[var(--apple-system-blue)] border border-[var(--apple-system-blue)]/20'
+                      : 'text-[var(--apple-secondary-label)]'
+                  )}>
+                    {hasSelection ? parts.join(' and ') + ' selected' : 'No items selected'}
+                  </span>
+                )
               })()}
             </div>
           )}
         </div>
         {selectMode && (
-          <p className="text-[12px] text-[var(--apple-secondary-label)] -mt-2">
+          <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">
             Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included.{' '}
             <span className="text-[var(--apple-system-orange)]">Items already in a sprint cannot be selected.</span>
           </p>
@@ -2257,6 +2375,15 @@ export default function BacklogPage() {
                     <TypeBadge type={isTask ? (item.taskType || 'task') : item.type} size="sm" />
                     <StatusBadge status={item.status} size="sm" />
                     <PriorityBadge priority={item.priority} size="sm" />
+                    {isTask && item.category && (
+                      <CategoryBadge
+                        category={item.category}
+                        title={
+                          categoryOptions.find(c => c.key === item.category)?.title ?? item.category
+                        }
+                        size="sm"
+                      />
+                    )}
                   </div>
 
                   {/* Row 3: MetaChips */}

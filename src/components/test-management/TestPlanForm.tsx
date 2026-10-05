@@ -175,7 +175,9 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
       const response = await fetch(`/api/test-suites?projectId=${projectId}`)
       const data = await response.json()
       if (data?.success && Array.isArray(data.data)) {
-        setTestSuites(data.data.map((s: any) => ({ _id: s._id, name: s.name })))
+        setTestSuites(data.data.map((s: any) => ({ _id: s._id, name: s.name }))
+            .sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
+        )
       }
     } catch (error) {
       console.error('Error fetching test suites:', error)

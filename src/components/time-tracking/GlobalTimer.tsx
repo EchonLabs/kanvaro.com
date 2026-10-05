@@ -40,6 +40,8 @@ export function GlobalTimer({ className }: GlobalTimerProps) {
 
   useEffect(() => {
     loadCurrentTimer()
+    const syncInterval = setInterval(loadCurrentTimer, 30000)
+    return () => clearInterval(syncInterval)
   }, [])
 
   useEffect(() => {

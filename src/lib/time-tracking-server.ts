@@ -121,7 +121,7 @@ export interface StopTimerOptions {
 export async function stopTimerInternal(
   activeTimer: IActiveTimer,
   options: StopTimerOptions = {}
-): Promise<{ success: boolean; timeEntry?: any; duration?: number; error?: string; alreadyStopped?: boolean; autoStopped?: boolean; reason?: string }> {
+): Promise<{ success: boolean; timeEntry?: any; duration?: number; error?: string; alreadyStopped?: boolean; autoStopped?: boolean; reason?: string; hasTimeLogged?: boolean }> {
   const organizationId = getIdString(activeTimer.organization)
   const projectId = getIdString(activeTimer.project)
 
@@ -202,11 +202,12 @@ export async function stopTimerInternal(
   if (finalDuration <= 0) {
     const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
     if (!deletedTimer) {
-      return { success: true, alreadyStopped: true, duration: 0 }
+      return { success: true, alreadyStopped: true, duration: 0, hasTimeLogged: false }
     }
     return {
       success: true,
       duration: 0,
+      hasTimeLogged: false,
       autoStopped: isAutoStop,
       reason: options.reason ?? 'manual'
     }
@@ -251,7 +252,7 @@ export async function stopTimerInternal(
     // the ActiveTimer if it's still there and report this as already stopped
     // rather than surfacing a raw error and losing the session.
     await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
-    return { success: true, alreadyStopped: true, duration: 0 }
+    return { success: true, alreadyStopped: true, duration: 0, hasTimeLogged: false }
   }
 
   const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
@@ -262,6 +263,7 @@ export async function stopTimerInternal(
       success: true,
       timeEntry: timeEntry.toObject(),
       duration: finalDuration,
+      hasTimeLogged: true,
       autoStopped: isAutoStop,
       reason: options.reason ?? 'manual'
     }
@@ -291,6 +293,7 @@ export async function stopTimerInternal(
     success: true,
     timeEntry: timeEntry.toObject(),
     duration: finalDuration,
+    hasTimeLogged: true,
     autoStopped: isAutoStop,
     reason: options.reason ?? 'manual'
   }

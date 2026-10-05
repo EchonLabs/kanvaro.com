@@ -11,7 +11,7 @@ export interface NotificationData {
   data?: {
     entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry'
     entityId?: string
-    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'completed' | 'overdue' | 'reminder'
+    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'unassigned' | 'completed' | 'overdue' | 'reminder'
     priority?: 'low' | 'medium' | 'high' | 'critical'
     url?: string
     projectName?: string
@@ -377,7 +377,7 @@ export class NotificationService {
         <p>Hello ${userName},</p>
         
         <div class="notification-content">
-            <p>${notification.message}</p>
+            <p>${(notification.message || '').replace(/\n/g, '<br/>')}</p>
         </div>
 
         ${notification.data ? `
@@ -410,7 +410,7 @@ export class NotificationService {
    */
   async notifyTaskUpdate(
     taskId: string,
-    action: 'created' | 'updated' | 'assigned' | 'completed' | 'overdue',
+    action: 'created' | 'updated' | 'assigned' | 'unassigned' | 'completed' | 'overdue',
     assignedUserId: string,
     organizationId: string,
     taskTitle: string,
@@ -421,6 +421,7 @@ export class NotificationService {
       created: `A new task "${taskTitle}" has been created${projectName ? ` in project "${projectName}"` : ''}`,
       updated: `Task "${taskTitle}" has been updated${projectName ? ` in project "${projectName}"` : ''}`,
       assigned: `You have been assigned to task "${taskTitle}"${projectName ? ` in project "${projectName}"` : ''}`,
+      unassigned: `You have been removed from task "${taskTitle}"${projectName ? ` in project "${projectName}"` : ''}`,
       completed: `Task "${taskTitle}" has been completed${projectName ? ` in project "${projectName}"` : ''}`,
       overdue: `Task "${taskTitle}" is overdue${projectName ? ` in project "${projectName}"` : ''}`
     }
@@ -436,6 +437,60 @@ export class NotificationService {
         priority: action === 'overdue' ? 'high' : 'medium',
         url: `${baseUrl}/tasks/${taskId}`,
         projectName: projectName
+      },
+      sendEmail: true,
+      sendPush: true
+    })
+  }
+
+  /**
+   * Create task deadline / approaching reminder notification
+   */
+  async notifyTaskDeadline(
+    taskId: string,
+    deadlineType: 'approaching' | 'overdue',
+    assignedUserId: string,
+    organizationId: string,
+    taskTitle: string,
+    dueDate: Date,
+    projectName?: string,
+    baseUrl?: string
+  ): Promise<INotification | null> {
+    const formattedDueDate = new Date(dueDate).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
+
+    const isApproaching = deadlineType === 'approaching'
+    const title = isApproaching
+      ? `Task Due Soon: ${taskTitle}`
+      : `Task Overdue: ${taskTitle}`
+
+    const message = isApproaching
+      ? `Task "${taskTitle}"${projectName ? ` in project "${projectName}"` : ''} is due tomorrow (${formattedDueDate}).`
+      : `Task "${taskTitle}"${projectName ? ` in project "${projectName}"` : ''} is overdue (due date: ${formattedDueDate}).`
+
+    const type: 'reminder' | 'deadline' = isApproaching ? 'reminder' : 'deadline'
+    const action: 'reminder' | 'overdue' = isApproaching ? 'reminder' : 'overdue'
+    const priority: 'high' | 'critical' = isApproaching ? 'high' : 'critical'
+
+    return await this.createNotification(assignedUserId, organizationId, {
+      type,
+      title,
+      message,
+      data: {
+        entityType: 'task',
+        entityId: taskId,
+        action,
+        priority,
+        url: baseUrl ? `${baseUrl}/tasks/${taskId}` : `/tasks/${taskId}`,
+        projectName,
+        metadata: {
+          dueDate,
+          formattedDueDate,
+          deadlineType
+        }
       },
       sendEmail: true,
       sendPush: true

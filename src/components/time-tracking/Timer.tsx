@@ -224,10 +224,16 @@ export function Timer({
     }
   }, [userId, organizationId])
 
-  // Load active timer on mount
+  // Load active timer on mount and sync periodically every 30 seconds
   useEffect(() => {
     if (userId && organizationId) {
       loadActiveTimer()
+      const syncInterval = setInterval(() => {
+        loadActiveTimer()
+      }, 30000)
+      return () => {
+        clearInterval(syncInterval)
+      }
     }
   }, [userId, organizationId, loadActiveTimer])
 

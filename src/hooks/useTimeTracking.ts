@@ -422,6 +422,8 @@ export function useTimeTracking(userId: string, organizationId: string) {
   useEffect(() => {
     loadActiveTimer()
     loadSettings()
+    const syncInterval = setInterval(loadActiveTimer, 30000)
+    return () => clearInterval(syncInterval)
   }, [loadActiveTimer, loadSettings])
 
   return {

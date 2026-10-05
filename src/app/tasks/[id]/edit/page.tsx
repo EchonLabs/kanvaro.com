@@ -13,8 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNotify } from '@/lib/notify'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { AttachmentList } from '@/components/ui/AttachmentList'
-import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar, Paperclip, X } from 'lucide-react'
+import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar, Paperclip, X, Settings2 } from 'lucide-react'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
+import TaskCategoryManagerModal from '@/components/tasks/TaskCategoryManagerModal'
 
 const STATUS_OPTIONS = [
   { value: 'backlog', label: 'Backlog' },
@@ -87,6 +91,7 @@ interface TaskFormState {
   story?: string
   epic?: string
   isBillable?: boolean
+  category?: string
   // storyPoints?: number
 }
 
@@ -104,40 +109,84 @@ const mapTaskFormState = (data: any): TaskFormState => ({
   story: data?.story?._id ?? data?.story ?? undefined,
   epic: data?.epic?._id ?? data?.epic ?? undefined,
   isBillable: typeof data?.isBillable === 'boolean' ? data.isBillable : undefined,
+  category: typeof data?.category === 'string' ? data.category : undefined,
   // storyPoints: typeof data?.storyPoints === 'number' ? data.storyPoints : undefined
 })
 
-const mapSubtasksFromResponse = (input: any): Subtask[] => {
+const mapSubtasksFromResponse = (input: any): SubtaskItem[] => {
   if (!Array.isArray(input)) return []
   return input.map((item: any) => ({
-    _id: typeof item?._id === 'string' ? item._id : undefined,
+    _id: typeof item?._id === 'string' ? item._id : (item?._id ? String(item._id) : undefined),
     title: item?.title ?? '',
     description: item?.description ?? '',
-    status: (item?.status ?? 'todo') as SubtaskStatus,
+    status: (item?.status ?? 'todo') as TaskStatus,
     isCompleted: typeof item?.isCompleted === 'boolean' ? item.isCompleted : item?.status === 'done',
-    createdAt: item?.createdAt,
-    updatedAt: item?.updatedAt
+    assignedTo: item?.assignedTo?._id || item?.assignedTo || undefined,
+    story: item?.story?._id || item?.story || undefined,
+    dueDate: item?.dueDate || undefined,
+    type: item?.type || 'subtask',
+    priority: item?.priority || 'medium',
+    estimatedHours: item?.estimatedHours !== undefined && item?.estimatedHours !== null ? item.estimatedHours : undefined,
+    subtasks: Array.isArray(item?.subtasks)
+      ? item.subtasks.map((nested: any) => ({
+          _id: typeof nested?._id === 'string' ? nested._id : (nested?._id ? String(nested._id) : undefined),
+          title: nested?.title ?? '',
+          description: nested?.description ?? '',
+          status: (nested?.status ?? 'todo') as TaskStatus,
+          isCompleted: typeof nested?.isCompleted === 'boolean' ? nested.isCompleted : nested?.status === 'done'
+        }))
+      : []
   }))
 }
 
-const sanitizeSubtasksForPayload = (subtasks: Subtask[]) =>
+const sanitizeSubtasksForPayload = (subtasks: SubtaskItem[]) =>
   subtasks
     .filter((subtask) => subtask.title.trim().length > 0)
     .map((subtask) => ({
       _id: subtask._id,
       title: subtask.title.trim(),
       description: subtask.description?.trim() || undefined,
-      status: subtask.status,
-      isCompleted: subtask.status === 'done' ? true : subtask.isCompleted
+      status: subtask.status || 'todo',
+      isCompleted: subtask.status === 'done' ? true : !!subtask.isCompleted,
+      assignedTo: subtask.assignedTo || undefined,
+      story: subtask.story || undefined,
+      dueDate: subtask.dueDate || undefined,
+      type: subtask.type || 'subtask',
+      priority: subtask.priority || 'medium',
+      estimatedHours: subtask.estimatedHours !== undefined && subtask.estimatedHours !== null && subtask.estimatedHours !== ''
+        ? Number(subtask.estimatedHours)
+        : undefined,
+      subtasks: (subtask.subtasks || [])
+        .filter((n) => n.title.trim().length > 0)
+        .map((n) => ({
+          _id: n._id,
+          title: n.title.trim(),
+          description: n.description?.trim() || undefined,
+          status: n.status || 'todo',
+          isCompleted: n.status === 'done' ? true : !!n.isCompleted
+        }))
     }))
 
-const normalizeSubtasksForCompare = (subtasks: Subtask[]) =>
+const normalizeSubtasksForCompare = (subtasks: SubtaskItem[]) =>
   sanitizeSubtasksForPayload(subtasks).map((subtask) => ({
     _id: subtask._id ?? null,
     title: subtask.title,
     description: subtask.description ?? '',
     status: subtask.status,
-    isCompleted: subtask.isCompleted
+    isCompleted: subtask.isCompleted,
+    assignedTo: subtask.assignedTo ?? null,
+    story: subtask.story ?? null,
+    dueDate: subtask.dueDate ? new Date(subtask.dueDate).toISOString().split('T')[0] : null,
+    type: subtask.type ?? 'subtask',
+    priority: subtask.priority ?? 'medium',
+    estimatedHours: subtask.estimatedHours ?? null,
+    subtasks: (subtask.subtasks || []).map((n) => ({
+      _id: n._id ?? null,
+      title: n.title,
+      description: n.description ?? '',
+      status: n.status,
+      isCompleted: n.isCompleted
+    }))
   }))
 
 interface AttachmentDraft {
@@ -288,18 +337,22 @@ export default function EditTaskPage() {
   const [task, setTask] = useState<TaskFormState | null>(null)
   const [originalTask, setOriginalTask] = useState<TaskFormState | null>(null)
   const [taskHasSprint, setTaskHasSprint] = useState(false)
-  const [subtasks, setSubtasks] = useState<Subtask[]>([])
-  const [originalSubtasks, setOriginalSubtasks] = useState<Subtask[]>([])
+  const [subtasks, setSubtasks] = useState<SubtaskItem[]>([])
+  const [originalSubtasks, setOriginalSubtasks] = useState<SubtaskItem[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [stories, setStories] = useState<Story[]>([])
   const [epics, setEpics] = useState<Epic[]>([])
+  const [categories, setCategories] = useState<Array<{ key: string; title: string; order: number }>>([])
   const [loadingStories, setLoadingStories] = useState(false)
   const [loadingEpics, setLoadingEpics] = useState(false)
+  const [loadingCategories, setLoadingCategories] = useState(false)
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false)
   const [storyQuery, setStoryQuery] = useState('')
   const [epicQuery, setEpicQuery] = useState('')
+  const [categoryQuery, setCategoryQuery] = useState('')
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [assignedTo, setAssignedTo] = useState<Array<{
@@ -347,6 +400,15 @@ export default function EditTaskPage() {
       const next = updater(prev)
       return next
     })
+  }, [])
+
+  const handleCategoriesUpdated = useCallback((updatedCategories: Array<{ key: string; title: string; order: number }>) => {
+    setCategories(updatedCategories)
+    setTask(prev => prev && updatedCategories.some(category => category.key === prev.category)
+      ? prev
+      : prev
+        ? { ...prev, category: undefined }
+        : prev)
   }, [])
 
   const fetchTask = useCallback(async () => {
@@ -407,6 +469,7 @@ export default function EditTaskPage() {
           updateAssignees(() => [])
           setStories([])
           setEpics([])
+          setCategories([])
         }
       } else {
         notifyError({ title: 'Failed to Load Task', message: data.error || 'Failed to load task' })
@@ -466,17 +529,20 @@ export default function EditTaskPage() {
   const fetchProjectTeamMembers = async (projectId: string, preserveAssigneeId?: string) => {
     if (!projectId) {
       setUsers([])
+      setCategories([])
       updateAssignees(() => [])
       return
     }
 
     setLoadingUsers(true)
+    setLoadingCategories(true)
     try {
       const response = await fetch(`/api/projects/${projectId}`)
       const data = await response.json()
 
       if (!response.ok || !data.success || !data.data) {
         setUsers([])
+        setCategories([]) 
         updateAssignees(() => [])
         return
       }
@@ -497,6 +563,10 @@ export default function EditTaskPage() {
         .filter((member: User): boolean => Boolean(member._id && member.firstName && member.lastName))
 
       setUsers(teamMembers)
+      const projectCategories = Array.isArray(data.data.settings?.taskCategories)
+        ? [...data.data.settings.taskCategories].sort((a: any, b: any) => a.order - b.order)
+        : []
+      setCategories(projectCategories)
 
       // Set billable default from project
       const billableDefault = typeof data.data.isBillableByDefault === 'boolean' ? data.data.isBillableByDefault : true
@@ -522,9 +592,11 @@ export default function EditTaskPage() {
     } catch (error) {
       console.error('Failed to fetch project team members:', error)
       setUsers([])
+      setCategories([])
       updateAssignees(() => [])
     } finally {
       setLoadingUsers(false)
+      setLoadingCategories(false)
     }
   }
 
@@ -578,64 +650,44 @@ export default function EditTaskPage() {
 
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
-    if (!query) return projects
-    return projects.filter((project) => project.name.toLowerCase().includes(query))
+    const list = !query ? projects : projects.filter((project) => project.name.toLowerCase().includes(query))
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectFilterQuery])
 
   const filteredAssignedToOptions = useMemo(() => {
     const query = assignedToFilterQuery.trim().toLowerCase()
-    if (!query) return users
-    return users.filter((user) =>
-      `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(query) ||
-      (user.email && user.email.toLowerCase().includes(query))
-    )
+    const list = !query
+      ? users
+      : users.filter((user) =>
+          `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(query) ||
+          (user.email && user.email.toLowerCase().includes(query))
+        )
+    return [...list].sort((a, b) => {
+      const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+      const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+    })
   }, [users, assignedToFilterQuery])
 
-  const addSubtask = () => {
-    setSubtasks((prev) => ([
-      ...prev,
-      {
-        title: '',
-        description: '',
-        status: 'todo',
-        isCompleted: false
+  const handleAssigneeAdded = useCallback((userId: string) => {
+    updateAssignees((prev) => {
+      if (prev.some(a => a._id === userId)) return prev
+      const member = users.find(u => u._id === userId)
+      if (member) {
+        return [
+          ...prev,
+          {
+            _id: member._id,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            email: member.email,
+            hourlyRate: member.projectHourlyRate !== undefined ? String(member.projectHourlyRate) : undefined
+          }
+        ]
       }
-    ]))
-  }
-
-  const updateSubtask = (index: number, field: keyof Subtask, value: any) => {
-    setSubtasks((prev) => {
-      const updated = [...prev]
-      updated[index] = {
-        ...updated[index],
-        [field]: field === 'status' ? (value as SubtaskStatus) : value
-      }
-      if (field === 'status') {
-        updated[index].isCompleted = (value as SubtaskStatus) === 'done'
-      }
-      return updated
+      return prev
     })
-  }
-
-  const toggleSubtaskCompletion = (index: number, checked: boolean) => {
-    setSubtasks((prev) => {
-      const updated = [...prev]
-      const current = updated[index]
-      const nextStatus: SubtaskStatus = checked
-        ? 'done'
-        : (current.status === 'done' ? 'todo' : current.status || 'todo')
-      updated[index] = {
-        ...current,
-        status: nextStatus,
-        isCompleted: checked
-      }
-      return updated
-    })
-  }
-
-  const removeSubtask = (index: number) => {
-    setSubtasks((prev) => prev.filter((_, i) => i !== index))
-  }
+  }, [updateAssignees, users])
 
   const uploadAttachmentFile = useCallback(async (file: File) => {
     if (!currentUser) {
@@ -709,14 +761,38 @@ export default function EditTaskPage() {
       return
     }
 
+    if (!task.category) {
+      notifyError({ title: 'Validation Error', message: 'Category is required' })
+      return
+    }
+
     if (assignedTo.length === 0) {
       notifyError({ title: 'Validation Error', message: 'Please assign this task to at least one team member' })
       return
     }
 
     try {
-      setSaving(true)
       const preparedSubtasks = sanitizeSubtasksForPayload(subtasks)
+
+      // Check subtask completion rules before submitting
+      const hasIncomplete = preparedSubtasks.some(st => {
+        const isStDone = st.isCompleted || st.status === 'done'
+        if (!isStDone) return true
+        return (st.subtasks || []).some(n => !n.isCompleted && n.status !== 'done')
+      })
+
+      let finalStatus = task.status
+      if (finalStatus === 'done' && hasIncomplete) {
+        notifyError({
+          title: 'Completion Blocked',
+          message: 'Cannot mark task as complete: all subtasks and nested subtasks must be completed first.'
+        })
+        setSaving(false)
+        return
+      } else if (preparedSubtasks.length > 0 && !hasIncomplete) {
+        finalStatus = 'done'
+      }
+
       const preparedAttachments = attachments
         .filter((attachment) => attachment.name && attachment.url)
         .map((attachment) => ({
@@ -740,7 +816,7 @@ export default function EditTaskPage() {
         body: JSON.stringify({
           title: task.title,
           description: task.description,
-          status: task.status,
+          status: finalStatus,
           priority: task.priority,
           type: task.type,
           project: task.project || undefined,
@@ -755,6 +831,7 @@ export default function EditTaskPage() {
           labels: labels,
           estimatedHours: task.estimatedHours || undefined,
           isBillable: task.isBillable,
+          category: task.category || undefined,
           //  storyPoints: task.storyPoints || undefined,
           story: task.story || undefined,
           epic: task.epic || undefined,
@@ -843,7 +920,7 @@ export default function EditTaskPage() {
   const isValid = useMemo(() => {
     if (!task) return false
     // Check all required fields
-    return !!(task.title?.trim() && task.project && assignedTo.length > 0)
+    return !!(task.title?.trim() && task.project && task.category && assignedTo.length > 0)
   }, [task, assignedTo])
 
 
@@ -905,9 +982,10 @@ export default function EditTaskPage() {
                     const currentAssigneeId = task?.assignedTo
 
                     // Update project but DON'T clear assignee yet - will be validated when team members load
-                    setTask((prev) => prev ? ({ ...prev, project: newProjectId, story: undefined, epic: undefined }) : prev)
+                    setTask((prev) => prev ? ({ ...prev, project: newProjectId, story: undefined, epic: undefined, category: undefined }) : prev)
                     setProjectFilterQuery('')
                     setAssignedToFilterQuery('')
+                    setCategoryQuery('')
 
                     // Fetch team members for new project and preserve assignee if they're in the new team
                     if (newProjectId) {
@@ -920,6 +998,7 @@ export default function EditTaskPage() {
                       updateAssignees(() => [])
                       setStories([])
                       setEpics([])
+                      setCategories([])
                     }
                   }}
                   disabled={loadingProjects}
@@ -1184,6 +1263,7 @@ export default function EditTaskPage() {
                               const filtered = stories.filter(s =>
                                 !q || s.title.toLowerCase().includes(q)
                               )
+                              .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
 
                               if (filtered.length === 0) {
                                 return (
@@ -1256,6 +1336,7 @@ export default function EditTaskPage() {
                               const filtered = availableEpics.filter(e =>
                                 !q || e.title.toLowerCase().includes(q)
                               )
+                              .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
 
                               if (filtered.length === 0) {
                                 return (
@@ -1267,6 +1348,76 @@ export default function EditTaskPage() {
                                 <SelectItem key={epic._id} value={epic._id}>
                                   <div className="truncate max-w-xs" title={epic.title}>
                                     {epic.title}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              {task.project && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="min-w-0">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <label className="text-sm font-medium">Category *</label>
+                      <PermissionGate permission={Permission.PROJECT_UPDATE} projectId={task.project}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsCategoryManagerOpen(true)}
+                          className="h-7 px-2 text-xs"
+                        >
+                          <Settings2 className="h-3.5 w-3.5" />
+                          Manage
+                        </Button>
+                      </PermissionGate>
+                    </div>
+                    <Select
+                      value={task.category || ''}
+                      onValueChange={(value) => setTask((prev) => prev ? ({ ...prev, category: value || undefined }) : prev)}
+                      disabled={loadingCategories}
+                      onOpenChange={(open) => { if (open) setCategoryQuery('') }}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder={loadingCategories ? 'Loading categories...' : 'Select a category'} />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={categoryQuery}
+                            onChange={(e) => setCategoryQuery(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder={loadingCategories ? 'Loading categories...' : 'Type to search categories'}
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            {loadingCategories ? (
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading categories...</span>
+                              </div>
+                            ) : (() => {
+                              const q = categoryQuery.toLowerCase().trim()
+                              const filtered = categories.filter(c =>
+                                !q || c.title.toLowerCase().includes(q)
+                              )
+
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">No categories found for this project</div>
+                                )
+                              }
+
+                              return filtered.map((category) => (
+                                <SelectItem key={category.key} value={category.key}>
+                                  <div className="truncate max-w-xs" title={category.title}>
+                                    {category.title}
                                   </div>
                                 </SelectItem>
                               ))
@@ -1374,96 +1525,13 @@ export default function EditTaskPage() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mt-2">
-                <div>
-                  <h3 className="text-lg font-medium">Subtask Details</h3>
-                  <p className="text-sm text-muted-foreground">Manage subtasks linked to this task</p>
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={addSubtask}>
-                  <Plus className="h-4 w-4 mr-2" /> Add Subtask
-                </Button>
-              </div>
-
-              {subtasks.length === 0 && (
-                <div className="text-center py-10 text-muted-foreground border rounded-lg">
-                  <p className="font-medium">No subtasks yet</p>
-                  <p className="text-sm">Use the button above to add a new subtask.</p>
-                </div>
-              )}
-
-              {subtasks.map((subtask, index) => (
-                <div key={subtask._id || index} className="p-4 border rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Subtask {index + 1}</h4>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeSubtask(index)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    <div>
-                      <label className="text-sm font-medium">Title *</label>
-                      <Input
-                        value={subtask.title}
-                        onChange={(e) => updateSubtask(index, 'title', e.target.value)}
-                        placeholder="Subtask title"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">Status</label>
-                      <Select
-                        value={subtask.status}
-                        onValueChange={(value) => updateSubtask(index, 'status', value as SubtaskStatus)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="z-[10050]">
-                          {STATUS_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={subtask.isCompleted || subtask.status === 'done'}
-                      onCheckedChange={(checked) => toggleSubtaskCompletion(index, !!checked)}
-                    />
-                    <span className="text-sm text-muted-foreground">Mark as completed</span>
-                  </div>
-
-                  {/* <div>
-                    <label className="text-sm font-medium">Description</label>
-                    <div className="mt-1">
-                      <RichTextEditor
-                        value={subtask.description || ''}
-                        onChange={(value) => updateSubtask(index, 'description', value)}
-                        placeholder="Subtask description"
-                        maxLength={2000}
-                        showCharCount={true}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Supports rich text formatting. Maximum 2,000 characters.
-                    </p>
-                  </div> */}
-                </div>
-              ))}
-            </div>
+            <SubtasksEditor
+              subtasks={subtasks}
+              onChange={setSubtasks}
+              users={users}
+              stories={stories}
+              onAssigneeAdded={handleAssigneeAdded}
+            />
 
             <div className="flex justify-end space-x-2 pt-2">
               <Button variant="outline" onClick={() => router.push('/tasks')}>Cancel</Button>
@@ -1478,6 +1546,12 @@ export default function EditTaskPage() {
           </CardContent>
         </Card>
       </div>
+      <TaskCategoryManagerModal
+        isOpen={isCategoryManagerOpen}
+        onClose={() => setIsCategoryManagerOpen(false)}
+        projectId={task?.project || ''}
+        onCategoriesUpdated={handleCategoriesUpdated}
+      />
     </MainLayout>
   )
 }

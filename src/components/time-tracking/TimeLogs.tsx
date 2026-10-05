@@ -176,33 +176,33 @@ export function TimeLogs({
 
   // Filtered lists based on search queries
   const filteredProjects = useMemo(() => {
-    if (!projectSearch.trim()) return filterProjects
-    const searchLower = projectSearch.toLowerCase()
-    return filterProjects.filter(project =>
-      project.name?.toLowerCase().includes(searchLower)
+    const result = filterProjects.filter(project =>
+      project.name?.toLowerCase().includes(projectSearch.toLowerCase())
     )
+    return result.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [filterProjects, projectSearch])
 
   const filteredTasks = useMemo(() => {
+    const q = taskSearch.trim().toLowerCase()
+    const list = !q ? filterTasks : filterTasks.filter(task => (task.title || '').toLowerCase().includes(q))
     // Apply smart truncation with capital letter detection
-    return filterTasks.map(task => {
+    return list.map(task => {
       const { truncated, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
       return {
         ...task,
         truncated,
         isTruncated
       }
-    })
-  }, [filterTasks])
+    }).sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
+  }, [filterTasks, taskSearch])
 
   const filteredEmployees = useMemo(() => {
-    if (!employeeSearch.trim()) return filterEmployees
-    const searchLower = employeeSearch.toLowerCase()
-    return filterEmployees.filter(employee => {
+    const result = filterEmployees.filter(employee => {
       const fullName = `${employee.firstName || ''} ${employee.lastName || ''}`.toLowerCase()
       const email = employee.email?.toLowerCase() || ''
-      return fullName.includes(searchLower) || email.includes(searchLower)
+      return fullName.includes(employeeSearch.toLowerCase()) || email.includes(employeeSearch.toLowerCase())
     })
+    return result.sort((a, b) => `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`))
   }, [filterEmployees, employeeSearch])
 
   const statusOptions = [
@@ -250,20 +250,18 @@ export function TimeLogs({
   const [modalEmployeeSearch, setModalEmployeeSearch] = useState('')
 
   const filteredModalProjects = useMemo(() => {
-    if (!modalProjectSearch.trim()) return projects
-    const searchLower = modalProjectSearch.toLowerCase()
-    return projects.filter(project =>
-      project.name?.toLowerCase().includes(searchLower)
+    const result = projects.filter(project =>
+      project.name?.toLowerCase().includes(modalProjectSearch.toLowerCase())
     )
+    return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   }, [projects, modalProjectSearch])
 
   const filteredModalTasks = useMemo(() => {
-    if (!modalTaskSearch.trim()) return tasks
-    const searchLower = modalTaskSearch.toLowerCase()
-    return tasks.filter(task =>
-      task.title?.toLowerCase().includes(searchLower) ||
-      task.displayId?.toLowerCase().includes(searchLower)
+    const result = tasks.filter(task =>
+      task.title?.toLowerCase().includes(modalTaskSearch.toLowerCase()) ||
+      task.displayId?.toLowerCase().includes(modalTaskSearch.toLowerCase())
     )
+    return result.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
   }, [tasks, modalTaskSearch])
 
   const selectedTaskForLogObject = useMemo(() =>
@@ -272,13 +270,12 @@ export function TimeLogs({
   )
 
   const filteredModalEmployees = useMemo(() => {
-    if (!modalEmployeeSearch.trim()) return filterEmployees
-    const searchLower = modalEmployeeSearch.toLowerCase()
-    return filterEmployees.filter(emp => {
+    const result = filterEmployees.filter(emp => {
       const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
       const email = emp.email?.toLowerCase() || ''
-      return fullName.includes(searchLower) || email.includes(searchLower)
+      return fullName.includes(modalEmployeeSearch.toLowerCase()) || email.includes(modalEmployeeSearch.toLowerCase())
     })
+    return result.sort((a, b) => `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`))
   }, [filterEmployees, modalEmployeeSearch])
   const [manualLogData, setManualLogData] = useState({
     startDate: '',
@@ -1199,6 +1196,10 @@ export function TimeLogs({
     if (!authResolving) {
       loadTimeEntries()
       loadActiveTimer()
+      const syncInterval = setInterval(() => {
+        loadActiveTimer()
+      }, 30000)
+      return () => clearInterval(syncInterval)
     }
   }, [authResolving, loadTimeEntries, loadActiveTimer, refreshKey])
 
@@ -2620,11 +2621,13 @@ export function TimeLogs({
               >
                 {/* ── Mobile / Tablet card (hidden on md+) ────────────── */}
                 <div className="md:hidden px-4 py-3 space-y-2.5">
-                  {/* Row 1: Task name + Project name */}
+                  {/* Row 1: Memo + Project name */}
                   <div className="grid grid-cols-[1fr_auto] gap-x-2 items-start">
                     <div className="min-w-0">
                       <p className="text-[15px] font-semibold text-[var(--apple-label)] truncate">
-                        {entry.task?.title || <span className="italic text-[var(--apple-tertiary-label)]">No task</span>}
+                        {entry.description
+                          ? <span className="truncate">{entry.description}</span>
+                          : <span className="italic text-[var(--apple-tertiary-label)]">No memo</span>}
                       </p>
                       <p className="text-[13px] text-[var(--apple-secondary-label)] truncate mt-0.5">
                         {entry.project?.name || <span className="italic text-[var(--apple-tertiary-label)]">No project</span>}
@@ -2765,10 +2768,12 @@ export function TimeLogs({
                       className="h-4 w-4"
                     />
                   )}
-                  {/* Col 1: Task name + Project name */}
+                  {/* Col 1: Memo (description) + Project name */}
                   <div className="min-w-0">
                     <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">
-                      {entry.task?.title || <span className="italic text-[var(--apple-tertiary-label)]">No task</span>}
+                      {entry.description
+                        ? <span className="truncate">{entry.description}</span>
+                        : <span className="italic text-[var(--apple-tertiary-label)]">No memo</span>}
                     </p>
                     <p className="text-[12px] text-[var(--apple-secondary-label)] truncate mt-0.5">
                       {entry.project?.name || <span className="italic text-[var(--apple-tertiary-label)]">No project</span>}

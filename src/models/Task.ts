@@ -3,12 +3,29 @@ import mongoose, { Schema, Document } from 'mongoose'
 export const TASK_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
 export type TaskStatus = typeof TASK_STATUS_VALUES[number]
 
+export interface INestedSubtask {
+  _id?: mongoose.Types.ObjectId
+  title: string
+  description?: string
+  status: TaskStatus
+  isCompleted: boolean
+  createdAt?: Date
+  updatedAt?: Date
+}
+
 export interface ITaskSubtask {
   _id?: mongoose.Types.ObjectId
   title: string
   description?: string
   status: TaskStatus
   isCompleted: boolean
+  assignedTo?: mongoose.Types.ObjectId | any
+  story?: mongoose.Types.ObjectId | any
+  dueDate?: Date
+  type?: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  estimatedHours?: number
+  subtasks?: INestedSubtask[]
   createdAt?: Date
   updatedAt?: Date
 }
@@ -20,10 +37,12 @@ export interface ITask extends Document {
   priority: 'low' | 'medium' | 'high' | 'critical'
   isBillable?: boolean
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+  category: string
   organization: mongoose.Types.ObjectId
   project: mongoose.Types.ObjectId
   taskNumber: number
   displayId: string
+  module?: string
   story?: mongoose.Types.ObjectId
   epic?: mongoose.Types.ObjectId
   parentTask?: mongoose.Types.ObjectId
@@ -59,6 +78,10 @@ export interface ITask extends Document {
   subtasks: ITaskSubtask[]
   archived: boolean
   position: number
+  remindersSent?: {
+    dueSoon24h?: boolean
+    overdue?: boolean
+  }
   comments?: Array<{
     _id?: mongoose.Types.ObjectId
     content: string
@@ -84,6 +107,29 @@ export interface ITask extends Document {
   updatedAt: Date
 }
 
+const NestedSubtaskSchema = new Schema<INestedSubtask>({
+  title: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 200
+  },
+  description: {
+    type: String,
+    trim: true,
+    maxlength: 1000
+  },
+  status: {
+    type: String,
+    default: 'todo',
+    trim: true
+  },
+  isCompleted: {
+    type: Boolean,
+    default: false
+  }
+}, { timestamps: true })
+
 const SubtaskSchema = new Schema<ITaskSubtask>({
   title: {
     type: String,
@@ -106,6 +152,35 @@ const SubtaskSchema = new Schema<ITaskSubtask>({
   isCompleted: {
     type: Boolean,
     default: false
+  },
+  assignedTo: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  story: {
+    type: Schema.Types.ObjectId,
+    ref: 'Story'
+  },
+  dueDate: {
+    type: Date
+  },
+  type: {
+    type: String,
+    enum: ['bug', 'feature', 'improvement', 'task', 'subtask'],
+    default: 'subtask'
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'critical'],
+    default: 'medium'
+  },
+  estimatedHours: {
+    type: Number,
+    min: 0
+  },
+  subtasks: {
+    type: [NestedSubtaskSchema],
+    default: []
   }
 }, { timestamps: true })
 
@@ -140,6 +215,12 @@ const TaskSchema = new Schema<ITask>({
     enum: ['bug', 'feature', 'improvement', 'task', 'subtask'],
     default: 'task'
   },
+  category: {
+    type: String,
+    trim: true,
+    maxlength: 50
+    // "Required on create/edit" is enforced in the API layer.
+  },
   organization: {
     type: Schema.Types.ObjectId,
     ref: 'Organization',
@@ -159,6 +240,10 @@ const TaskSchema = new Schema<ITask>({
     required: true,
     trim: true,
     maxlength: 50
+  },
+  module: {
+    type: String,
+    trim: true
   },
   story: {
     type: Schema.Types.ObjectId,
@@ -241,6 +326,10 @@ const TaskSchema = new Schema<ITask>({
     default: []
   },
   archived: { type: Boolean, default: false },
+  remindersSent: {
+    dueSoon24h: { type: Boolean, default: false },
+    overdue: { type: Boolean, default: false }
+  },
   comments: [{
     content: { type: String, required: true, trim: true, maxlength: 2000 },
     author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -289,6 +378,7 @@ TaskSchema.index({ priority: 1 })
 TaskSchema.index({ type: 1 })
 TaskSchema.index({ organization: 1, status: 1 })
 TaskSchema.index({ project: 1, status: 1 })
+TaskSchema.index({ project: 1, category: 1 })
 TaskSchema.index({ sprint: 1, status: 1 })
 TaskSchema.index({ assignedTo: 1, status: 1 })
 TaskSchema.index({ organization: 1, assignedTo: 1 })
@@ -299,6 +389,9 @@ TaskSchema.index({ project: 1, archived: 1 })
 TaskSchema.index({ project: 1, status: 1, position: 1 })
 TaskSchema.index({ organization: 1, createdAt: -1 })
 TaskSchema.index({ project: 1, status: 1, createdAt: -1 })
+TaskSchema.index({ dueDate: 1, status: 1, archived: 1 })
+TaskSchema.index({ dueDate: 1, 'remindersSent.dueSoon24h': 1 })
+TaskSchema.index({ dueDate: 1, 'remindersSent.overdue': 1 })
 TaskSchema.index({ title: 'text', description: 'text' })
 
 export const Task = mongoose.models.Task || mongoose.model<ITask>('Task', TaskSchema)

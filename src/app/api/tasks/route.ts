@@ -5,6 +5,7 @@ import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import '@/models/Sprint'
+import '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -16,6 +17,7 @@ import { logTaskActivity } from '@/lib/task-activity-logger'
 import { logActivity } from '@/lib/activity-logger'
 import { countWords, TASK_TITLE_MAX_WORDS } from '@/lib/text/word-limit'
 import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
+import { CompletionService } from '@/lib/completion-service'
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -39,12 +41,27 @@ function sanitizeLabels(input: any): string[] {
   return []
 }
 
+type IncomingNestedSubtask = {
+  _id?: string
+  title?: unknown
+  description?: unknown
+  status?: unknown
+  isCompleted?: unknown
+}
+
 type IncomingSubtask = {
   _id?: string
   title?: unknown
   description?: unknown
   status?: unknown
   isCompleted?: unknown
+  assignedTo?: unknown
+  story?: unknown
+  dueDate?: unknown
+  type?: unknown
+  priority?: unknown
+  estimatedHours?: unknown
+  subtasks?: unknown
 }
 
 type IncomingAttachment = {
@@ -56,7 +73,7 @@ type IncomingAttachment = {
   uploadedAt?: unknown
 }
 
-function sanitizeSubtasks(input: any): Array<{
+function sanitizeNestedSubtasks(input: any): Array<{
   _id?: string
   title: string
   description?: string
@@ -68,12 +85,12 @@ function sanitizeSubtasks(input: any): Array<{
   }
 
   return input
-    .filter((item: IncomingSubtask) => typeof item?.title === 'string' && item.title.trim().length > 0)
-    .map((item: IncomingSubtask) => {
+    .filter((item: IncomingNestedSubtask) => typeof item?.title === 'string' && item.title.trim().length > 0)
+    .map((item: IncomingNestedSubtask) => {
       const rawStatus = typeof item.status === 'string' ? item.status : undefined
       const status = rawStatus && TASK_STATUS_SET.has(rawStatus as TaskStatus)
         ? rawStatus as TaskStatus
-        : 'backlog'
+        : 'todo'
 
       const sanitized: {
         _id?: string
@@ -102,6 +119,141 @@ function sanitizeSubtasks(input: any): Array<{
 
       return sanitized
     })
+}
+
+function sanitizeSubtasks(input: any): Array<{
+  _id?: string
+  title: string
+  description?: string
+  status: TaskStatus
+  isCompleted: boolean
+  assignedTo?: mongoose.Types.ObjectId
+  story?: mongoose.Types.ObjectId
+  dueDate?: Date
+  type?: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  estimatedHours?: number
+  subtasks?: Array<{
+    _id?: string
+    title: string
+    description?: string
+    status: TaskStatus
+    isCompleted: boolean
+  }>
+}> {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  const VALID_TYPES = new Set(['task', 'bug', 'feature', 'improvement', 'subtask'])
+  const VALID_PRIORITIES = new Set(['low', 'medium', 'high', 'critical'])
+
+  return input
+    .filter((item: IncomingSubtask) => typeof item?.title === 'string' && item.title.trim().length > 0)
+    .map((item: IncomingSubtask) => {
+      const rawStatus = typeof item.status === 'string' ? item.status : undefined
+      const status = rawStatus && TASK_STATUS_SET.has(rawStatus as TaskStatus)
+        ? rawStatus as TaskStatus
+        : 'todo'
+
+      const sanitized: {
+        _id?: string
+        title: string
+        description?: string
+        status: TaskStatus
+        isCompleted: boolean
+        assignedTo?: mongoose.Types.ObjectId
+        story?: mongoose.Types.ObjectId
+        dueDate?: Date
+        type?: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+        priority?: 'low' | 'medium' | 'high' | 'critical'
+        estimatedHours?: number
+        subtasks?: Array<{
+          _id?: string
+          title: string
+          description?: string
+          status: TaskStatus
+          isCompleted: boolean
+        }>
+      } = {
+        title: (item.title as string).trim(),
+        status,
+        isCompleted: typeof item.isCompleted === 'boolean'
+          ? item.isCompleted
+          : status === 'done',
+        type: typeof item.type === 'string' && VALID_TYPES.has(item.type) ? (item.type as any) : 'subtask',
+        priority: typeof item.priority === 'string' && VALID_PRIORITIES.has(item.priority) ? (item.priority as any) : 'medium',
+        subtasks: sanitizeNestedSubtasks(item.subtasks)
+      }
+
+      if (item._id && typeof item._id === 'string') {
+        sanitized._id = item._id
+      }
+
+      if (typeof item.description === 'string') {
+        const trimmed = item.description.trim()
+        if (trimmed.length > 0) {
+          sanitized.description = trimmed
+        }
+      }
+
+      if (item.assignedTo) {
+        const rawId = typeof item.assignedTo === 'string'
+          ? item.assignedTo.trim()
+          : (typeof item.assignedTo === 'object' && item.assignedTo !== null && '_id' in item.assignedTo)
+            ? String((item.assignedTo as any)._id).trim()
+            : undefined
+
+        if (rawId && mongoose.Types.ObjectId.isValid(rawId)) {
+          sanitized.assignedTo = new mongoose.Types.ObjectId(rawId)
+        }
+      }
+
+      if (item.story) {
+        const rawId = typeof item.story === 'string'
+          ? item.story.trim()
+          : (typeof item.story === 'object' && item.story !== null && '_id' in item.story)
+            ? String((item.story as any)._id).trim()
+            : undefined
+
+        if (rawId && mongoose.Types.ObjectId.isValid(rawId)) {
+          sanitized.story = new mongoose.Types.ObjectId(rawId)
+        }
+      }
+
+      if (item.dueDate) {
+        const d = new Date(item.dueDate as any)
+        if (!Number.isNaN(d.getTime())) {
+          sanitized.dueDate = d
+        }
+      }
+
+      if (item.estimatedHours !== undefined && item.estimatedHours !== null && item.estimatedHours !== '') {
+        const val = typeof item.estimatedHours === 'number' ? item.estimatedHours : Number(item.estimatedHours)
+        if (!Number.isNaN(val) && val >= 0) {
+          sanitized.estimatedHours = val
+        }
+      }
+
+      return sanitized
+    })
+}
+
+function areAllSubtasksCompleted(subtasks: any[]): boolean {
+  if (!subtasks || subtasks.length === 0) return true
+  return subtasks.every(st => {
+    const isStDone = st.isCompleted === true || st.status === 'done'
+    if (!isStDone) return false
+    if (st.subtasks && Array.isArray(st.subtasks) && st.subtasks.length > 0) {
+      return st.subtasks.every((nested: any) => nested.isCompleted === true || nested.status === 'done')
+    }
+    return true
+  })
+}
+
+function hasAnyIncompleteSubtasks(subtasks: any[]): boolean {
+  if (!subtasks || subtasks.length === 0) return false
+  return !areAllSubtasksCompleted(subtasks)
 }
 
 function sanitizeAttachments(input: any, defaultUserId: string) {
@@ -193,10 +345,11 @@ export async function GET(request: NextRequest) {
     const createdAtFrom = searchParams.get('createdAtFrom') || '';
     const createdAtTo = searchParams.get('createdAtTo') || '';
     const minimal = searchParams.get('minimal') === 'true';
+    const category = searchParams.get('category') || ''
 
     console.log('[Tasks GET] Parameters parsed:', {
       page, limit, after, search, status, priority, type, project, story,
-      assignedTo, createdBy, dueDateFrom, dueDateTo, createdAtFrom, createdAtTo, minimal
+      assignedTo, createdBy, dueDateFrom, dueDateTo, createdAtFrom, createdAtTo, minimal, category
     });
 
     const useCursorPagination = !!after;
@@ -305,6 +458,7 @@ export async function GET(request: NextRequest) {
     if (type) filters.type = type;
     if (project) filters.project = project;
     if (story) filters.story = story;
+    if (category) filters.category = category
 
     console.log('[Tasks GET] Building date filters');
     // Date range filters
@@ -403,6 +557,8 @@ export async function GET(request: NextRequest) {
     const populatePaths = minimal ? [] : [
       { path: 'project', select: '_id name' },
       { path: 'assignedTo.user', select: '_id firstName lastName email avatar' },
+      { path: 'subtasks.assignedTo', select: '_id firstName lastName email avatar' },
+      { path: 'subtasks.story', select: '_id title' },
       { path: 'createdBy', select: 'firstName lastName email' },
       { path: 'movedFromSprint', select: '_id name' }
     ];
@@ -506,6 +662,7 @@ export async function POST(request: NextRequest) {
       status,
       priority,
       type,
+      category: rawCategory,
       project,
       story,
       epic,
@@ -525,9 +682,9 @@ export async function POST(request: NextRequest) {
     const normalizedTitle = typeof title === 'string' ? title.trim() : ''
 
     // Validate required fields first (fail fast)
-    if (!normalizedTitle || !project) {
+    if (!normalizedTitle || !project || typeof rawCategory !== 'string' || !rawCategory.trim()) {
       return NextResponse.json(
-        { error: 'Title and project are required' },
+        { error: 'Title, project, and category are required' },
         { status: 400 }
       )
     }
@@ -541,7 +698,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch project and check permissions in parallel for better performance
     const [projectDoc, canCreateTask] = await Promise.all([
-      Project.findById(project).select('projectNumber organization name teamMembers createdBy isBillableByDefault'),
+      Project.findById(project).select('projectNumber organization name teamMembers createdBy isBillableByDefault settings.taskCategories'),
       PermissionService.hasPermission(userId, Permission.TASK_CREATE, project)
     ])
 
@@ -564,12 +721,71 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const sanitizedSubtasks = sanitizeSubtasks(subtasks)
+
+    // Handle assignedTo as an array of objects with user, user details, and hourlyRate
+    let normalizedAssignedTo: Array<{ user: string; firstName?: string; lastName?: string; email?: string; hourlyRate?: number }> = []
+    if (Array.isArray(assignedTo)) {
+      normalizedAssignedTo = assignedTo
+        .filter(item => typeof item === 'object' && item !== null && item.user)
+        .map(item => ({
+          user: typeof item.user === 'string' ? item.user.trim() : String(item.user),
+          firstName: typeof item.firstName === 'string' ? item.firstName.trim() : undefined,
+          lastName: typeof item.lastName === 'string' ? item.lastName.trim() : undefined,
+          email: typeof item.email === 'string' ? item.email.trim() : undefined,
+          hourlyRate: typeof item.hourlyRate === 'number' && item.hourlyRate >= 0 ? item.hourlyRate : undefined
+        }))
+    } else if (typeof assignedTo === 'string' && assignedTo.trim() !== '') {
+      // Legacy support for single string
+      normalizedAssignedTo = [{ user: assignedTo.trim() }]
+    }
+
+    // Auto-sync subtask assignees: ensure anyone assigned to a subtask is also in task assignedTo
+    const subtaskAssigneeIds = new Set<string>()
+    for (const st of sanitizedSubtasks) {
+      if (st.assignedTo) {
+        subtaskAssigneeIds.add(st.assignedTo.toString())
+      }
+    }
+    for (const subAssigneeId of Array.from(subtaskAssigneeIds)) {
+      const alreadyInTask = normalizedAssignedTo.some(item => item.user === subAssigneeId)
+      if (!alreadyInTask) {
+        normalizedAssignedTo.push({ user: subAssigneeId })
+      }
+    }
+
+    const categoryInput = rawCategory.trim()
+    const category = (projectDoc.settings?.taskCategories || []).find((item: any) =>
+      item.key === categoryInput || item.title === categoryInput
+    )
+    if (!category) {
+      return NextResponse.json({ error: 'Select a valid task category for this project' }, { status: 400 })
+    }
+
     // Get the next position for this project/status combination
     // Allow any string status to support custom kanban statuses per project
     // Default to 'backlog' if no status provided
-    const taskStatus: string = typeof status === 'string' && status.trim().length > 0
+    let taskStatus: string = typeof status === 'string' && status.trim().length > 0
       ? status.trim()
       : 'backlog'
+
+    let completedAt: Date | undefined = undefined
+
+    // Completion rules:
+    // 1. Task cannot be marked done if any subtask is incomplete
+    // 2. If all subtasks are complete, auto mark task as done
+    if (taskStatus === 'done') {
+      if (hasAnyIncompleteSubtasks(sanitizedSubtasks)) {
+        return NextResponse.json(
+          { error: 'Cannot mark task as complete: all subtasks and nested subtasks must be completed first.' },
+          { status: 400 }
+        )
+      }
+      completedAt = new Date()
+    } else if (sanitizedSubtasks.length > 0 && areAllSubtasksCompleted(sanitizedSubtasks)) {
+      taskStatus = 'done'
+      completedAt = new Date()
+    }
 
     // Get the next position for this project/status combination
     const maxPosition = await Task.findOne(
@@ -588,22 +804,6 @@ export async function POST(request: NextRequest) {
     const normalizedStory = typeof story === 'string' && story.trim() !== '' ? story.trim() : undefined
     const normalizedEpic = typeof epic === 'string' && epic.trim() !== '' ? epic.trim() : undefined
     const normalizedParentTask = typeof parentTask === 'string' && parentTask.trim() !== '' ? parentTask.trim() : undefined
-    // Handle assignedTo as an array of objects with user, user details, and hourlyRate
-    let normalizedAssignedTo: Array<{ user: string; firstName?: string; lastName?: string; email?: string; hourlyRate?: number }> = []
-    if (Array.isArray(assignedTo)) {
-      normalizedAssignedTo = assignedTo
-        .filter(item => typeof item === 'object' && item !== null && item.user)
-        .map(item => ({
-          user: typeof item.user === 'string' ? item.user.trim() : String(item.user),
-          firstName: typeof item.firstName === 'string' ? item.firstName.trim() : undefined,
-          lastName: typeof item.lastName === 'string' ? item.lastName.trim() : undefined,
-          email: typeof item.email === 'string' ? item.email.trim() : undefined,
-          hourlyRate: typeof item.hourlyRate === 'number' && item.hourlyRate >= 0 ? item.hourlyRate : undefined
-        }))
-    } else if (typeof assignedTo === 'string' && assignedTo.trim() !== '') {
-      // Legacy support for single string
-      normalizedAssignedTo = [{ user: assignedTo.trim() }]
-    }
 
     // Increment counter to get next task number
     // If task save fails later, we'll decrement it back to prevent gaps
@@ -623,6 +823,7 @@ export async function POST(request: NextRequest) {
         status: taskStatus,
         priority: priority || 'medium',
         type: type || 'task',
+        category: category.key,
         organization: user.organization,
         project,
         taskNumber,
@@ -646,15 +847,22 @@ export async function POST(request: NextRequest) {
           ? estimatedHours
           : (typeof estimatedHours === 'string' && estimatedHours.trim() !== '' ? Number(estimatedHours) : undefined),
         labels: sanitizeLabels(labels),
-        subtasks: sanitizeSubtasks(subtasks),
+        subtasks: sanitizedSubtasks,
         attachments: sanitizeAttachments(attachments, userId),
         position: nextPosition,
+        completedAt,
         isBillable: typeof isBillable === 'boolean'
           ? isBillable
           : (projectDoc as any)?.isBillableByDefault ?? true
       })
 
       await task.save()
+
+      if (task.status === 'done') {
+        CompletionService.handleTaskStatusChange(task._id.toString()).catch(err => {
+          console.error('[Task POST] Error in CompletionService:', err)
+        })
+      }
     } catch (saveError) {
       // Task save failed — roll back the counter to prevent number gaps
       await Counter.findOneAndUpdate(
@@ -670,6 +878,9 @@ export async function POST(request: NextRequest) {
     // Only populate essential fields that are likely to be used immediately
     const populatePaths: any[] = [
       { path: 'project', select: '_id name' },
+      { path: 'assignedTo.user', select: '_id firstName lastName email avatar' },
+      { path: 'subtasks.assignedTo', select: '_id firstName lastName email avatar' },
+      { path: 'subtasks.story', select: '_id title' },
       { path: 'createdBy', select: 'firstName lastName email' }
     ]
 
