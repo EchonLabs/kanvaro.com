@@ -1464,6 +1464,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
       {/* R2's blocking banner: a previous /complete call died mid-saga.
           Non-dismissible — resuming (a plain re-POST) is the only way past
           it, so there is nothing for a dismiss action to safely do. */}
+      {/* Gate on runId, not the object: Mongoose's `default: null` on `lastCompletedStep` materialises a runId-less subdocument on every insert, so object truthiness is not a safe test for "a completion run is in flight". */}
       {board.completionState?.runId && (
         <PlanBanner
           tone="danger"

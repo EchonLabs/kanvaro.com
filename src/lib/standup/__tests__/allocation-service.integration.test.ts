@@ -588,6 +588,26 @@ describe('loadAllocationBoard', () => {
     expect(boardMember?.attendance).toBeUndefined()
   })
 
+  it('reports no completionState for a stand-up that never started a completion run', async () => {
+    // Mongoose's `default: null` on `lastCompletedStep` materialises
+    // `{ lastCompletedStep: null }` on insert, with no runId.
+    const raw = await Standup.collection.findOne({ _id: new mongoose.Types.ObjectId(standupId) })
+    expect(raw?.completionState).toEqual({ lastCompletedStep: null })
+
+    const board = await loadAllocationBoard(standupId)
+    expect(board.completionState).toBeNull()
+  })
+
+  it('preserves completionState when a completion run is genuinely in flight', async () => {
+    await Standup.updateOne(
+      { _id: standupId },
+      { $set: { 'completionState.runId': 'run-abc', 'completionState.lastCompletedStep': 'allocations' } }
+    )
+
+    const board = await loadAllocationBoard(standupId)
+    expect(board.completionState).toEqual({ runId: 'run-abc', lastCompletedStep: 'allocations' })
+  })
+
   it('carries durationMinutes so the run screen can drive E57’s elapsed-time indicator', async () => {
     const board = await loadAllocationBoard(standupId)
     expect(board.durationMinutes).toBe(15)

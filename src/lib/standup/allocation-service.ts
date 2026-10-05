@@ -645,6 +645,7 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
     members,
     pool,
     computedAt: new Date().toISOString(),
+    // Gate on runId, not the object: Mongoose's `default: null` on `lastCompletedStep` materialises a runId-less subdocument on every insert, so object truthiness is not a safe test for "a completion run is in flight".
     completionState: context.standup.completionState?.runId
       ? {
           runId: context.standup.completionState.runId,
