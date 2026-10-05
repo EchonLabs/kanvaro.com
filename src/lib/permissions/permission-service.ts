@@ -40,7 +40,11 @@ export class PermissionService {
     // Find all projects where user is a team member
     const projects = await Project.find({
       $or: [
-        { teamMembers: user._id },
+        // `teamMembers` is an array of subdocuments ({ memberId, hourlyRate }),
+        // so the member id lives one level down. Matching the array itself never
+        // hit, which meant a project the user is ONLY a team member of was never
+        // loaded here and they ended up with no project permissions at all.
+        { 'teamMembers.memberId': user._id },
         { createdBy: user._id },
         { client: user._id },
         { 'projectRoles.user': user._id }
@@ -231,8 +235,13 @@ export class PermissionService {
     }
 
     // Check if user is a team member
+    // `teamMembers` holds subdocuments ({ memberId, hourlyRate }), not bare
+    // ObjectIds. Comparing the subdocument itself never matched, so every team
+    // member fell through to PROJECT_VIEWER and lost their project-scoped
+    // stand-up permissions.
     const isTeamMember = project.teamMembers.some(
-      (memberId: mongoose.Types.ObjectId) => memberId.toString() === user._id.toString()
+      (entry: { memberId?: mongoose.Types.ObjectId }) =>
+        entry?.memberId?.toString() === user._id.toString()
     );
 
     if (isTeamMember) {
