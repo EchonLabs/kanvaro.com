@@ -51,7 +51,16 @@ function TestComponent() {
 
 describe('PermissionContext', () => {
   beforeEach(() => {
-    (global.fetch as jest.Mock).mockClear();
+    (global.fetch as jest.Mock).mockReset();
+    // permission-context keeps `permissionsCache`/`cacheTimestamp` as MODULE
+    // state with a 5-minute TTL, mirrored into sessionStorage. The module is
+    // evaluated once per test file, so without a reset the first test's
+    // successful fetch leaves a warm cache: PermissionProvider then seeds
+    // `permissions` from it, starts with `loading === false` (so no
+    // "Loading..." ever renders) and returns early from its mount effect
+    // (so fetch is never called). Every test here means to exercise a COLD
+    // mount, so clear the cache using the provider's own documented hook.
+    (window as any).clearPermissionCache();
   });
 
   it('should load permissions and provide them to components', async () => {
