@@ -170,13 +170,14 @@ export async function loadSprintHealthTotals(
   const sprintId = String(sprint._id)
   const endDateIso = isoOfStoredDate(sprint.endDate)
 
-  const [calendarRow, settings, tasks, capacities] = await Promise.all([
+  const [calendarRow, settings, tasks, capacities, sprintRow] = await Promise.all([
     WorkingCalendar.findOne({ project: projectId, scope: 'project' }).select('timezone').lean() as Promise<any>,
     ProjectStandupSettings.findOne({ project: projectId }).lean() as Promise<any>,
     Task.find({ sprint: sprintId }).select('status remainingEstimateMinutes').lean() as Promise<any[]>,
     MemberCapacity.find({ project: projectId, isActive: true })
       .select('member dailyCapacityMinutes effectiveFrom effectiveTo isActive')
-      .lean() as Promise<any[]>
+      .lean() as Promise<any[]>,
+    Sprint.findById(sprintId).select('teamMembers').lean() as Promise<any>
   ])
 
   const timezone = calendarRow?.timezone ?? 'UTC'
@@ -202,11 +203,23 @@ export async function loadSprintHealthTotals(
         else byMember.set(key, [record])
       }
 
-      for (const records of Array.from(byMember.values())) {
-        const current = selectCapacityAsOf<any>(records, todayIso)
-        if (current) {
-          remainingCapacityMinutes += current.dailyCapacityMinutes * remainingWorkingDays
-        }
+      // Iterate the sprint's team, not the capacity rows: a member with no
+      // MemberCapacity row in force still works a standard day. Counting only
+      // configured rows reported 0h remaining for every project that had never
+      // set them, which showed as a false "scope exceeds capacity" alarm. The
+      // standard day is the calendar's own (`fullStandardMinutes`, summed over
+      // the remaining working days), the same fallback capacity-context uses.
+      // ProjectStandupSettings carries no standard-day field of its own.
+      const standardMinutesRemaining = resolutions
+        .filter((resolution) => resolution.isWorkingDay)
+        .reduce((sum, resolution) => sum + resolution.fullStandardMinutes, 0)
+      const teamMemberIds: string[] = (sprintRow?.teamMembers ?? []).map(String)
+
+      for (const memberId of teamMemberIds) {
+        const current = selectCapacityAsOf<any>(byMember.get(memberId) ?? [], todayIso)
+        remainingCapacityMinutes += current
+          ? current.dailyCapacityMinutes * remainingWorkingDays
+          : standardMinutesRemaining
       }
     }
   }

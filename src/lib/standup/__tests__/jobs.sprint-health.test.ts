@@ -235,4 +235,57 @@ describe('runSprintHealthJob', () => {
     expect(result.created).toBe(1)
     expect(notify).toHaveBeenCalled()
   })
+
+  it('assumes a standard day for a member with no capacity row', async () => {
+    await seedStandup('2026-08-18', 2)
+    // Deliberately no seedCapacity(): a brand-new project has no MemberCapacity
+    // rows at all. 4 remaining working days at the standard day is ample for
+    // 120m of scope, so the job must stay quiet. Counting only configured
+    // rows made capacity 0 and fired a false "scope exceeds capacity" warning.
+    await seedTask(120)
+
+    const result = await runSprintHealthJob(new Date('2026-08-18T09:00:00.000Z'))
+
+    expect(result.created).toBe(0)
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('still warns on a no-row member when scope really exceeds a standard day', async () => {
+    await seedStandup('2026-08-18', 2)
+    // 4 days * 480m = 1920m standard capacity against 5000m of scope.
+    await seedTask(5000)
+
+    const result = await runSprintHealthJob(new Date('2026-08-18T09:00:00.000Z'))
+
+    expect(result.created).toBe(1)
+  })
+
+  it('does not conjure capacity once the sprint is past its end date', async () => {
+    await seedStandup('2026-08-18', 2)
+    await seedTask(120)
+
+    // 24 Aug is after the 21 Aug end date: zero working days remain, so even a
+    // standard-day fallback must yield zero capacity and warn on any scope.
+    const result = await runSprintHealthJob(new Date('2026-08-24T09:00:00.000Z'))
+
+    expect(result.created).toBe(1)
+  })
+
+  it('does not fall back for a member whose only row is not yet effective', async () => {
+    await seedStandup('2026-08-18', 2)
+    await MemberCapacity.create({
+      project,
+      member,
+      dailyCapacityMinutes: 60,
+      effectiveFrom: '2026-08-20',
+      isActive: true
+    })
+    await seedTask(1000)
+
+    // On 18 Aug the 60m row is not in force, so the standard day applies
+    // (documented choice: no row in force == no configured capacity).
+    const result = await runSprintHealthJob(new Date('2026-08-18T09:00:00.000Z'))
+
+    expect(result.created).toBe(0)
+  })
 })
