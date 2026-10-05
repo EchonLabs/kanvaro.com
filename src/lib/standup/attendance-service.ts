@@ -33,8 +33,14 @@ import { ALLOCATION_STEP_MINUTES } from './allocation'
 import { StandupError, immutableCompletedStandup, staleStandup } from './errors'
 import { minutes, sumMinutes, type Minutes } from './minutes'
 
-/** The states that remove a member's whole day and therefore detach their work. */
-const ABSENT_STATES = new Set<AttendanceStatus>(['absent_planned', 'absent_unplanned'])
+/**
+ * The states that remove a member's whole day and therefore detach their work.
+ *
+ * Exported for `backfill-service`, the one other sanctioned writer of
+ * attendance (SCH-14): a backfilled absence owes RUN-7 the same detachment a
+ * live one does, and reading this set from there keeps the two from drifting.
+ */
+export const ABSENT_STATES = new Set<AttendanceStatus>(['absent_planned', 'absent_unplanned'])
 
 const MUTABLE_STATUSES = new Set(['Scheduled', 'Ready', 'In_Progress', 'Reopened'])
 
@@ -276,7 +282,18 @@ export async function reassignDetached(
 
 /* --- internals ----------------------------------------------------------- */
 
-async function detachAllocations(
+/**
+ * RUN-7's detachment, exported for `backfill-service` (SCH-14).
+ *
+ * Reused rather than reimplemented: `detachedReason: 'owner_absent'` and
+ * `excludedFromCapacity: true` must be set together, and Phase 9's register
+ * sweep, Phase 8's "no ledger entries for somebody who was not there" (V11)
+ * and `computeCapacity`'s stranded-minutes alert all key off exactly that
+ * pair. A backfilled absence that skipped it left the member's allocations
+ * attached and still counting toward a capacity the record says they did not
+ * have, and the completion saga then froze that wrong state.
+ */
+export async function detachAllocations(
   standupId: string,
   memberId: string
 ): Promise<DetachedAllocation[]> {
@@ -391,7 +408,10 @@ function assertKnownState(value: AttendanceStatus): void {
  * and recording it as a partial would leave the allocations attached — the
  * exact silent stranding this module exists to prevent.
  */
-function assertPartialMinutes(value: Minutes | undefined, nominalMinutes: Minutes): void {
+export function assertPartialMinutes(
+  value: Minutes | undefined,
+  nominalMinutes: Minutes
+): void {
   if (value === undefined || !Number.isInteger(value)) {
     throw new StandupError(
       'VALIDATION_FAILED',
