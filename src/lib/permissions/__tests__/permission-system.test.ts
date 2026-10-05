@@ -8,6 +8,12 @@ import mongoose from 'mongoose';
 jest.mock('@/models/User');
 jest.mock('@/models/Project');
 
+function mockUserFindById(user: unknown) {
+  ;(User.findById as jest.Mock).mockReturnValue({
+    populate: jest.fn().mockResolvedValue(user)
+  })
+}
+
 describe('Permission System', () => {
   const mockUser = {
     _id: 'user123',
@@ -38,7 +44,7 @@ describe('Permission System', () => {
   describe('PermissionService', () => {
     describe('hasPermission', () => {
       it('should return true for admin users with global permissions', async () => {
-        (User.findById as jest.Mock).mockResolvedValue(mockUser);
+        mockUserFindById(mockUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const hasPermission = await PermissionService.hasPermission(
@@ -51,7 +57,7 @@ describe('Permission System', () => {
 
       it('should return false for users without required permissions', async () => {
         const teamMemberUser = { ...mockUser, role: Role.TEAM_MEMBER };
-        (User.findById as jest.Mock).mockResolvedValue(teamMemberUser);
+        mockUserFindById(teamMemberUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const hasPermission = await PermissionService.hasPermission(
@@ -63,7 +69,7 @@ describe('Permission System', () => {
       });
 
       it('should return true for project-scoped permissions when user has access', async () => {
-        (User.findById as jest.Mock).mockResolvedValue(mockUser);
+        mockUserFindById(mockUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const hasPermission = await PermissionService.hasPermission(
@@ -77,7 +83,7 @@ describe('Permission System', () => {
 
       it('should return false for project-scoped permissions when user lacks access', async () => {
         const teamMemberUser = { ...mockUser, role: Role.TEAM_MEMBER };
-        (User.findById as jest.Mock).mockResolvedValue(teamMemberUser);
+        mockUserFindById(teamMemberUser);
         (Project.find as jest.Mock).mockResolvedValue([]);
 
         const hasPermission = await PermissionService.hasPermission(
@@ -92,7 +98,7 @@ describe('Permission System', () => {
 
     describe('canAccessProject', () => {
       it('should return true for admin users', async () => {
-        (User.findById as jest.Mock).mockResolvedValue(mockUser);
+        mockUserFindById(mockUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const canAccess = await PermissionService.canAccessProject(
@@ -105,7 +111,7 @@ describe('Permission System', () => {
 
       it('should return true for project team members', async () => {
         const teamMemberUser = { ...mockUser, role: Role.TEAM_MEMBER };
-        (User.findById as jest.Mock).mockResolvedValue(teamMemberUser);
+        mockUserFindById(teamMemberUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const canAccess = await PermissionService.canAccessProject(
@@ -118,7 +124,7 @@ describe('Permission System', () => {
 
       it('should return false for users without project access', async () => {
         const teamMemberUser = { ...mockUser, role: Role.TEAM_MEMBER };
-        (User.findById as jest.Mock).mockResolvedValue(teamMemberUser);
+        mockUserFindById(teamMemberUser);
         (Project.find as jest.Mock).mockResolvedValue([]);
 
         const canAccess = await PermissionService.canAccessProject(
@@ -138,7 +144,7 @@ describe('Permission System', () => {
           { _id: 'project3' }
         ];
 
-        (User.findById as jest.Mock).mockResolvedValue(mockUser);
+        mockUserFindById(mockUser);
         (Project.find as jest.Mock).mockResolvedValue(allProjects);
 
         const accessibleProjects = await PermissionService.getAccessibleProjects('user123');
@@ -148,7 +154,7 @@ describe('Permission System', () => {
 
       it('should return only assigned projects for non-admin users', async () => {
         const teamMemberUser = { ...mockUser, role: Role.TEAM_MEMBER };
-        (User.findById as jest.Mock).mockResolvedValue(teamMemberUser);
+        mockUserFindById(teamMemberUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const accessibleProjects = await PermissionService.getAccessibleProjects('user123');
