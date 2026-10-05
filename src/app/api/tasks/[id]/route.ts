@@ -227,6 +227,11 @@ export async function GET(
     const organizationId = user.organization
     const taskId = params.id
 
+    // A path like /api/tasks/create is not a task id; answer 404, not a cast error 500.
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+
     // Check if user has permission to view all tasks
     const [hasTaskViewAll, hasProjectViewAll, canViewAssignedProjects] = await Promise.all([
       PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL),
@@ -318,6 +323,11 @@ export async function PUT(
     const userId = user.id
     const organizationId = user.organization
     const taskId = params.id
+
+    // A path like /api/tasks/create is not a task id; answer 404, not a cast error 500.
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
 
     const rawUpdate = await request.json()
     const updateData: Record<string, any> = { ...rawUpdate }
@@ -1013,6 +1023,11 @@ export async function DELETE(
     const userId = user.id
     const organizationId = user.organization
     const taskId = params.id
+
+    // A path like /api/tasks/create is not a task id; answer 404, not a cast error 500.
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
 
     const canDeleteTask = await PermissionService.hasPermission(userId, Permission.TASK_DELETE)
     if (!canDeleteTask) {
