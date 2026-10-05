@@ -310,6 +310,36 @@ describe('evaluateCompletionChecks', () => {
       expect(check(results, 'CC-6').status).toBe('fail')
     })
 
+    it('fails a present member with nothing allocated at all', () => {
+      const results = evaluateCompletionChecks({
+        shape: 'mid_sprint',
+        members: [
+          member({
+            capacity: capacity({
+              effectiveMinutes: m(480),
+              allocatedMinutes: m(0),
+              gapMinutes: m(480),
+              status: 'zero'
+            }),
+            allocations: []
+          })
+        ]
+      })
+
+      const cc1 = check(results, 'CC-1')
+      expect(cc1.status).toBe('fail')
+      expect(cc1.message).toBe('1 member is not planned to full capacity.')
+      expect(cc1.entities).toEqual([
+        {
+          memberId: KASUN,
+          name: 'Kasun',
+          effectiveMinutes: 480,
+          allocatedMinutes: 0,
+          gapMinutes: 480
+        }
+      ])
+    })
+
     it('still exempts an unavailable member with nothing allocated', () => {
       const results = evaluateCompletionChecks({
         shape: 'mid_sprint',

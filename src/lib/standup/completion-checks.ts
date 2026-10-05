@@ -325,13 +325,19 @@ function cc4(items: readonly CheckCarryForwardItem[] | undefined): CompletionChe
  * CC-1. Every present member's allocated hours equal their effective capacity
  * within tolerance.
  *
- * Only `under` counts. An unavailable member needs no action (ALO-3's table
+ * Only `under` and `zero` count. An unavailable member needs no action (ALO-3's table
  * says so in as many words), and an over-allocated one is CC-6's business —
  * reporting both would tell the PM the same thing twice in two different words
  * and offer two overrides for one decision.
  */
 function cc1(members: readonly CheckMember[]): CompletionCheckResult {
-  const offenders = members.filter((member) => member.capacity.status === 'under')
+  // `zero` is `under` taken to its limit — a present member with nothing at all
+  // planned. Excluding it let a stand-up complete with an empty board while this
+  // check reported "Everybody is planned to capacity". `unavailable` stays exempt
+  // (ALO-3: no action needed) and `over` stays CC-6's business.
+  const offenders = members.filter(
+    (member) => member.capacity.status === 'under' || member.capacity.status === 'zero'
+  )
 
   return {
     checkId: 'CC-1',
