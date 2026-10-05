@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -62,6 +62,12 @@ export default function CreateSprintPage() {
     teamMembers: [] as string[]
   })
 
+  // Set synchronously the moment the user edits the name, so the async
+  // auto-namer stops racing them. A ref, not state: generateSprintName closes
+  // over the render it was created in (when the project was picked), so a state
+  // flag read after the await would still hold that render's stale value.
+  const nameTouchedRef = useRef(false)
+
   // Remove the old global sprint count logic
 
   // Auto-generate sprint name based on selected project
@@ -72,7 +78,7 @@ export default function CreateSprintPage() {
       const response = await fetch(`/api/sprints?project=${projectId}&countOnly=true`)
       const data = await response.json()
 
-      if (data.success && typeof data.count === 'number') {
+      if (data.success && typeof data.count === 'number' && !nameTouchedRef.current) {
         const nextSprintNumber = data.count + 1
         setFormData(prev => ({
           ...prev,
@@ -81,11 +87,13 @@ export default function CreateSprintPage() {
       }
     } catch (err) {
       console.error('Failed to fetch project sprint count:', err)
-      // Fallback to generic name
-      setFormData(prev => ({
-        ...prev,
-        name: 'Sprint 1'
-      }))
+      // Fallback to generic name, unless the user has already chosen one
+      if (!nameTouchedRef.current) {
+        setFormData(prev => ({
+          ...prev,
+          name: 'Sprint 1'
+        }))
+      }
     }
   }
 
@@ -323,6 +331,7 @@ export default function CreateSprintPage() {
   }
 
   const handleChange = (field: string, value: string | string[]) => {
+    if (field === 'name') nameTouchedRef.current = true
     setFormData(prev => {
       const newData = {
         ...prev,

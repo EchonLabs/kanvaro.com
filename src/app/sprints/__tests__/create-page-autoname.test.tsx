@@ -68,3 +68,43 @@ it('still auto-names the sprint while the field is untouched, and renumbers on p
   await flush()
   await waitFor(() => expect(name).toHaveValue('Sprint 7'))
 })
+
+it('does not overwrite a name the user typed while the count fetch was in flight', async () => {
+  render(<CreateSprintPage />)
+  const name = await screen.findByPlaceholderText('Enter sprint name')
+  await waitFor(() => expect(document.querySelector('select option[value="p1"]')).not.toBeNull())
+
+  pickProject('p1')
+  await waitFor(() => expect(releaseCounts.length).toBe(1))
+  fireEvent.change(name, { target: { value: 'E2E Sprint 1' } })
+  await flush()
+
+  expect(name).toHaveValue('E2E Sprint 1')
+})
+
+it('does not overwrite a name typed before the project was chosen', async () => {
+  render(<CreateSprintPage />)
+  const name = await screen.findByPlaceholderText('Enter sprint name')
+  await waitFor(() => expect(document.querySelector('select option[value="p1"]')).not.toBeNull())
+
+  fireEvent.change(name, { target: { value: 'Hardening Sprint' } })
+  pickProject('p1')
+  await waitFor(() => expect(releaseCounts.length).toBe(1))
+  await flush()
+
+  expect(name).toHaveValue('Hardening Sprint')
+})
+
+it('does not overwrite a typed name when the count fetch fails (catch fallback)', async () => {
+  countFails = true
+  render(<CreateSprintPage />)
+  const name = await screen.findByPlaceholderText('Enter sprint name')
+  await waitFor(() => expect(document.querySelector('select option[value="p1"]')).not.toBeNull())
+
+  pickProject('p1')
+  await waitFor(() => expect(releaseCounts.length).toBe(1))
+  fireEvent.change(name, { target: { value: 'Mine' } })
+  await flush()
+
+  expect(name).toHaveValue('Mine')
+})
