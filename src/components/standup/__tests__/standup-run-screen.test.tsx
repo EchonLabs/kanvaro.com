@@ -1432,3 +1432,28 @@ describe('Panels 2 and 3 — the review row (side by side)', () => {
     ).toBeTruthy()
   })
 })
+
+describe('completion-interrupted banner', () => {
+  it('still shows the resume banner for a genuinely interrupted completion', () => {
+    renderScreen({ completionState: { runId: 'run-abc', lastCompletedStep: 'allocations' } })
+
+    expect(
+      screen.getByText(/previous attempt to complete this stand-up did not finish/i)
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Resume completion' })).toBeInTheDocument()
+  })
+
+  it('shows no resume banner for a stand-up that was never started', () => {
+    // Exactly what Mongoose materialises on insert: the subdocument exists
+    // because `lastCompletedStep` has `default: null`, but no run ever started
+    // so there is no `runId`.
+    renderScreen({ completionState: { lastCompletedStep: null } as never })
+
+    expect(
+      screen.queryByText(/previous attempt to complete this stand-up did not finish/i)
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Resume completion' })
+    ).not.toBeInTheDocument()
+  })
+})

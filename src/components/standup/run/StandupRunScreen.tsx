@@ -1464,7 +1464,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
       {/* R2's blocking banner: a previous /complete call died mid-saga.
           Non-dismissible — resuming (a plain re-POST) is the only way past
           it, so there is nothing for a dismiss action to safely do. */}
-      {board.completionState && (
+      {board.completionState?.runId && (
         <PlanBanner
           tone="danger"
           bordered

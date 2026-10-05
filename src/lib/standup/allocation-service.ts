@@ -645,7 +645,7 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
     members,
     pool,
     computedAt: new Date().toISOString(),
-    completionState: context.standup.completionState
+    completionState: context.standup.completionState?.runId
       ? {
           runId: context.standup.completionState.runId,
           lastCompletedStep: context.standup.completionState.lastCompletedStep ?? null
