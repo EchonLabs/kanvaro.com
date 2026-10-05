@@ -6,9 +6,27 @@ import { User } from '@/models/User'
 import { Organization } from '@/models/Organization'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
-import { Permission } from '@/lib/permissions/permission-definitions'
+import mongoose from 'mongoose'
+import { Permission, ProjectRole } from '@/lib/permissions/permission-definitions'
 import { notificationService } from '@/lib/notification-service'
 import { logActivity } from '@/lib/activity-logger'
+
+function buildProjectRoles(teamMembers: unknown, assignedBy: string) {
+  const seen = new Set<string>()
+  const roles: Array<{ user: mongoose.Types.ObjectId; role: ProjectRole; assignedBy: mongoose.Types.ObjectId; assignedAt: Date }> = []
+  for (const member of Array.isArray(teamMembers) ? teamMembers : []) {
+    const memberId = String(member?.memberId ?? '')
+    if (!mongoose.Types.ObjectId.isValid(memberId) || seen.has(memberId)) continue
+    seen.add(memberId)
+    roles.push({
+      user: new mongoose.Types.ObjectId(memberId),
+      role: ProjectRole.PROJECT_MEMBER,
+      assignedBy: new mongoose.Types.ObjectId(assignedBy),
+      assignedAt: new Date()
+    })
+  }
+  return roles
+}
 
 // In-memory cache for request deduplication
 const pendingRequests = new Map<string, Promise<any>>()
@@ -308,6 +326,9 @@ export async function POST(request: NextRequest) {
         createdBy: userId,
         projectNumber,
         teamMembers: teamMembers || [],
+        // Defence in depth: give every submitted member an explicit project role
+        // (membership itself resolves from teamMembers).
+        projectRoles: buildProjectRoles(teamMembers, userId),
         client: clients?.[0], // For now, only support one client
         startDate: startDate ? new Date(startDate) : new Date(),
         endDate: endDate ? new Date(endDate) : undefined,
