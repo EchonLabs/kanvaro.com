@@ -1,3 +1,11 @@
+## [1.45.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.5...v1.45.6) (2026-10-05)
+
+
+### Bug Fixes
+
+* resolve daily limit reset issue with dual timezone check ([39b459e](https://github.com/EchonLabs/kanvaro.com/commit/39b459e8cbcad663d4ec1054dd7972cc41dea5f9))
+* timezone-aware daily time limit enforcement for timer and manual logs ([d751ca4](https://github.com/EchonLabs/kanvaro.com/commit/d751ca4fecd979ca15c990d004bd6076f9e36bd5))
+
 ## [1.45.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.4...v1.45.5) (2026-10-02)
 
 
