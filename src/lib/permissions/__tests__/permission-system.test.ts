@@ -14,6 +14,15 @@ function mockUserFindById(user: unknown) {
   })
 }
 
+// getAccessibleProjects chains `.select('_id')` onto Project.find, while
+// getUserPermissions awaits it directly. Mock both shapes.
+function mockProjectFindChainable(projects: unknown[]) {
+  ;(Project.find as jest.Mock).mockReturnValue({
+    select: jest.fn().mockResolvedValue(projects),
+    then: (resolve: (v: unknown) => unknown) => Promise.resolve(projects).then(resolve)
+  })
+}
+
 describe('Permission System', () => {
   const mockUser = {
     _id: 'user123',
@@ -138,14 +147,18 @@ describe('Permission System', () => {
 
     describe('getAccessibleProjects', () => {
       it('should return all projects for admin users', async () => {
+        // Project.createdBy is `required: true` (models/Project.ts), and
+        // getUserPermissions' $or query only ever returns projects the user
+        // touches, so getUserProjectRole dereferences createdBy/teamMembers
+        // unguarded. Stubs must therefore carry them.
         const allProjects = [
-          { _id: 'project1' },
-          { _id: 'project2' },
-          { _id: 'project3' }
+          { _id: 'project1', createdBy: 'user123', teamMembers: [] },
+          { _id: 'project2', createdBy: 'user456', teamMembers: [] },
+          { _id: 'project3', createdBy: 'user456', teamMembers: [] }
         ];
 
         mockUserFindById(mockUser);
-        (Project.find as jest.Mock).mockResolvedValue(allProjects);
+        mockProjectFindChainable(allProjects);
 
         const accessibleProjects = await PermissionService.getAccessibleProjects('user123');
 
@@ -171,6 +184,11 @@ describe('Permission System', () => {
       expect(getPermissionScope(Permission.USER_DELETE)).toBe('global');
       expect(getPermissionScope(Permission.ORGANIZATION_UPDATE)).toBe('global');
       expect(getPermissionScope(Permission.PROJECT_VIEW_ALL)).toBe('global');
+      // Inviting is organisation-wide, not per project: permission-definitions
+      // lists TEAM_INVITE (and USER_INVITE) under globalPermissions with that
+      // exact rationale. GLOBAL is the stricter scope - a project-role grant
+      // cannot satisfy it (permission-service.ts, PermissionScope.GLOBAL).
+      expect(getPermissionScope(Permission.TEAM_INVITE)).toBe('global');
     });
 
     it('should correctly identify project permissions', () => {
@@ -178,7 +196,11 @@ describe('Permission System', () => {
       
       expect(getPermissionScope(Permission.PROJECT_UPDATE)).toBe('project');
       expect(getPermissionScope(Permission.TASK_CREATE)).toBe('project');
-      expect(getPermissionScope(Permission.TEAM_INVITE)).toBe('project');
+      // SETTINGS_VIEW is NOT an `own` permission. OWN scope short-circuits to
+      // `true` for every caller (permission-service.ts), which would void the
+      // fact that only Role.ADMIN and Role.HUMAN_RESOURCE are granted
+      // SETTINGS_VIEW - Role.TEAM_MEMBER deliberately is not.
+      expect(getPermissionScope(Permission.SETTINGS_VIEW)).toBe('project');
     });
 
     it('should correctly identify own permissions', () => {
@@ -186,7 +208,7 @@ describe('Permission System', () => {
       
       expect(getPermissionScope(Permission.USER_READ)).toBe('own');
       expect(getPermissionScope(Permission.TIME_TRACKING_CREATE)).toBe('own');
-      expect(getPermissionScope(Permission.SETTINGS_VIEW)).toBe('own');
+      expect(getPermissionScope(Permission.USER_UPDATE)).toBe('own');
     });
   });
 
@@ -206,7 +228,13 @@ describe('Permission System', () => {
       const { ROLE_PERMISSIONS } = require('../permission-definitions');
       const teamMemberPermissions = ROLE_PERMISSIONS[Role.TEAM_MEMBER];
 
-      expect(teamMemberPermissions).toContain(Permission.TASK_CREATE);
+      // TASK_CREATE is withheld org-wide ON PURPOSE and granted per project
+      // instead: see the [Role.TEAM_MEMBER] block comment in
+      // permission-definitions.ts - a grant in ROLE_PERMISSIONS is
+      // organisation-wide, so listing a PROJECT-scoped permission there would
+      // let every team member in the org act on every project. The capability
+      // lives on PROJECT_ROLE_PERMISSIONS[PROJECT_MEMBER] (asserted below).
+      expect(teamMemberPermissions).not.toContain(Permission.TASK_CREATE);
       expect(teamMemberPermissions).toContain(Permission.TIME_TRACKING_CREATE);
       expect(teamMemberPermissions).not.toContain(Permission.USER_DELETE);
       expect(teamMemberPermissions).not.toContain(Permission.PROJECT_DELETE);
