@@ -120,7 +120,10 @@ describe('PokerVote — one vote per voter per round', () => {
 
     expect(result.spread).toBe(8)
     expect(result.median).toBe(9)
-    expect(result.votes.filter((entry) => entry.isOutlier)).toHaveLength(2)
+    // Outlier = more than one deck position from the median. 5 and 13 sit at
+    // positions 3 and 5 of the Fibonacci deck, the median (9) at midpoint 4, so
+    // each is exactly one card away: near consensus, no outliers.
+    expect(result.votes.filter((entry) => entry.isOutlier)).toHaveLength(0)
   })
 })
 

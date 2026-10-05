@@ -78,7 +78,7 @@ export interface PokerVoteInput {
 export interface RevealedVote extends PokerVoteInput {
   /** `null` for `?` and `coffee`. */
   value: number | null
-  /** True when this vote sits at either end of a spread wider than one step. */
+  /** True when this vote sits more than one deck position from the median. */
   isOutlier: boolean
 }
 
@@ -132,12 +132,32 @@ export function revealVotes(
       : round2((values[values.length / 2 - 1] + values[values.length / 2]) / 2)
     : null
 
-  // Only mark outliers when there is a genuine disagreement to discuss.
+  // An outlier is a vote more than one deck position from the median: the same
+  // "cards apart" measure the reveal panel already speaks in. The previous rule
+  // (value === min || value === max) marked every voter in any round with only
+  // two distinct values, so 5/8/8 flagged all three.
+  //
+  // With an even number of votes the median falls between two cards, so it is
+  // measured from the midpoint of the two middle cards' positions instead.
   const hasDisagreement = !unanimous && values.length > 1
+  const deck = deckCards(deckType)
+  const positionOf = (value: number) =>
+    deck.findIndex((card) => cardValue(deckType, card) === value)
+  const middle = (offset: number) => positionOf(values[Math.floor((values.length - 1) / 2) + offset])
+  const medianPosition = values.length
+    ? values.length % 2 === 1
+      ? middle(0)
+      : (middle(0) + middle(1)) / 2
+    : -1
+  const centred = hasDisagreement && medianPosition >= 0
+
   const revealed: RevealedVote[] = withValues.map((vote) => ({
     ...vote,
     isOutlier:
-      hasDisagreement && vote.value !== null && (vote.value === min || vote.value === max)
+      centred &&
+      vote.value !== null &&
+      positionOf(vote.value) >= 0 &&
+      Math.abs(positionOf(vote.value) - medianPosition) > 1
   }))
 
   return {

@@ -89,7 +89,7 @@ describe('revealVotes — PLN-11 / PLN-12', () => {
 
   it('marks both ends of a disagreement as outliers', () => {
     const result = revealVotes('fibonacci', 'facilitator_decides', votes(
-      ['kasun', 5], ['priya', 8], ['dilani', 14]
+      ['kasun', 1], ['priya', 8], ['dilani', 21]
     ))
 
     const outliers = result.votes.filter((vote) => vote.isOutlier).map((vote) => vote.voterId)
@@ -319,5 +319,38 @@ describe('revealVotes — what the outlier rule must not disturb', () => {
     expect(result.median).toBe(8)
     expect(result.spread).toBe(3)
     expect(result.suggestedValue).toBe(8)
+  })
+})
+
+describe('revealVotes — outliers are deviations, not extremes', () => {
+  const outliersOf = (cards: string[]) =>
+    revealVotes(
+      'fibonacci',
+      'median',
+      cards.map((card, index) => ({ voterId: String.fromCharCode(97 + index), card }))
+    ).votes
+      .filter((vote) => vote.isOutlier)
+      .map((vote) => vote.voterId)
+
+  // 5 and 8 are adjacent cards: "Near consensus", so nobody is an outlier.
+  it('flags nobody when every vote is within one card of the median', () => {
+    expect(outliersOf(['5', '8', '8'])).toEqual([])
+    expect(outliersOf(['13', '13', '8'])).toEqual([])
+  })
+
+  it('marks both ends when the room is genuinely split', () => {
+    expect(outliersOf(['1', '8', '21'])).toEqual(['a', 'c'])
+  })
+
+  it('still ignores abstentions when real outliers are present', () => {
+    expect(outliersOf(['1', '8', '21', '?', 'coffee'])).toEqual(['a', 'c'])
+  })
+
+  // Even count: the median sits between two cards, so it is measured from the
+  // midpoint of their deck positions rather than skipped.
+  it('measures an even-sized room from the midpoint of its two middle cards', () => {
+    expect(outliersOf(['5', '13'])).toEqual([])
+    expect(outliersOf(['1', '21'])).toEqual(['a', 'b'])
+    expect(outliersOf(['1', '5', '5', '13'])).toEqual(['a', 'd'])
   })
 })
