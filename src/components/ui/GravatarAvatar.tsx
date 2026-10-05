@@ -54,6 +54,7 @@ interface GravatarAvatarProps {
   } | null | undefined
   size?: number
   className?: string
+  fallbackClassName?: string
   gravatarOptions?: GravatarOptions
 }
 
@@ -65,6 +66,7 @@ export function GravatarAvatar({
   user, 
   size = 40, 
   className,
+  fallbackClassName,
   gravatarOptions = {}
 }: GravatarAvatarProps) {
   const { avatarUrl, fallbackInitials } = getAvatarData(user, {
@@ -80,7 +82,7 @@ export function GravatarAvatar({
           alt={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User avatar'}
         />
       )}
-      <AvatarFallback className="text-sm font-medium">
+      <AvatarFallback className={cn("font-medium", size <= 24 ? "text-[10px]" : size <= 32 ? "text-xs" : "text-sm", fallbackClassName)}>
         {fallbackInitials}
       </AvatarFallback>
     </Avatar>
