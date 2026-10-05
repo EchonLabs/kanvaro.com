@@ -18,7 +18,7 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 
 import { assembleCompletionContext } from '@/lib/standup/completion-context'
 import { runCompletionSaga } from '@/lib/standup/completion-saga'
-import { toErrorResponse } from '@/lib/standup/errors'
+import { StandupError, toErrorResponse } from '@/lib/standup/errors'
 import {
   readJson,
   requireStandupVersion,
@@ -35,6 +35,20 @@ export const POST = withStandupIdPermission(
   { permission: Permission.STANDUP_COMPLETE },
   async (request, { userId, organizationId, projectId, standupId, standup }) => {
     try {
+      // A Missed day is closed only by Backfill. `backfill-service` reaches
+      // `runCompletionSaga` directly, so this guard belongs here and not in the
+      // saga: it refuses the live path without breaking the legitimate caller.
+      // A failed backfill can leave attendance recorded, so CC-7 passes on a
+      // Missed stand-up; completing it from here would skip the SCH-14 window
+      // and the backfill stamps.
+      if ((standup as any).status === 'Missed') {
+        throw new StandupError(
+          'STANDUP_NOT_STARTABLE',
+          'A missed stand-up cannot be completed directly. Use Backfill instead.',
+          { status: 'Missed' }
+        )
+      }
+
       const expectedVersion = requireStandupVersion(request)
       const body = await readJson<CompleteBody>(request)
 

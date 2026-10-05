@@ -1712,8 +1712,12 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         {/* A completed stand-up is immutable: the saga would answer
             STANDUP_ALREADY_COMPLETED, and "All checks passed" is a claim about
             a gate that has already closed. The header's status pill and
-            "View summary" link already say it is done. */}
-        {board.status !== 'Completed' && (
+            "View summary" link already say it is done.
+            A Missed one is closed only through Backfill: a failed backfill can
+            leave attendance recorded, so CC-7 passes and this panel would offer
+            a Complete that skips the SCH-14 window and the backfill stamps
+            (the route refuses it too). */}
+        {board.status !== 'Completed' && board.status !== 'Missed' && (
           <CompletionPanel
             className="min-w-0"
             checks={checks}
@@ -1889,7 +1893,11 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
                   // Ruling 21: a failing overridable check needs an attestation
                   // the server will actually accept before Backfill can be
                   // pressed, rather than a 422 after the fact.
-                  !backfillAcknowledgementReady
+                  !backfillAcknowledgementReady ||
+                  // An unwaivable failure (CC-3, CC-5, CC-6...) means the saga
+                  // will 422 after backfill-service has already persisted the
+                  // attendance, so do not start the attempt at all.
+                  backfillUnwaivableFailures.length > 0
                 }
                 className={planButtonClass('danger')}
               >

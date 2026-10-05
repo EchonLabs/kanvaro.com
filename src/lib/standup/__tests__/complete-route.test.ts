@@ -189,6 +189,23 @@ describe('POST /api/standups/:id/complete', () => {
     expect(await StandupSummary.countDocuments({ standup: standup._id })).toBe(1)
   })
 
+  it('refuses a Missed stand-up with STANDUP_NOT_STARTABLE and writes nothing, even when CC-7 would pass', async () => {
+    // A failed backfill leaves attendance recorded on a Missed day. The live
+    // path must not complete it: that skips the SCH-14 window and the stamps.
+    const standup = await seedCleanStandup({ status: 'Missed' })
+
+    const response = await invoke(String(standup._id), 0)
+    const payload = await response.json()
+
+    expect(response.status).toBe(409)
+    expect(payload.error.code).toBe('STANDUP_NOT_STARTABLE')
+    expect(payload.error.message).toMatch(/backfill/i)
+
+    const after = await Standup.findById(standup._id).lean()
+    expect(after!.status).toBe('Missed')
+    expect(await StandupSummary.countDocuments({ standup: standup._id })).toBe(0)
+  })
+
   it('RUN-23: a stale expectedVersion 409s with STALE_STANDUP and writes nothing', async () => {
     const standup = await seedCleanStandup()
 
