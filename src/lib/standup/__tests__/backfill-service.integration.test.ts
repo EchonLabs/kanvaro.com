@@ -211,6 +211,55 @@ describe('backfillStandup (SCH-14/E49)', () => {
     expect(reloaded!.wasBackfilled).toBe(false)
   })
 
+  // Pins: the existing backfill path must keep working once the service
+  // starts accepting an attendance payload.
+
+  it('still stamps wasBackfilled and backfilledAt for an already-passable standup', async () => {
+    await seedSprint('2026-08-25', '2026-09-10')
+    await ProjectStandupSettings.create({
+      project,
+      organization,
+      backfillWindowWorkingDays: 2
+    })
+    const standup = await seedMissedStandup('2026-09-01')
+
+    const result = await backfillStandup({
+      standupId: String(standup._id),
+      backfilledBy: String(user),
+      now: new Date('2026-09-02T10:00:00.000Z')
+    })
+
+    expect(result.standup.status).toBe('Completed')
+    expect(result.standup.wasBackfilled).toBe(true)
+    expect(result.standup.backfilledAt).toBeInstanceOf(Date)
+  })
+
+  // Review Focus 5: an attendance payload must not buy a way past the window.
+  it('still refuses a backfill outside the configured window, payload or not', async () => {
+    await seedSprint('2026-08-17', '2026-09-11')
+    await ProjectStandupSettings.create({
+      project,
+      organization,
+      backfillWindowWorkingDays: 2
+    })
+    const standup = await seedMissedStandup('2026-08-24')
+
+    await expect(
+      backfillStandup({
+        standupId: String(standup._id),
+        backfilledBy: String(user),
+        attendance: [{ memberId: String(member), state: 'present' }],
+        now: new Date('2026-09-07T10:00:00.000Z')
+      } as Parameters<typeof backfillStandup>[0])
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+
+    const reloaded = await Standup.findById(standup._id).lean()
+    expect(reloaded!.status).toBe('Missed')
+    expect(reloaded!.wasBackfilled).toBe(false)
+    expect(reloaded!.backfilledAt).toBeUndefined()
+    expect(await StandupSummary.countDocuments({ standup: standup._id })).toBe(0)
+  })
+
   it('404s on a nonexistent standup', async () => {
     await expect(
       backfillStandup({
