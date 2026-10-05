@@ -283,3 +283,87 @@ describe('Permission System', () => {
     });
   });
 });
+
+// Pinning tests for project-role resolution. `getUserProjectRole` is private,
+// so these drive it through the public `getUserPermissions` and read the
+// resolved role back out of the returned `projectRoles` map. They exist because
+// the teamMembers fix WIDENS a permission boundary: they fix in place every
+// outcome that must NOT change when team members stop falling through to
+// PROJECT_VIEWER.
+describe('Project role resolution', () => {
+  const USER = new mongoose.Types.ObjectId();
+  const OTHER = new mongoose.Types.ObjectId();
+
+  // Mirrors the real schema: `teamMembers` is an array of subdocuments
+  // ({ memberId, hourlyRate }) and `createdBy` is required.
+  const projectWith = (overrides: Record<string, unknown>) => ({
+    _id: new mongoose.Types.ObjectId(),
+    organization: 'org123',
+    createdBy: OTHER,
+    teamMembers: [] as unknown[],
+    projectRoles: [] as unknown[],
+    ...overrides
+  });
+
+  const resolve = async (project: { _id: mongoose.Types.ObjectId }) => {
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    (Project.find as jest.Mock).mockResolvedValue([project]);
+
+    const permissions = await PermissionService.getUserPermissions(USER.toString());
+    return permissions.projectRoles.get(project._id.toString());
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('still prefers an explicit projectRoles entry over any fallback', async () => {
+    const project = projectWith({
+      projectRoles: [{ user: USER, role: ProjectRole.PROJECT_MANAGER }],
+      teamMembers: [{ memberId: USER }]
+    });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_MANAGER);
+  });
+
+  it('still resolves the project creator to project manager', async () => {
+    const project = projectWith({ createdBy: USER, teamMembers: [{ memberId: USER }] });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_MANAGER);
+  });
+
+  it('still resolves the client', async () => {
+    const project = projectWith({ client: USER });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_CLIENT);
+  });
+
+  // The one assertion that proves nobody gains access they should not have.
+  it('still resolves a non-member to viewer', async () => {
+    const project = projectWith({ teamMembers: [{ memberId: OTHER }] });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_VIEWER);
+  });
+
+  it('still resolves a user with no relationship at all to viewer', async () => {
+    const project = projectWith({ client: OTHER });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_VIEWER);
+  });
+
+  it('still leaves org-level role resolution untouched', async () => {
+    const { ROLE_PERMISSIONS } = require('../permission-definitions');
+    const project = projectWith({ teamMembers: [{ memberId: USER }] });
+
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    (Project.find as jest.Mock).mockResolvedValue([project]);
+
+    const permissions = await PermissionService.getUserPermissions(USER.toString());
+
+    expect(permissions.userRole).toBe(Role.TEAM_MEMBER);
+    expect(permissions.globalPermissions).toEqual(ROLE_PERMISSIONS[Role.TEAM_MEMBER]);
+    // STANDUP_VIEW is withheld org-wide on purpose (permission-definitions.ts)
+    // so that it can be granted per project. That stays true.
+    expect(permissions.globalPermissions).not.toContain(Permission.STANDUP_VIEW);
+  });
+});
