@@ -16,6 +16,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
 
+import { ToastProvider } from '@/components/ui/Toast'
+
 import StandupRunPage from '../page'
 
 jest.mock('next/navigation', () => ({
@@ -78,6 +80,7 @@ function mockFetch() {
     if (url.endsWith('/carry-forward')) return jsonOk(null)
     if (url.endsWith('/sprint-close')) return jsonOk(null)
     if (url.endsWith('/blockers')) return jsonOk(null)
+    if (url.endsWith('/checks')) return jsonOk({ checks: [], allPassed: true })
     if (url.includes('/standup/health')) return jsonOk({ degradations: [] })
     throw new Error(`Unexpected fetch: ${url}`)
   })
@@ -99,7 +102,9 @@ describe("page.tsx's give-a-reason dialog (Important 7)", () => {
     global.fetch = mockFetch() as any
 
     render(
-      <StandupRunPage params={{ id: 'proj-1', sprintId: 'sprint-1', standupId: 's1' }} />
+      <ToastProvider>
+        <StandupRunPage params={{ id: 'proj-1', sprintId: 'sprint-1', standupId: 's1' }} />
+      </ToastProvider>
     )
 
     const trigger = await screen.findByRole('button', { name: /give a reason for kan-1/i })
