@@ -309,6 +309,53 @@ describe('evaluateCompletionChecks', () => {
       expect(check(results, 'CC-1').status).toBe('pass')
       expect(check(results, 'CC-6').status).toBe('fail')
     })
+
+    it('still exempts an unavailable member with nothing allocated', () => {
+      const results = evaluateCompletionChecks({
+        shape: 'mid_sprint',
+        members: [
+          member({
+            capacity: capacity({
+              effectiveMinutes: m(0),
+              allocatedMinutes: m(0),
+              gapMinutes: m(0),
+              status: 'unavailable'
+            }),
+            allocations: []
+          })
+        ]
+      })
+
+      expect(check(results, 'CC-1').status).toBe('pass')
+    })
+
+    it('still passes a fully allocated member', () => {
+      const results = evaluateCompletionChecks({
+        shape: 'mid_sprint',
+        members: [
+          member({
+            capacity: capacity({ allocatedMinutes: m(480), gapMinutes: m(0), status: 'full' }),
+            allocations: [allocation({ plannedMinutes: m(480), remainingEstimateMinutes: m(480) })]
+          })
+        ]
+      })
+
+      expect(check(results, 'CC-1').status).toBe('pass')
+    })
+
+    it('still leaves over-allocation to CC-6 with allocations present', () => {
+      const results = evaluateCompletionChecks({
+        shape: 'mid_sprint',
+        members: [
+          member({
+            capacity: capacity({ allocatedMinutes: m(600), gapMinutes: m(-120), status: 'over' }),
+            allocations: [allocation({ plannedMinutes: m(600), remainingEstimateMinutes: m(600) })]
+          })
+        ]
+      })
+
+      expect(check(results, 'CC-1').status).toBe('pass')
+    })
   })
 
   describe('CC-2 — every allocation references an estimated task', () => {
