@@ -39,7 +39,10 @@ import mongoose from 'mongoose'
 import { ATTENDANCE_STATES, Standup, type AttendanceState } from '@/models/Standup'
 import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 
+import { ABSENT_STATES, assertPartialMinutes, detachAllocations } from './attendance-service'
 import { addDays, isoOfStoredDate, todayInTimezone, type IsoDate } from './calendar-dates'
+import { loadCapacityContext } from './capacity-context'
+import type { Minutes } from './minutes'
 import { loadCalendarContext } from './calendar-service'
 import { resolveWorkingDaysFrom } from './working-day'
 import { assembleCompletionContext } from './completion-context'
@@ -59,6 +62,15 @@ export interface BackfillAttendanceEntry {
   state: AttendanceState
   /** Required when `state` is `partial` — stored as `attendance.partialMinutes`. */
   minutes?: number
+}
+
+/** What a backfill actually wrote, for the audit trail (SEC-3). */
+interface RecordedBackfillAttendance {
+  memberId: string
+  state: AttendanceState
+  minutes?: number
+  /** Allocations RUN-7 detached because this member was recorded absent. */
+  detachedAllocationIds: string[]
 }
 
 export interface BackfillStandupInput {
@@ -122,10 +134,9 @@ export async function backfillStandup(
   // only mutated in memory: the context's own loaders (`loadAllocationBoard`)
   // re-read the stand-up from the database, so an in-memory-only edit would
   // leave the capacity board and CC-7 reading the pre-write room.
-  if (input.attendance?.length) {
-    applyBackfillAttendance(standup, input.attendance)
-    await standup.save()
-  }
+  const recordedAttendance = input.attendance?.length
+    ? await applyBackfillAttendance(standup, input.attendance)
+    : []
 
   const ctx = await assembleCompletionContext({
     standupId: input.standupId,
@@ -155,7 +166,18 @@ export async function backfillStandup(
     entityId: input.standupId,
     projectId,
     before: { status: 'Missed', wasBackfilled: false },
-    after: { status: 'Completed', wasBackfilled: true, elapsedWorkingDays, windowDays }
+    after: {
+      status: 'Completed',
+      wasBackfilled: true,
+      elapsedWorkingDays,
+      windowDays,
+      // SEC-3. A backfill fabricates history from somebody's recollection, so
+      // the claim itself is the part of this write that most needs a trace.
+      // The sanctioned path audits every per-member attendance write as
+      // `standup_attendance_set`; this is the only record that a backfilled
+      // room was ever asserted, by whom, and what it detached.
+      attendance: recordedAttendance
+    }
   })
 
   const reloaded = await Standup.findById(input.standupId)
@@ -172,17 +194,24 @@ export async function backfillStandup(
  * untouched. Backfill fills the gaps a missed day left; it is not a back door
  * for rewriting attendance somebody already recorded.
  */
-function applyBackfillAttendance(
+async function applyBackfillAttendance(
   standup: InstanceType<typeof Standup>,
   entries: BackfillAttendanceEntry[]
-): void {
+): Promise<RecordedBackfillAttendance[]> {
   const expected = new Set(standup.expectedAttendees.map((attendee) => String(attendee)))
   const recorded = new Set(standup.attendance.map((entry) => String(entry.user)))
 
+  // The nominal day each member would otherwise have, which is what bounds a
+  // `partial` entry. Loaded without the hydrated document on purpose, so the
+  // context reads independently of the doc being mutated below.
+  const capacityContext = await loadCapacityContext(String(standup._id))
+
+  const written: RecordedBackfillAttendance[] = []
+
   for (const entry of entries) {
-    // Mirrors `attendance-service`'s own two guards. The payload arrives from
-    // a route body, and the `$push`-free `save()` below would surface a bad
-    // state as a Mongoose validation error (a 500), not a 422.
+    // Mirrors `attendance-service`'s own guards. The payload arrives from a
+    // route body, and a bad value would otherwise surface as a Mongoose
+    // validation error (a 500) rather than a 422.
     if (!ATTENDANCE_STATES.includes(entry.state)) {
       throw new StandupError('VALIDATION_FAILED', 'Unknown attendance state.', {
         state: entry.state
@@ -195,12 +224,13 @@ function applyBackfillAttendance(
         { memberId: entry.memberId }
       )
     }
-    if (entry.state === 'partial' && !(Number.isInteger(entry.minutes) && entry.minutes! > 0)) {
-      throw new StandupError(
-        'VALIDATION_FAILED',
-        'A partial day needs the whole number of minutes the member was available.',
-        { memberId: entry.memberId, minutes: entry.minutes }
-      )
+    if (entry.state === 'partial') {
+      // RUN-6's real bound — at least one allocation step, at most the
+      // member's day less one step — reused rather than restated weakly here.
+      // Passed unbranded on purpose: `assertPartialMinutes` answers a
+      // non-integer with a 422, where `minutes()` would throw `RangeError`.
+      const nominal = capacityContext.computeFor(entry.memberId, { attendance: 'present' })
+      assertPartialMinutes(entry.minutes as Minutes | undefined, nominal.adjustedMinutes)
     }
 
     if (recorded.has(entry.memberId)) continue
@@ -215,7 +245,40 @@ function applyBackfillAttendance(
       ...(entry.state === 'partial' ? { partialMinutes: entry.minutes } : {})
     })
     recorded.add(entry.memberId)
+    written.push({
+      memberId: entry.memberId,
+      state: entry.state,
+      ...(entry.state === 'partial' ? { minutes: entry.minutes } : {}),
+      detachedAllocationIds: []
+    })
   }
+
+  if (written.length === 0) return written
+
+  // `validateModifiedOnly` on purpose: the pushed subdocument still gets the
+  // schema's `enum`/`min` validators — the reason for saving rather than
+  // `updateOne`-ing — but one unrelated invalid field on a legacy stand-up
+  // does not turn a backfill into a 500.
+  await standup.save({ validateModifiedOnly: true })
+
+  // RUN-7: an absence detaches that member's work, exactly as the live path
+  // does. Without this, the allocations of somebody the record says was away
+  // stayed attached and counting toward their capacity, and the saga's
+  // `freeze-allocations` step froze that wrong state — silently, because an
+  // absent member's effective capacity is zero, so `allocationStatus` reads
+  // `unavailable`, CC-1 exempts them and CC-6 only fires on an
+  // over-allocation. Two of the backfill dialog's three options are absent
+  // states, so this is the common path, not a corner.
+  //
+  // Only rows this call wrote are acted on: a pre-existing record was left
+  // alone, so nothing about its allocations changed either.
+  for (const row of written) {
+    if (!ABSENT_STATES.has(row.state)) continue
+    const detached = await detachAllocations(String(standup._id), row.memberId)
+    row.detachedAllocationIds = detached.map((allocation) => allocation.allocationId)
+  }
+
+  return written
 }
 
 /**

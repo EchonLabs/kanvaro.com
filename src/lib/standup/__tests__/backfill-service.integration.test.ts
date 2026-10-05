@@ -250,6 +250,79 @@ describe('backfillStandup (SCH-14/E49)', () => {
     expect(await StandupSummary.countDocuments({ standup: standup._id })).toBe(1)
   })
 
+  it('detaches a backfilled absentee\u2019s allocations, same as the live path (RUN-7)', async () => {
+    // Two of the dialog's three options are absent states, so this is the
+    // common path. `setAttendance` runs `detachAllocations` for any absent
+    // state; a backfilled absence that skipped it left the member's work
+    // attached and counting toward a capacity the record says they did not
+    // have, and the saga's freeze step then froze that.
+    await seedSprint('2026-08-25', '2026-09-10')
+    const standup = await seedUnrecordedMissedStandup('2026-09-01')
+
+    const { Task } = await import('@/models/Task')
+    const task = await Task.create({
+      title: 'Absentee task',
+      organization,
+      project,
+      sprint: sprintId,
+      createdBy: user,
+      taskNumber: 9102,
+      displayId: 'KAN-9102',
+      status: 'in_progress',
+      remainingEstimateMinutes: 60,
+      originalEstimateMinutes: 60,
+      assignedTo: [{ user: member }]
+    })
+    const allocation = await Allocation.create({
+      standup: standup._id,
+      sprint: sprintId,
+      project,
+      organization,
+      member,
+      task: task._id,
+      plannedMinutes: 60,
+      source: 'assigned_in_standup',
+      excludedFromCapacity: false,
+      createdBy: user
+    })
+
+    await backfillStandup({
+      standupId: String(standup._id),
+      backfilledBy: String(user),
+      attendance: [{ memberId: String(member), state: 'absent_planned' }],
+      now: new Date('2026-09-02T10:00:00.000Z')
+    })
+
+    const reloaded = await Allocation.findById(allocation._id).lean()
+    expect(reloaded!.detachedReason).toBe('owner_absent')
+    expect(reloaded!.excludedFromCapacity).toBe(true)
+    // The saga still ran, and froze the corrected state rather than the wrong one.
+    expect(reloaded!.frozenAt).toBeTruthy()
+  })
+
+  it('records the attendance it wrote in the backfill audit entry (SEC-3)', async () => {
+    await seedSprint('2026-08-25', '2026-09-10')
+    const standup = await seedUnrecordedMissedStandup('2026-09-01')
+
+    await backfillStandup({
+      standupId: String(standup._id),
+      backfilledBy: String(user),
+      attendance: [{ memberId: String(member), state: 'absent_planned' }],
+      now: new Date('2026-09-02T10:00:00.000Z')
+    })
+
+    const { ActivityLog } = await import('@/models/ActivityLog')
+    const entry = (await ActivityLog.findOne({
+      action: 'standup_backfilled',
+      entityId: String(standup._id)
+    }).lean()) as any
+
+    expect(entry).toBeTruthy()
+    expect(entry.details.after.attendance).toEqual([
+      expect.objectContaining({ memberId: String(member), state: 'absent_planned' })
+    ])
+  })
+
   it('refuses an attendance payload naming somebody who was not expected', async () => {
     await seedSprint('2026-08-25', '2026-09-10')
     const standup = await seedUnrecordedMissedStandup('2026-09-01')
