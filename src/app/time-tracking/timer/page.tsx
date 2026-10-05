@@ -29,6 +29,7 @@ import {
 import { useToast } from '@/components/ui/Toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn, focusSearchInput } from '@/lib/utils'
+import { detectClientTimezone } from '@/lib/timezone'
 
 interface Project {
   _id: string
@@ -147,7 +148,7 @@ export default function TimerPage() {
 
   const filteredProjects = projects.filter((project) =>
     project.name.toLowerCase().includes(projectSearch.toLowerCase())
-  ).sort((a, b) => a.name.localeCompare(b.name))
+  ).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
 
   const showInitialTasksLoading = tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)
 
@@ -558,7 +559,8 @@ export default function TimerPage() {
     try {
       const params = new URLSearchParams({
         userId: effectiveUser.id,
-        organizationId: effectiveUser.organization
+        organizationId: effectiveUser.organization,
+        timezone: detectClientTimezone()
       })
       const response = await fetch(`/api/time-tracking/timer?${params.toString()}`)
       const data = await response.json()

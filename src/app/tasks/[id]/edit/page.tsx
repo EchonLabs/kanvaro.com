@@ -650,17 +650,23 @@ export default function EditTaskPage() {
 
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
-    if (!query) return projects
-    return projects.filter((project) => project.name.toLowerCase().includes(query))
+    const list = !query ? projects : projects.filter((project) => project.name.toLowerCase().includes(query))
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectFilterQuery])
 
   const filteredAssignedToOptions = useMemo(() => {
     const query = assignedToFilterQuery.trim().toLowerCase()
-    if (!query) return users
-    return users.filter((user) =>
-      `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(query) ||
-      (user.email && user.email.toLowerCase().includes(query))
-    )
+    const list = !query
+      ? users
+      : users.filter((user) =>
+          `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(query) ||
+          (user.email && user.email.toLowerCase().includes(query))
+        )
+    return [...list].sort((a, b) => {
+      const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+      const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+    })
   }, [users, assignedToFilterQuery])
 
   const handleAssigneeAdded = useCallback((userId: string) => {
@@ -1257,6 +1263,7 @@ export default function EditTaskPage() {
                               const filtered = stories.filter(s =>
                                 !q || s.title.toLowerCase().includes(q)
                               )
+                              .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
 
                               if (filtered.length === 0) {
                                 return (
@@ -1329,6 +1336,7 @@ export default function EditTaskPage() {
                               const filtered = availableEpics.filter(e =>
                                 !q || e.title.toLowerCase().includes(q)
                               )
+                              .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
 
                               if (filtered.length === 0) {
                                 return (

@@ -14,6 +14,7 @@ import { Timer } from '@/components/time-tracking/Timer'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { applyRoundingRules } from '@/lib/utils'
+import { detectClientTimezone } from '@/lib/timezone'
 
 interface TimeTrackingWidgetProps {
   userId: string
@@ -111,7 +112,8 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
 
   const loadActiveTimer = useCallback(async () => {
     try {
-      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}`)
+      const tz = detectClientTimezone()
+      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}&timezone=${encodeURIComponent(tz)}`)
       const data = await response.json()
 
       if (response.ok) {

@@ -16,6 +16,7 @@ import {
   DialogTitle
 } from '@/components/ui/Dialog'
 import { useNotify } from '@/lib/notify'
+import { detectClientTimezone } from '@/lib/timezone'
 
 type EntityRef = {
   id: string
@@ -77,7 +78,8 @@ export function StartTimerModal({
           organizationId,
           projectId: project.id,
           taskId: task.id,
-          description: memo
+          description: memo,
+          timezone: detectClientTimezone()
         })
       })
 

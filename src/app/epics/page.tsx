@@ -385,10 +385,10 @@ export default function EpicsPage() {
   // Added filtered project options based on projectFilterQuery
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase();
-    if (!query) return projects;
-    return projects.filter((project) =>
-      project.name.toLowerCase().includes(query),
-    );
+    const list = query
+      ? projects.filter((project) => project.name?.toLowerCase().includes(query))
+      : projects;
+    return list.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }));
   }, [projects, projectFilterQuery]);
 
   const locallyFilteredEpics = useMemo(() => {

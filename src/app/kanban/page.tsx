@@ -454,12 +454,19 @@ export default function KanbanPage() {
     if (projectFilter === 'all' && projects.length > 0) {
       const statusSet = new Set<string>()
       const statusMap = new Map<string, { title: string }>()
+      
+      // Always include default columns
+      defaultColumns.forEach(col => {
+        statusSet.add(col.id)
+        statusMap.set(col.id, { title: col.title })
+      })
+      
       projects.forEach(project => {
         project.settings?.kanbanStatuses?.forEach(col => {
           if (!statusSet.has(col.key)) { statusSet.add(col.key); statusMap.set(col.key, { title: col.title }) }
         })
       })
-      if (statusMap.size > 0) return Array.from(statusMap.entries()).map(([key, val]) => ({ id: key, title: val.title }))
+      return Array.from(statusMap.entries()).map(([key, val]) => ({ id: key, title: val.title }))
     }
     return defaultColumns
   }, [selectedProject, projectFilter, projects])
@@ -574,8 +581,8 @@ export default function KanbanPage() {
 
   const filteredProjectOptions = useMemo(() => {
     const q = projectFilterQuery.trim().toLowerCase()
-    if (!q) return projects.slice().sort((a, b) => a.name.localeCompare(b.name))
-    return projects.filter(p => p.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name))
+    if (!q) return projects.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
+    return projects.filter(p => p.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectFilterQuery])
 
   const priorityOptions = [

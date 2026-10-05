@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/Toast'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { detectClientTimezone } from '@/lib/timezone'
 import { useOrganization } from '@/hooks/useOrganization'
 import { Role } from '@/lib/permissions/permission-definitions'
 import { getOrgLocalDateString, getOrgLocalTimeString, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
@@ -170,25 +171,27 @@ export function ManualTimeLogModal({
 
   // Filtered lists based on search
   const filteredEmployees = useMemo(() => {
-    if (!employeeSearch.trim()) return employees
-    const searchLower = employeeSearch.toLowerCase()
-    return employees.filter(emp => {
-      const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
-      const email = emp.email?.toLowerCase() || ''
-      const memberId = emp.memberId?.toLowerCase() || ''
-      return fullName.includes(searchLower) || email.includes(searchLower) || memberId.includes(searchLower)
-    })
+    const searchLower = employeeSearch.toLowerCase().trim()
+    const list = searchLower
+      ? employees.filter(emp => {
+          const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
+          const email = emp.email?.toLowerCase() || ''
+          const memberId = emp.memberId?.toLowerCase() || ''
+          return fullName.includes(searchLower) || email.includes(searchLower) || memberId.includes(searchLower)
+        })
+      : employees
+    return list.slice().sort((a, b) => `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`))
   }, [employees, employeeSearch])
 
   const filteredProjects = useMemo(() => {
-    if (!projectSearch.trim()) return projects
+    if (!projectSearch.trim()) return [...projects].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
     const searchLower = projectSearch.toLowerCase()
-    return projects.filter(p => p.name?.toLowerCase().includes(searchLower))
+    return projects.filter(p => p.name?.toLowerCase().includes(searchLower)).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectSearch])
 
   const filteredTasks = useMemo(() => {
     // We now fetch tasks from the server based on search, so we display the server results directly
-    return tasks
+    return tasks.slice().sort((a, b) => (a.title || '').localeCompare(b.title || ''))
   }, [tasks])
 
   const selectedTask = useMemo(() =>
@@ -531,7 +534,8 @@ export function ManualTimeLogModal({
           // re-deriving a date from the converted instant (which can land on the wrong day if
           // the browser's timezone differs from the organization's configured timezone).
           startDateOnly: formData.startDate,
-          isBillable: true
+          isBillable: true,
+          timezone: detectClientTimezone()
         })
       })
 
