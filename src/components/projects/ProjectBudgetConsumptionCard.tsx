@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 
 interface ProjectBudgetConsumptionCardProps {
   totalBudget: number
@@ -18,37 +19,31 @@ export function ProjectBudgetConsumptionCard({
   const availablePercent = totalBudget > 0 ? Math.max(0, 100 - utilizationPercent) : 0
 
   return (
-    <div className="rounded-xl border border-border/80 bg-card p-6 shadow-sm">
-      <div className="space-y-5">
-        {/* Header */}
-        <div>
-          <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">
-            Project Budget Consumption
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Real-time based on logged hours
-          </p>
-        </div>
-
+    <Card>
+      <CardHeader>
+        <CardTitle>Project Budget Consumption</CardTitle>
+        <CardDescription>Real-time based on logged hours</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
         {/* Stats 3 columns */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-1">
           <div>
-            <p className="text-xs font-medium text-muted-foreground">Total Budget</p>
-            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mt-1">
+            <p className="text-sm font-medium text-muted-foreground">Total Budget</p>
+            <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground mt-1">
               {formatCurrency(totalBudget)}
             </p>
           </div>
 
           <div>
-            <p className="text-xs font-medium text-muted-foreground">Actual Spend</p>
-            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-amber-500 dark:text-amber-400 mt-1">
+            <p className="text-sm font-medium text-muted-foreground">Actual Spend</p>
+            <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-amber-500 dark:text-amber-400 mt-1">
               {formatCurrency(actualSpend)}
             </p>
           </div>
 
           <div>
-            <p className="text-xs font-medium text-muted-foreground">Remaining</p>
-            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 mt-1">
+            <p className="text-sm font-medium text-muted-foreground">Remaining</p>
+            <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-400 mt-1">
               {formatCurrency(remaining)}
             </p>
           </div>
@@ -81,10 +76,10 @@ export function ProjectBudgetConsumptionCard({
         </div>
 
         {/* Formula calculation note */}
-        <div className="text-xs sm:text-sm text-muted-foreground pt-4 border-t border-border/60">
+        <div className="text-xs sm:text-sm text-muted-foreground pt-4 border-t border-[var(--apple-separator)]">
           {formatCurrency(totalBudget)} - {formatCurrency(actualSpend)} Actual Spend = {formatCurrency(remaining)} Remaining
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
