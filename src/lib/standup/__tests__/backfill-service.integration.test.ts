@@ -531,6 +531,111 @@ describe('backfillStandup (SCH-14/E49)', () => {
     expect(await StandupOverride.countDocuments({ standup: standup._id })).toBe(0)
   })
 
+  /**
+   * Ruling 21, the defect itself. CC-1 can never pass on a missed day — you
+   * cannot plan work retroactively — so the live path's own answer is reused:
+   * the facilitator acknowledges the failing overridable check with a
+   * justification, the service issues a real `under_allocation` override, and
+   * the saga's existing `filterOverriddenFailures` lifts the block. The
+   * overridden check stays a recorded fact rather than a silent exemption.
+   */
+  const ACKNOWLEDGEMENT = 'Nobody planned the day because the stand-up was missed entirely.'
+
+  it('completes a missed day whose CC-1 failure the facilitator acknowledged', async () => {
+    await seedSprint('2026-08-25', '2026-09-10')
+    await ProjectStandupSettings.create({
+      project,
+      organization,
+      backfillWindowWorkingDays: 2
+    })
+    const standup = await seedUnrecordedMissedStandup('2026-09-01')
+
+    const result = await backfillStandup({
+      standupId: String(standup._id),
+      backfilledBy: String(user),
+      attendance: [{ memberId: String(member), state: 'present' }],
+      acknowledgedChecks: [{ checkId: 'CC-1', justification: ACKNOWLEDGEMENT }],
+      now: new Date('2026-09-02T10:00:00.000Z')
+    })
+
+    expect(result.standup.status).toBe('Completed')
+    expect(result.standup.wasBackfilled).toBe(true)
+    expect(await StandupSummary.countDocuments({ standup: standup._id })).toBe(1)
+
+    const { StandupOverride } = await import('@/models/StandupOverride')
+    const overrides = await StandupOverride.find({ standup: standup._id }).lean()
+    expect(overrides).toEqual([
+      expect.objectContaining({
+        type: 'under_allocation',
+        justification: ACKNOWLEDGEMENT,
+        issuedBy: user
+      })
+    ])
+    // The override names the members CC-1 actually flagged, not everybody.
+    expect(overrides[0].affectedMemberIds.map(String)).toEqual([String(member)])
+    expect(overrides[0].gapMinutes).toBeGreaterThan(0)
+  })
+
+  it('refuses an acknowledgement whose justification is too thin (OVR-5)', async () => {
+    await seedSprint('2026-08-25', '2026-09-10')
+    const standup = await seedUnrecordedMissedStandup('2026-09-01')
+
+    await expect(
+      backfillStandup({
+        standupId: String(standup._id),
+        backfilledBy: String(user),
+        attendance: [{ memberId: String(member), state: 'present' }],
+        acknowledgedChecks: [{ checkId: 'CC-1', justification: 'n/a' }],
+        now: new Date('2026-09-02T10:00:00.000Z')
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_JUSTIFICATION' })
+
+    const reloaded = await Standup.findById(standup._id).lean()
+    expect(reloaded!.status).toBe('Missed')
+    const { StandupOverride } = await import('@/models/StandupOverride')
+    expect(await StandupOverride.countDocuments({ standup: standup._id })).toBe(0)
+  })
+
+  it('refuses to acknowledge a check that can never be overridden (OVR-2)', async () => {
+    // CC-7 is hard and NOT overridable. Accepting an acknowledgement for it
+    // would be the silent exemption this whole design exists to avoid, so the
+    // service refuses the payload outright rather than ignoring the field.
+    await seedSprint('2026-08-25', '2026-09-10')
+    const standup = await seedUnrecordedMissedStandup('2026-09-01')
+
+    await expect(
+      backfillStandup({
+        standupId: String(standup._id),
+        backfilledBy: String(user),
+        attendance: [{ memberId: String(member), state: 'present' }],
+        acknowledgedChecks: [{ checkId: 'CC-7', justification: ACKNOWLEDGEMENT }],
+        now: new Date('2026-09-02T10:00:00.000Z')
+      })
+    ).rejects.toMatchObject({ code: 'OVERRIDE_NOT_PERMITTED' })
+
+    const reloaded = await Standup.findById(standup._id).lean()
+    expect(reloaded!.status).toBe('Missed')
+  })
+
+  it('issues no override when the acknowledged check is not actually failing', async () => {
+    // The already-passable fixture: CC-1 exempts its `absent_planned` member,
+    // so there is nothing to override and nothing should be recorded, even
+    // though the payload offers an acknowledgement.
+    await seedSprint('2026-08-25', '2026-09-10')
+    const standup = await seedMissedStandup('2026-09-01')
+
+    const result = await backfillStandup({
+      standupId: String(standup._id),
+      backfilledBy: String(user),
+      acknowledgedChecks: [{ checkId: 'CC-1', justification: ACKNOWLEDGEMENT }],
+      now: new Date('2026-09-02T10:00:00.000Z')
+    })
+
+    expect(result.standup.status).toBe('Completed')
+    const { StandupOverride } = await import('@/models/StandupOverride')
+    expect(await StandupOverride.countDocuments({ standup: standup._id })).toBe(0)
+  })
+
   it('404s on a nonexistent standup', async () => {
     await expect(
       backfillStandup({

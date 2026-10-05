@@ -18,7 +18,8 @@ import { NextResponse } from 'next/server'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import {
   backfillStandup,
-  type BackfillAttendanceEntry
+  type BackfillAttendanceEntry,
+  type BackfillCheckAcknowledgement
 } from '@/lib/standup/backfill-service'
 import { toErrorResponse } from '@/lib/standup/errors'
 import { ok, readJson, withStandupIdPermission } from '@/lib/standup/route-helpers'
@@ -35,6 +36,16 @@ export const dynamic = 'force-dynamic'
 interface BackfillBody {
   notes?: string
   attendance?: BackfillAttendanceEntry[]
+  /**
+   * Ruling 21. A missed day had nothing allocated, so the hard-but-overridable
+   * CC-1 fails for every member recorded as present and can never pass
+   * retroactively. Rather than exempting backfill from the check, the
+   * facilitator attests to it here and the service issues a real override —
+   * see `backfill-service.ts`. Validated there, not here: an acknowledgement
+   * of a non-overridable check is refused and the justification goes through
+   * OVR-5's rule.
+   */
+  acknowledgedChecks?: BackfillCheckAcknowledgement[]
 }
 
 export const POST = withStandupIdPermission(
@@ -47,7 +58,8 @@ export const POST = withStandupIdPermission(
         standupId,
         backfilledBy: userId,
         notes: body.notes,
-        attendance: body.attendance
+        attendance: body.attendance,
+        acknowledgedChecks: body.acknowledgedChecks
       })
 
       return ok({

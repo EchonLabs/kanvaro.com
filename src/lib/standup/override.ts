@@ -96,8 +96,17 @@ export interface IssuedOverrideForReconciliation {
   affectedTaskIds: readonly string[]
 }
 
-/** checkId -> override type, derived from `OVERRIDE_TABLE`, for the four overridable hard checks this reconciles. */
-const CHECK_TO_OVERRIDE_TYPE: Partial<Record<CheckId, AnyOverrideType>> = (() => {
+/**
+ * checkId -> override type, derived from `OVERRIDE_TABLE`, for the four
+ * overridable hard checks this reconciles.
+ *
+ * Exported because `backfill-service` needs the same derivation to turn a
+ * facilitator's acknowledgement of a failing check into the right override
+ * type (Ruling 21). Deriving it twice would let the two drift; a non-
+ * overridable check is deliberately absent, which is what makes "there is no
+ * override type for this check" the single answer to "may it be waved".
+ */
+export const CHECK_TO_OVERRIDE_TYPE: Partial<Record<CheckId, AnyOverrideType>> = (() => {
   const map: Partial<Record<CheckId, AnyOverrideType>> = {}
   for (const [type, entry] of Object.entries(OVERRIDE_TABLE) as [AnyOverrideType, { checkId: string | null; overridable: boolean }][]) {
     if (entry.overridable && entry.checkId) map[entry.checkId as CheckId] = type

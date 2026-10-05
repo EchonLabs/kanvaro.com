@@ -46,9 +46,12 @@ import type { Minutes } from './minutes'
 import { loadCalendarContext } from './calendar-service'
 import { resolveWorkingDaysFrom } from './working-day'
 import { assembleCompletionContext } from './completion-context'
-import { runCompletionSaga } from './completion-saga'
+import { blockingFailures, evaluateCompletionChecks, type CheckId } from './completion-checks'
+import { runCompletionSaga, type CompletionContext } from './completion-saga'
+import { CHECK_TO_OVERRIDE_TYPE, type AnyOverrideType } from './override'
+import { issueOverride } from './override-service'
 import { recordAudit } from './audit'
-import { StandupError } from './errors'
+import { overrideNotPermitted, StandupError } from './errors'
 
 /** Mirrors `ProjectStandupSettings`'s own schema default for this field. */
 const DEFAULT_BACKFILL_WINDOW_WORKING_DAYS = 2
@@ -91,12 +94,23 @@ interface BackfillAttendanceOutcome {
   detachedForAlreadyRecorded: DetachedForAlreadyRecorded[]
 }
 
+/**
+ * Ruling 21: the facilitator's attestation for an overridable check that a
+ * past day cannot pass. One justification per failing check id.
+ */
+export interface BackfillCheckAcknowledgement {
+  checkId: string
+  justification: string
+}
+
 export interface BackfillStandupInput {
   standupId: string
   backfilledBy: string
   notes?: string
   /** SCH-14's run payload. Fills gaps in `attendance`; never rewrites a record. */
   attendance?: BackfillAttendanceEntry[]
+  /** Ruling 21: the facilitator's attestation for checks a past day cannot pass. */
+  acknowledgedChecks?: BackfillCheckAcknowledgement[]
   now?: Date
 }
 
@@ -156,15 +170,49 @@ export async function backfillStandup(
     ? await applyBackfillAttendance(standup, input.attendance)
     : { recorded: [], detachedForAlreadyRecorded: [] }
 
-  const ctx = await assembleCompletionContext({
-    standupId: input.standupId,
-    standup,
+  const assemble = () =>
+    assembleCompletionContext({
+      standupId: input.standupId,
+      standup,
+      projectId,
+      organizationId,
+      completedBy: input.backfilledBy,
+      notes: input.notes,
+      expectedVersion: standup.version
+    })
+
+  let ctx = await assemble()
+
+  // Ruling 21. Some hard checks can never pass on a past day — CC-1 above all,
+  // because a missed day by definition had nothing allocated and work cannot
+  // be planned retroactively. Backfill is NOT exempted from those checks (that
+  // would re-open the gate bypass Task 8 closed: a stand-up completing with
+  // nobody allocated and every check green). Instead it reuses the live
+  // completion path's own answer — the facilitator issues a real override for
+  // the failing *overridable* check, and the saga's `filterOverriddenFailures`
+  // lifts the block. One check engine, and an overridden check stays a
+  // recorded, audited fact rather than a silent exemption.
+  //
+  // Strictly opt-in: a failing overridable check the payload does not
+  // acknowledge still blocks, and nothing is ever issued on the facilitator's
+  // behalf. See `issueAcknowledgedOverrides`.
+  const issuedOverrideIds = await issueAcknowledgedOverrides({
+    ctx,
+    acknowledgements: input.acknowledgedChecks,
+    sprintId: String(standup.sprint),
     projectId,
     organizationId,
-    completedBy: input.backfilledBy,
-    notes: input.notes,
-    expectedVersion: standup.version
+    issuedBy: input.backfilledBy
   })
+
+  if (issuedOverrideIds.length > 0) {
+    // Re-assembled rather than patched: the context reads the issued overrides
+    // out of the database (`StandupOverride.find`) into two separate fields —
+    // the saga's `overridesIssued` *and* the summary's own override list — so
+    // rebuilding is the only way both see what was just written. Paid for only
+    // on the override path.
+    ctx = await assemble()
+  }
 
   const result = await runCompletionSaga(ctx)
 
@@ -199,7 +247,12 @@ export async function backfillStandup(
       // an ordinary backfill's entry keeps its existing shape.
       ...(attendanceOutcome.detachedForAlreadyRecorded.length
         ? { detachedForAlreadyRecorded: attendanceOutcome.detachedForAlreadyRecorded }
-        : {})
+        : {}),
+      // Ruling 21: which overrides this backfill had to issue to get past a
+      // check the day could not pass. Each one is separately audited by
+      // `issueOverride` as `override_issued`; this ties them to the backfill
+      // that caused them, so the trail reads as one decision.
+      ...(issuedOverrideIds.length ? { acknowledgedOverrideIds: issuedOverrideIds } : {})
     }
   })
 
@@ -207,6 +260,124 @@ export async function backfillStandup(
   if (!reloaded) throw new StandupError('NOT_FOUND', 'Stand-up not found.')
 
   return { standup: reloaded, summaryId: result.summaryId }
+}
+
+/**
+ * Ruling 21's override step.
+ *
+ * Evaluates the completion checks against the context the saga is about to
+ * re-evaluate, and for each hard failure that is **both overridable and
+ * acknowledged by the payload** issues one real `StandupOverride` through
+ * `issueOverride` — the same function the live `POST /overrides` route calls,
+ * so OVR-2's table, OVR-5's justification rule and SEC-3's audit all apply
+ * unchanged.
+ *
+ * Three refusals, all deliberate:
+ *
+ * - a failing overridable check that is **not** acknowledged is left alone, so
+ *   it still blocks. Nothing is issued on the facilitator's behalf.
+ * - acknowledging a check that has no override type — every non-overridable
+ *   check, CC-7 included — is refused outright rather than ignored. Ignoring
+ *   it would let a client believe it had waved a gate it cannot wave.
+ * - a check that is not actually failing issues nothing, so an over-eager
+ *   payload cannot manufacture an override record for a clean board.
+ *
+ * Returns the ids it issued, for the backfill audit entry.
+ */
+/**
+ * OVR-6 requires the affected member's **own** acknowledgement tick before an
+ * `over_allocation` override may be issued. A backfill reconstructs a day from
+ * one facilitator's recollection and has no way to obtain that tick, so CC-6
+ * is not acknowledgeable here — an over-allocated missed day has to be fixed
+ * by correcting the allocations, not attested away by somebody else. Every
+ * other overridable check needs nothing a backfill cannot supply.
+ */
+function isAcknowledgeableByBackfill(type: AnyOverrideType): boolean {
+  return type !== 'over_allocation'
+}
+
+async function issueAcknowledgedOverrides(args: {
+  ctx: CompletionContext
+  acknowledgements: BackfillCheckAcknowledgement[] | undefined
+  sprintId: string
+  projectId: string
+  organizationId: string
+  issuedBy: string
+}): Promise<string[]> {
+  const { ctx, acknowledgements, sprintId, projectId, organizationId, issuedBy } = args
+  if (!acknowledgements?.length) return []
+
+  const justificationByCheckId = new Map<string, string>()
+  for (const entry of acknowledgements) {
+    // OVR-2: "the button must simply not exist" — the server's half of that
+    // rule. `CHECK_TO_OVERRIDE_TYPE` only holds the overridable checks, so a
+    // missing entry is exactly "this check may never be waved".
+    const overrideType = CHECK_TO_OVERRIDE_TYPE[entry.checkId as CheckId]
+    if (!overrideType || !isAcknowledgeableByBackfill(overrideType)) {
+      throw overrideNotPermitted(entry.checkId)
+    }
+    justificationByCheckId.set(entry.checkId, entry.justification)
+  }
+
+  const failures = blockingFailures(evaluateCompletionChecks(ctx.checkInput))
+  const issuedIds: string[] = []
+
+  for (const failure of failures) {
+    if (!failure.overridable) continue
+
+    const justification = justificationByCheckId.get(failure.checkId)
+    if (justification === undefined) continue // not acknowledged — still blocks
+
+    const overrideType = CHECK_TO_OVERRIDE_TYPE[failure.checkId]
+    if (!overrideType) continue
+
+    // Scoped to the entities the check actually named, so the override cannot
+    // cover a member or task this failure did not flag — the same per-entity
+    // granularity `filterOverriddenFailures` matches on. Both id kinds are
+    // read because the entity shape differs per check (member-scoped CC-1/CC-6
+    // vs. task-scoped CC-3/CC-10).
+    const affectedMemberIds = uniqueStrings(failure.entities.map((entity) => entity.memberId))
+    const affectedTaskIds = uniqueStrings(failure.entities.map((entity) => entity.taskId))
+    const gapMinutes = failure.entities.reduce(
+      (total, entity) => total + (typeof entity.gapMinutes === 'number' ? entity.gapMinutes : 0),
+      0
+    )
+
+    const override = await issueOverride({
+      standupId: ctx.standupId,
+      sprintId,
+      projectId,
+      organizationId,
+      type: overrideType,
+      affectedMemberIds,
+      affectedTaskIds,
+      // The one honest code for "the day was never run": the detail lives in
+      // the facilitator's justification, which OVR-5 already forces to be
+      // substantive. `other` is a member of both OVR-3/OVR-4 reason-code lists.
+      reasonCode: 'other',
+      justification,
+      gapMinutes,
+      // `memberAcknowledged` is deliberately not passed: it is OVR-6's tick,
+      // and `isAcknowledgeableByBackfill` already refused the one type that
+      // needs it rather than letting a backfill fabricate somebody's consent.
+      issuedBy,
+      // N7's recipients are looked up and notified from the completion saga,
+      // exactly as `POST /api/standups/:id/overrides` leaves them.
+      adminRecipientIds: []
+    })
+
+    issuedIds.push(String(override._id))
+  }
+
+  return issuedIds
+}
+
+function uniqueStrings(values: readonly unknown[]): string[] {
+  const seen: string[] = []
+  for (const value of values) {
+    if (typeof value === 'string' && !seen.includes(value)) seen.push(value)
+  }
+  return seen
 }
 
 /**

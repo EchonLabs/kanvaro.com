@@ -132,6 +132,37 @@ describe('POST /api/standups/:id/backfill — body contract (SCH-14)', () => {
     expect(passed.attendance ?? []).toEqual([])
   })
 
+  /**
+   * Ruling 21's half of the same seam. The acknowledgement is the only thing
+   * that lets a missed day past CC-1, so a route that silently dropped it
+   * would reproduce the Task 10 defect one field along: the dialog would
+   * collect an attestation, the facilitator would see a 422 anyway, and both
+   * `tsc` and the service's own tests would stay green.
+   */
+  it('passes the facilitator acknowledgement through to the service', async () => {
+    const acknowledgedChecks = [
+      { checkId: 'CC-1', justification: 'The day was missed outright, so nobody planned anything.' }
+    ]
+
+    const response = await post({
+      attendance: [{ memberId: member.toString(), state: 'present' }],
+      acknowledgedChecks
+    })
+
+    expect(response.status).toBe(200)
+    expect(backfillStandup).toHaveBeenCalledWith(
+      expect.objectContaining({ acknowledgedChecks })
+    )
+  })
+
+  it('invents no acknowledgement when the caller sends none', async () => {
+    const response = await post({ notes: 'Nothing to attest to.' })
+
+    expect(response.status).toBe(200)
+    const [[passed]] = backfillStandup.mock.calls as [[{ acknowledgedChecks?: unknown[] }]]
+    expect(passed.acknowledgedChecks).toBeUndefined()
+  })
+
   it('answers the service refusal rather than a 500 when the payload is rejected', async () => {
     const { StandupError } = await import('../errors')
     backfillStandup.mockRejectedValue(
