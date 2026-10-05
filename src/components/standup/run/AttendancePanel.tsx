@@ -23,7 +23,11 @@ import {
 /**
  * Panel 1 — attendance, and RUN-7's prompt (§15.8.3).
  *
- * Everyone defaults to present (RUN-6); the PM only touches the exceptions.
+ * Everyone defaults to present (RUN-6), and that default is PERSISTED when the
+ * stand-up starts (start-service) — so the PM only touches the exceptions. A
+ * member with no record at all (for example one added to the sprint after the
+ * stand-up began) is rendered as unset, the truthful fallback, rather than
+ * being shown as present.
  *
  * The prompt is the visible half of the RUN-7 seam. Detaching an absent
  * member's allocations is loud on the server — the rows are tagged, the hours
