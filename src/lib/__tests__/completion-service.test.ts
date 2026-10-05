@@ -121,7 +121,12 @@ describe('CompletionService', () => {
       const taskId = 'task123'
       const mockTaskData = { _id: taskId, status: 'done', story: 'story123' }
 
-      mockTask.findById.mockResolvedValue(mockTaskData)
+      // findById(...).populate(...).populate(...) -- a chainable, awaitable query
+      const query: any = {
+        populate: jest.fn().mockReturnThis(),
+        then: (resolve: (v: unknown) => unknown) => Promise.resolve(mockTaskData).then(resolve)
+      }
+      mockTask.findById.mockReturnValue(query)
       mockStory.findById.mockResolvedValue({ _id: 'story123', status: 'in_progress' })
       mockTask.find.mockResolvedValue([{ status: 'done' }])
       mockStory.findByIdAndUpdate.mockResolvedValue({})
