@@ -1516,3 +1516,149 @@ describe('completion-interrupted banner', () => {
     ).not.toBeInTheDocument()
   })
 })
+
+/**
+ * The backfill dialog's acknowledgement (Ruling 21).
+ *
+ * A browser acceptance run found that backfill clears CC-7 and then fails on
+ * CC-1 — hard, overridable, and unpassable on a past day, because work cannot
+ * be planned retroactively. The dialog therefore shows what is failing and
+ * takes one attestation, which the service turns into a real `under_allocation`
+ * override. Every unit and integration test was blind to this, so these cover
+ * the screen's half of it: what the facilitator is shown, and what gets sent.
+ */
+describe('the backfill dialog (Ruling 21)', () => {
+  const JUSTIFICATION = 'The day was missed outright, so nobody planned any work for it.'
+
+  const missedApi = () => ({
+    ...okApi(),
+    backfill: jest.fn().mockResolvedValue({ status: 'completed', summaryId: 'summary-2' })
+  })
+
+  const openDialog = (overrides: Partial<RunScreenData>, api = missedApi()) => {
+    renderScreen({ status: 'Missed', ...overrides }, api)
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.backfill() }))
+    return api
+  }
+
+  /** CC-1 fails and CC-7 fails; a missed day's normal state. */
+  const unplannedMissedBoard = () => ({
+    members: underAllocatedMember().map((member) => ({ ...member, attendance: undefined }))
+  })
+
+  it('names the failing overridable check instead of silently sending nothing', () => {
+    openDialog(unplannedMissedBoard())
+
+    expect(screen.getByText(standupStrings.run.backfillChecksLegend())).toBeInTheDocument()
+    expect(screen.getByText(/CC-1 — .*not planned to full capacity/)).toBeInTheDocument()
+  })
+
+  it('keeps Backfill disabled until both the room and a real justification are given', () => {
+    openDialog(unplannedMissedBoard())
+
+    const confirm = screen.getByRole('button', { name: standupStrings.run.backfillConfirm() })
+    expect(confirm).toBeDisabled()
+
+    fireEvent.change(
+      screen.getByLabelText(standupStrings.run.backfillAttendanceFor('Kasun')),
+      { target: { value: 'present' } }
+    )
+    // Room complete, but nothing attested to yet.
+    expect(confirm).toBeDisabled()
+
+    const justification = screen.getByLabelText(
+      standupStrings.run.backfillJustificationLabel()
+    )
+    // OVR-5's own rule, not a guess at one: under 20 characters is refused.
+    fireEvent.change(justification, { target: { value: 'missed' } })
+    expect(confirm).toBeDisabled()
+
+    fireEvent.change(justification, { target: { value: JUSTIFICATION } })
+    expect(confirm).toBeEnabled()
+  })
+
+  it('sends the acknowledgement alongside the attendance', async () => {
+    const api = openDialog(unplannedMissedBoard())
+
+    fireEvent.change(
+      screen.getByLabelText(standupStrings.run.backfillAttendanceFor('Kasun')),
+      { target: { value: 'present' } }
+    )
+    fireEvent.change(screen.getByLabelText(standupStrings.run.backfillJustificationLabel()), {
+      target: { value: JUSTIFICATION }
+    })
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.backfillConfirm() }))
+
+    await waitFor(() => expect(api.backfill).toHaveBeenCalled())
+    expect(api.backfill).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attendance: [{ memberId: 'kasun', state: 'present' }],
+        acknowledgedChecks: [{ checkId: 'CC-1', justification: JUSTIFICATION }]
+      })
+    )
+  })
+
+  it('offers no attestation at all when nothing overridable is failing', () => {
+    // Everybody absent: CC-1 exempts an unavailable member, so there is
+    // nothing to attest to and no field should appear to invite one.
+    openDialog({
+      members: [
+        {
+          memberId: 'kasun',
+          name: 'Kasun',
+          attendance: 'absent_planned' as const,
+          capacity: capacity({
+            allocatedMinutes: m(0),
+            effectiveMinutes: m(0),
+            gapMinutes: m(0),
+            status: 'unavailable' as const,
+            isUnavailable: true
+          }),
+          allocations: []
+        }
+      ]
+    })
+
+    expect(
+      screen.queryByLabelText(standupStrings.run.backfillJustificationLabel())
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(standupStrings.run.backfillChecksLegend())
+    ).not.toBeInTheDocument()
+  })
+
+  it('says a non-overridable check must be fixed rather than offering a tick for it', () => {
+    // CC-5 (an allocation with no hours) is hard and never overridable. CC-7 is
+    // too, but it is failing *because* the attendance is unrecorded, which the
+    // selects above resolve — so it must not appear in this list and frighten
+    // the facilitator off a backfill that will work.
+    openDialog({
+      members: [
+        {
+          memberId: 'kasun',
+          name: 'Kasun',
+          attendance: undefined,
+          capacity: capacity({ allocatedMinutes: m(0), gapMinutes: m(480), status: 'under' as const }),
+          allocations: [
+            {
+              allocationId: 'a9',
+              taskId: 't9',
+              taskKey: 'KAN-900',
+              title: 'Hours never set',
+              plannedMinutes: m(0),
+              remainingEstimateMinutes: m(60),
+              source: 'assigned_in_standup' as const,
+              isBlocked: false,
+              excludedFromCapacity: false,
+              pairedDeliberately: false
+            }
+          ]
+        }
+      ]
+    })
+
+    expect(screen.getByText(standupStrings.run.backfillBlockedByChecks())).toBeInTheDocument()
+    expect(screen.getByText(/CC-5 — .*empty allocation/)).toBeInTheDocument()
+    expect(screen.queryByText(/CC-7 — /)).not.toBeInTheDocument()
+  })
+})

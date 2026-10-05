@@ -469,6 +469,28 @@ export const standupStrings = {
     backfillAttendanceLegend: () => 'Who attended?',
     backfillAttendanceUnrecorded: () => 'Not recorded',
     backfillAttendanceFor: (name: string) => `Backfill attendance for ${name}`,
+    /**
+     * Ruling 21. A missed day had nothing allocated, so CC-1 — hard but
+     * overridable — can never pass retroactively. Rather than exempting
+     * backfill from the check, the dialog shows what is failing and takes the
+     * facilitator's attestation, which the service turns into a real,
+     * audited override. The copy says "attest", not "ignore", because that is
+     * what the recorded override means.
+     */
+    backfillChecksLegend: () => 'What this day cannot satisfy',
+    backfillChecksDescription: () =>
+      'Work cannot be planned retroactively, so these checks will never pass for a past day. Say what happened and they will be recorded as overridden, with your name against them.',
+    backfillJustificationLabel: () => 'Why these could not be met',
+    backfillJustificationHint: () =>
+      'At least 20 characters, and specific enough to explain the day.',
+    /**
+     * A non-overridable failing check cannot be attested away by anybody, so
+     * the dialog says so rather than offering a tick that cannot work. CC-7 is
+     * excluded from this list by the caller — the attendance selects above are
+     * what resolve it.
+     */
+    backfillBlockedByChecks: () =>
+      'These must be fixed before this day can be backfilled; no attestation can clear them:',
     backfillNotesLabel: () => 'Notes (optional)',
     backfillCancel: () => 'Cancel',
     backfillConfirm: () => 'Backfill',

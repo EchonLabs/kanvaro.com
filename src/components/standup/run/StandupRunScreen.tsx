@@ -56,6 +56,7 @@ import { isOwnRowReadOnly } from '@/lib/standup/own-row'
 import {
   filterOverriddenFailures,
   OVERRIDE_TABLE,
+  validateJustification,
   type IssuedOverrideForReconciliation
 } from '@/lib/standup/override'
 import { standupStrings } from '@/lib/standup/strings'
@@ -373,6 +374,14 @@ export interface RunScreenApi {
      * always 422s on its own gate.
      */
     attendance?: { memberId: string; state: AttendanceStatus }[]
+    /**
+     * Ruling 21. CC-1 is hard but *overridable*, and a missed day had nothing
+     * allocated, so it can never pass retroactively. Backfill is not exempted
+     * from it; instead the facilitator attests to it here and the service
+     * issues a real `under_allocation` override, exactly as the live
+     * completion path does. Omitting this leaves the check blocking.
+     */
+    acknowledgedChecks?: { checkId: string; justification: string }[]
   }): Promise<{ status: string; summaryId: string }>
 
   // --- Phase 8 -------------------------------------------------------------
@@ -946,12 +955,47 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     Record<string, AttendanceStatus>
   >({})
   const [backfillSubmitting, setBackfillSubmitting] = useState(false)
+  // Ruling 21: one attestation covering every failing overridable check, in
+  // the facilitator's own words. Validated with the same `validateJustification`
+  // the server applies, so the button does not promise a 422.
+  const [backfillJustification, setBackfillJustification] = useState('')
 
   // CC-7 needs every expected attendee recorded, so the dialog refuses to
   // submit a half-filled room rather than letting the saga 422 on it.
   const backfillAttendanceComplete = board.members.every((member) =>
     Boolean(backfillAttendance[member.memberId])
   )
+
+  /**
+   * Ruling 21. The checks are already on screen — `blocking` is
+   * `filterOverriddenFailures(blockingFailures(checks), overridesIssued)`
+   * above — so the dialog reuses them rather than fetching anything.
+   *
+   * Split two ways, because the two halves need opposite affordances:
+   *
+   * - overridable failures can be attested to, which is what the justification
+   *   field below collects. Note these are evaluated against the board as
+   *   stored (no attendance yet), so CC-1 may appear here even for a room the
+   *   facilitator is about to mark entirely absent. Harmless: the service
+   *   re-evaluates after writing the attendance and issues nothing for a check
+   *   that is no longer failing.
+   * - non-overridable failures cannot be waved by anybody, so the dialog says
+   *   so instead of offering a tick that cannot work. CC-7 is excluded: it is
+   *   failing precisely because the attendance is unrecorded, which is what
+   *   the selects above are for.
+   */
+  const backfillOverridableFailures = useMemo(
+    () => blocking.filter((check) => check.overridable),
+    [blocking]
+  )
+  const backfillUnwaivableFailures = useMemo(
+    () => blocking.filter((check) => !check.overridable && check.checkId !== 'CC-7'),
+    [blocking]
+  )
+
+  const backfillJustificationValid = validateJustification(backfillJustification).valid
+  const backfillAcknowledgementReady =
+    backfillOverridableFailures.length === 0 || backfillJustificationValid
 
   const onBackfill = useCallback(async () => {
     if (!api.backfill) return
@@ -963,11 +1007,24 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         attendance: Object.entries(backfillAttendance).map(([memberId, state]) => ({
           memberId,
           state
-        }))
+        })),
+        // Ruling 21. Sent only for the checks actually shown as failing and
+        // overridable — the service refuses an acknowledgement for anything
+        // else, and issues nothing for a check that stops failing once the
+        // attendance lands.
+        ...(backfillOverridableFailures.length > 0
+          ? {
+              acknowledgedChecks: backfillOverridableFailures.map((check) => ({
+                checkId: check.checkId,
+                justification: backfillJustification.trim()
+              }))
+            }
+          : {})
       })
       setBackfilling(false)
       setBackfillNotes('')
       setBackfillAttendance({})
+      setBackfillJustification('')
       setNotice(standupStrings.run.backfillSuccess())
       await reload()
     } catch (error) {
@@ -984,7 +1041,14 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     } finally {
       setBackfillSubmitting(false)
     }
-  }, [api, backfillAttendance, backfillNotes, reload])
+  }, [
+    api,
+    backfillAttendance,
+    backfillJustification,
+    backfillNotes,
+    backfillOverridableFailures,
+    reload
+  ])
 
   /**
    * E57/§15.8.2. A live, client-side-only elapsed-time indicator — advisory
@@ -1728,6 +1792,53 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
               ))}
             </fieldset>
 
+            {backfillUnwaivableFailures.length > 0 && (
+              <div className="flex flex-col gap-1.5 rounded-[var(--apple-radius-md)] border border-[var(--plan-danger)] p-3">
+                <p className="apple-type-subheadline font-medium text-[var(--plan-text)]">
+                  {standupStrings.run.backfillBlockedByChecks()}
+                </p>
+                <ul className="flex flex-col gap-1 apple-type-footnote text-[var(--plan-secondary)]">
+                  {backfillUnwaivableFailures.map((check) => (
+                    <li key={check.checkId}>
+                      {check.checkId} — {check.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {backfillOverridableFailures.length > 0 && (
+              <fieldset className="flex flex-col gap-2">
+                <legend className="apple-type-subheadline font-medium text-[var(--plan-text)]">
+                  {standupStrings.run.backfillChecksLegend()}
+                </legend>
+                <p className="apple-type-footnote text-[var(--plan-secondary)]">
+                  {standupStrings.run.backfillChecksDescription()}
+                </p>
+                <ul className="flex flex-col gap-1 apple-type-footnote text-[var(--plan-secondary)]">
+                  {backfillOverridableFailures.map((check) => (
+                    <li key={check.checkId}>
+                      {check.checkId} — {check.message}
+                    </li>
+                  ))}
+                </ul>
+                <label className="flex flex-col gap-1.5 apple-type-subheadline text-[var(--plan-text)]">
+                  {standupStrings.run.backfillJustificationLabel()}
+                  <textarea
+                    value={backfillJustification}
+                    onChange={(event) => setBackfillJustification(event.target.value)}
+                    className={cn(planFieldClass, 'h-auto min-h-20 px-2.5 py-2')}
+                    disabled={backfillSubmitting}
+                  />
+                </label>
+                {!backfillJustificationValid && (
+                  <p className="apple-type-footnote text-[var(--plan-secondary)]">
+                    {standupStrings.run.backfillJustificationHint()}
+                  </p>
+                )}
+              </fieldset>
+            )}
+
             <label className="flex flex-col gap-1.5 apple-type-subheadline text-[var(--plan-text)]">
               {standupStrings.run.backfillNotesLabel()}
               <textarea
@@ -1750,7 +1861,14 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
               <button
                 type="button"
                 onClick={() => void onBackfill()}
-                disabled={backfillSubmitting || !backfillAttendanceComplete}
+                disabled={
+                  backfillSubmitting ||
+                  !backfillAttendanceComplete ||
+                  // Ruling 21: a failing overridable check needs an attestation
+                  // the server will actually accept before Backfill can be
+                  // pressed, rather than a 422 after the fact.
+                  !backfillAcknowledgementReady
+                }
                 className={planButtonClass('danger')}
               >
                 {standupStrings.run.backfillConfirm()}

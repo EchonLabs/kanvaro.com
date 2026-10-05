@@ -221,7 +221,7 @@ export default function StandupRunPage({
     // the route's own contract (a `Missed` stand-up was never edited under a
     // version the PM could have read), so this is a plain `fetch`, not
     // `mutate()`, the same way `overrides`/`blockers` above are.
-    async backfill({ notes, attendance }) {
+    async backfill({ notes, attendance, acknowledgedChecks }) {
       const response = await fetch(`/api/standups/${standupId}/backfill`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -230,7 +230,14 @@ export default function StandupRunPage({
         // backfill of a day whose room was never recorded.
         body: JSON.stringify({
           ...(notes ? { notes } : {}),
-          ...(attendance?.length ? { attendance } : {})
+          ...(attendance?.length ? { attendance } : {}),
+          // Ruling 21: the facilitator's attestation for a check a past day
+          // cannot pass (CC-1 above all). Destructured explicitly above for
+          // the same reason `attendance` is — this function takes a named
+          // object, so a field it does not name is silently dropped and
+          // `tsc` stays clean straight through it, which is exactly how
+          // Task 10's defect reached the browser.
+          ...(acknowledgedChecks?.length ? { acknowledgedChecks } : {})
         })
       })
       return unwrap(response)
