@@ -229,11 +229,16 @@ invalid: frontmatter
       expect(mockedFs.readdirSync).toHaveBeenCalledTimes(1);
     });
 
-    it('should clear cache when requested', () => {
+    it('should clear cache when requested', async () => {
+      await DocsLoader.getIndex();
+      expect(mockedFs.readdirSync).toHaveBeenCalledTimes(1);
+
       DocsLoader.clearCache();
-      
-      // Cache should be cleared
-      expect(true).toBe(true); // Placeholder assertion
+      await DocsLoader.getIndex();
+
+      // A second readdirSync proves the index was rebuilt rather than served
+      // from the memoised copy.
+      expect(mockedFs.readdirSync).toHaveBeenCalledTimes(2);
     });
   });
 });
