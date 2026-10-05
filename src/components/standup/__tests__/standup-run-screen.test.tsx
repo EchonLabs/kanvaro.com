@@ -684,6 +684,65 @@ describe('Panel 1 — attendance (RUN-6, RUN-7)', () => {
   })
 })
 
+describe('Panel 1 — unset attendance (Task 7)', () => {
+  const unrecordedMember = (over: Record<string, unknown> = {}) => ({
+    memberId: 'kasun',
+    name: 'Kasun',
+    attendance: undefined,
+    capacity: capacity(),
+    allocations: [],
+    ...over
+  })
+
+  it('still renders a recorded attendance state', () => {
+    renderScreen({ members: [unrecordedMember({ attendance: 'absent_planned' })] })
+
+    expect(screen.getByLabelText('Attendance for Kasun')).toHaveValue('absent_planned')
+  })
+
+  it('still writes through when a real state is chosen', () => {
+    const api = { ...okApi(), setAttendance: jest.fn().mockResolvedValue(undefined) }
+    renderScreen({ members: [unrecordedMember()] }, api)
+
+    fireEvent.change(screen.getByLabelText('Attendance for Kasun'), {
+      target: { value: 'present' }
+    })
+
+    expect(api.setAttendance).toHaveBeenCalledWith(
+      expect.objectContaining({ memberId: 'kasun', state: 'present' })
+    )
+  })
+
+  // Review Focus 1: a partial day must still defer its write until hours exist.
+  it('still defers the write for a partial day', () => {
+    const api = { ...okApi(), setAttendance: jest.fn().mockResolvedValue(undefined) }
+    renderScreen({ members: [unrecordedMember()] }, api)
+
+    fireEvent.change(screen.getByLabelText('Attendance for Kasun'), {
+      target: { value: 'partial' }
+    })
+
+    expect(api.setAttendance).not.toHaveBeenCalled()
+  })
+
+  it('does not render unset attendance as Present', () => {
+    renderScreen({ members: [unrecordedMember()] })
+
+    const select = screen.getByLabelText('Attendance for Kasun')
+    expect(select).not.toHaveValue('present')
+    expect(screen.getByRole('option', { name: 'Not recorded' })).toBeInTheDocument()
+  })
+
+  it('never writes the placeholder back', () => {
+    const api = { ...okApi(), setAttendance: jest.fn().mockResolvedValue(undefined) }
+    renderScreen({ members: [unrecordedMember()] }, api)
+
+    fireEvent.change(screen.getByLabelText('Attendance for Kasun'), { target: { value: '' } })
+
+    expect(api.setAttendance).not.toHaveBeenCalled()
+  })
+})
+
 describe('RUN-25 — optimistic edits roll back visibly', () => {
   it('shows the new hours immediately, before the server has answered', async () => {
     const api = okApi()

@@ -88,8 +88,10 @@ export function AttendancePanel({
   const [draftStates, setDraftStates] = useState<Record<string, AttendanceStatus>>({})
   const [reassignTo, setReassignTo] = useState('')
 
-  const stateOf = (member: AttendanceMember): AttendanceStatus =>
-    draftStates[member.memberId] ?? member.attendance ?? 'present'
+  // Nobody having recorded attendance is `''`, not "present": the select must
+  // not claim a full room while CC-7 is about to block completion.
+  const stateOf = (member: AttendanceMember): AttendanceStatus | '' =>
+    draftStates[member.memberId] ?? member.attendance ?? ''
 
   const promptMember = prompt
     ? members.find((member) => member.memberId === prompt.memberId)
@@ -151,7 +153,7 @@ export function AttendancePanel({
         {members.map((member) => {
           const state = stateOf(member)
           const absent = state === 'absent_planned' || state === 'absent_unplanned'
-          const tone = TONE_FOR[state]
+          const tone = state ? TONE_FOR[state] : 'neutral'
           const stranded = (member.capacity?.strandedMinutes ?? 0) > 0
           const needsReassign = absent && (stranded || prompt?.memberId === member.memberId)
 
@@ -200,6 +202,7 @@ export function AttendancePanel({
                         value={state}
                         disabled={disabled}
                         onChange={(event) => {
+                          if (!event.target.value) return
                           const next = event.target.value as AttendanceStatus
                           setDraftStates((current) => ({ ...current, [member.memberId]: next }))
                           // A partial day needs its hours before the write means
@@ -213,6 +216,9 @@ export function AttendancePanel({
                           'apple-transition cursor-pointer appearance-none border-0 py-[5px] pl-2 pr-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--plan-accent)] disabled:cursor-default disabled:opacity-60'
                         )}
                       >
+                        <option value="" disabled>
+                          Not recorded
+                        </option>
                         {STATES.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label()}
@@ -278,7 +284,7 @@ export function AttendancePanel({
                   onBlur={(event) => {
                     const reason = event.target.value.trim()
                     if (!reason) return
-                    onSetAttendance({ memberId: member.memberId, state, reason })
+                    onSetAttendance({ memberId: member.memberId, state: state as AttendanceStatus, reason })
                   }}
                   className={cn(planFieldClass, 'w-full')}
                 />
@@ -377,9 +383,12 @@ const CHEVRON_TONE: Record<PlanPillTone, string> = {
  */
 function capacityLine(
   member: AttendanceMember,
-  state: AttendanceStatus,
+  state: AttendanceStatus | '',
   locale?: string
 ): string {
+  // No recorded state means no capacity claim either way.
+  if (!state) return 'Not recorded'
+
   if (state === 'absent_planned' || state === 'absent_unplanned') {
     return standupStrings.run.attendanceOut()
   }
