@@ -1709,3 +1709,11 @@ describe('the backfill dialog (Ruling 21)', () => {
     expect(screen.queryByText(/CC-7 — /)).not.toBeInTheDocument()
   })
 })
+
+describe('StandupRunScreen — completion action by status', () => {
+  it('still offers completion while the stand-up is in progress', () => {
+    renderScreen({ status: 'In_Progress' })
+
+    expect(screen.getByRole('button', { name: standupStrings.run.complete() })).toBeEnabled()
+  })
+})
