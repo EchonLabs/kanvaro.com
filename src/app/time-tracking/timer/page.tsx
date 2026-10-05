@@ -910,7 +910,7 @@ export default function TimerPage() {
                                 if (taskNumStr.includes(searchLower) || (searchNormalized !== searchLower && taskNumStr.includes(searchNormalized))) return true
                               }
                               return false
-                            }).sort((a, b) => (a.title || '').localeCompare(b.title || '')).map((task) => {
+                            }).sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true })).map((task) => {
                               const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
                               return (
                                 <SelectItem

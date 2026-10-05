@@ -253,7 +253,7 @@ export function TimeLogs({
     const result = projects.filter(project =>
       project.name?.toLowerCase().includes(modalProjectSearch.toLowerCase())
     )
-    return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    return result.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, modalProjectSearch])
 
   const filteredModalTasks = useMemo(() => {
@@ -261,7 +261,7 @@ export function TimeLogs({
       task.title?.toLowerCase().includes(modalTaskSearch.toLowerCase()) ||
       task.displayId?.toLowerCase().includes(modalTaskSearch.toLowerCase())
     )
-    return result.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+    return result.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [tasks, modalTaskSearch])
 
   const selectedTaskForLogObject = useMemo(() =>
