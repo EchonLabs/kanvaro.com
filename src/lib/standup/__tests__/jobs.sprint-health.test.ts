@@ -207,4 +207,32 @@ describe('runSprintHealthJob', () => {
     expect(storedDay1.notificationsSent?.[`N12:${sprintId}`]).toBeInstanceOf(Date)
     expect(storedDay2.notificationsSent?.[`N12:${sprintId}`]).toBeUndefined()
   })
+
+  it('still stays quiet when a configured capacity row covers the scope', async () => {
+    await seedStandup('2026-08-18', 2)
+    // 4 remaining working days (18-21 Aug) at 480m/day against 120m of scope.
+    await seedCapacity(480)
+    await seedTask(120)
+
+    const result = await runSprintHealthJob(new Date('2026-08-18T09:00:00.000Z'))
+
+    expect(result.created).toBe(0)
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  // A member WITH rows must still resolve through selectCapacityAsOf, never
+  // through the standard-day fallback.
+  it('still warns when a configured low capacity row cannot cover the scope', async () => {
+    await seedStandup('2026-08-18', 2)
+    // 4 working days * 60m = 240m of capacity against 2400m of scope. If the
+    // fallback were applied to a member who HAS a row, this would read
+    // 4 * 480 = 1920m and the warning would be lost.
+    await seedCapacity(60)
+    await seedTask(2400)
+
+    const result = await runSprintHealthJob(new Date('2026-08-18T09:00:00.000Z'))
+
+    expect(result.created).toBe(1)
+    expect(notify).toHaveBeenCalled()
+  })
 })
