@@ -46,9 +46,13 @@ import type { Minutes } from './minutes'
 import { loadCalendarContext } from './calendar-service'
 import { resolveWorkingDaysFrom } from './working-day'
 import { assembleCompletionContext } from './completion-context'
-import { blockingFailures, evaluateCompletionChecks, type CheckId } from './completion-checks'
+import { blockingFailures, evaluateCompletionChecks } from './completion-checks'
 import { runCompletionSaga, type CompletionContext } from './completion-saga'
-import { CHECK_TO_OVERRIDE_TYPE, type AnyOverrideType } from './override'
+import {
+  CHECK_TO_OVERRIDE_TYPE,
+  filterOverriddenFailures,
+  isCheckAcknowledgeableByBackfill
+} from './override'
 import { issueOverride } from './override-service'
 import { recordAudit } from './audit'
 import { overrideNotPermitted, StandupError } from './errors'
@@ -153,6 +157,14 @@ export async function backfillStandup(
       { standupDate: standup.standupDate, elapsedWorkingDays, windowDays }
     )
   }
+
+  // Ruling 21, checked here rather than inside `issueAcknowledgedOverrides`:
+  // "is every acknowledged check one a backfill may waive at all" needs no
+  // context and no database read, so it must be answered BEFORE the attendance
+  // write below. Refusing it afterwards would leave a `Missed` stand-up with a
+  // half-applied backfill — attendance persisted and allocations detached for
+  // a call that then 422s.
+  assertAcknowledgementsWaivable(input.acknowledgedChecks)
 
   // SCH-14's "full run payload", and the only way CC-7 can ever be satisfied
   // on a missed day. A `Missed` stand-up has no attendance by definition;
@@ -285,15 +297,25 @@ export async function backfillStandup(
  * Returns the ids it issued, for the backfill audit entry.
  */
 /**
- * OVR-6 requires the affected member's **own** acknowledgement tick before an
- * `over_allocation` override may be issued. A backfill reconstructs a day from
- * one facilitator's recollection and has no way to obtain that tick, so CC-6
- * is not acknowledgeable here — an over-allocated missed day has to be fixed
- * by correcting the allocations, not attested away by somebody else. Every
- * other overridable check needs nothing a backfill cannot supply.
+ * OVR-2's server-side half, and Ruling 21's narrowing of it.
+ *
+ * `isCheckAcknowledgeableByBackfill` is the single rule — shared with the
+ * backfill dialog, which renders exactly the set this will accept — covering
+ * both "this check is not overridable by anybody" (no `OVERRIDE_TABLE` entry)
+ * and "this check needs something a backfill cannot supply" (CC-6's member
+ * tick, CC-3's one-task deferral). See that function for why each is excluded.
+ *
+ * Pure and context-free on purpose, so the whole payload can be judged before
+ * anything is written.
  */
-function isAcknowledgeableByBackfill(type: AnyOverrideType): boolean {
-  return type !== 'over_allocation'
+function assertAcknowledgementsWaivable(
+  acknowledgements: BackfillCheckAcknowledgement[] | undefined
+): void {
+  for (const entry of acknowledgements ?? []) {
+    if (!isCheckAcknowledgeableByBackfill(entry.checkId)) {
+      throw overrideNotPermitted(entry.checkId)
+    }
+  }
 }
 
 async function issueAcknowledgedOverrides(args: {
@@ -307,19 +329,32 @@ async function issueAcknowledgedOverrides(args: {
   const { ctx, acknowledgements, sprintId, projectId, organizationId, issuedBy } = args
   if (!acknowledgements?.length) return []
 
+  // Re-asserted rather than assumed: `backfillStandup` already refused an
+  // unwaivable check before writing anything, and this keeps the guarantee
+  // local to the function that actually issues the records.
+  assertAcknowledgementsWaivable(acknowledgements)
+
   const justificationByCheckId = new Map<string, string>()
   for (const entry of acknowledgements) {
-    // OVR-2: "the button must simply not exist" — the server's half of that
-    // rule. `CHECK_TO_OVERRIDE_TYPE` only holds the overridable checks, so a
-    // missing entry is exactly "this check may never be waved".
-    const overrideType = CHECK_TO_OVERRIDE_TYPE[entry.checkId as CheckId]
-    if (!overrideType || !isAcknowledgeableByBackfill(overrideType)) {
-      throw overrideNotPermitted(entry.checkId)
-    }
     justificationByCheckId.set(entry.checkId, entry.justification)
   }
 
-  const failures = blockingFailures(evaluateCompletionChecks(ctx.checkInput))
+  // Filtered against the overrides this stand-up ALREADY carries, exactly as
+  // the saga's own gate does — a failure an existing override already covers is
+  // not failing any more, so re-issuing for it would be a duplicate record.
+  //
+  // This is what makes a retry idempotent, and it is not cosmetic: on
+  // `COMPLETION_CHECKS_FAILED` the dialog stays open without reloading, so a
+  // second press re-sends the same acknowledgements. Without this filter that
+  // writes a second identical `under_allocation` override, and
+  // `detectChronicUnderAllocation` counts three per member per sprint with no
+  // per-stand-up dedupe — three presses on one missed day could raise an N7
+  // chronic-under-allocation flag against a real person. Same bug class as
+  // RUN-7's detach idempotency, one field along.
+  const failures = filterOverriddenFailures(
+    blockingFailures(evaluateCompletionChecks(ctx.checkInput)),
+    ctx.overridesIssued
+  )
   const issuedIds: string[] = []
 
   for (const failure of failures) {
@@ -358,8 +393,8 @@ async function issueAcknowledgedOverrides(args: {
       justification,
       gapMinutes,
       // `memberAcknowledged` is deliberately not passed: it is OVR-6's tick,
-      // and `isAcknowledgeableByBackfill` already refused the one type that
-      // needs it rather than letting a backfill fabricate somebody's consent.
+      // and `isCheckAcknowledgeableByBackfill` already refused the one type
+      // that needs it rather than letting a backfill fabricate consent.
       issuedBy,
       // N7's recipients are looked up and notified from the completion saga,
       // exactly as `POST /api/standups/:id/overrides` leaves them.

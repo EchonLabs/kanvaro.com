@@ -150,6 +150,44 @@ function entityIsCovered(
   }
 }
 
+/**
+ * Ruling 21. Two of the four overridable types need something a **backfill**
+ * cannot supply, so a facilitator reconstructing a past day may not attest to
+ * their checks even though the live run screen can override them:
+ *
+ * - `over_allocation` (CC-6) — OVR-6 requires the affected member's *own*
+ *   acknowledgement tick. A backfill reconstructs the day from one
+ *   facilitator's recollection and cannot obtain it; issuing anyway would mean
+ *   fabricating somebody else's consent. An over-allocated missed day has to
+ *   be fixed by correcting the allocations.
+ * - `skip_reestimate` (CC-3) — OVR-3/OVR-7 scope a deferral to exactly one
+ *   task and let it happen once. `issueOverride` reads only
+ *   `affectedTaskIds[0]` and creates an `override_followup` carry-forward item,
+ *   whose `alreadyDeferred` guard then refuses the next attempt. A CC-3 failure
+ *   naming several tasks — the normal state of a missed non-day-one day, whose
+ *   variance rows are all unanswered — would therefore persist an override and
+ *   a carry-forward item, still fail the gate, and be permanently unable to
+ *   succeed on a retry. Re-estimates have to be answered, not attested away.
+ *
+ * This restricts which of the *derived* mappings a backfill may use; it does
+ * not re-derive or hardcode the mapping itself, which stays `OVERRIDE_TABLE`'s
+ * job. Exported as the single rule, because the backfill dialog has to render
+ * exactly the set the service will accept — a dialog that offered a tick the
+ * server hard-refuses rejects the whole payload, including the valid parts of
+ * it, and tells the facilitator nothing.
+ */
+export const BACKFILL_UNSUPPORTED_OVERRIDE_TYPES: readonly AnyOverrideType[] = [
+  'over_allocation',
+  'skip_reestimate'
+]
+
+/** Ruling 21: may a backfill's facilitator attest to this failing check? */
+export function isCheckAcknowledgeableByBackfill(checkId: string): boolean {
+  const type = CHECK_TO_OVERRIDE_TYPE[checkId as CheckId]
+  // No entry at all means the check is not overridable by anybody (OVR-2).
+  return type !== undefined && !BACKFILL_UNSUPPORTED_OVERRIDE_TYPES.includes(type)
+}
+
 export function filterOverriddenFailures(
   failures: readonly CompletionCheckResult[],
   overrides: readonly IssuedOverrideForReconciliation[]

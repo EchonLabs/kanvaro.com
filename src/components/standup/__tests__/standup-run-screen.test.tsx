@@ -1627,6 +1627,53 @@ describe('the backfill dialog (Ruling 21)', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('lists CC-6 as unwaivable rather than taking an attestation the server refuses', () => {
+    // CC-6 is `overridable: true`, so filtering on that alone offered a tick,
+    // enabled Backfill, and had the service hard-refuse the whole payload with
+    // `overrideNotPermitted('CC-6')` — losing a valid CC-1 attestation alongside
+    // it and telling the facilitator only "That could not be backfilled."
+    // OVR-6 needs the member's own tick, which a backfill cannot obtain, so the
+    // dialog has to render the same rule the service enforces.
+    openDialog({
+      members: [
+        {
+          memberId: 'kasun',
+          name: 'Kasun',
+          attendance: 'present' as const,
+          capacity: capacity({
+            allocatedMinutes: m(600),
+            gapMinutes: m(-120) as never,
+            status: 'over' as const
+          }),
+          allocations: [
+            {
+              allocationId: 'a7',
+              taskId: 't7',
+              taskKey: 'KAN-700',
+              title: 'Too much',
+              plannedMinutes: m(600),
+              remainingEstimateMinutes: m(600),
+              source: 'assigned_in_standup' as const,
+              isBlocked: false,
+              excludedFromCapacity: false,
+              pairedDeliberately: false
+            }
+          ]
+        }
+      ]
+    })
+
+    expect(screen.getByText(standupStrings.run.backfillBlockedByChecks())).toBeInTheDocument()
+    expect(screen.getByText(/CC-6 — .*over allocated/)).toBeInTheDocument()
+    // No tick, and no field inviting one.
+    expect(
+      screen.queryByLabelText(standupStrings.run.backfillJustificationLabel())
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(standupStrings.run.backfillChecksLegend())
+    ).not.toBeInTheDocument()
+  })
+
   it('says a non-overridable check must be fixed rather than offering a tick for it', () => {
     // CC-5 (an allocation with no hours) is hard and never overridable. CC-7 is
     // too, but it is failing *because* the attendance is unrecorded, which the

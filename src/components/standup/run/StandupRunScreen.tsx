@@ -55,6 +55,7 @@ import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import { isOwnRowReadOnly } from '@/lib/standup/own-row'
 import {
   filterOverriddenFailures,
+  isCheckAcknowledgeableByBackfill,
   OVERRIDE_TABLE,
   validateJustification,
   type IssuedOverrideForReconciliation
@@ -973,23 +974,38 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
    *
    * Split two ways, because the two halves need opposite affordances:
    *
-   * - overridable failures can be attested to, which is what the justification
-   *   field below collects. Note these are evaluated against the board as
-   *   stored (no attendance yet), so CC-1 may appear here even for a room the
-   *   facilitator is about to mark entirely absent. Harmless: the service
-   *   re-evaluates after writing the attendance and issues nothing for a check
-   *   that is no longer failing.
-   * - non-overridable failures cannot be waved by anybody, so the dialog says
-   *   so instead of offering a tick that cannot work. CC-7 is excluded: it is
-   *   failing precisely because the attendance is unrecorded, which is what
-   *   the selects above are for.
+   * - what a backfill may actually attest to, which is what the justification
+   *   field below collects. The test is `isCheckAcknowledgeableByBackfill`, the
+   *   *same* rule the service enforces — not `check.overridable`, which is
+   *   wider. CC-6 and CC-3 are overridable on a live run but need something a
+   *   backfill cannot supply (a member's own tick; a one-task deferral), and a
+   *   dialog that offered a tick for them would have the server reject the
+   *   whole payload — including a valid CC-1 attestation — with nothing on
+   *   screen explaining why.
+   *
+   *   Note these are evaluated against the board as stored (no attendance
+   *   yet), so CC-1 may appear here even for a room the facilitator is about to
+   *   mark entirely absent. Harmless: the service re-evaluates after writing
+   *   the attendance and issues nothing for a check that is no longer failing.
+   * - everything else blocking, which no attestation can clear here, so the
+   *   dialog says so instead of offering a tick that cannot work. CC-7 is
+   *   excluded: it is failing precisely because the attendance is unrecorded,
+   *   which is what the selects above are for.
    */
   const backfillOverridableFailures = useMemo(
-    () => blocking.filter((check) => check.overridable),
+    () =>
+      blocking.filter(
+        (check) => check.overridable && isCheckAcknowledgeableByBackfill(check.checkId)
+      ),
     [blocking]
   )
   const backfillUnwaivableFailures = useMemo(
-    () => blocking.filter((check) => !check.overridable && check.checkId !== 'CC-7'),
+    () =>
+      blocking.filter(
+        (check) =>
+          check.checkId !== 'CC-7' &&
+          !(check.overridable && isCheckAcknowledgeableByBackfill(check.checkId))
+      ),
     [blocking]
   )
 

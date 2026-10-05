@@ -636,6 +636,112 @@ describe('backfillStandup (SCH-14/E49)', () => {
     expect(await StandupOverride.countDocuments({ standup: standup._id })).toBe(0)
   })
 
+  /**
+   * Review round 1, Important 3. On `COMPLETION_CHECKS_FAILED` the dialog stays
+   * open without reloading, so a second press re-sends the same
+   * acknowledgements. Nothing stopped that writing a second identical
+   * `under_allocation` override — and `detectChronicUnderAllocation` counts
+   * three per member per sprint with no per-stand-up dedupe, so three presses
+   * on one missed day could have raised an N7 chronic-under-allocation flag
+   * against a real person. The acknowledgement loop now filters its failures
+   * through `filterOverriddenFailures` against the overrides the stand-up
+   * already carries, the same way the saga's own gate does.
+   */
+  it('writes exactly one override when the same acknowledgement is retried', async () => {
+    await seedSprint('2026-08-25', '2026-09-10')
+    const standup = await seedUnrecordedMissedStandup('2026-09-01')
+    const { StandupOverride } = await import('@/models/StandupOverride')
+
+    const attempt = () =>
+      backfillStandup({
+        standupId: String(standup._id),
+        backfilledBy: String(user),
+        attendance: [{ memberId: String(member), state: 'present' }],
+        acknowledgedChecks: [{ checkId: 'CC-1', justification: ACKNOWLEDGEMENT }],
+        now: new Date('2026-09-02T10:00:00.000Z')
+      })
+
+    await attempt()
+    expect(await StandupOverride.countDocuments({ standup: standup._id })).toBe(1)
+
+    // The stand-up is Completed now, so the retry is refused for that reason —
+    // the point is that it issues no second override on the way to refusing.
+    await expect(attempt()).rejects.toMatchObject({ code: 'STANDUP_NOT_STARTABLE' })
+    expect(await StandupOverride.countDocuments({ standup: standup._id })).toBe(1)
+  })
+
+  it('issues no second override when a retry re-sends an acknowledgement already covered', async () => {
+    // The same idempotency, reached from the state a half-finished attempt
+    // actually leaves: the override is already on record but the stand-up is
+    // still Missed, which is exactly what the dialog's open-and-press-again
+    // path produces when a later check fails the saga.
+    await seedSprint('2026-08-25', '2026-09-10')
+    const standup = await seedUnrecordedMissedStandup('2026-09-01')
+    const { StandupOverride } = await import('@/models/StandupOverride')
+    const { issueOverride } = await import('../override-service')
+
+    const first = await issueOverride({
+      standupId: String(standup._id),
+      sprintId: String(sprintId),
+      projectId: String(project),
+      organizationId: String(organization),
+      type: 'under_allocation',
+      affectedMemberIds: [String(member)],
+      reasonCode: 'other',
+      justification: ACKNOWLEDGEMENT,
+      issuedBy: String(user),
+      adminRecipientIds: []
+    })
+
+    const result = await backfillStandup({
+      standupId: String(standup._id),
+      backfilledBy: String(user),
+      attendance: [{ memberId: String(member), state: 'present' }],
+      acknowledgedChecks: [{ checkId: 'CC-1', justification: ACKNOWLEDGEMENT }],
+      now: new Date('2026-09-02T10:00:00.000Z')
+    })
+
+    expect(result.standup.status).toBe('Completed')
+    const overrides = await StandupOverride.find({ standup: standup._id }).lean()
+    expect(overrides).toHaveLength(1)
+    expect(String(overrides[0]._id)).toBe(String(first._id))
+  })
+
+  /**
+   * Review round 1, Important 1/2 and the bundled Minor. CC-6 needs OVR-6's
+   * member tick and CC-3 needs OVR-7's one-task deferral, neither of which a
+   * backfill can supply, so both are refused — and refused *before* anything is
+   * written, because a refusal after `applyBackfillAttendance` left a `Missed`
+   * stand-up with attendance persisted and allocations detached for a call that
+   * then 422d.
+   */
+  it.each([['CC-6'], ['CC-3'], ['CC-7']])(
+    'refuses an acknowledgement of %s before writing any attendance',
+    async (checkId) => {
+      await seedSprint('2026-08-25', '2026-09-10')
+      const standup = await seedUnrecordedMissedStandup('2026-09-01')
+
+      await expect(
+        backfillStandup({
+          standupId: String(standup._id),
+          backfilledBy: String(user),
+          attendance: [{ memberId: String(member), state: 'absent_planned' }],
+          acknowledgedChecks: [{ checkId, justification: ACKNOWLEDGEMENT }],
+          now: new Date('2026-09-02T10:00:00.000Z')
+        })
+      ).rejects.toMatchObject({ code: 'OVERRIDE_NOT_PERMITTED' })
+
+      const reloaded = await Standup.findById(standup._id).lean()
+      expect(reloaded!.status).toBe('Missed')
+      // The whole point of the hoist: no half-applied backfill left behind.
+      expect(reloaded!.attendance).toEqual([])
+      const { StandupOverride } = await import('@/models/StandupOverride')
+      expect(await StandupOverride.countDocuments({ standup: standup._id })).toBe(0)
+      const { CarryForwardItem } = await import('@/models/CarryForwardItem')
+      expect(await CarryForwardItem.countDocuments({ standup: standup._id })).toBe(0)
+    }
+  )
+
   it('404s on a nonexistent standup', async () => {
     await expect(
       backfillStandup({
