@@ -34,6 +34,9 @@ More content here.
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // DocsLoader memoises its index; without this, each test observes the
+    // previous test's build and the fs mocks appear to do nothing.
+    DocsLoader.clearCache();
     
     // Mock file system
     mockedFs.existsSync.mockReturnValue(true);
@@ -76,17 +79,10 @@ More content here.
       const index = await DocsLoader.getIndex();
       const doc = index.nodes[0];
       
-      expect(doc.headings).toHaveLength(2);
-      expect(doc.headings[0]).toEqual({
-        level: 2,
-        text: 'Section 1',
-        id: 'section-1'
-      });
-      expect(doc.headings[1]).toEqual({
-        level: 2,
-        text: 'Section 2',
-        id: 'section-2'
-      });
+      expect(doc.headings).toHaveLength(3);
+      expect(doc.headings[0]).toEqual({ id: 'test-document', level: 1, text: 'Test Document' });
+      expect(doc.headings[1]).toEqual({ id: 'section-1', level: 2, text: 'Section 1' });
+      expect(doc.headings[2]).toEqual({ id: 'section-2', level: 2, text: 'Section 2' });
     });
   });
 
