@@ -10,6 +10,8 @@
  * transition, `startedAt`, version bump) and that AC-5 genuinely blocks a
  * sprint that never finished planning.
  */
+import { Types } from 'mongoose'
+
 import { Standup } from '@/models/Standup'
 import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
@@ -35,7 +37,8 @@ let taskCounter = 100
 async function seedSprintAndStandup(
   sprintStatus: 'planning' | 'active',
   standupStatus: 'Ready' | 'Scheduled',
-  scheduledStartAt: Date = new Date(Date.now() - 60_000)
+  scheduledStartAt: Date = new Date(Date.now() - 60_000),
+  roster: { expectedAttendees?: Types.ObjectId[]; attendance?: unknown[] } = {}
 ) {
   const sprint = await Sprint.create({
     organization,
@@ -92,7 +95,8 @@ async function seedSprintAndStandup(
     shape: 'mid_sprint',
     status: standupStatus,
     facilitator: user,
-    expectedAttendees: [],
+    expectedAttendees: roster.expectedAttendees ?? [],
+    attendance: roster.attendance ?? [],
     version: 0
   })
 
@@ -189,6 +193,83 @@ describe('startStandup (AC-5)', () => {
 
       const reloaded = await Standup.findById(standup._id)
       expect(reloaded!.status).toBe('Scheduled')
+    })
+  })
+
+  describe('attendance on start (RUN-6 / CC-7)', () => {
+    const memberA = new Types.ObjectId()
+    const memberB = new Types.ObjectId()
+    const memberC = new Types.ObjectId()
+
+    // Pinning: existing start behaviour must survive the RUN-6 change.
+    it('still flips Scheduled to In_Progress and bumps the version, persisted', async () => {
+      const { standup } = await seedSprintAndStandup('active', 'Scheduled', undefined, {
+        expectedAttendees: [memberA]
+      })
+
+      await startStandup({
+        standupId: standup._id.toString(),
+        startedBy: user.toString(),
+        expectedVersion: 0
+      })
+
+      const reloaded = await Standup.findById(standup._id).lean()
+      expect(reloaded!.status).toBe('In_Progress')
+      expect(reloaded!.version).toBe(1)
+    })
+
+    it('never overwrites an existing attendance record, in any state', async () => {
+      const { standup } = await seedSprintAndStandup('active', 'Ready', undefined, {
+        expectedAttendees: [memberA, memberB],
+        attendance: [{ user: memberA, state: 'absent_planned', reason: 'Leave' }]
+      })
+
+      await startStandup({
+        standupId: standup._id.toString(),
+        startedBy: user.toString(),
+        expectedVersion: 0
+      })
+
+      const reloaded = await Standup.findById(standup._id).lean()
+      const a = reloaded!.attendance.filter((e) => String(e.user) === String(memberA))
+      expect(a).toHaveLength(1)
+      expect(a[0].state).toBe('absent_planned')
+      expect(a[0].reason).toBe('Leave')
+    })
+    // The defect.
+    it('persists present for every expected attendee lacking a record', async () => {
+      const { standup } = await seedSprintAndStandup('active', 'Ready', undefined, {
+        expectedAttendees: [memberA, memberB, memberC]
+      })
+
+      await startStandup({
+        standupId: standup._id.toString(),
+        startedBy: user.toString(),
+        expectedVersion: 0
+      })
+
+      const reloaded = await Standup.findById(standup._id).lean()
+      expect(reloaded!.attendance).toHaveLength(3)
+      expect(reloaded!.attendance.every((entry) => entry.state === 'present')).toBe(true)
+    })
+
+    it('adds present only for members lacking a record when some already have one', async () => {
+      const { standup } = await seedSprintAndStandup('active', 'Ready', undefined, {
+        expectedAttendees: [memberA, memberB],
+        attendance: [{ user: memberA, state: 'absent_unplanned' }]
+      })
+
+      await startStandup({
+        standupId: standup._id.toString(),
+        startedBy: user.toString(),
+        expectedVersion: 0
+      })
+
+      const reloaded = await Standup.findById(standup._id).lean()
+      const byUser = new Map(reloaded!.attendance.map((e) => [String(e.user), e.state]))
+      expect(reloaded!.attendance).toHaveLength(2)
+      expect(byUser.get(String(memberA))).toBe('absent_unplanned')
+      expect(byUser.get(String(memberB))).toBe('present')
     })
   })
 })
