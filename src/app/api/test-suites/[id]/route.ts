@@ -6,6 +6,7 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { hasTestPermission } from '@/lib/permissions/test-permission-helper'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { isProjectTeamMember } from '@/lib/permissions/project-team-membership'
 
 export async function GET(
   req: NextRequest,
@@ -34,9 +35,7 @@ export async function GET(
     const roleStr = (authResult.user.role || '').toString()
     const hasRolePerm = await hasTestPermission(userIdStr, roleStr, Permission.TEST_SUITE_READ)
     const createdByStr = project?.createdBy?.toString?.()
-    const teamHasUser = Array.isArray(project?.teamMembers)
-      ? project!.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
-      : false
+    const teamHasUser = isProjectTeamMember(project, userIdStr)
     const roleHasUser = Array.isArray(project?.projectRoles)
       ? project!.projectRoles.some(
           (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
@@ -88,9 +87,7 @@ export async function PUT(
     const roleStr = (authResult.user.role || '').toString()
     const hasRolePerm = await hasTestPermission(userIdStr, roleStr, Permission.TEST_SUITE_UPDATE)
     const createdByStr = project?.createdBy?.toString?.()
-    const teamHasUser = Array.isArray(project?.teamMembers)
-      ? project!.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
-      : false
+    const teamHasUser = isProjectTeamMember(project, userIdStr)
     const roleHasUser = Array.isArray(project?.projectRoles)
       ? project!.projectRoles.some(
           (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)

@@ -6,6 +6,7 @@ import '@/models/TestCase' // Ensure TestCase model is registered for populate
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasTestPermission } from '@/lib/permissions/test-permission-helper'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { isProjectTeamMember } from '@/lib/permissions/project-team-membership'
 
 export async function GET(req: NextRequest) {
   try {
@@ -132,9 +133,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
     }
     const createdByStr = project.createdBy?.toString?.()
-    const teamHasUser = Array.isArray(project.teamMembers)
-      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
-      : false
+    const teamHasUser = isProjectTeamMember(project, userIdStr)
     const roleHasUser = Array.isArray(project.projectRoles)
       ? project.projectRoles.some(
           (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead'].includes(role.role)

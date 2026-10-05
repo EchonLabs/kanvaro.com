@@ -5,6 +5,7 @@ import { TestCase, TestSuite, Project } from '@/models'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasTestPermission } from '@/lib/permissions/test-permission-helper'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { isProjectTeamMember } from '@/lib/permissions/project-team-membership'
 
 export async function GET(req: NextRequest) {
   try {
@@ -137,9 +138,7 @@ export async function POST(req: NextRequest) {
     const createdByStr = project?.createdBy?.toString?.()
     const roleStr = (authResult.user.role || '').toString()
     const hasRolePerm = await hasTestPermission(userIdStr, roleStr, Permission.TEST_CASE_CREATE)
-    const teamHasUser = Array.isArray(project?.teamMembers)
-      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
-      : false
+    const teamHasUser = isProjectTeamMember(project, userIdStr)
     const hasAccess = !!project && (hasRolePerm || createdByStr === userIdStr || teamHasUser)
 
     if (!hasAccess) {

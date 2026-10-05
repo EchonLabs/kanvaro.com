@@ -5,6 +5,7 @@ import { TestCase, TestSuite, Project } from '@/models'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasTestPermission } from '@/lib/permissions/test-permission-helper'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { isProjectTeamMember } from '@/lib/permissions/project-team-membership'
 
 export async function GET(
   req: NextRequest,
@@ -32,9 +33,7 @@ export async function GET(
     const userIdStr_GET = authResult.user.id?.toString?.() || String(authResult.user.id)
     const roleStr_GET = (authResult.user.role || '').toString()
     const hasRolePerm_GET = await hasTestPermission(userIdStr_GET, roleStr_GET, Permission.TEST_CASE_READ)
-    const teamHasUser_GET = Array.isArray(project?.teamMembers)
-      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr_GET)
-      : false
+    const teamHasUser_GET = isProjectTeamMember(project, userIdStr_GET)
     const createdByStr_GET = project?.createdBy?.toString?.()
     const roleHasUser_GET = Array.isArray(project?.projectRoles)
       ? project.projectRoles.some(
@@ -101,9 +100,7 @@ export async function PUT(
     const userIdStr = authResult.user.id?.toString?.() || String(authResult.user.id)
     const roleStr = (authResult.user.role || '').toString()
     const hasRolePerm = await hasTestPermission(userIdStr, roleStr, Permission.TEST_CASE_UPDATE)
-    const teamHasUser = Array.isArray(project?.teamMembers)
-      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
-      : false
+    const teamHasUser = isProjectTeamMember(project, userIdStr)
     const createdByStr = project?.createdBy?.toString?.()
     const roleHasUser = Array.isArray(project?.projectRoles)
       ? project.projectRoles.some(
@@ -185,9 +182,7 @@ export async function DELETE(
     const userIdStr_DEL = authResult.user.id?.toString?.() || String(authResult.user.id)
     const roleStr_DEL = (authResult.user.role || '').toString()
     const hasRolePerm_DEL = await hasTestPermission(userIdStr_DEL, roleStr_DEL, Permission.TEST_CASE_DELETE)
-    const teamHasUser_DEL = Array.isArray(project?.teamMembers)
-      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr_DEL)
-      : false
+    const teamHasUser_DEL = isProjectTeamMember(project, userIdStr_DEL)
     const createdByStr_DEL = project?.createdBy?.toString?.()
     const roleHasUser_DEL = Array.isArray(project?.projectRoles)
       ? project.projectRoles.some(

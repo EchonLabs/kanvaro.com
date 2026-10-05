@@ -6,6 +6,7 @@ import '@/models/TestCase' // Ensure TestCase model is registered for populate
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasTestPermission } from '@/lib/permissions/test-permission-helper'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { isProjectTeamMember } from '@/lib/permissions/project-team-membership'
 
 export async function GET(
   req: NextRequest,
@@ -35,9 +36,7 @@ export async function GET(
     const roleStr_GET = (((authResult as any)?.user?.role ?? (authResult as any)?.role) || '').toString()
     const hasRolePerm_GET = await hasTestPermission(userIdStr_GET, roleStr_GET, Permission.TEST_PLAN_READ)
     const createdByStr_GET = project?.createdBy?.toString?.()
-    const teamHasUser_GET = Array.isArray(project?.teamMembers)
-      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr_GET)
-      : false
+    const teamHasUser_GET = isProjectTeamMember(project, userIdStr_GET)
     const roleHasUser_GET = Array.isArray(project?.projectRoles)
       ? project.projectRoles.some(
           (role: any) => role?.user?.toString?.() === userIdStr_GET && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
@@ -100,9 +99,7 @@ export async function PUT(
     const roleStr_PUT = (((authResult as any)?.user?.role ?? (authResult as any)?.role) || '').toString()
     const hasRolePerm_PUT = await hasTestPermission(userIdStr_PUT, roleStr_PUT, Permission.TEST_PLAN_UPDATE)
     const createdByStr_PUT = project?.createdBy?.toString?.()
-    const teamHasUser_PUT = Array.isArray(project?.teamMembers)
-      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr_PUT)
-      : false
+    const teamHasUser_PUT = isProjectTeamMember(project, userIdStr_PUT)
     const roleHasUser_PUT = Array.isArray(project?.projectRoles)
       ? project.projectRoles.some(
           (role: any) => role?.user?.toString?.() === userIdStr_PUT && ['project_manager', 'project_qa_lead'].includes(role.role)
@@ -175,9 +172,7 @@ export async function DELETE(
     const roleStr_DEL = (((authResult as any)?.user?.role ?? (authResult as any)?.role) || '').toString()
     const hasRolePerm_DEL = await hasTestPermission(userIdStr_DEL, roleStr_DEL, Permission.TEST_PLAN_DELETE)
     const createdByStr_DEL = project?.createdBy?.toString?.()
-    const teamHasUser_DEL = Array.isArray(project?.teamMembers)
-      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr_DEL)
-      : false
+    const teamHasUser_DEL = isProjectTeamMember(project, userIdStr_DEL)
     const roleHasUser_DEL = Array.isArray(project?.projectRoles)
       ? project.projectRoles.some(
           (role: any) => role?.user?.toString?.() === userIdStr_DEL && ['project_manager', 'project_qa_lead'].includes(role.role)
