@@ -221,11 +221,17 @@ export default function StandupRunPage({
     // the route's own contract (a `Missed` stand-up was never edited under a
     // version the PM could have read), so this is a plain `fetch`, not
     // `mutate()`, the same way `overrides`/`blockers` above are.
-    async backfill({ notes }) {
+    async backfill({ notes, attendance }) {
       const response = await fetch(`/api/standups/${standupId}/backfill`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(notes ? { notes } : {})
+        // SCH-14's run payload: the attendance the dialog collected has to
+        // reach the service, or CC-7 (hard, non-overridable) rejects every
+        // backfill of a day whose room was never recorded.
+        body: JSON.stringify({
+          ...(notes ? { notes } : {}),
+          ...(attendance?.length ? { attendance } : {})
+        })
       })
       return unwrap(response)
     },

@@ -459,6 +459,16 @@ export const standupStrings = {
     backfillTitle: () => 'Backfill this stand-up',
     backfillDescription: () =>
       "This day was missed. Backfilling completes it using today's board as recorded, so it counts toward the sprint's history.",
+    /**
+     * SCH-14's "full run payload". A missed day has no attendance recorded by
+     * definition, and CC-7 is hard and non-overridable, so the dialog has to
+     * collect the room before it can complete anything. `partial` is
+     * deliberately absent from the options: reconstructing partial-day minutes
+     * after the fact is guesswork.
+     */
+    backfillAttendanceLegend: () => 'Who attended?',
+    backfillAttendanceUnrecorded: () => 'Not recorded',
+    backfillAttendanceFor: (name: string) => `Backfill attendance for ${name}`,
     backfillNotesLabel: () => 'Notes (optional)',
     backfillCancel: () => 'Cancel',
     backfillConfirm: () => 'Backfill',

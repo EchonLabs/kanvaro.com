@@ -365,7 +365,15 @@ export interface RunScreenApi {
    * this takes no `expectedVersion`, unlike `completeStandup` above. Optional
    * so the header's Backfill action only renders once wired.
    */
-  backfill?(input: { notes?: string }): Promise<{ status: string; summaryId: string }>
+  backfill?(input: {
+    notes?: string
+    /**
+     * SCH-14's run payload. A `Missed` stand-up has no attendance recorded,
+     * and CC-7 is hard and non-overridable, so without this the backfill
+     * always 422s on its own gate.
+     */
+    attendance?: { memberId: string; state: AttendanceStatus }[]
+  }): Promise<{ status: string; summaryId: string }>
 
   // --- Phase 8 -------------------------------------------------------------
   // Optional so a caller that has not wired Panels 2 and 3 yet still compiles;
@@ -931,16 +939,35 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
    */
   const [backfilling, setBackfilling] = useState(false)
   const [backfillNotes, setBackfillNotes] = useState('')
+  // Keyed by memberId; a member missing from the map is simply unrecorded,
+  // which the Backfill button refuses to submit (CC-7 would reject it anyway,
+  // and a 422 after the fact is a worse way to learn it).
+  const [backfillAttendance, setBackfillAttendance] = useState<
+    Record<string, AttendanceStatus>
+  >({})
   const [backfillSubmitting, setBackfillSubmitting] = useState(false)
+
+  // CC-7 needs every expected attendee recorded, so the dialog refuses to
+  // submit a half-filled room rather than letting the saga 422 on it.
+  const backfillAttendanceComplete = board.members.every((member) =>
+    Boolean(backfillAttendance[member.memberId])
+  )
 
   const onBackfill = useCallback(async () => {
     if (!api.backfill) return
     setBackfillSubmitting(true)
     setNotice(null)
     try {
-      await api.backfill({ notes: backfillNotes.trim() || undefined })
+      await api.backfill({
+        notes: backfillNotes.trim() || undefined,
+        attendance: Object.entries(backfillAttendance).map(([memberId, state]) => ({
+          memberId,
+          state
+        }))
+      })
       setBackfilling(false)
       setBackfillNotes('')
+      setBackfillAttendance({})
       setNotice(standupStrings.run.backfillSuccess())
       await reload()
     } catch (error) {
@@ -957,7 +984,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     } finally {
       setBackfillSubmitting(false)
     }
-  }, [api, backfillNotes, reload])
+  }, [api, backfillAttendance, backfillNotes, reload])
 
   /**
    * E57/§15.8.2. A live, client-side-only elapsed-time indicator — advisory
@@ -1664,6 +1691,43 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
               </p>
             </div>
 
+            <fieldset className="flex flex-col gap-2">
+              <legend className="apple-type-subheadline font-medium text-[var(--plan-text)]">
+                {standupStrings.run.backfillAttendanceLegend()}
+              </legend>
+              {board.members.map((member) => (
+                <label
+                  key={member.memberId}
+                  className="flex items-center justify-between gap-3 apple-type-subheadline text-[var(--plan-text)]"
+                >
+                  <span className="truncate">{member.name}</span>
+                  <select
+                    aria-label={standupStrings.run.backfillAttendanceFor(member.name)}
+                    value={backfillAttendance[member.memberId] ?? ''}
+                    onChange={(event) =>
+                      setBackfillAttendance((current) => ({
+                        ...current,
+                        [member.memberId]: event.target.value as AttendanceStatus
+                      }))
+                    }
+                    className={cn(planFieldClass, 'w-40 px-2')}
+                    disabled={backfillSubmitting}
+                  >
+                    <option value="" disabled>
+                      {standupStrings.run.backfillAttendanceUnrecorded()}
+                    </option>
+                    <option value="present">{standupStrings.run.statePresent()}</option>
+                    <option value="absent_planned">
+                      {standupStrings.run.stateAbsentPlanned()}
+                    </option>
+                    <option value="absent_unplanned">
+                      {standupStrings.run.stateAbsentUnplanned()}
+                    </option>
+                  </select>
+                </label>
+              ))}
+            </fieldset>
+
             <label className="flex flex-col gap-1.5 apple-type-subheadline text-[var(--plan-text)]">
               {standupStrings.run.backfillNotesLabel()}
               <textarea
@@ -1686,7 +1750,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
               <button
                 type="button"
                 onClick={() => void onBackfill()}
-                disabled={backfillSubmitting}
+                disabled={backfillSubmitting || !backfillAttendanceComplete}
                 className={planButtonClass('danger')}
               >
                 {standupStrings.run.backfillConfirm()}
