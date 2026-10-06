@@ -421,7 +421,7 @@ export default function CreateTaskPage() {
 
       if (data.success) {
         notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
-        router.push('/tasks')
+        router.push('/backlog')
         setAttachments([])
       } else {
         notifyError({ title: 'Failed to Create Task', message: data.error || 'Failed to create task' })
