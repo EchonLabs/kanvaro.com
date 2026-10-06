@@ -43,6 +43,7 @@ interface MyStandupBoard {
   projectId: string
   sprintId: string
   projectName: string
+  sprintName: string
   scheduledStartAt?: string
   durationMinutes?: number
   meetingUrl?: string
@@ -181,6 +182,7 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
             projectId: board.projectId,
             sprintId: board.sprintId,
             projectName: board.projectName,
+            sprintName: board.sprintName,
             scheduledStartAt: board.scheduledStartAt,
             durationMinutes: board.durationMinutes,
             meetingUrl: board.meetingUrl,
@@ -309,6 +311,7 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
             projectId={data.projectId}
             sprintId={data.sprintId}
             projectName={data.projectName}
+            sprintName={data.sprintName}
             member={data.member}
             poolTasks={data.poolTasks}
             /* Deliberately unconditional. P11-6 makes the server the real gate:

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Check, ChevronsUpDown } from 'lucide-react'
+import { Check, ChevronsUpDown, ListFilter } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
 import {
@@ -22,6 +22,9 @@ export interface ProjectSwitcherProps {
   currentStandupId: string
   currentProjectId?: string
   currentProjectName?: string
+  /** Shown alongside the project name so the viewer can tell which sprint
+   *  each option is for without opening it first. */
+  currentSprintName?: string
   /** Every open stand-up the viewer is expected at, the current one included. */
   candidates: readonly StandupCandidate[]
   locale?: string
@@ -49,13 +52,24 @@ function formatLocalTime(iso: string, locale?: string): string {
  * is the selector, and because the meeting link, pool and capacity all belong
  * to one project's stand-up, switching it switches all of them.
  *
- * Rendered as plain text rather than a menu when there is only one stand-up to
- * choose from — a dropdown with a single item is a control that does nothing.
+ * Sits in the header's action row beside "Open full stand-up" — not in the
+ * breadcrumb, which shows the project name as plain static text instead, so
+ * there is exactly one place on screen offering to change what you are
+ * looking at. Styled to match that button's visual weight (an outlined
+ * sibling, not a quiet inline link) because it is now a destination in its
+ * own right rather than breadcrumb trim.
+ *
+ * Rendered as a non-interactive chip rather than a menu when there is only
+ * one stand-up to choose from — a dropdown with a single item is a control
+ * that does nothing — but the project/sprint context still shows, so a
+ * member with only one open stand-up is not left wondering where the filter
+ * went.
  */
 export function ProjectSwitcher({
   currentStandupId,
   currentProjectId,
   currentProjectName,
+  currentSprintName,
   candidates,
   locale
 }: ProjectSwitcherProps) {
@@ -74,7 +88,9 @@ export function ProjectSwitcher({
                 status: '',
                 scheduledStartAt: '',
                 projectId: currentProjectId,
-                projectName: currentProjectName
+                projectName: currentProjectName,
+                sprintId: '',
+                sprintName: currentSprintName ?? ''
               } satisfies StandupCandidate
             ]
           : []),
@@ -83,23 +99,45 @@ export function ProjectSwitcher({
 
   const selected = options.find((option) => option.standupId === currentStandupId)
   const label = selected?.projectName || currentProjectName
+  const sprintLabel = selected?.sprintName || currentSprintName
 
   if (!label) return null
 
   if (options.length < 2) {
-    return <span className="truncate font-medium text-[var(--my-blue)]">{label}</span>
+    return (
+      <span className="inline-flex h-9 max-w-[16rem] items-center gap-2 rounded-[var(--apple-radius-pill)] border border-[var(--apple-separator)] px-4 text-[var(--apple-label)]">
+        <ListFilter className="h-4 w-4 shrink-0 opacity-70" strokeWidth={2} aria-hidden />
+        <span className="flex min-w-0 flex-col items-start truncate text-left">
+          <span className="truncate apple-type-footnote font-semibold leading-tight">
+            {label}
+          </span>
+          {sprintLabel ? (
+            <span className="truncate apple-type-caption leading-tight text-[var(--apple-secondary-label)]">
+              {sprintLabel}
+            </span>
+          ) : null}
+        </span>
+      </span>
+    )
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="ghost"
-          size="sm"
+          variant="outline"
           aria-label={standupStrings.my.switchProject()}
-          className="-mx-2 h-auto max-w-[16rem] gap-1.5 px-2 py-0.5 apple-type-subheadline font-medium text-[var(--my-blue)] hover:bg-[var(--my-blue-tint)]"
+          className="h-auto max-w-[16rem] gap-2 px-4 py-1.5 font-semibold"
         >
-          <span className="truncate">{label}</span>
+          <ListFilter className="h-4 w-4 shrink-0 opacity-70" strokeWidth={2} aria-hidden />
+          <span className="flex min-w-0 flex-col items-start truncate text-left">
+            <span className="truncate apple-type-footnote leading-tight">{label}</span>
+            {sprintLabel ? (
+              <span className="truncate apple-type-caption font-normal leading-tight text-[var(--apple-secondary-label)]">
+                {sprintLabel}
+              </span>
+            ) : null}
+          </span>
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-70" strokeWidth={2} aria-hidden />
         </Button>
       </DropdownMenuTrigger>
@@ -127,8 +165,15 @@ export function ProjectSwitcher({
                 strokeWidth={2.5}
                 aria-hidden
               />
-              <span className="min-w-0 flex-1 truncate apple-type-subheadline font-medium">
-                {option.projectName}
+              <span className="flex min-w-0 flex-1 flex-col truncate">
+                <span className="truncate apple-type-subheadline font-medium">
+                  {option.projectName}
+                </span>
+                {option.sprintName ? (
+                  <span className="truncate apple-type-footnote text-[var(--apple-secondary-label)]">
+                    {option.sprintName}
+                  </span>
+                ) : null}
               </span>
               {option.scheduledStartAt ? (
                 <span className="font-apple-mono shrink-0 tabular-nums apple-type-caption text-[var(--apple-secondary-label)]">

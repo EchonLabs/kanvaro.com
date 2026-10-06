@@ -17,11 +17,19 @@ function candidate(overrides: Partial<StandupCandidate> = {}): StandupCandidate 
     scheduledStartAt: '2026-09-05T09:00:00.000Z',
     projectId: 'p1',
     projectName: 'Project Alpha',
+    sprintId: 'sp1',
+    sprintName: 'Sprint 3',
     ...overrides
   }
 }
 
-const beta = candidate({ standupId: 's2', projectId: 'p2', projectName: 'Project Beta' })
+const beta = candidate({
+  standupId: 's2',
+  projectId: 'p2',
+  projectName: 'Project Beta',
+  sprintId: 'sp2',
+  sprintName: 'Sprint 7'
+})
 
 /** Radix opens its trigger on `pointerdown`, which jsdom does not synthesise
  *  from a click; the keyboard path it also supports is the reliable one here. */
@@ -32,7 +40,7 @@ function open(name = /switch project/i) {
 describe('ProjectSwitcher', () => {
   afterEach(() => mockPush.mockClear())
 
-  it('renders plain text, not a menu, when there is only one stand-up', () => {
+  it('renders a non-interactive chip, not a menu, when there is only one stand-up', () => {
     render(
       <ProjectSwitcher
         currentStandupId="s1"
@@ -116,5 +124,57 @@ describe('ProjectSwitcher', () => {
     )
     open()
     expect(screen.getAllByRole('menuitem')).toHaveLength(2)
+  })
+
+  it('shows the current sprint name beside the project on the trigger', () => {
+    render(
+      <ProjectSwitcher
+        currentStandupId="s1"
+        currentProjectId="p1"
+        currentProjectName="Project Alpha"
+        candidates={[candidate(), beta]}
+      />
+    )
+    expect(screen.getByRole('button', { name: /switch project/i })).toHaveTextContent('Sprint 3')
+  })
+
+  it('shows each option’s own sprint name in the menu', () => {
+    render(
+      <ProjectSwitcher
+        currentStandupId="s1"
+        currentProjectId="p1"
+        currentProjectName="Project Alpha"
+        candidates={[candidate(), beta]}
+      />
+    )
+    open()
+    const items = screen.getAllByRole('menuitem')
+    expect(items[0]).toHaveTextContent('Sprint 3')
+    expect(items[1]).toHaveTextContent('Sprint 7')
+  })
+
+  it('falls back to the union-in fallback’s currentSprintName when the dropped stand-up has no candidate row to supply one', () => {
+    render(
+      <ProjectSwitcher
+        currentStandupId="s9"
+        currentProjectId="p1"
+        currentProjectName="Project Alpha"
+        currentSprintName="Sprint 9"
+        candidates={[beta]}
+      />
+    )
+    expect(screen.getByRole('button', { name: /switch project/i })).toHaveTextContent('Sprint 9')
+  })
+
+  it('renders the sprint name in the single-option plain-text path too', () => {
+    render(
+      <ProjectSwitcher
+        currentStandupId="s1"
+        currentProjectId="p1"
+        currentProjectName="Project Alpha"
+        candidates={[candidate()]}
+      />
+    )
+    expect(screen.getByText('Sprint 3')).toBeInTheDocument()
   })
 })

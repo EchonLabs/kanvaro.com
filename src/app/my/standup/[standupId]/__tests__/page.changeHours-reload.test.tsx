@@ -52,6 +52,7 @@ const board = {
   projectId: 'p1',
   sprintId: 'sp1',
   projectName: 'Acme Redesign',
+  sprintName: 'Sprint 3',
   members: [
     {
       memberId: 'u1',

@@ -81,9 +81,12 @@ export interface MyStandupScreenProps {
    *  be resolved. */
   projectId?: string
   sprintId?: string
-  /** Shown in the header's breadcrumb so a member on more than one project's
-   *  sprint team can tell at a glance which stand-up this is. */
+  /** Shown in the header's breadcrumb, as plain text, so a member on more
+   *  than one project's sprint team can tell at a glance which stand-up this
+   *  is. Not a control — the filter button in the action row is. */
   projectName?: string
+  /** Shown on the filter button beside the project name. */
+  sprintName?: string
   member: MyStandupMember
   poolTasks: readonly MyStandupPoolTask[]
   allowSelfSelect: boolean
@@ -97,7 +100,7 @@ export interface MyStandupScreenProps {
   sprintDayNumber?: number
   totalSprintDays?: number
   /** Every open stand-up the viewer is expected at, this one included — the
-   *  header's project switcher is the control over them. */
+   *  header's filter button is the control over them. */
   standupsToday?: StandupCandidate[]
   yesterday?: YesterdayPanelData
   variance?: VariancePanel
@@ -117,6 +120,7 @@ export function MyStandupScreen({
   projectId,
   sprintId,
   projectName,
+  sprintName,
   member,
   poolTasks,
   allowSelfSelect,
@@ -215,18 +219,15 @@ export function MyStandupScreen({
             >
               {standupStrings.my.breadcrumbRoot()}
             </Link>
-            {projectName || standupsToday.length > 0 ? (
+            {/* Plain text, not a control — switching projects lives on the
+                filter button in the action row below, so there is exactly
+                one place on screen that changes what you are looking at. */}
+            {projectName ? (
               <>
                 <span aria-hidden className="text-[var(--my-subtle)]">
                   /
                 </span>
-                <ProjectSwitcher
-                  currentStandupId={standupId}
-                  currentProjectId={projectId}
-                  currentProjectName={projectName}
-                  candidates={standupsToday}
-                  locale={locale}
-                />
+                <span className="truncate font-medium text-[var(--my-blue)]">{projectName}</span>
               </>
             ) : null}
           </nav>
@@ -234,20 +235,37 @@ export function MyStandupScreen({
             {standupStrings.my.title()}
           </h1>
         </div>
-        {canViewSchedule ? (
-          // Points at the project's stand-up schedule hub, matching the
-          // "Stand-ups" button on the sprint page (src/app/sprints/[id]/page.tsx)
-          // so the two surfaces land in the same place rather than one going
-          // to the hub and the other straight to a single day's meeting.
-          <Button
-            type="button"
-            onClick={() => router.push(`/projects/${projectId}/standups`)}
-            className="gap-2 font-semibold"
-          >
-            <ExternalLink className="h-4 w-4" strokeWidth={2} aria-hidden />
-            {standupStrings.my.openFullStandup()}
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Lets a member on more than one project's sprint team jump to
+              another open stand-up, or just see which project/sprint this
+              one belongs to. Not gated on canViewSchedule — unlike "Open full
+              stand-up", every member gets this, not just whoever can run the
+              project's stand-ups. */}
+          {projectName || standupsToday.length > 0 ? (
+            <ProjectSwitcher
+              currentStandupId={standupId}
+              currentProjectId={projectId}
+              currentProjectName={projectName}
+              currentSprintName={sprintName}
+              candidates={standupsToday}
+              locale={locale}
+            />
+          ) : null}
+          {canViewSchedule ? (
+            // Points at the project's stand-up schedule hub, matching the
+            // "Stand-ups" button on the sprint page (src/app/sprints/[id]/page.tsx)
+            // so the two surfaces land in the same place rather than one going
+            // to the hub and the other straight to a single day's meeting.
+            <Button
+              type="button"
+              onClick={() => router.push(`/projects/${projectId}/standups`)}
+              className="gap-2 font-semibold"
+            >
+              <ExternalLink className="h-4 w-4" strokeWidth={2} aria-hidden />
+              {standupStrings.my.openFullStandup()}
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       <div className="flex w-full flex-col gap-3">

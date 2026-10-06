@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within, fireEvent } from '@testing-library/react'
 import { MyStandupScreen } from '../my/MyStandupScreen'
 import type { CapacityBreakdown } from '@/lib/standup/capacity'
 import { minutes } from '@/lib/standup/minutes'
@@ -282,14 +282,18 @@ describe('MyStandupScreen', () => {
           status: 'Ready',
           scheduledStartAt: '2026-09-05T09:00:00.000Z',
           projectId: 'p1',
-          projectName: 'Project Alpha'
+          projectName: 'Project Alpha',
+          sprintId: 'sp1',
+          sprintName: 'Sprint 3'
         },
         {
           standupId: 's2',
           status: 'Ready',
           scheduledStartAt: '2026-09-05T09:30:00.000Z',
           projectId: 'p2',
-          projectName: 'Project Beta'
+          projectName: 'Project Beta',
+          sprintId: 'sp2',
+          sprintName: 'Sprint 7'
         }
       ]
     })
@@ -337,9 +341,24 @@ describe('MyStandupScreen', () => {
   })
 
   describe('the project-name subtitle (a member on more than one project needs to tell them apart)', () => {
-    it('shows the project name in the page header when known', () => {
+    it('shows the project name as plain text in the breadcrumb, not a control', () => {
       setup({ projectName: 'Acme Redesign' })
-      expect(screen.getByText('Acme Redesign')).toBeInTheDocument()
+      const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i })
+      expect(within(breadcrumb).getByText('Acme Redesign')).toBeInTheDocument()
+      // Plain text, not the filter button — switching projects is that
+      // button's job now, not the breadcrumb's.
+      expect(
+        within(breadcrumb).queryByRole('button', { name: /switch project/i })
+      ).not.toBeInTheDocument()
+    })
+
+    it('also shows the project name on the filter button in the action row', () => {
+      setup({ projectId: 'p1', projectName: 'Acme Redesign' })
+      // Single open stand-up (the default fixture), so the filter button
+      // renders as the non-interactive chip, not a dropdown — see
+      // ProjectSwitcher.test.tsx for that control's own behaviour.
+      const matches = screen.getAllByText('Acme Redesign')
+      expect(matches).toHaveLength(2)
     })
   })
 })

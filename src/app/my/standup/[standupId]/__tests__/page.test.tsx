@@ -40,6 +40,7 @@ const board = {
   projectId: 'p1',
   sprintId: 'sp1',
   projectName: 'Acme Redesign',
+  sprintName: 'Sprint 3',
   members: [
     {
       memberId: 'u1',
@@ -99,7 +100,10 @@ describe('MyStandupDetailPage — the board’s projectId/sprintId/projectName r
 
     render(<MyStandupDetailPage params={{ standupId: 's1' }} />)
 
-    expect(await screen.findByText('Acme Redesign')).toBeInTheDocument()
+    // Appears twice now: the breadcrumb (plain text) and the filter button
+    // beside "Open full stand-up" (ProjectSwitcher.test.tsx covers that
+    // button's own behaviour in full).
+    expect(await screen.findAllByText('Acme Redesign')).toHaveLength(2)
 
     fireEvent.click(screen.getByRole('button', { name: /open full stand-up/i }))
     expect(push).toHaveBeenCalledWith('/projects/p1/standups')
