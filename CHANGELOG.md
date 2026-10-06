@@ -1,3 +1,12 @@
+## [1.45.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.6...v1.45.7) (2026-10-06)
+
+
+### Bug Fixes
+
+* prevent duplicate task overdue reminders ([f32c201](https://github.com/EchonLabs/kanvaro.com/commit/f32c20151908127c860d58c09e3aef171b67eeb9))
+* sync daily hours logged with client timezone in timer API ([6c948db](https://github.com/EchonLabs/kanvaro.com/commit/6c948dbbb2eeb69d4de98957fbf172a1896bfbe6))
+* update task category dropdown on delete and category migration in task forms ([dd35b8e](https://github.com/EchonLabs/kanvaro.com/commit/dd35b8eca52087d6e662c71fcd6deefa6a91599b))
+
 ## [1.45.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.5...v1.45.6) (2026-10-05)
 
 
