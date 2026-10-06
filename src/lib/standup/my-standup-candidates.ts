@@ -7,6 +7,7 @@
  * see the ones it used to drop.
  */
 import { Project } from '@/models/Project'
+import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
 
 export interface StandupCandidate {
@@ -15,6 +16,9 @@ export interface StandupCandidate {
   scheduledStartAt: string
   projectId: string
   projectName: string
+  sprintId: string
+  /** Empty string if the sprint record could not be found. */
+  sprintName: string
 }
 
 const PRIORITY = ['In_Progress', 'Ready', 'Scheduled']
@@ -28,7 +32,7 @@ export async function findOpenStandupCandidates(input: {
     expectedAttendees: input.userId,
     status: { $in: PRIORITY }
   })
-    .select('status scheduledStartAt project')
+    .select('status scheduledStartAt project sprint')
     .sort({ scheduledStartAt: 1 })
     .lean()) as any[]
 
@@ -39,6 +43,14 @@ export async function findOpenStandupCandidates(input: {
     .select('name')
     .lean()) as any[]
   const projectNameById = new Map(projects.map((project) => [String(project._id), project.name]))
+
+  // My Stand-up's relocated project/sprint filter (beside "Open full
+  // stand-up") needs this to label each option; nothing read it before.
+  const sprintIds = Array.from(new Set(rows.map((row) => String(row.sprint))))
+  const sprints = (await Sprint.find({ _id: { $in: sprintIds } })
+    .select('name')
+    .lean()) as any[]
+  const sprintNameById = new Map(sprints.map((sprint) => [String(sprint._id), sprint.name]))
 
   const byPriorityThenTime = [...rows].sort((a, b) => {
     const priorityDiff = PRIORITY.indexOf(a.status) - PRIORITY.indexOf(b.status)
@@ -51,6 +63,8 @@ export async function findOpenStandupCandidates(input: {
     status: row.status,
     scheduledStartAt: new Date(row.scheduledStartAt).toISOString(),
     projectId: String(row.project),
-    projectName: projectNameById.get(String(row.project)) ?? ''
+    projectName: projectNameById.get(String(row.project)) ?? '',
+    sprintId: String(row.sprint),
+    sprintName: sprintNameById.get(String(row.sprint)) ?? ''
   }))
 }

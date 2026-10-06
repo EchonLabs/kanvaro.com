@@ -509,16 +509,17 @@ describe('loadAllocationBoard', () => {
   })
 
   /**
-   * UI-12's My Stand-up screen needs these to link straight to this exact
-   * sprint's stand-up run screen, rather than the project-wide schedule hub —
-   * and to show which project a member on more than one is looking at.
+   * UI-12's My Stand-up screen needs these to link to the project's stand-up
+   * schedule hub, and to label its relocated project/sprint filter (beside
+   * "Open full stand-up") for a member on more than one project's sprint team.
    */
-  it('carries projectId, sprintId and the project name', async () => {
+  it('carries projectId, sprintId, the project name and the sprint name', async () => {
     const board = await loadAllocationBoard(standupId)
 
     expect(board.projectId).toBe(String(project))
     expect(board.sprintId).toBe(String(sprint))
     expect(board.projectName).toBe('Invoicing Revamp')
+    expect(board.sprintName).toBe('Sprint 21')
   })
 
   it('carries DN-6’s flag so the board can explain undeducted ceremonies (OB-10)', async () => {
