@@ -1,16 +1,17 @@
 'use client'
 
 /**
- * Hosts the three stand-up configuration screens inside the project Settings
+ * Hosts the three stand-up configuration screens inside the project Stand-ups
  * tab (spec §15.2, §15.3, §15.4).
  *
- * Kanvaro's information architecture is flat — project settings are a tab, not a
- * nested route — so these live as sub-views here rather than at
- * `/projects/[id]/settings/calendar` as the spec's own §15.1 tree suggests.
+ * Kanvaro's information architecture is flat — a project's sections are tabs, not
+ * nested routes — so these live as sub-views here rather than at
+ * `/projects/[id]/settings/calendar` as the spec's own §15.1 tree suggests. The
+ * tab that owns this panel supplies the heading and the link to the schedule
+ * hub, so what is left here is the configuration itself.
  */
 import { useRef, useState, type KeyboardEvent } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowRight, CalendarDays, Settings2, Users } from 'lucide-react'
+import { CalendarDays, Settings2, Users } from 'lucide-react'
 
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -37,7 +38,6 @@ const tabId = (view: StandupSettingsView) => `standup-settings-tab-${view}`
 const panelId = (view: StandupSettingsView) => `standup-settings-panel-${view}`
 
 export function StandupSettingsPanel({ projectId }: { projectId: string }) {
-  const router = useRouter()
   const [view, setView] = useState<StandupSettingsView>('calendar')
   const { hasPermission, loading, permissions } = usePermissions()
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -117,25 +117,8 @@ export function StandupSettingsPanel({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="space-y-5 border-t border-[var(--apple-separator)] pt-6">
+    <div className="space-y-5">
       <div className="space-y-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-foreground">Stand-ups</h3>
-            <p className="text-sm text-muted-foreground">
-              Working days, stand-up rules, and each member&rsquo;s real daily capacity.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => router.push(`/projects/${projectId}/standups`)}
-            className="apple-transition flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[var(--apple-system-blue)] px-4 text-[13px] font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)] focus-visible:ring-offset-2"
-          >
-            Scheduled Stand-ups
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
         {/* Full-width pill segmented control, matching the global Settings page's tablist. */}
         <div
           role="tablist"
