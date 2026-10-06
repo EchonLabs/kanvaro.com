@@ -74,9 +74,11 @@ export interface MyStandupScreenProps {
   standupVersion: number
   status: string
   date: string
-  /** Lets a PM jump straight from their own stand-up screen to this exact
-   *  sprint's stand-up run screen. Paired with `sprintId`; the button is
-   *  omitted entirely when either could not be resolved. */
+  /** Lets a PM jump from their own stand-up screen to the project's stand-up
+   *  schedule hub. Paired with `sprintId`, which gates the button on a
+   *  concrete sprint stand-up existing even though the destination URL only
+   *  needs `projectId`; the button is omitted entirely when either could not
+   *  be resolved. */
   projectId?: string
   sprintId?: string
   /** Shown in the header's breadcrumb so a member on more than one project's
@@ -138,12 +140,12 @@ export function MyStandupScreen({
   const router = useRouter()
   const { hasPermission } = usePermissions()
 
-  // A PM lands here to run their own stand-up, but often also wants the full
-  // run screen for the same sprint — today that means leaving to hunt for it
-  // via the project. Gated the same way `PlanningWorkspace`'s facilitator
-  // controls are, so the button only ever appears for someone who could
-  // actually use the destination, and only once there is a concrete sprint
-  // stand-up to link to.
+  // A PM lands here to run their own stand-up, but often also wants the
+  // project's full stand-up schedule — the same destination the sprint
+  // page's "Stand-ups" button goes to. Gated the same way
+  // `PlanningWorkspace`'s facilitator controls are, so the button only ever
+  // appears for someone who could actually use the destination, and only
+  // once there is a concrete sprint stand-up to link to.
   const canViewSchedule =
     Boolean(projectId) && Boolean(sprintId) && hasPermission(Permission.SPRINT_UPDATE, projectId)
 
@@ -233,9 +235,13 @@ export function MyStandupScreen({
           </h1>
         </div>
         {canViewSchedule ? (
+          // Points at the project's stand-up schedule hub, matching the
+          // "Stand-ups" button on the sprint page (src/app/sprints/[id]/page.tsx)
+          // so the two surfaces land in the same place rather than one going
+          // to the hub and the other straight to a single day's meeting.
           <Button
             type="button"
-            onClick={() => router.push(`/projects/${projectId}/sprints/${sprintId}/standups/${standupId}`)}
+            onClick={() => router.push(`/projects/${projectId}/standups`)}
             className="gap-2 font-semibold"
           >
             <ExternalLink className="h-4 w-4" strokeWidth={2} aria-hidden />

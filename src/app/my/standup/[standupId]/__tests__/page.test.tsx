@@ -92,7 +92,7 @@ describe('MyStandupDetailPage — the board’s projectId/sprintId/projectName r
     jest.clearAllMocks()
   })
 
-  it('shows the project name and points "open full stand-up" at this exact sprint stand-up', async () => {
+  it('shows the project name and points "open full stand-up" at the project\'s schedule hub', async () => {
     global.fetch = mockFetch() as any
     const push = jest.fn()
     ;(useRouter as jest.Mock).mockReturnValue({ push })
@@ -102,6 +102,6 @@ describe('MyStandupDetailPage — the board’s projectId/sprintId/projectName r
     expect(await screen.findByText('Acme Redesign')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /open full stand-up/i }))
-    expect(push).toHaveBeenCalledWith('/projects/p1/sprints/sp1/standups/s1')
+    expect(push).toHaveBeenCalledWith('/projects/p1/standups')
   })
 })

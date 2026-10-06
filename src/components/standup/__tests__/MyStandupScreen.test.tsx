@@ -320,18 +320,19 @@ describe('MyStandupScreen', () => {
     })
 
     /**
-     * The old destination was the project-wide schedule hub
-     * (`/projects/:id/standups`) — a PM landing here still had to find today's
-     * stand-up in a list. Linking straight to this sprint's stand-up run
-     * screen (`standupId` is this screen's own `standupId` prop, "s1" in
-     * `setup()`) takes them to the exact meeting instead.
+     * Matches the "Stand-ups" button on the sprint page
+     * (`src/app/sprints/[id]/page.tsx`), which also goes to
+     * `/projects/:id/standups` — so the two surfaces land in the same place
+     * rather than one going to the schedule hub and the other straight to a
+     * single day's meeting. `sprintId` still gates whether the button
+     * appears at all (see `canViewSchedule`); it is not part of the URL.
      */
-    it('navigates straight to this sprint’s stand-up for a PM', () => {
+    it('navigates to the project’s stand-up schedule hub for a PM', () => {
       mockHasPermission.mockReturnValue(true)
       setup({ projectId: 'p1', sprintId: 'sp1' })
 
       fireEvent.click(screen.getByRole('button', { name: /open full stand-up/i }))
-      expect(mockPush).toHaveBeenCalledWith('/projects/p1/sprints/sp1/standups/s1')
+      expect(mockPush).toHaveBeenCalledWith('/projects/p1/standups')
     })
   })
 
