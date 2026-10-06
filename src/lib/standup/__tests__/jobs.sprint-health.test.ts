@@ -271,7 +271,7 @@ describe('runSprintHealthJob', () => {
     expect(result.created).toBe(1)
   })
 
-  it('does not fall back for a member whose only row is not yet effective', async () => {
+  it('falls back to a standard day for a member whose only row is not yet effective', async () => {
     await seedStandup('2026-08-18', 2)
     await MemberCapacity.create({
       project,
