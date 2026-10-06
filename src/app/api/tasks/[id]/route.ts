@@ -549,10 +549,6 @@ export async function PUT(
       } else {
         updateData.dueDate = new Date(value)
       }
-      updateData.remindersSent = {
-        dueSoon24h: false,
-        overdue: false
-      }
     }
 
     if (Object.prototype.hasOwnProperty.call(updateData, 'assignedTo')) {
@@ -664,6 +660,17 @@ export async function PUT(
         { error: 'Task not found or unauthorized' },
         { status: 404 }
       )
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'dueDate')) {
+      const oldTime = currentTask.dueDate ? new Date(currentTask.dueDate).getTime() : null
+      const newTime = updateData.dueDate ? new Date(updateData.dueDate).getTime() : null
+      if (oldTime !== newTime) {
+        updateData.remindersSent = {
+          dueSoon24h: false,
+          overdue: false
+        }
+      }
     }
 
     const hasCategoryUpdate = Object.prototype.hasOwnProperty.call(updateData, 'category')

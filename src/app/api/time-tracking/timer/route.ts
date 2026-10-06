@@ -35,8 +35,23 @@ export async function GET(request: NextRequest) {
       organization: organizationId
     }).populate('project', 'name settings').populate('task', 'title').populate('user', 'firstName lastName')
 
+    const clientTimezone = searchParams.get('timezone') || request.headers.get('x-timezone') || undefined
+
+    // Calculate remaining daily minutes and daily hours logged for the client
+    const effectiveSettings = await getEffectiveTimeTrackingSettings(organizationId, null)
+    let remainingDailyMinutes: number | null = null
+    let dailyHoursLogged = 0
+    const MINUTES_PER_HOUR = 60
+    if (effectiveSettings?.maxDailyHours) {
+      dailyHoursLogged = await getDailyHoursLogged(userId, organizationId, clientTimezone)
+      if (effectiveSettings.allowOvertime === false) {
+        const remainingHours = Math.max(0, effectiveSettings.maxDailyHours - dailyHoursLogged)
+        remainingDailyMinutes = remainingHours * MINUTES_PER_HOUR
+      }
+    }
+
     if (!activeTimer) {
-      return NextResponse.json({ activeTimer: null })
+      return NextResponse.json({ activeTimer: null, dailyHoursLogged })
     }
 
     const autoStopResult = await enforceTimerLimitsInternal(activeTimer)
@@ -44,7 +59,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           ...autoStopResult.result,
-          activeTimer: null
+          activeTimer: null,
+          dailyHoursLogged
         },
         { status: 200 }
       )
@@ -52,25 +68,14 @@ export async function GET(request: NextRequest) {
 
     const currentDuration = calculateCurrentDurationMinutes(activeTimer, new Date())
 
-    const clientTimezone = searchParams.get('timezone') || request.headers.get('x-timezone') || undefined
-
-    // Calculate remaining daily minutes for the client
-    const effectiveSettings = await getEffectiveTimeTrackingSettings(organizationId, null)
-    let remainingDailyMinutes: number | null = null
-    const MINUTES_PER_HOUR = 60
-    if (effectiveSettings?.maxDailyHours && effectiveSettings.allowOvertime === false) {
-      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId, clientTimezone)
-      const remainingHours = Math.max(0, effectiveSettings.maxDailyHours - dailyHoursLogged)
-      remainingDailyMinutes = remainingHours * MINUTES_PER_HOUR
-    }
-
     return NextResponse.json({
       activeTimer: {
         ...activeTimer.toObject(),
         currentDuration,
         isPaused: !!activeTimer.pausedAt,
         remainingDailyMinutes
-      }
+      },
+      dailyHoursLogged
     })
   } catch (error) {
     console.error('Error fetching active timer:', error)
