@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ activeTimer: null, dailyHoursLogged })
     }
 
-    const autoStopResult = await enforceTimerLimitsInternal(activeTimer)
+    const autoStopResult = await enforceTimerLimitsInternal(activeTimer, clientTimezone)
     if (autoStopResult && autoStopResult.success) {
       return NextResponse.json(
         {
@@ -264,7 +264,7 @@ export async function PUT(request: NextRequest) {
     await connectDB()
     
     const body = await request.json()
-    const { userId, organizationId, action, description, category, tags } = body
+    const { userId, organizationId, action, description, category, tags, timezone } = body
 
     if (!userId || !organizationId || !action) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -332,11 +332,13 @@ export async function PUT(request: NextRequest) {
         break
 
       case 'stop': {
+        const clientTimezone = timezone || request.headers.get('x-timezone') || undefined
         const stopResult = await stopTimerInternal(activeTimer, {
           description,
           category,
           tags,
-          reason: 'manual'
+          reason: 'manual',
+          deviceTimezone: clientTimezone
         })
         // Log activity: timer stopped (non-blocking)
         if (stopResult.success && !stopResult.alreadyStopped) {

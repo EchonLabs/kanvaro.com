@@ -71,6 +71,7 @@ import { extractUserId } from '@/lib/auth/user-utils'
 import TaskActivityLog from '@/components/tasks/TaskActivityLog'
 import { StartTimerModal } from '@/components/time-tracking/StartTimerModal'
 import { CategoryBadge } from '@/components/tasks/TasksShared'
+import { detectClientTimezone } from '@/lib/timezone'
 
 interface Task {
   _id: string
@@ -454,8 +455,9 @@ export default function TaskDetailPage() {
     if (!currentUserId || !currentOrganizationId) return
 
     try {
+      const tz = detectClientTimezone()
       const response = await fetch(
-        `/api/time-tracking/timer?userId=${encodeURIComponent(currentUserId)}&organizationId=${encodeURIComponent(currentOrganizationId)}`
+        `/api/time-tracking/timer?userId=${encodeURIComponent(currentUserId)}&organizationId=${encodeURIComponent(currentOrganizationId)}&timezone=${encodeURIComponent(tz)}`
       )
 
       if (!response.ok) {
@@ -482,7 +484,8 @@ export default function TaskDetailPage() {
           userId: currentUserId,
           organizationId: currentOrganizationId,
           action: 'stop',
-          description: (activeTimer as any)?.description ?? ''
+          description: (activeTimer as any)?.description ?? '',
+          timezone: detectClientTimezone()
         })
       })
 
