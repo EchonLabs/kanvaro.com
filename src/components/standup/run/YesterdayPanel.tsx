@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowUpRight, ChevronDown, Pencil } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar'
 
 import { formatMinutesAsHours, hoursToMinutes, minutes as toMinutes, roundToStep, type Minutes } from '@/lib/standup/minutes'
@@ -12,13 +12,9 @@ import { cn } from '@/lib/utils'
 import {
   PLAN_SCROLL_MAX_NESTED,
   PlanCard,
-  PlanCount,
-  PlanRow,
   initialsOf,
   planButtonClass,
   planFieldClass,
-  planInsetClass,
-  planLinkClass,
   planPillClass,
   type PlanPillTone
 } from '../planning/ui'
@@ -43,6 +39,13 @@ import {
  * because a meeting cannot wait for a round trip per click, and when the server
  * refuses, the row goes back *and says so*. A silent revert is strictly worse
  * than no optimism: the PM believes it stuck and finds out at completion.
+ *
+ * **No red count on this panel.** It used to show one beside the heading,
+ * counting every row that had not finished and labelled "rows need a note or
+ * a revision" — but nothing here blocks completion, so the number disagreed
+ * with the checklist and sent the PM hunting for work that did not exist. The
+ * rows that genuinely owe an answer are counted once, on the variance panel
+ * beside this one.
  */
 
 export interface YesterdayPanelApi {
@@ -54,6 +57,12 @@ export interface YesterdayPanelApi {
   addNote(input: { taskId: string; memberId?: string; note: string }): Promise<void>
   openTask(taskId: string): void
   reviseEstimate(row: YesterdayRow): void
+  /**
+   * Whether "Revise remaining estimate" can open for this row — the dialog
+   * needs the task's estimate figures, which come from the variance panel.
+   * Omitted, every row offers it.
+   */
+  canRevise?(row: YesterdayRow): boolean
 }
 
 export interface YesterdayPanelProps {
@@ -93,10 +102,20 @@ export function YesterdayPanel({
   const [optimisticLogged, setOptimisticLogged] = useState<Record<string, Minutes>>({})
   const [loggedDraft, setLoggedDraft] = useState<Record<string, string>>({})
   const [noteDraft, setNoteDraft] = useState<Record<string, string>>({})
+  const [editingRow, setEditingRow] = useState<Record<string, boolean>>({})
   const [noteStatus, setNoteStatus] = useState<Record<string, 'saving' | 'saved'>>({})
   const [toast, setToast] = useState<string | null>(null)
 
   const hasYesterday = Boolean(data.previousStandupId)
+
+  // A fresh board from the server is the truth. The optimistic overlays and
+  // drafts are keyed by task, so left in place they kept winning over the
+  // refreshed values — which is part of why Refresh looked like it did nothing.
+  useEffect(() => {
+    setOptimisticStatus({})
+    setOptimisticLogged({})
+    setLoggedDraft({})
+  }, [data])
 
   const statusOf = (row: YesterdayRow) => optimisticStatus[row.taskId] ?? row.currentStatus
   const loggedOf = (row: YesterdayRow) => optimisticLogged[row.taskId] ?? row.loggedMinutes
@@ -163,19 +182,6 @@ export function YesterdayPanel({
     }
   }
 
-  /**
-   * The red heading count: yesterday's rows the PM still has to answer for —
-   * anything that did not finish, plus anything that landed on somebody's day
-   * after the stand-up closed (I1). The completed bucket is deliberately not in
-   * it: a finished task is the one row here with nothing to decide, which is
-   * also why it starts collapsed.
-   */
-  const issues =
-    data.buckets.reduce(
-      (total, bucket) => (bucket.bucket === 'completed' ? total : total + bucket.rows.length),
-      0
-    ) + data.addedAfterCompletion.length
-
   return (
     <PlanCard
       id="panel-2"
@@ -184,14 +190,6 @@ export function YesterdayPanel({
       headingLevel="h3"
       headingId="panel-2-heading"
       className={className}
-      aside={
-        hasYesterday && (
-          <PlanCount
-            count={issues}
-            label={standupStrings.run.yesterdayIssueCount({ count: issues })}
-          />
-        )
-      }
     >
 
       {toast && (
@@ -217,30 +215,41 @@ export function YesterdayPanel({
           const heading = HEADINGS[bucket.bucket]()
           const isCollapsed = collapsed[bucket.bucket] ?? false
           const bodyId = `yesterday-${bucket.bucket}`
+          const empty = bucket.rows.length === 0
 
           return (
-            <div key={bucket.bucket} className="flex flex-col gap-2">
+            <div key={bucket.bucket} className="flex flex-col gap-2.5">
+              {/* All four buckets always render (RUN-9), but an empty one is
+                  just its heading and "(0)" — the dashed "Nothing here." box
+                  under it said the same thing a second time. */}
               <button
                 type="button"
-                aria-expanded={!isCollapsed}
-                aria-controls={bodyId}
+                aria-expanded={empty ? undefined : !isCollapsed}
+                aria-controls={empty ? undefined : bodyId}
+                disabled={empty}
                 onClick={() =>
                   setCollapsed((current) => ({
                     ...current,
                     [bucket.bucket]: !isCollapsed
                   }))
                 }
-                className="apple-transition flex items-center gap-1.5 self-start text-left apple-type-subheadline font-semibold text-[var(--plan-text)]"
+                className={cn(
+                  'apple-transition flex items-center gap-1.5 self-start text-left apple-type-subheadline font-semibold',
+                  empty ? 'text-[var(--plan-muted)]' : 'text-[var(--plan-text)]'
+                )}
               >
                 <ChevronDown
-                  className={cn('h-3.5 w-3.5 shrink-0 text-[var(--plan-muted)] apple-transition', isCollapsed && '-rotate-90')}
+                  className={cn(
+                    'h-3.5 w-3.5 shrink-0 text-[var(--plan-muted)] apple-transition',
+                    (isCollapsed || empty) && '-rotate-90'
+                  )}
                   strokeWidth={2}
                   aria-hidden="true"
                 />
                 <h4>{standupStrings.yesterday.bucketCount({ label: heading, count: bucket.rows.length })}</h4>
               </button>
 
-              {!isCollapsed && (
+              {!isCollapsed && !empty && (
                 <ul
                   id={bodyId}
                   className={cn(
@@ -248,204 +257,231 @@ export function YesterdayPanel({
                     // Roughly three rows before it scrolls. The four buckets
                     // stack inside one card, so an unbounded in-progress
                     // bucket on a large team buries the three below it.
-                    bucket.rows.length > 0 && `plan-scroll ${PLAN_SCROLL_MAX_NESTED} p-0.5`
+                    `plan-scroll ${PLAN_SCROLL_MAX_NESTED} p-0.5`
                   )}
                 >
-                  {bucket.rows.length === 0 && (
-                    <li className="rounded-[var(--apple-radius-md)] border border-dashed border-[var(--plan-border)] px-3 py-2.5 apple-type-subheadline text-[var(--plan-muted)]">
-                      {standupStrings.yesterday.emptyBucket()}
-                    </li>
-                  )}
+                  {bucket.rows.map((row) => {
+                    const label = row.taskKey ?? row.taskId
+                    const editing = editingRow[row.taskId] ?? false
 
-                  {bucket.rows.map((row) => (
-                    <li
-                      key={row.allocationId ?? `${row.memberId}:${row.taskId}`}
-                      data-testid={`yesterday-row-${row.taskKey ?? row.taskId}`}
-                      className={cn(planInsetClass, 'flex flex-col gap-3 p-3')}
-                    >
-                      {/* The blueprint's row head: "ARD-410 Base LLM Wiring",
-                          "Sarah K. · Planned 4h / Logged 4.5h", variance badge. */}
-                      <PlanRow
-                        title={
-                          <>
-                            <span>{row.taskKey ?? row.taskId}</span> {row.title}
-                          </>
-                        }
-                        meta={
-                          <>
-                            <span>{row.memberName}</span> · Planned{' '}
-                            <span data-testid="planned" className="tabular-nums">
-                              {formatMinutesAsHours(row.plannedMinutes, { locale })}
-                            </span>{' '}
-                            / Logged{' '}
-                            <span data-testid="logged" className="tabular-nums">
-                              {formatMinutesAsHours(loggedOf(row), { locale })}
+                    return (
+                      <li
+                        key={row.allocationId ?? `${row.memberId}:${row.taskId}`}
+                        data-testid={`yesterday-row-${label}`}
+                        className="flex flex-col gap-2.5 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-4 py-3.5 shadow-[var(--plan-shadow)]"
+                      >
+                        {/* Four lines, each with one job: whose task it is,
+                            what it is, what the day cost, what to do. Badges
+                            became words in the first line — three pills in a
+                            row competed with the title for the same width. */}
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 apple-type-caption text-[var(--plan-muted)]">
+                            <span className="font-semibold tabular-nums text-[var(--plan-secondary)]">
+                              {label}
                             </span>
-                          </>
-                        }
-                        badge={
-                          <>
+                            {' · '}
+                            <span>{row.memberName}</span>
                             {row.ageInStandups > 1 && (
-                              <span className={planPillClass('neutral')} data-testid="age-badge">
-                                {standupStrings.yesterday.ageBadge({ standups: row.ageInStandups })}
-                              </span>
+                              <>
+                                {' · '}
+                                <span data-testid="age-badge">
+                                  {standupStrings.yesterday.ageBadge({ standups: row.ageInStandups })}
+                                </span>
+                              </>
                             )}
-
                             {row.unplanned && (
+                              <>
+                                {' · '}
+                                <span
+                                  className="font-semibold text-[var(--plan-warning)]"
+                                  title={standupStrings.yesterday.unplannedHint()}
+                                >
+                                  {standupStrings.yesterday.unplannedBadge()}
+                                </span>
+                              </>
+                            )}
+                          </p>
+
+                          <span className={planPillClass(varianceTone(row.dayVarianceMinutes), 'shrink-0')}>
+                            <span data-testid="day-variance" className="tabular-nums">
+                              {formatMinutesAsHours(row.dayVarianceMinutes, { locale, signed: true })}
+                            </span>
+                            &nbsp;{varianceWord(row.dayVarianceMinutes)}
+                          </span>
+                        </div>
+
+                        <p className="line-clamp-2 apple-type-body font-semibold leading-snug text-[var(--plan-text)]">
+                          {row.title}
+                        </p>
+
+                        <p className="apple-type-caption tabular-nums text-[var(--plan-muted)]">
+                          <span data-testid="planned" className="text-[var(--plan-text)]">
+                            {formatMinutesAsHours(row.plannedMinutes, { locale })}
+                          </span>{' '}
+                          planned{' · '}
+                          <span data-testid="logged" className="text-[var(--plan-text)]">
+                            {formatMinutesAsHours(loggedOf(row), { locale })}
+                          </span>{' '}
+                          logged{' · '}
+                          <span data-testid="remaining" className="text-[var(--plan-text)]">
+                            {formatMinutesAsHours(row.remainingEstimateMinutes, { locale })}
+                          </span>{' '}
+                          left
+                        </p>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--plan-border)] pt-2.5">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {/* "was …" only when the status actually moved —
+                                "To do → To do" is a sentence with nothing in it. */}
+                            {row.previousStatus !== statusOf(row) && (
                               <span
-                                className={planPillClass('warning')}
-                                title={standupStrings.yesterday.unplannedHint()}
+                                data-testid="previous-status"
+                                className="shrink-0 apple-type-caption text-[var(--plan-muted)]"
                               >
-                                {standupStrings.yesterday.unplannedBadge()}
+                                {standupStrings.yesterday.was()} {statusLabel(row.previousStatus)} →
                               </span>
                             )}
+                            <select
+                              id={`status-${row.taskId}`}
+                              data-testid="current-status"
+                              aria-label={`Status for ${label}`}
+                              value={statusOf(row)}
+                              disabled={disabled}
+                              onChange={(event) => changeStatus(row, event.target.value)}
+                              className={cn(
+                                planFieldClass,
+                                'h-8 min-w-0 rounded-[var(--apple-radius-pill)] px-3 font-semibold'
+                              )}
+                            >
+                              {statusOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {statusLabel(option)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
 
-                            <span className={planPillClass(varianceTone(row.dayVarianceMinutes))}>
-                              <span data-testid="day-variance" className="tabular-nums">
-                                {formatMinutesAsHours(row.dayVarianceMinutes, { locale, signed: true })}
-                              </span>
-                              &nbsp;{standupStrings.yesterday.varianceBadge()}
-                            </span>
-                          </>
-                        }
-                      />
+                          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                            <button
+                              type="button"
+                              aria-expanded={editing}
+                              aria-controls={`yesterday-edit-${row.taskId}`}
+                              aria-label={`Hours and note for ${label}`}
+                              title={standupStrings.yesterday.editRow()}
+                              disabled={disabled}
+                              onClick={() =>
+                                setEditingRow((current) => ({ ...current, [row.taskId]: !editing }))
+                              }
+                              className={planButtonClass(
+                                'secondary',
+                                cn('h-8 w-8 px-0', editing && 'bg-[var(--plan-track)]'),
+                                'sm'
+                              )}
+                            >
+                              <Pencil aria-hidden="true" />
+                            </button>
 
-                      {/* The rest of RUN-12's fields — status then and now, and
-                          what is left. Planned, logged and variance live in the
-                          row head above. */}
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                        <div
-                          data-testid="previous-status"
-                          className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--plan-surface)] px-2 py-1.5"
-                        >
-                          <span className="apple-type-caption font-semibold uppercase tracking-wide text-[var(--plan-muted)]">
-                            {standupStrings.yesterday.previousStatus()}
-                          </span>
-                          <span className="apple-type-subheadline text-[var(--plan-text)]">{row.previousStatus}</span>
+                            {(api.canRevise?.(row) ?? true) && (
+                              <button
+                                type="button"
+                                aria-label={`${standupStrings.variance.reviseTitle()} for ${label}`}
+                                onClick={() => api.reviseEstimate(row)}
+                                disabled={disabled}
+                                className={planButtonClass('secondary', 'h-8 px-3', 'sm')}
+                              >
+                                {standupStrings.yesterday.reviseShort()}
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              aria-label={`${standupStrings.yesterday.goToTask()} ${label}`}
+                              onClick={() => api.openTask(row.taskId)}
+                              className={planButtonClass('secondary', 'h-8 px-3', 'sm')}
+                            >
+                              {standupStrings.yesterday.goToTask()}
+                              <ArrowUpRight aria-hidden="true" />
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--plan-surface)] px-2 py-1">
-                          <label
-                            className="apple-type-caption font-semibold uppercase tracking-wide text-[var(--plan-muted)]"
-                            htmlFor={`status-${row.taskId}`}
+                        {/* RUN-10's two corrections, out of the way until asked
+                            for: on every row at once they doubled the panel's
+                            height for something done on one row in ten. */}
+                        {editing && (
+                          <div
+                            id={`yesterday-edit-${row.taskId}`}
+                            className="flex flex-wrap items-center gap-2 rounded-[var(--apple-radius-md)] bg-[var(--plan-raised)] p-3"
                           >
-                            {standupStrings.yesterday.currentStatus()}
-                          </label>
-                          <select
-                            id={`status-${row.taskId}`}
-                            data-testid="current-status"
-                            aria-label={`Status for ${row.taskKey ?? row.taskId}`}
-                            value={statusOf(row)}
-                            disabled={disabled}
-                            onChange={(event) => changeStatus(row, event.target.value)}
-                            className="h-6 w-full rounded-[var(--apple-radius-sm)] border-0 bg-transparent p-0 apple-type-subheadline text-[var(--plan-text)]"
-                          >
-                            {statusOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                            <label
+                              className="flex items-center gap-2 apple-type-caption text-[var(--plan-muted)]"
+                              htmlFor={`logged-${row.taskId}`}
+                            >
+                              <span aria-hidden="true">{standupStrings.yesterday.loggedLabel()}</span>
+                              <input
+                                id={`logged-${row.taskId}`}
+                                data-testid="logged-hours-edit"
+                                aria-label={`Logged hours for ${label}`}
+                                type="number"
+                                inputMode="decimal"
+                                step={0.25}
+                                min={0}
+                                disabled={disabled}
+                                value={loggedDraft[row.taskId] ?? hoursText(loggedOf(row))}
+                                onChange={(event) =>
+                                  setLoggedDraft((current) => ({ ...current, [row.taskId]: event.target.value }))
+                                }
+                                onBlur={() => commitLoggedHours(row)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault()
+                                    commitLoggedHours(row)
+                                  }
+                                }}
+                                className={cn(planFieldClass, 'w-20 shrink-0 text-right tabular-nums')}
+                              />
+                            </label>
 
-                        <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-sm)] bg-[var(--plan-surface)] px-2 py-1.5">
-                          <span className="apple-type-caption font-semibold uppercase tracking-wide text-[var(--plan-muted)]">
-                            Remaining
-                          </span>
-                          <span data-testid="remaining" className="apple-type-subheadline tabular-nums text-[var(--plan-text)]">
-                            {formatMinutesAsHours(row.remainingEstimateMinutes, { locale })}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Actions line — the note field takes whatever width is left. */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <label className="sr-only" htmlFor={`logged-${row.taskId}`}>
-                          {`Logged hours for ${row.taskKey ?? row.taskId}`}
-                        </label>
-                        <input
-                          id={`logged-${row.taskId}`}
-                          data-testid="logged-hours-edit"
-                          aria-label={`Logged hours for ${row.taskKey ?? row.taskId}`}
-                          type="number"
-                          inputMode="decimal"
-                          step={0.25}
-                          min={0}
-                          disabled={disabled}
-                          value={loggedDraft[row.taskId] ?? hoursText(loggedOf(row))}
-                          onChange={(event) =>
-                            setLoggedDraft((current) => ({ ...current, [row.taskId]: event.target.value }))
-                          }
-                          onBlur={() => commitLoggedHours(row)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault()
-                              commitLoggedHours(row)
-                            }
-                          }}
-                          className={cn(planFieldClass, 'w-20 shrink-0 text-right tabular-nums')}
-                        />
-
-                        <label className="sr-only" htmlFor={`note-${row.taskId}`}>
-                          {`Note for ${row.taskKey ?? row.taskId}`}
-                        </label>
-                        <input
-                          id={`note-${row.taskId}`}
-                          data-testid="note-input"
-                          aria-label={`Note for ${row.taskKey ?? row.taskId}`}
-                          type="text"
-                          placeholder="Add a note"
-                          disabled={disabled}
-                          value={noteDraft[row.taskId] ?? ''}
-                          onChange={(event) => {
-                            setNoteDraft((current) => ({ ...current, [row.taskId]: event.target.value }))
-                            setNoteStatus((current) => {
-                              const next = { ...current }
-                              delete next[row.taskId]
-                              return next
-                            })
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault()
-                              submitNote(row)
-                            }
-                          }}
-                          className={cn(planFieldClass, 'min-w-[10rem] flex-1 px-2.5')}
-                        />
-                        <button
-                          type="button"
-                          data-testid="note-save"
-                          disabled={disabled || !((noteDraft[row.taskId] ?? '').trim())}
-                          onClick={() => submitNote(row)}
-                          className={cn(planLinkClass, 'shrink-0')}
-                        >
-                          {noteStatus[row.taskId] === 'saved'
-                            ? standupStrings.yesterday.noteSaved()
-                            : standupStrings.yesterday.saveNote()}
-                        </button>
-
-                        <span className="ml-auto flex shrink-0 flex-wrap items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => api.reviseEstimate(row)}
-                            disabled={disabled}
-                            className={planLinkClass}
-                          >
-                            {standupStrings.variance.reviseTitle()}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => api.openTask(row.taskId)}
-                            className={planLinkClass}
-                          >
-                            {`Open ${row.taskKey ?? row.taskId}`}
-                          </button>
-                        </span>
-                      </div>
-                    </li>
-                  ))}
+                            <input
+                              id={`note-${row.taskId}`}
+                              data-testid="note-input"
+                              aria-label={`Note for ${label}`}
+                              type="text"
+                              placeholder={standupStrings.yesterday.notePlaceholder()}
+                              disabled={disabled}
+                              value={noteDraft[row.taskId] ?? ''}
+                              onChange={(event) => {
+                                setNoteDraft((current) => ({ ...current, [row.taskId]: event.target.value }))
+                                setNoteStatus((current) => {
+                                  const next = { ...current }
+                                  delete next[row.taskId]
+                                  return next
+                                })
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault()
+                                  submitNote(row)
+                                }
+                              }}
+                              className={cn(planFieldClass, 'min-w-[10rem] flex-1 px-2.5')}
+                            />
+                            <button
+                              type="button"
+                              data-testid="note-save"
+                              disabled={disabled || !((noteDraft[row.taskId] ?? '').trim())}
+                              onClick={() => submitNote(row)}
+                              className={planButtonClass('primary', 'h-8 px-3', 'sm')}
+                            >
+                              {noteStatus[row.taskId] === 'saved'
+                                ? standupStrings.yesterday.noteSaved()
+                                : standupStrings.yesterday.saveNote()}
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
 
@@ -457,7 +493,7 @@ export function YesterdayPanel({
                   onClick={() =>
                     api.confirmCompleted({ taskIds: bucket.rows.map((row) => row.taskId) })
                   }
-                  className={planButtonClass('secondary', 'h-8 self-start px-3')}
+                  className={planButtonClass('secondary', 'h-8 self-start px-3', 'sm')}
                 >
                   {standupStrings.yesterday.markAllConfirmed()}
                 </button>
@@ -484,7 +520,7 @@ export function YesterdayPanel({
               <li
                 key={row.allocationId ?? `${row.memberId}:${row.taskId}`}
                 data-testid={`yesterday-added-row-${row.taskKey ?? row.taskId}`}
-                className={cn(planInsetClass, 'flex flex-wrap items-center gap-3 p-3 apple-type-subheadline')}
+                className="flex flex-wrap items-center gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-4 apple-type-subheadline shadow-[var(--plan-shadow)]"
               >
                 <span className="apple-type-caption font-semibold text-[var(--plan-muted)]">
                   {row.taskKey ?? row.taskId}
@@ -521,11 +557,24 @@ export function YesterdayPanel({
   )
 }
 
+/** "in_progress" -> "In progress": the workflow's stored value, readable. */
+function statusLabel(status: string): string {
+  const words = String(status ?? '').replace(/_/g, ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
 function hoursText(value: Minutes): string {
   return String(Number((value / 60).toFixed(2)))
 }
 
-/** Over is amber (the blueprint's "+0.5h variance"), under blue, on-plan green. */
+/** The word beside the signed hours, so colour is never the only signal (NFR-A2). */
+function varianceWord(minutesOver: number): string {
+  if (minutesOver > 0) return standupStrings.variance.labelOver()
+  if (minutesOver < 0) return standupStrings.variance.labelUnder()
+  return standupStrings.yesterday.onPlan()
+}
+
+/** Over is amber (the blueprint's "+0.5h over"), under blue, on-plan green. */
 function varianceTone(minutesOver: number): PlanPillTone {
   if (minutesOver > 0) return 'warning'
   if (minutesOver < 0) return 'accent'

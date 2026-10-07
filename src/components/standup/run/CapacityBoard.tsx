@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { XCircle } from 'lucide-react'
+import { ChevronRight, X, XCircle } from 'lucide-react'
 
 import { Drawer } from '@/components/standup/primitives/Drawer'
 import { HourStepper } from '@/components/standup/primitives/HourStepper'
@@ -186,44 +186,63 @@ export function MemberAllocationRow({
   locale?: string
 }) {
   return (
-    <div className="flex items-start justify-between gap-2 rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-2 py-1.5">
-      <div className="min-w-0 flex-1">
-        <p className="truncate apple-type-subheadline text-[var(--plan-text)]">
-          {allocation.taskKey ? (
-            <span className="font-apple-mono apple-type-caption text-[var(--plan-muted)]">
-              {allocation.taskKey}{' '}
+    <div className="flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-3 shadow-[var(--plan-shadow)]">
+      {/* What it is: the key and where it came from, the title, and the one
+          destructive action — a quiet icon until it is hovered. */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="flex flex-wrap items-center gap-x-1.5 apple-type-caption text-[var(--plan-muted)]">
+            {allocation.taskKey && (
+              <span className="font-semibold tabular-nums text-[var(--plan-secondary)]">
+                {allocation.taskKey}
+              </span>
+            )}
+            <span aria-hidden="true">·</span>
+            <span data-testid={`source-${allocation.allocationId}`}>
+              {standupStrings.allocation.source[allocation.source]()}
             </span>
-          ) : null}
-          {allocation.title}
-        </p>
-        <span
-          data-testid={`source-${allocation.allocationId}`}
-          className="apple-type-caption text-[var(--plan-secondary)]"
+            {allocation.isBlocked && (
+              <span className="font-semibold text-[var(--plan-warning)]">
+                · {standupStrings.allocation.blockedTag()}
+              </span>
+            )}
+          </p>
+          <p className="line-clamp-2 apple-type-subheadline font-semibold leading-snug text-[var(--plan-text)]">
+            {allocation.title}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          disabled={readOnly}
+          onClick={() => onRemove(allocation.allocationId)}
+          aria-label={standupStrings.allocation.removeRow({
+            task: allocation.taskKey ?? allocation.title
+          })}
+          title={standupStrings.allocation.removeTitle()}
+          className="apple-transition -mr-1 -mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--plan-muted)] hover:bg-[var(--plan-danger-bg)] hover:text-[var(--plan-danger)] disabled:opacity-40"
         >
-          {standupStrings.allocation.source[allocation.source]()}
-        </span>
+          <X className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+        </button>
       </div>
 
-      <HourStepper
-        taskLabel={allocation.taskKey ?? allocation.title}
-        valueMinutes={allocation.plannedMinutes}
-        remainingEstimateMinutes={allocation.remainingEstimateMinutes}
-        disabled={readOnly}
-        locale={locale}
-        onChange={(next) => onChangeHours(allocation.allocationId, next)}
-      />
-
-      <button
-        type="button"
-        disabled={readOnly}
-        onClick={() => onRemove(allocation.allocationId)}
-        aria-label={standupStrings.allocation.removeRow({
-          task: allocation.taskKey ?? allocation.title
-        })}
-        className="apple-transition shrink-0 rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] px-2 py-1 apple-type-caption text-[var(--plan-secondary)] hover:bg-[var(--plan-raised)] hover:text-[var(--plan-danger)] disabled:opacity-40"
-      >
-        ✕
-      </button>
+      {/* What it costs today: planned hours, editable, against what is left. */}
+      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2 border-t border-[var(--plan-border)] pt-3">
+        <HourStepper
+          taskLabel={allocation.taskKey ?? allocation.title}
+          valueMinutes={allocation.plannedMinutes}
+          remainingEstimateMinutes={allocation.remainingEstimateMinutes}
+          disabled={readOnly}
+          locale={locale}
+          onChange={(next) => onChangeHours(allocation.allocationId, next)}
+        />
+        <p className="apple-type-caption tabular-nums text-[var(--plan-muted)]">
+          <span className="font-semibold text-[var(--plan-text)]">
+            {formatMinutesAsHours(allocation.remainingEstimateMinutes, { locale })}
+          </span>{' '}
+          {standupStrings.allocation.leftOnTask()}
+        </p>
+      </div>
     </div>
   )
 }
@@ -268,15 +287,28 @@ export function MemberRunDetails({
         />
       )}
 
+      {/* A bare "8.0h" pill gave no hint what it was or that it opened
+          anything; it now says what the number is and where it goes. */}
       <button
         type="button"
         onClick={() => setBreakdownOpen(true)}
         aria-label={standupStrings.allocation.breakdownTrigger({ name: member.name })}
-        className={cn(
-          'apple-transition font-apple-mono self-start rounded-full border border-[var(--plan-border)] px-2 py-0.5 apple-type-caption tabular-nums text-[var(--plan-secondary)] hover:bg-[var(--plan-raised)]'
-        )}
+        className="apple-transition group inline-flex items-center gap-1 self-start rounded-full apple-type-caption text-[var(--plan-muted)] hover:text-[var(--plan-text)]"
       >
-        {formatMinutesAsHours(capacity.effectiveMinutes, { locale })}
+        <span>
+          {standupStrings.allocation.capacityToday()}{' '}
+          <span className="font-semibold tabular-nums text-[var(--plan-text)]">
+            {formatMinutesAsHours(capacity.effectiveMinutes, { locale })}
+          </span>
+        </span>
+        <span className="text-[var(--plan-accent-ink)]">
+          · {standupStrings.allocation.viewBreakdown()}
+        </span>
+        <ChevronRight
+          className="h-3 w-3 text-[var(--plan-accent-ink)] apple-transition group-hover:translate-x-0.5"
+          strokeWidth={2.25}
+          aria-hidden="true"
+        />
       </button>
 
       <Drawer

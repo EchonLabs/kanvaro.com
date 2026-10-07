@@ -234,13 +234,13 @@ describe('UnassignedPool', () => {
       expect(screen.getByText('Audit log')).toBeInTheDocument()
     })
 
-    it('filters by priority', () => {
+    it('offers type and sort only — no priority or skill filter', () => {
       renderPool()
 
-      fireEvent.change(screen.getByLabelText('Priority'), { target: { value: 'high' } })
-
-      expect(cards()).toHaveLength(1)
-      expect(screen.getByText('Export CSV')).toBeInTheDocument()
+      expect(screen.getByLabelText('Type')).toBeInTheDocument()
+      expect(screen.getByLabelText('Sort')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Skill')).not.toBeInTheDocument()
     })
 
     it('sorts smallest first', () => {

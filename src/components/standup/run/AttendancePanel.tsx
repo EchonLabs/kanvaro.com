@@ -16,7 +16,6 @@ import {
   initialsOf,
   planButtonClass,
   planFieldClass,
-  planPillClass,
   type PlanPillTone
 } from '../planning/ui'
 
@@ -215,9 +214,12 @@ export function AttendancePanel({
                             onSetAttendance({ memberId: member.memberId, state: next })
                           }
                         }}
+                        // A solid field with a status dot, not a tinted pill: the
+                        // 12% tint read as nearly blank on both themes, and its
+                        // coloured ink leaked into the opened option list.
                         className={cn(
-                          planPillClass(tone),
-                          'apple-transition cursor-pointer appearance-none border-0 py-[5px] pl-2 pr-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--plan-accent)] disabled:cursor-default disabled:opacity-60'
+                          'plan-select apple-transition apple-type-caption h-7 cursor-pointer appearance-none rounded-[var(--apple-radius-pill)] border border-[var(--plan-border)] bg-[var(--plan-surface)] pl-6 pr-7 font-semibold text-[var(--plan-text)] shadow-[var(--plan-shadow)] hover:border-[var(--plan-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--plan-accent)] disabled:cursor-default disabled:opacity-60',
+                          !state && 'text-[var(--plan-muted)]'
                         )}
                       >
                         <option value="" disabled>
@@ -229,13 +231,17 @@ export function AttendancePanel({
                           </option>
                         ))}
                       </select>
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          'pointer-events-none absolute left-2.5 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full',
+                          DOT_TONE[tone]
+                        )}
+                      />
                       <ChevronDown
                         aria-hidden="true"
                         strokeWidth={2.5}
-                        className={cn(
-                          'pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2',
-                          CHEVRON_TONE[tone]
-                        )}
+                        className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--plan-muted)]"
                       />
                     </span>
                   </div>
@@ -372,12 +378,13 @@ const AVATAR_TONE: Record<PlanPillTone, string> = {
   neutral: 'bg-[var(--plan-track)] text-[var(--plan-muted)]'
 }
 
-const CHEVRON_TONE: Record<PlanPillTone, string> = {
-  success: 'text-[var(--plan-success)]',
-  warning: 'text-[var(--plan-warning)]',
-  danger: 'text-[var(--plan-danger)]',
-  accent: 'text-[var(--plan-accent-ink)]',
-  neutral: 'text-[var(--plan-muted)]'
+/** The attendance field's status dot — the one place its state is coloured. */
+const DOT_TONE: Record<PlanPillTone, string> = {
+  success: 'bg-[var(--plan-success)]',
+  warning: 'bg-[var(--plan-warning)]',
+  danger: 'bg-[var(--plan-danger)]',
+  accent: 'bg-[var(--plan-accent)]',
+  neutral: 'bg-[var(--plan-idle)]'
 }
 
 /**

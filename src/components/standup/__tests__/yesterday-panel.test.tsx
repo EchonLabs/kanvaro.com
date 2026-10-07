@@ -64,6 +64,10 @@ const makeApi = () => ({
   reviseEstimate: jest.fn()
 })
 
+/** RUN-10's hours and note fields sit behind the row's "Hours & note" toggle. */
+const openEditor = (key = 'KAN-214') =>
+  fireEvent.click(screen.getByRole('button', { name: `Hours and note for ${key}` }))
+
 describe('YesterdayPanel', () => {
   it('renders all four buckets in the RUN-9 order with the completed one collapsed', () => {
     const data = panelData([row(), row({ taskKey: 'KAN-255', taskId: 'task-255', currentStatus: 'done' })])
@@ -117,7 +121,7 @@ describe('YesterdayPanel', () => {
     expect(rendered.getByText('KAN-214')).toBeInTheDocument()
     expect(rendered.getByText('Invoice model')).toBeInTheDocument()
     expect(rendered.getByText('Kasun Perera')).toBeInTheDocument()
-    expect(rendered.getByTestId('previous-status')).toHaveTextContent('todo')
+    expect(rendered.getByTestId('previous-status')).toHaveTextContent(/todo/i)
     expect(rendered.getByTestId('current-status')).toHaveValue('in_progress')
     expect(rendered.getByTestId('planned')).toHaveTextContent('6.0h')
     expect(rendered.getByTestId('logged')).toHaveTextContent('8.0h')
@@ -189,6 +193,7 @@ describe('YesterdayPanel', () => {
     const api = makeApi()
     render(<YesterdayPanel data={panelData([row()])} api={api} />)
 
+    openEditor()
     const hours = screen.getByLabelText('Logged hours for KAN-214')
     fireEvent.change(hours, { target: { value: '7.5' } })
     fireEvent.blur(hours)
@@ -207,6 +212,7 @@ describe('YesterdayPanel', () => {
     api.adjustLoggedHours.mockRejectedValueOnce(new Error('STALE_STANDUP'))
     render(<YesterdayPanel data={panelData([row()])} api={api} />)
 
+    openEditor()
     const hours = screen.getByLabelText('Logged hours for KAN-214')
     fireEvent.change(hours, { target: { value: '7.5' } })
     fireEvent.blur(hours)
@@ -219,6 +225,7 @@ describe('YesterdayPanel', () => {
     const api = makeApi()
     render(<YesterdayPanel data={panelData([row()])} api={api} />)
 
+    openEditor()
     fireEvent.change(screen.getByLabelText('Note for KAN-214'), {
       target: { value: 'Blocked on review' }
     })
@@ -251,7 +258,8 @@ describe('YesterdayPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /revise remaining estimate/i }))
     expect(api.reviseEstimate).toHaveBeenCalledWith(expect.objectContaining({ taskId: 'task-214' }))
 
-    fireEvent.click(screen.getByRole('button', { name: /open KAN-214/i }))
+    // A button that says where it goes, not the task key styled as a link.
+    fireEvent.click(screen.getByRole('button', { name: /go to task KAN-214/i }))
     expect(api.openTask).toHaveBeenCalledWith('task-214')
   })
 

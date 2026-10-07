@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, ChevronDown, CircleDashed, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronDown, CircleDashed, ShieldCheck, XCircle } from 'lucide-react'
 
 import type { CompletionCheckResult } from '@/lib/standup/completion-checks'
 import { standupStrings } from '@/lib/standup/strings'
@@ -12,7 +12,8 @@ import {
   PlanCard,
   PlanCount,
   planButtonClass,
-  planLinkClass
+  planPillClass,
+  scrollToSection
 } from '../planning/ui'
 
 /**
@@ -87,19 +88,22 @@ const CHECK_ANCHOR: Record<string, string> = {
   'CC-11': 'panel-5'
 }
 
-function anchorFor(checkId: string): string {
+export function anchorFor(checkId: string): string {
   return CHECK_ANCHOR[checkId] ?? 'panel-5'
 }
 
 function CheckRow({
   check,
-  onOverride
+  onOverride,
+  overridden = false
 }: {
   check: CompletionCheckResult
   onOverride?: (check: CompletionCheckResult) => void
+  /** A failing hard check an issued override has lifted. */
+  overridden?: boolean
 }) {
-  const Icon = ICON_FOR[check.status]
-  const needsAttention = check.status === 'fail' || check.status === 'warn'
+  const Icon = overridden ? ShieldCheck : ICON_FOR[check.status]
+  const needsAttention = !overridden && (check.status === 'fail' || check.status === 'warn')
 
   return (
     <li
@@ -108,43 +112,69 @@ function CheckRow({
     >
       <span
         key={`${check.checkId}-${check.status}`}
-        className={cn('mt-[2px] shrink-0 check-pop', ICON_TONE[check.status])}
+        className={cn(
+          'mt-[2px] shrink-0 check-pop',
+          overridden ? 'text-[var(--plan-warning)]' : ICON_TONE[check.status]
+        )}
       >
         <Icon className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
       </span>
 
-      {/* The blueprint's row: the message, then its actions inline after it
-          ("Liam J. is overallocated by 2h  Fix"). A long message wraps and
-          the actions follow it rather than squeezing it. */}
-      <p className="apple-type-subheadline min-w-0 flex-1 leading-snug text-[var(--plan-secondary)]">
-        <span className="mr-2">
+      {/* The message on its own line, then the actions under it: "Fix" as
+          a real button, because it is the usual answer, and "Override" as the
+          quieter exception beside it. Inline after the sentence, the two read
+          as equal choices — and Override, in amber, read as the louder one. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <p className="apple-type-subheadline leading-snug text-[var(--plan-secondary)]">
           {check.status === 'not_evaluated'
             ? standupStrings.run.checkNotEvaluated({ phase: check.ownedBy ?? '' })
             : check.message}
-        </span>
+          {overridden && (
+            <span className={planPillClass('warning', 'ml-2 align-middle')}>
+              {standupStrings.run.overridden()}
+            </span>
+          )}
+        </p>
 
-        {/* RUN-19's jump link. Only where there is something to jump to. */}
-        {needsAttention && check.entities.length > 0 && (
-          <a
-            href={`#${anchorFor(check.checkId)}`}
-            className={cn(planLinkClass, 'mr-2')}
-          >
-            {standupStrings.run.jumpToFailure()}
-          </a>
-        )}
+        {needsAttention && (check.entities.length > 0 || (check.status === 'fail' && check.overridable && onOverride)) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {/* RUN-19's jump link. Only where there is something to jump to.
+                Scrolled and focused explicitly: the bare hash did nothing
+                inside the app's own scroll container. */}
+            {check.entities.length > 0 && (
+              <a
+                href={`#${anchorFor(check.checkId)}`}
+                onClick={(event) => {
+                  event.preventDefault()
+                  scrollToSection(anchorFor(check.checkId))
+                }}
+                className={planButtonClass('secondary', 'h-7 px-3', 'sm')}
+              >
+                {standupStrings.run.jumpToFailure()}
+              </a>
+            )}
 
-        {/* Task 22 — AC-10's whole point: a PM must be able to knowingly
-            accept this exception instead of only being blocked by it. */}
-        {needsAttention && check.status === 'fail' && check.overridable && onOverride && (
-          <button
-            type="button"
-            onClick={() => onOverride(check)}
-            className="font-semibold text-[var(--plan-warning)] underline underline-offset-2"
-          >
-            {standupStrings.run.override()}
-          </button>
+            {/* Task 22 — AC-10's whole point: a PM must be able to knowingly
+                accept this exception instead of only being blocked by it. */}
+            {check.status === 'fail' && check.overridable && onOverride && (
+              <>
+                {check.entities.length > 0 && (
+                  <span className="apple-type-caption text-[var(--plan-muted)]">
+                    {standupStrings.run.overrideHint()}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onOverride(check)}
+                  className="apple-type-footnote font-semibold text-[var(--plan-secondary)] underline underline-offset-2 hover:text-[var(--plan-text)]"
+                >
+                  {standupStrings.run.override()}
+                </button>
+              </>
+            )}
+          </div>
         )}
-      </p>
+      </div>
     </li>
   )
 }
@@ -161,12 +191,23 @@ export function CompletionPanel({
   const [showAll, setShowAll] = useState(false)
   const firstBlocker = blocking[0]
 
+  /**
+   * A hard failure that is no longer in `blocking` has been overridden. It
+   * used to keep rendering as a red failure with its Override button, so the
+   * PM saw the same problem "still failing" after dealing with it — with only
+   * the re-enabled Complete button hinting otherwise.
+   */
+  const isOverridden = (check: CompletionCheckResult) =>
+    check.status === 'fail' &&
+    check.hard &&
+    !blocking.some((candidate) => candidate.checkId === check.checkId)
+  const overridden = checks.filter(isOverridden)
   const needsAttention = checks.filter(
-    (check) => check.status === 'fail' || check.status === 'warn'
+    (check) => (check.status === 'fail' || check.status === 'warn') && !isOverridden(check)
   )
   const settled = checks.filter((check) => check.status === 'pass' || check.status === 'not_evaluated')
   const passedCount = checks.filter((check) => check.status === 'pass').length
-  const failedCount = checks.filter((check) => check.status === 'fail').length
+  const failedCount = needsAttention.filter((check) => check.status === 'fail').length
 
   return (
     <PlanCard
@@ -203,6 +244,14 @@ export function CompletionPanel({
         </p>
       ) : needsAttention.length === 0 && settled.length === 0 ? null : (
         <div className="flex flex-col gap-2">
+          {overridden.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {overridden.map((check) => (
+                <CheckRow key={check.checkId} check={check} overridden />
+              ))}
+            </ul>
+          )}
+
           {needsAttention.length > 0 ? (
             /* Eleven checks can all need attention at once on a bad day, and
                this panel closes the page — the Complete button below it must

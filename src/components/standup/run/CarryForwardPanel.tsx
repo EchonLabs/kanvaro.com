@@ -10,11 +10,9 @@ import {
   PLAN_SCROLL_MAX,
   PlanCard,
   PlanCount,
-  PlanRow,
   planButtonClass,
   planEmptyClass,
   planFieldClass,
-  planInsetClass,
   planPillClass,
   type PlanPillTone
 } from '../planning/ui'
@@ -35,6 +33,11 @@ import {
  * **A note that fails validation says why, inline** (CFW-4). `NOTE_UNCHANGED`
  * and "too short" are different failures with different fixes, so the panel
  * surfaces whatever the server actually said rather than one generic error.
+ *
+ * Each item is one full-width rounded row: who and what on the left; age,
+ * "note due" and the actions on the right; the note thread underneath. The
+ * earlier two-column row split identity from the record at a fixed 20rem,
+ * which left a narrow column of badges and buttons stacked five deep.
  */
 
 export interface CarryForwardNoteView {
@@ -169,7 +172,6 @@ export function CarryForwardPanel({
       id="panel-4"
       aria-labelledby="panel-4-heading"
       title={standupStrings.carryForward.title()}
-      description={standupStrings.carryForward.subtitle()}
       headingLevel="h3"
       headingId="panel-4-heading"
       className={className}
@@ -180,122 +182,131 @@ export function CarryForwardPanel({
         />
       }
     >
-
-      {/* CFW-11's summary and CFW-10's filters share one wrapping row. They
-          were two stacked rows, which cost vertical space in a panel that is
-          the tallest on the page by the end of a sprint — and they read as one
-          control strip anyway: the pills say what is outstanding, the selects
-          narrow to it. */}
-      <div className="apple-type-subheadline flex flex-wrap items-center gap-x-3 gap-y-2 text-[var(--plan-muted)]">
-        <div className="flex flex-wrap gap-1.5" data-testid="carry-forward-summary">
-          <span className={planPillClass('neutral')}>
+      {/* CFW-11's summary as one quiet line, and CFW-10's filters at the far
+          end of it. The summary used to be four pills (zeros included) beside
+          two labelled selects and a "sorted oldest first" caption — seven
+          things to read before the first item. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <p
+          data-testid="carry-forward-summary"
+          className="apple-type-subheadline text-[var(--plan-muted)]"
+        >
+          <span className="font-semibold text-[var(--plan-text)]">
             {standupStrings.carryForward.summaryOpen({ count: data.summary.totalOpen })}
           </span>
-          <span className={planPillClass(data.summary.needingNoteToday > 0 ? 'warning' : 'neutral')}>
-            {standupStrings.carryForward.summaryNeedingNote({ count: data.summary.needingNoteToday })}
-          </span>
-          <span className={planPillClass(data.summary.escalated > 0 ? 'danger' : 'neutral')}>
-            {standupStrings.carryForward.summaryEscalated({ count: data.summary.escalated })}
-          </span>
-          <span className={planPillClass('neutral')}>
-            {standupStrings.carryForward.summaryResolved({ count: data.summary.resolvedYesterday })}
-          </span>
-        </div>
+          {data.summary.needingNoteToday > 0 && (
+            <>
+              {' · '}
+              <span className="font-semibold text-[var(--plan-warning)]">
+                {standupStrings.carryForward.summaryNeedingNote({
+                  count: data.summary.needingNoteToday
+                })}
+              </span>
+            </>
+          )}
+          {data.summary.escalated > 0 && (
+            <>
+              {' · '}
+              <span className="font-semibold text-[var(--plan-danger)]">
+                {standupStrings.carryForward.summaryEscalated({ count: data.summary.escalated })}
+              </span>
+            </>
+          )}
+          {data.summary.resolvedYesterday > 0 && (
+            <>
+              {' · '}
+              {standupStrings.carryForward.summaryResolved({ count: data.summary.resolvedYesterday })}
+            </>
+          )}
+        </p>
 
-        <span aria-hidden="true" className="hidden h-5 w-px bg-[var(--plan-border)] sm:block" />
-
-        <label className="flex items-center gap-1.5">
-          {standupStrings.carryForward.filterType()}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <select
+            aria-label={standupStrings.carryForward.filterType()}
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
-            className={planFieldClass}
+            className={cn(planFieldClass, 'rounded-[var(--apple-radius-pill)] px-3')}
           >
-            <option value="all">All</option>
+            <option value="all">{standupStrings.carryForward.allTypes()}</option>
             {types.map((type) => (
               <option key={type} value={type}>
                 {standupStrings.carryForward.itemTypeLabel(type)}
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex items-center gap-1.5">
-          {standupStrings.carryForward.filterAgeBand()}
           <select
+            aria-label={standupStrings.carryForward.filterAgeBand()}
             value={ageFilter}
             onChange={(event) => setAgeFilter(event.target.value)}
-            className={planFieldClass}
+            className={cn(planFieldClass, 'rounded-[var(--apple-radius-pill)] px-3')}
           >
-            <option value="all">All</option>
+            <option value="all">{standupStrings.carryForward.allAges()}</option>
             <option value="normal">Normal</option>
             <option value="note_required">Needs a note</option>
             <option value="escalated">Escalated</option>
             <option value="chronic">Chronic</option>
           </select>
-        </label>
-        <span className="ml-auto self-center">
-          {standupStrings.carryForward.sortedByAge()}
-        </span>
+        </div>
       </div>
 
       {visible.length === 0 && (
         <p className={planEmptyClass}>{standupStrings.carryForward.empty()}</p>
       )}
 
-      {/* The register only grows across a sprint — by the final day it is the
-          tallest panel on the page — and every row can open a note editor and
-          its note thread on top of that. */}
-      <ul
-        className={cn(
-          'flex flex-col divide-y divide-[var(--plan-border)]',
-          visible.length > 0 && `plan-scroll ${PLAN_SCROLL_MAX}`
-        )}
-      >
-        {visible.map((item) => {
-          const resolved = !OPEN_STATUSES.includes(item.status)
-          const typeLabel = standupStrings.carryForward.itemTypeLabel(item.type)
-          const meta = [
-            item.memberName ? standupStrings.carryForward.ownedBy({ name: item.memberName }) : null,
-            item.taskKey || item.taskTitle ? typeLabel : null
-          ]
-            .filter(Boolean)
-            .join(' · ')
+      {/* Full-width rows, oldest first (CFW-10). The register only grows
+          across a sprint, so the list scrolls rather than the page. */}
+      {visible.length > 0 && (
+        <ul className={cn('flex flex-col gap-2.5 p-0.5', `plan-scroll ${PLAN_SCROLL_MAX}`)}>
+          {visible.map((item) => {
+            const resolved = !OPEN_STATUSES.includes(item.status)
+            const typeLabel = standupStrings.carryForward.itemTypeLabel(item.type)
+            const owesNote = !resolved && item.requiresNoteToday && !item.notedToday
+            const editorOpen = !resolved && (owesNote || revealed[item.itemId])
 
-          const owesNote = !resolved && item.requiresNoteToday && !item.notedToday
+            return (
+              <li
+                key={item.itemId}
+                data-testid={`carry-forward-item-${item.itemId}`}
+                className={cn(
+                  'flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-4 shadow-[var(--plan-shadow)]',
+                  /* The age band as a left rule. Reinforcement only — the age
+                     badge spells "Escalated"/"Chronic" out in text and an owed
+                     note carries its own label, so a reader who cannot
+                     distinguish the rule's colour loses nothing. */
+                  AGE_RULE[item.ageBand] && cn('border-l-[3px]', AGE_RULE[item.ageBand]),
+                  resolved && 'opacity-75'
+                )}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+                  {/* Who and what. */}
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <p className="flex min-w-0 flex-wrap items-center gap-2 apple-type-body font-semibold text-[var(--plan-text)]">
+                      {item.taskKey && (
+                        <span className={planPillClass('neutral', 'tabular-nums')}>{item.taskKey}</span>
+                      )}
+                      <span className="min-w-0">{item.taskTitle ?? typeLabel}</span>
+                    </p>
+                    <p className="apple-type-caption text-[var(--plan-muted)]">
+                      {[item.memberName, item.taskKey || item.taskTitle ? typeLabel : null]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  </div>
 
-          return (
-            <li
-              key={item.itemId}
-              data-testid={`carry-forward-item-${item.itemId}`}
-              className={cn(
-                /* Two columns from `lg`: identity and urgency on the left, the
-                   record on the right. Stacked, these two groups made every
-                   open row about five blocks tall, so a scroll box capped at
-                   26rem showed roughly one and a half items by the end of a
-                   sprint. Side by side, a row is about as tall as its thread. */
-                'grid gap-x-4 gap-y-2 py-3 apple-type-subheadline first:pt-0 last:pb-0',
-                'lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]',
-                /* The age band as a left rule. Reinforcement only — the age
-                   badge spells "Escalated"/"Chronic" out in text and an owed
-                   note carries its own icon and sentence, so a reader who
-                   cannot distinguish the rule's colour loses nothing. */
-                AGE_RULE[item.ageBand] && cn('border-l-2 pl-3', AGE_RULE[item.ageBand])
-              )}
-            >
-              <div className="flex min-w-0 flex-col gap-2">
-              {/* The blueprint's row: "Ardeo AI Plans" / "Owned by Marcus T." /
-                  "AGE: 4 DAYS", the badge's colour climbing with the age band. */}
-              <PlanRow
-                title={
-                  <>
-                    <span>{item.taskKey ?? typeLabel}</span>
-                    {item.taskTitle && <span> {item.taskTitle}</span>}
-                  </>
-                }
-                meta={meta || undefined}
-                badge={
-                  <>
-                    {resolved && <span className={planPillClass('neutral', 'capitalize')}>{item.status}</span>}
+                  {/* How urgent, then what can be done about it. */}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {resolved && (
+                      <span className={planPillClass('neutral', 'capitalize')}>{item.status}</span>
+                    )}
+                    {owesNote && (
+                      <span
+                        className={planPillClass('warning')}
+                        title={standupStrings.carryForward.noteRequired()}
+                      >
+                        <AlertTriangle className="mr-1 h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
+                        {standupStrings.carryForward.noteDue()}
+                      </span>
+                    )}
                     <span className={planPillClass(AGE_TONE[item.ageBand])} data-testid="age-badge">
                       {standupStrings.carryForward.ageBadge({ age: item.ageInStandups })}
                       {item.ageBand === 'chronic'
@@ -304,100 +315,72 @@ export function CarryForwardPanel({
                           ? ` · ${standupStrings.carryForward.escalatedBadge()}`
                           : ''}
                     </span>
-                  </>
-                }
-              />
 
-                {/* The owed-note warning sits with the age badge rather than
-                    under the thread: both answer "how urgent is this", and a
-                    PM scanning the left column should not have to read past a
-                    note history to find out. */}
-                {owesNote && (
-                  <p className="flex items-center gap-1 apple-type-caption font-semibold text-[var(--plan-warning)]">
-                    <AlertTriangle className="h-3 w-3 shrink-0" strokeWidth={2.5} aria-hidden="true" />
-                    {standupStrings.carryForward.noteRequired()}
-                  </p>
-                )}
-
-                {!resolved && item.validResolutions.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {item.validResolutions.map((resolutionType) => (
+                    {!resolved && !editorOpen && (
                       <button
-                        key={resolutionType}
                         type="button"
+                        data-testid="reveal-note"
                         disabled={disabled}
-                        onClick={() => void resolve(item, resolutionType)}
-                        /* `done` is the primary action wherever it is offered —
-                           four equal secondary buttons gave a PM no steer on
-                           which one was expected. Keyed off the VALUE, not the
-                           array position: the server owns that order. */
-                        className={planButtonClass(
-                          resolutionType === 'done' ? 'primary' : 'secondary',
-                          'h-7 px-2.5',
-                          'sm'
-                        )}
+                        onClick={() =>
+                          setRevealed((current) => ({ ...current, [item.itemId]: true }))
+                        }
+                        className={planButtonClass('secondary', 'h-8 px-3', 'sm')}
                       >
-                        {resolutionLabel(resolutionType)}
+                        {standupStrings.carryForward.addNote()}
                       </button>
-                    ))}
+                    )}
+
+                    {!resolved &&
+                      item.validResolutions.map((resolutionType) => (
+                        <button
+                          key={resolutionType}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => void resolve(item, resolutionType)}
+                          /* `done` is the primary action wherever it is offered.
+                             Keyed off the VALUE, not the array position: the
+                             server owns that order. */
+                          className={planButtonClass(
+                            resolutionType === 'done' ? 'primary' : 'secondary',
+                            'h-8 px-3',
+                            'sm'
+                          )}
+                        >
+                          {resolutionLabel(resolutionType)}
+                        </button>
+                      ))}
                   </div>
-                )}
-              </div>
-
-              {/* The record: the thread, then the editor. */}
-              <div className="flex min-w-0 flex-col gap-2">
-              {/* CFW-5's note thread. Never collapsed — not on an urgent row,
-                  not on a calm one, not on a resolved one. The editor below
-                  may collapse; this may not, because spotting the same excuse
-                  five days running is the whole point of the register. */}
-              {item.notes.length > 0 && (
-                <div
-                  data-testid="note-history"
-                  className={cn(planInsetClass, 'flex flex-col gap-1 p-2.5 apple-type-caption')}
-                >
-                  <p className="font-semibold text-[var(--plan-secondary)]">
-                    {standupStrings.carryForward.noteHistory()}
-                  </p>
-                  {item.notes.map((note, index) => (
-                    <p key={index} className="text-[var(--plan-text)]">
-                      <span className="text-[var(--plan-muted)]">{note.standupDate}</span>
-                      {note.authorName ? ` — ${note.authorName}: ` : ': '}
-                      {note.text}
-                    </p>
-                  ))}
                 </div>
-              )}
 
-              {!resolved && (
-                <>
-                  {/* A row that owes a note today gets the editor open. A calm
-                      one gets a button that reveals it, because a 56px
-                      textarea on every row it did not need was the single
-                      biggest consumer of height in this panel. The capability
-                      is collapsed, never removed — any open item can still be
-                      noted. */}
-                  {!owesNote && !revealed[item.itemId] && (
-                    <button
-                      type="button"
-                      data-testid="reveal-note"
-                      disabled={disabled}
-                      onClick={() =>
-                        setRevealed((current) => ({ ...current, [item.itemId]: true }))
-                      }
-                      className={planButtonClass('secondary', 'h-7 self-start px-2.5', 'sm')}
-                    >
-                      {standupStrings.carryForward.addNote()}
-                    </button>
-                  )}
+                {/* CFW-5's note thread. Never collapsed — spotting the same
+                    excuse five days running is the whole point of the
+                    register — but compact: one line per note, newest last. */}
+                {item.notes.length > 0 && (
+                  <ol
+                    data-testid="note-history"
+                    className="flex flex-col gap-1.5 rounded-[var(--apple-radius-md)] bg-[var(--plan-raised)] px-3 py-2.5 apple-type-caption"
+                  >
+                    {item.notes.map((note, index) => (
+                      <li key={index} className="flex flex-wrap gap-x-2 text-[var(--plan-text)]">
+                        <span className="shrink-0 tabular-nums text-[var(--plan-muted)]">
+                          {note.standupDate}
+                          {note.authorName ? ` · ${note.authorName}` : ''}
+                        </span>
+                        <span className="min-w-0">{note.text}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
 
-                  {(owesNote || revealed[item.itemId]) && (
-                  <div className="flex flex-wrap items-start gap-2">
+                {editorOpen && (
+                  <div className="flex flex-wrap items-center gap-2">
                     <label className="sr-only" htmlFor={`note-${item.itemId}`}>
                       {standupStrings.carryForward.notePlaceholder()}
                     </label>
-                    <textarea
+                    <input
                       id={`note-${item.itemId}`}
                       data-testid="note-input"
+                      type="text"
                       value={draftText[item.itemId] ?? ''}
                       onChange={(event) =>
                         setDraftText((current) => ({
@@ -405,34 +388,38 @@ export function CarryForwardPanel({
                           [item.itemId]: event.target.value
                         }))
                       }
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && (draftText[item.itemId] ?? '').trim()) {
+                          event.preventDefault()
+                          void submitNote(item)
+                        }
+                      }}
                       placeholder={standupStrings.carryForward.notePlaceholder()}
                       disabled={disabled}
-                      className="min-h-14 w-full min-w-[12rem] flex-1 rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-2.5 py-1.5 apple-type-subheadline text-[var(--plan-text)] disabled:opacity-40"
+                      className={cn(planFieldClass, 'h-9 min-w-[12rem] flex-1 px-3')}
                     />
                     <button
                       type="button"
                       data-testid="add-note"
                       disabled={disabled || !(draftText[item.itemId] ?? '').trim()}
                       onClick={() => void submitNote(item)}
-                      className={planButtonClass('secondary', 'h-8 shrink-0 px-3')}
+                      className={planButtonClass('primary', 'h-9 px-4', 'sm')}
                     >
                       {standupStrings.carryForward.addNote()}
                     </button>
                   </div>
-                  )}
+                )}
 
-                  {errors[item.itemId] && (
-                    <p role="alert" className="apple-type-caption text-[var(--plan-danger)]">
-                      {errors[item.itemId]}
-                    </p>
-                  )}
-                </>
-              )}
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+                {errors[item.itemId] && (
+                  <p role="alert" className="apple-type-caption text-[var(--plan-danger)]">
+                    {errors[item.itemId]}
+                  </p>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </PlanCard>
   )
 }
@@ -453,9 +440,9 @@ const AGE_TONE: Record<CarryForwardItemRow['ageBand'], PlanPillTone> = {
  */
 const AGE_RULE: Record<CarryForwardItemRow['ageBand'], string> = {
   normal: '',
-  note_required: 'border-[var(--plan-warning)]',
-  escalated: 'border-[var(--plan-danger)]',
-  chronic: 'border-[var(--plan-danger)]'
+  note_required: 'border-l-[var(--plan-warning)]',
+  escalated: 'border-l-[var(--plan-danger)]',
+  chronic: 'border-l-[var(--plan-danger)]'
 }
 
 function resolutionLabel(resolutionType: string): string {

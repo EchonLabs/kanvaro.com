@@ -177,9 +177,15 @@ export function UnassignedPool({
       </div>
 
       <TaskAssignmentSplitScreen
-        // `minmax(0,1fr)`: the single-column track below `lg` otherwise sizes
-        // to the filter row's content and clips the cards on a phone.
-        className="grid-cols-[minmax(0,1fr)] gap-5"
+        // `minmax(0,1fr)`: the single column otherwise sizes to the filter
+        // row's content and clips the cards on a phone. Two equal columns
+        // from `xl`, matching the run screen's other paired sections
+        // (`RUN_TWO_UP_CLASSES`) instead of the split screen's own 1 : 1.15
+        // split from `lg`, so every section's halves meet at one middle line.
+        className="grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-2"
+        // Type and sort only. Priority and skill made five controls for a
+        // list the PM scans in a meeting; sort already orders by priority.
+        filters={['type']}
         repositoryTitle={standupStrings.run.allocationBacklogTitle()}
         teamTitle={standupStrings.run.allocationBoardTitle()}
         headingClassName="apple-type-body font-semibold text-[var(--plan-text)]"

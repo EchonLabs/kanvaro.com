@@ -132,23 +132,23 @@ describe('CarryForwardPanel — urgency is marked without relying on colour', ()
     renderPanel([item({ ageBand: 'escalated', ageInStandups: 5 })])
 
     const row = screen.getByTestId('carry-forward-item-cf1')
-    expect(row.className).toContain('border-[var(--plan-danger)]')
+    expect(row.className).toContain('border-l-[var(--plan-danger)]')
   })
 
   it('rules a note_required row in the warning token', () => {
     renderPanel([item({ ageBand: 'note_required', ageInStandups: 3 })])
 
     const row = screen.getByTestId('carry-forward-item-cf1')
-    expect(row.className).toContain('border-[var(--plan-warning)]')
-    expect(row.className).not.toContain('border-[var(--plan-danger)]')
+    expect(row.className).toContain('border-l-[var(--plan-warning)]')
+    expect(row.className).not.toContain('border-l-[var(--plan-danger)]')
   })
 
   it('leaves a normal row unruled', () => {
     renderPanel([item({ ageBand: 'normal' })])
 
     const row = screen.getByTestId('carry-forward-item-cf1')
-    expect(row.className).not.toContain('border-[var(--plan-danger)]')
-    expect(row.className).not.toContain('border-[var(--plan-warning)]')
+    expect(row.className).not.toContain('border-l-[var(--plan-danger)]')
+    expect(row.className).not.toContain('border-l-[var(--plan-warning)]')
   })
 
   it('names the band in text as well, so the rule is reinforcement not the signal', () => {
