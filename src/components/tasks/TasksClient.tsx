@@ -40,7 +40,8 @@ import {
     Upload,
     ListTodo,
     CheckSquare,
-    ChevronDown
+    ChevronDown,
+    RefreshCw
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -367,6 +368,7 @@ export default function TasksClient({
     const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
+    const [refreshKey, setRefreshKey] = useState(0)
     const [projectCategories, setProjectCategories] = useState<Record<string, Array<{ key: string; title: string; order: number }>>>({})
     const { statusMap: projectsWithStatuses } = useProjectKanbanStatuses()
     const { success: notifySuccess, error: notifyError } = useNotify()
@@ -1229,6 +1231,11 @@ const handlePageChange = (newPage: number) => {
             setStatusUpdatingId(null)
         }
     }
+    const handleRefresh = async () => {
+        setRefreshKey((prev) => prev + 1)
+        await fetchTasks(false)
+    }
+
     const shouldShowInitialLoader = loading && tasks.length === 0
     const shouldShowInlineLoader = loading && tasks.length > 0
 
@@ -1736,18 +1743,32 @@ const handlePageChange = (newPage: number) => {
                 <p className="text-[13px] text-[var(--apple-secondary-label)] font-apple-mono">
                     {totalCount} task{totalCount !== 1 ? 's' : ''}
                 </p>
-                <ViewSwitcher
-                    value={viewMode}
-                    onChange={(v) => {
-                        setViewMode(v)
-                        if (v === 'list' || v === 'grid') {
-                            setTasks([])
-                            setPagination({})
-                            fetchTasks(true)
-                        }
-                    }}
-                    options={['list', 'grid', 'kanban']}
-                />
+                <div className="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefresh}
+                        disabled={loading}
+                        className="rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-3 py-1.5 text-[13px] font-medium text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition flex items-center gap-1.5 h-8"
+                        title="Refresh tasks"
+                    >
+                        <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+                        Refresh
+                    </Button>
+                    <ViewSwitcher
+                        value={viewMode}
+                        onChange={(v) => {
+                            setViewMode(v)
+                            if (v === 'list' || v === 'grid') {
+                                setTasks([])
+                                setPagination({})
+                                fetchTasks(true)
+                            }
+                        }}
+                        options={['list', 'grid', 'kanban']}
+                    />
+                </div>
             </div>
 
             {/* ── List View ─────────────────────────────────────────────────────── */}
@@ -2267,6 +2288,7 @@ const handlePageChange = (newPage: number) => {
                         <>
                             {shouldShowInlineLoader && <InlineLoader label="Refreshing board..." />}
                             <KanbanBoard
+                                key={refreshKey}
                                 projectId={projectFilter}
                                 filters={kanbanFilters}
                                 onProjectChange={setProjectFilter}
