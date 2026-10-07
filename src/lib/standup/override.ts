@@ -16,6 +16,35 @@ export const OVER_ALLOCATION_REASON_CODES = [
   'critical_deadline', 'task_will_split', 'other'
 ] as const
 
+/**
+ * CC-3 and CC-10 used to borrow the under-allocation list, so a PM deferring a
+ * re-estimate was asked to pick from "No work available" or "Onboarding" —
+ * reasons that do not describe the decision being recorded. `reasonCode` is a
+ * free string on the model, so each type can carry codes that fit it.
+ */
+export const SKIP_REESTIMATE_REASON_CODES = [
+  'owner_unavailable', 'needs_investigation', 'awaiting_dependency', 'will_split_task', 'other'
+] as const
+
+export const DUPLICATE_ALLOCATION_REASON_CODES = [
+  'deliberate_pairing', 'handover_in_progress', 'review_or_qa', 'other'
+] as const
+
+/** The reason list the override modal offers for one override type. */
+export function reasonCodesFor(type: string): readonly string[] {
+  switch (type) {
+    case 'over_allocation':
+      return OVER_ALLOCATION_REASON_CODES
+    case 'skip_reestimate':
+      return SKIP_REESTIMATE_REASON_CODES
+    case 'duplicate_allocation':
+      return DUPLICATE_ALLOCATION_REASON_CODES
+    case 'under_allocation':
+    default:
+      return UNDER_ALLOCATION_REASON_CODES
+  }
+}
+
 export const JUSTIFICATION_MIN_LENGTH = 20
 
 /** OVR-5's configurable low-value list. */
@@ -151,15 +180,10 @@ function entityIsCovered(
 }
 
 /**
- * Ruling 21. Two of the four overridable types need something a **backfill**
+ * Ruling 21. One of the four overridable types needs something a **backfill**
  * cannot supply, so a facilitator reconstructing a past day may not attest to
- * their checks even though the live run screen can override them:
+ * its check even though the live run screen can override it:
  *
- * - `over_allocation` (CC-6) — OVR-6 requires the affected member's *own*
- *   acknowledgement tick. A backfill reconstructs the day from one
- *   facilitator's recollection and cannot obtain it; issuing anyway would mean
- *   fabricating somebody else's consent. An over-allocated missed day has to
- *   be fixed by correcting the allocations.
  * - `skip_reestimate` (CC-3) — OVR-3/OVR-7 scope a deferral to exactly one
  *   task and let it happen once. `issueOverride` reads only
  *   `affectedTaskIds[0]` and creates an `override_followup` carry-forward item,
@@ -169,6 +193,17 @@ function entityIsCovered(
  *   a carry-forward item, still fail the gate, and be permanently unable to
  *   succeed on a retry. Re-estimates have to be answered, not attested away.
  *
+ * `over_allocation` (CC-6) used to be on this list too, because OVR-6 asks for
+ * the affected member's own acknowledgement and a backfill cannot obtain it.
+ * That left an over-allocated missed day with no way through at all —
+ * allocations cannot be edited on a `Missed` stand-up. It is now attestable,
+ * on one condition: the facilitator must explicitly confirm the affected
+ * members agreed (`memberAcknowledged` on the acknowledgement, enforced by
+ * `assertAcknowledgementsWaivable` before anything is written), and the
+ * backfill audit entry records that the consent was attested rather than
+ * given. The tick is the facilitator's word, on the record, not a silent
+ * default.
+ *
  * This restricts which of the *derived* mappings a backfill may use; it does
  * not re-derive or hardcode the mapping itself, which stays `OVERRIDE_TABLE`'s
  * job. Exported as the single rule, because the backfill dialog has to render
@@ -177,9 +212,13 @@ function entityIsCovered(
  * it, and tells the facilitator nothing.
  */
 export const BACKFILL_UNSUPPORTED_OVERRIDE_TYPES: readonly AnyOverrideType[] = [
-  'over_allocation',
   'skip_reestimate'
 ]
+
+/** Override types whose backfill attestation also needs the facilitator's confirmation that members agreed. */
+export function backfillNeedsMemberConfirmation(checkId: string): boolean {
+  return CHECK_TO_OVERRIDE_TYPE[checkId as CheckId] === 'over_allocation'
+}
 
 /** Ruling 21: may a backfill's facilitator attest to this failing check? */
 export function isCheckAcknowledgeableByBackfill(checkId: string): boolean {

@@ -49,6 +49,7 @@ import { assembleCompletionContext } from './completion-context'
 import { blockingFailures, evaluateCompletionChecks } from './completion-checks'
 import { runCompletionSaga, type CompletionContext } from './completion-saga'
 import {
+  backfillNeedsMemberConfirmation,
   CHECK_TO_OVERRIDE_TYPE,
   filterOverriddenFailures,
   isCheckAcknowledgeableByBackfill
@@ -105,6 +106,12 @@ interface BackfillAttendanceOutcome {
 export interface BackfillCheckAcknowledgement {
   checkId: string
   justification: string
+  /**
+   * CC-6 only (OVR-6). The facilitator's explicit confirmation that the
+   * members named by the check agreed to the overtime. Required for that
+   * check, ignored for the others.
+   */
+  memberAcknowledged?: boolean
 }
 
 export interface BackfillStandupInput {
@@ -236,6 +243,10 @@ export async function backfillStandup(
     { $set: { wasBackfilled: true, backfilledAt: now } }
   )
 
+  const memberAgreementAttestedFor = (input.acknowledgedChecks ?? [])
+    .filter((entry) => backfillNeedsMemberConfirmation(entry.checkId) && entry.memberAcknowledged === true)
+    .map((entry) => entry.checkId)
+
   await recordAudit({
     actor: { type: 'user', userId: input.backfilledBy },
     organizationId,
@@ -264,7 +275,13 @@ export async function backfillStandup(
       // check the day could not pass. Each one is separately audited by
       // `issueOverride` as `override_issued`; this ties them to the backfill
       // that caused them, so the trail reads as one decision.
-      ...(issuedOverrideIds.length ? { acknowledgedOverrideIds: issuedOverrideIds } : {})
+      ...(issuedOverrideIds.length ? { acknowledgedOverrideIds: issuedOverrideIds } : {}),
+      // OVR-6's tick on a backfill is the facilitator's word that the members
+      // agreed, not the members' own — recorded as such so nobody reads the
+      // override's `memberAcknowledged` as consent that was actually given.
+      ...(issuedOverrideIds.length && memberAgreementAttestedFor.length
+        ? { memberAgreementAttestedFor }
+        : {})
     }
   })
 
@@ -315,6 +332,16 @@ function assertAcknowledgementsWaivable(
     if (!isCheckAcknowledgeableByBackfill(entry.checkId)) {
       throw overrideNotPermitted(entry.checkId)
     }
+    // Before any write, like the refusal above: a backfill cannot obtain the
+    // member's own tick, so the facilitator has to say, in as many words, that
+    // they agreed. Anything short of an explicit `true` is refused.
+    if (backfillNeedsMemberConfirmation(entry.checkId) && entry.memberAcknowledged !== true) {
+      throw new StandupError(
+        'VALIDATION_FAILED',
+        'Confirm that the affected members agreed to this overtime.',
+        { checkId: entry.checkId, field: 'memberAcknowledged' }
+      )
+    }
   }
 }
 
@@ -335,8 +362,10 @@ async function issueAcknowledgedOverrides(args: {
   assertAcknowledgementsWaivable(acknowledgements)
 
   const justificationByCheckId = new Map<string, string>()
+  const memberConfirmedCheckIds = new Set<string>()
   for (const entry of acknowledgements) {
     justificationByCheckId.set(entry.checkId, entry.justification)
+    if (entry.memberAcknowledged === true) memberConfirmedCheckIds.add(entry.checkId)
   }
 
   // Filtered against the overrides this stand-up ALREADY carries, exactly as
@@ -392,9 +421,14 @@ async function issueAcknowledgedOverrides(args: {
       reasonCode: 'other',
       justification,
       gapMinutes,
-      // `memberAcknowledged` is deliberately not passed: it is OVR-6's tick,
-      // and `isCheckAcknowledgeableByBackfill` already refused the one type
-      // that needs it rather than letting a backfill fabricate consent.
+      // OVR-6's tick, set only where the facilitator explicitly confirmed it
+      // (`assertAcknowledgementsWaivable` has already refused CC-6 without
+      // that). It is the facilitator's attestation, not the member's own, and
+      // the backfill audit entry says so.
+      ...(backfillNeedsMemberConfirmation(failure.checkId) &&
+      memberConfirmedCheckIds.has(failure.checkId)
+        ? { memberAcknowledged: true }
+        : {}),
       issuedBy,
       // N7's recipients are looked up and notified from the completion saga,
       // exactly as `POST /api/standups/:id/overrides` leaves them.

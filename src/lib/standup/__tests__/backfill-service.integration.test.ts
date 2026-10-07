@@ -708,14 +708,14 @@ describe('backfillStandup (SCH-14/E49)', () => {
   })
 
   /**
-   * Review round 1, Important 1/2 and the bundled Minor. CC-6 needs OVR-6's
-   * member tick and CC-3 needs OVR-7's one-task deferral, neither of which a
-   * backfill can supply, so both are refused — and refused *before* anything is
+   * Review round 1, Important 1/2 and the bundled Minor. CC-3 needs OVR-7's
+   * one-task deferral, which a backfill cannot supply, so it is refused — as is
+   * CC-7, which nobody may override — and refused *before* anything is
    * written, because a refusal after `applyBackfillAttendance` left a `Missed`
    * stand-up with attendance persisted and allocations detached for a call that
    * then 422d.
    */
-  it.each([['CC-6'], ['CC-3'], ['CC-7']])(
+  it.each([['CC-3'], ['CC-7']])(
     'refuses an acknowledgement of %s before writing any attendance',
     async (checkId) => {
       await seedSprint('2026-08-25', '2026-09-10')
@@ -741,6 +741,98 @@ describe('backfillStandup (SCH-14/E49)', () => {
       expect(await CarryForwardItem.countDocuments({ standup: standup._id })).toBe(0)
     }
   )
+
+  /**
+   * CC-6 on a missed day. Allocations cannot be edited on a `Missed` stand-up,
+   * so an over-allocated one used to have no way through at all. It may now be
+   * attested to — but OVR-6's member tick cannot be obtained, so the
+   * facilitator has to confirm it explicitly, and the audit says whose word it
+   * was.
+   */
+  describe('an over-allocated missed day (CC-6)', () => {
+    async function seedOverAllocated() {
+      await seedSprint('2026-08-25', '2026-09-10')
+      const standup = await seedMissedStandup('2026-09-01', {
+        attendance: [{ user: member, state: 'present' }]
+      })
+      const { Task } = await import('@/models/Task')
+      const task = await Task.create({
+        title: 'Backfill task',
+        organization,
+        project,
+        sprint: sprintId,
+        createdBy: user,
+        taskNumber: 9201,
+        displayId: 'KAN-9201',
+        status: 'in_progress',
+        remainingEstimateMinutes: 900,
+        originalEstimateMinutes: 900,
+        assignedTo: [{ user: member }]
+      })
+      await Allocation.create({
+        standup: standup._id,
+        sprint: sprintId,
+        project,
+        organization,
+        member,
+        task: task._id,
+        plannedMinutes: 900,
+        source: 'assigned_in_standup',
+        excludedFromCapacity: false,
+        createdBy: user
+      })
+      return standup
+    }
+
+    it('refuses CC-6 without the facilitator confirming the members agreed, before writing anything', async () => {
+      const standup = await seedOverAllocated()
+
+      await expect(
+        backfillStandup({
+          standupId: String(standup._id),
+          backfilledBy: String(user),
+          acknowledgedChecks: [{ checkId: 'CC-6', justification: ACKNOWLEDGEMENT }],
+          now: new Date('2026-09-02T10:00:00.000Z')
+        })
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_FAILED',
+        details: { field: 'memberAcknowledged' }
+      })
+
+      const { StandupOverride } = await import('@/models/StandupOverride')
+      expect(await StandupOverride.countDocuments({ standup: standup._id })).toBe(0)
+      expect((await Standup.findById(standup._id).lean())!.status).toBe('Missed')
+    })
+
+    it('completes once the facilitator confirms, recording an over_allocation override and whose word it was', async () => {
+      const standup = await seedOverAllocated()
+
+      const result = await backfillStandup({
+        standupId: String(standup._id),
+        backfilledBy: String(user),
+        acknowledgedChecks: [
+          { checkId: 'CC-6', justification: ACKNOWLEDGEMENT, memberAcknowledged: true }
+        ],
+        now: new Date('2026-09-02T10:00:00.000Z')
+      })
+
+      expect(result.standup.status).toBe('Completed')
+
+      const { StandupOverride } = await import('@/models/StandupOverride')
+      const overrides = await StandupOverride.find({ standup: standup._id }).lean()
+      expect(overrides).toEqual([
+        expect.objectContaining({
+          type: 'over_allocation',
+          memberAcknowledged: true,
+          issuedBy: user
+        })
+      ])
+
+      const { ActivityLog } = await import('@/models/ActivityLog')
+      const audit = (await ActivityLog.findOne({ action: 'standup_backfilled' }).lean()) as any
+      expect(audit.details.after.memberAgreementAttestedFor).toEqual(['CC-6'])
+    })
+  })
 
   it('404s on a nonexistent standup', async () => {
     await expect(
