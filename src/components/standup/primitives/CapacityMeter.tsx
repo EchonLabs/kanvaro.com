@@ -15,10 +15,18 @@ import { cn } from '@/lib/utils'
  * beside the bar, and the bar itself is a `progressbar` carrying the real
  * minute values so a screen reader gets the numbers rather than a percentage.
  *
- * **Over-allocation renders beyond the bar's end, never clipped.** A meter that
+ * **Over-allocation is never clipped — and never leaves the bar.** A meter that
  * saturates at 100% makes nine hours and twenty hours look identical, and the
  * difference between those two is the difference between a day that needs a
- * nudge and one that needs the plan rewritten.
+ * nudge and one that needs the plan rewritten. So when a member is over, the
+ * bar's scale becomes the *allocated* hours: a tick marks where capacity ends
+ * and the overage fills red after it. The further over, the further left the
+ * tick sits. The overage used to be drawn past the bar's right end instead,
+ * which pushed it out of the bar and over the edge of the member card.
+ *
+ * Once over, the whole bar turns red — carried and new work included — so an
+ * over-allocated member reads as one state at a glance rather than a mostly
+ * green bar with a red tail. The capacity tick still shows how far over.
  *
  * Purely presentational. It computes no capacity — `computeCapacity()` is the
  * only authority for that — it renders the breakdown it is handed.
@@ -57,19 +65,28 @@ export function CapacityMeter({
   // An unavailable member has no denominator. Guarding here rather than at the
   // call site keeps every caller from having to remember that a zero day is a
   // legal state rather than an error.
-  const denominator = effectiveMinutes > 0 ? effectiveMinutes : 0
+  const capacity = effectiveMinutes > 0 ? effectiveMinutes : 0
+  const overMinutes = capacity > 0 ? Math.max(0, allocatedMinutes - capacity) : 0
+  // The bar's full length: the day's capacity, or the whole allocation once
+  // that exceeds it, so every segment stays inside the track.
+  const scale = overMinutes > 0 ? allocatedMinutes : capacity
 
   const percent = (value: number) =>
-    denominator === 0 ? 0 : Math.min(100, (value / denominator) * 100)
+    scale === 0 ? 0 : Math.min(100, (value / scale) * 100)
 
-  const carried = Math.min(carriedMinutes, allocatedMinutes)
-  const fresh = Math.max(0, allocatedMinutes - carried)
-  const overMinutes = Math.max(0, allocatedMinutes - denominator)
+  // Within capacity, carried work fills first, then new; whatever lies past
+  // capacity is the over segment, whichever kind of work it is.
+  const withinCapacity = Math.min(allocatedMinutes, capacity)
+  const carried = Math.min(carriedMinutes, withinCapacity)
+  const fresh = Math.max(0, withinCapacity - carried)
 
   return (
     <div className={cn('flex flex-col gap-1', className)}>
-      <div className="flex items-baseline justify-between gap-2 text-[12.5px]">
-        <span className="font-apple-mono tabular-nums text-[var(--apple-secondary-label)]">
+      {/* `min-w-0` + truncate on the label, `shrink-0` on the status: on a
+          narrow card the label gives way, and the status word — the part that
+          says OVER — always stays inside the card. */}
+      <div className="flex min-w-0 items-baseline justify-between gap-2 text-[12.5px]">
+        <span className="min-w-0 truncate font-apple-mono tabular-nums text-[var(--apple-secondary-label)]">
           {standupStrings.allocation.meterLabel({
             name,
             allocated: allocatedMinutes,
@@ -78,7 +95,7 @@ export function CapacityMeter({
           })}
         </span>
         {/* NFR-A1: the word, always, not only the colour. */}
-        <span className={cn('font-apple-mono font-semibold tabular-nums', TONE[status])}>
+        <span className={cn('shrink-0 font-apple-mono font-semibold tabular-nums', TONE[status])}>
           {statusLabel(status, gapMinutes, locale)}
         </span>
       </div>
@@ -94,7 +111,7 @@ export function CapacityMeter({
           capacity: effectiveMinutes,
           locale
         })}
-        className="relative flex h-[6px] w-full overflow-visible rounded-full bg-[var(--apple-tertiary-fill)]"
+        className="relative flex h-[6px] w-full overflow-hidden rounded-full bg-[var(--apple-tertiary-fill)]"
       >
         <div
           data-testid="meter-carried"
@@ -102,7 +119,12 @@ export function CapacityMeter({
             minutes: carried as Minutes,
             locale
           })}
-          className="h-full rounded-l-full bg-[var(--apple-system-blue)]/60"
+          className={cn(
+            'h-full rounded-l-full',
+            overMinutes > 0
+              ? 'bg-[var(--apple-system-red)]'
+              : 'bg-[var(--apple-system-blue)]/60'
+          )}
           style={{ width: `${percent(carried)}%` }}
         />
         <div
@@ -111,7 +133,12 @@ export function CapacityMeter({
             minutes: fresh as Minutes,
             locale
           })}
-          className="h-full bg-[var(--apple-system-green)]/70"
+          className={cn(
+            'h-full',
+            overMinutes > 0
+              ? 'bg-[var(--apple-system-red)]'
+              : 'bg-[var(--apple-system-green)]/70'
+          )}
           style={{ width: `${percent(fresh)}%` }}
         />
         {overMinutes > 0 && (
@@ -121,9 +148,17 @@ export function CapacityMeter({
               minutes: overMinutes as Minutes,
               locale
             })}
-            // Sits past the bar's end deliberately: the overflow is the point.
-            className="absolute left-full top-0 h-full rounded-r-full bg-[var(--apple-system-red)]"
-            style={{ width: `${Math.min(50, percent(overMinutes))}%` }}
+            className="h-full bg-[var(--apple-system-red)]"
+            style={{ width: `${percent(overMinutes)}%` }}
+          />
+        )}
+        {overMinutes > 0 && (
+          // Where the day's capacity ends — the line the red is past.
+          <span
+            aria-hidden="true"
+            data-testid="meter-capacity-mark"
+            className="absolute top-0 h-full w-[2px] -translate-x-1/2 bg-[var(--plan-surface)]"
+            style={{ left: `${percent(capacity)}%` }}
           />
         )}
       </div>

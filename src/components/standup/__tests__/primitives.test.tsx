@@ -93,7 +93,7 @@ describe('CapacityMeter (NFR-A1)', () => {
     expect(screen.getByTestId('meter-new')).toHaveStyle({ width: '25%' })
   })
 
-  it('renders over-allocation beyond the bar rather than clipping it', () => {
+  it('renders over-allocation inside the bar, rescaled rather than clipped', () => {
     render(
       <CapacityMeter
         {...base}
@@ -105,8 +105,37 @@ describe('CapacityMeter (NFR-A1)', () => {
     )
 
     // Clipping would make 9h and 20h look identical, which is precisely the
-    // case a PM needs to see.
-    expect(screen.getByTestId('meter-over')).toBeInTheDocument()
+    // case a PM needs to see — so the scale becomes the 600 allocated, the
+    // 120 over is a fifth of the bar, and capacity is marked at 480/600.
+    expect(screen.getByTestId('meter-over')).toHaveStyle({ width: '20%' })
+    expect(screen.getByTestId('meter-capacity-mark')).toHaveStyle({ left: '80%' })
+    // Nothing is drawn past the track: the segments add up to the whole bar.
+    expect(screen.getByTestId('meter-carried')).toHaveStyle({ width: '30%' })
+    expect(screen.getByTestId('meter-new')).toHaveStyle({ width: '50%' })
+    expect(screen.getByRole('progressbar').className).toContain('overflow-hidden')
+  })
+
+  it('turns the whole bar red once the member is over', () => {
+    render(
+      <CapacityMeter
+        {...base}
+        allocatedMinutes={m(600)}
+        carriedMinutes={m(180)}
+        gapMinutes={m(-120)}
+        status="over"
+      />
+    )
+
+    for (const id of ['meter-carried', 'meter-new', 'meter-over']) {
+      expect(screen.getByTestId(id).className).toContain('--apple-system-red')
+    }
+  })
+
+  it('keeps the carried and new colours while within capacity', () => {
+    render(<CapacityMeter {...base} status="under" />)
+
+    expect(screen.getByTestId('meter-carried').className).not.toContain('--apple-system-red')
+    expect(screen.getByTestId('meter-new').className).not.toContain('--apple-system-red')
   })
 
   it('renders an unavailable day without dividing by zero', () => {

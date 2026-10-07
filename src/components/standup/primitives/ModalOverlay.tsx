@@ -21,9 +21,15 @@ export interface ModalOverlayProps {
   onClose: () => void
   labelledBy: string
   children: ReactNode
+  /**
+   * `md` for a single-decision dialog, `lg` for one that lists a whole team
+   * (backfill). The overlay owns the card shell — border, radius, surface —
+   * so a dialog's own root must not draw a second one inside it.
+   */
+  size?: 'md' | 'lg'
 }
 
-export function ModalOverlay({ open, onClose, labelledBy, children }: ModalOverlayProps) {
+export function ModalOverlay({ open, onClose, labelledBy, children, size = 'md' }: ModalOverlayProps) {
   const panelRef = useRef<HTMLDivElement | null>(null)
   const returnFocusTo = useRef<HTMLElement | null>(null)
 
@@ -31,9 +37,12 @@ export function ModalOverlay({ open, onClose, labelledBy, children }: ModalOverl
     if (!open) return
     returnFocusTo.current = document.activeElement as HTMLElement | null
     const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE)
-    first?.focus()
+    first?.focus({ preventScroll: true })
     return () => {
-      returnFocusTo.current?.focus()
+      // `preventScroll`: a plain `focus()` scrolls every ancestor to reveal
+      // the element, app-shell frame included, which shifted the whole page
+      // up when a dialog closed — and fought a Fix action's own scroll.
+      returnFocusTo.current?.focus({ preventScroll: true })
     }
   }, [open])
 
@@ -76,7 +85,7 @@ export function ModalOverlay({ open, onClose, labelledBy, children }: ModalOverl
         aria-modal="true"
         aria-labelledby={labelledBy}
         onKeyDown={onKeyDown}
-        className="relative z-10 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_16px_48px_rgba(0,0,0,0.25)]"
+        className={`relative z-10 max-h-[90vh] w-full ${size === 'lg' ? 'max-w-xl' : 'max-w-md'} overflow-y-auto rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_16px_48px_rgba(0,0,0,0.25)]`}
       >
         {children}
       </div>

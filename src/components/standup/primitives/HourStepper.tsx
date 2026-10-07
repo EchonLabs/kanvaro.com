@@ -111,14 +111,23 @@ export function HourStepper({
 
   return (
     <div className={cn('flex flex-col gap-1', className)}>
-      <div className="flex items-center gap-1">
+      {/* One segmented pill — minus, hours, plus — rather than three loose
+          boxes. The bare variant (My Stand-up's single hours box) is unchanged. */}
+      <div
+        className={cn(
+          'flex items-center',
+          bare
+            ? 'gap-1'
+            : 'gap-0.5 self-start rounded-full border border-[var(--plan-border)] bg-[var(--plan-raised)] p-0.5'
+        )}
+      >
         {!bare && (
           <button
             type="button"
             aria-label={standupStrings.allocation.stepperDecrease()}
             disabled={disabled || atFloor}
             onClick={() => step(-1)}
-            className="apple-transition h-7 w-7 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] text-[13px] leading-none text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
+            className="apple-transition h-7 w-7 rounded-full text-[15px] leading-none text-[var(--plan-text)] hover:bg-[var(--plan-surface)] disabled:opacity-40"
           >
             −
           </button>
@@ -156,7 +165,7 @@ export function HourStepper({
           className={
             bare && inputClassName
               ? inputClassName
-              : 'font-apple-mono h-7 w-16 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-background px-2 text-right text-[13px] tabular-nums disabled:opacity-40'
+              : 'h-7 w-12 border-0 bg-transparent px-0 text-center apple-type-subheadline font-semibold tabular-nums text-[var(--plan-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--plan-accent)]/40 rounded-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none disabled:opacity-40'
           }
         />
 
@@ -166,7 +175,7 @@ export function HourStepper({
             aria-label={standupStrings.allocation.stepperIncrease()}
             disabled={disabled}
             onClick={() => step(1)}
-            className="apple-transition h-7 w-7 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] text-[13px] leading-none text-[var(--apple-label)] hover:bg-[var(--apple-quaternary-fill)] disabled:opacity-40"
+            className="apple-transition h-7 w-7 rounded-full text-[15px] leading-none text-[var(--plan-text)] hover:bg-[var(--plan-surface)] disabled:opacity-40"
           >
             +
           </button>
@@ -174,7 +183,7 @@ export function HourStepper({
       </div>
 
       {split && (
-        <p className="text-[11px] text-[var(--apple-secondary-label)]">
+        <p className="apple-type-caption text-[var(--plan-muted)]">
           {standupStrings.allocation.stepperSplit({
             planned: split.plannedMinutes,
             remaining: split.remainingEstimateMinutes,
