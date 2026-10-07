@@ -27,6 +27,7 @@ import {
 import { loadSprintCloseReadiness } from '@/lib/standup/sprint-close-service'
 import { loadVariancePanel } from '@/lib/standup/variance-service'
 import { ok, withStandupIdPermission } from '@/lib/standup/route-helpers'
+import { StandupOverride } from '@/models/StandupOverride'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,8 +36,14 @@ export const GET = withStandupIdPermission(
   async (_request, { standupId, standup }) => {
     const sprintId = String(standup.sprint)
 
-    const [board, variance, carryForward, { blockers, sprintHealth }, sprintCloseReadiness] =
-      await Promise.all([
+    const [
+      board,
+      variance,
+      carryForward,
+      { blockers, sprintHealth },
+      sprintCloseReadiness,
+      overrideDocs
+    ] = await Promise.all([
         loadAllocationBoard(standupId),
         // CC-3 asks whether yesterday has been explained, so it needs yesterday.
         // Passing the rows rather than omitting them is what separates
@@ -48,7 +55,12 @@ export const GET = withStandupIdPermission(
         // check-extras.ts's docblock for what happens when they do).
         loadBlockersAndSprintHealth(standupId, sprintId),
         // CC-8, final day only.
-        loadSprintCloseReadiness(standupId)
+        loadSprintCloseReadiness(standupId),
+        // The overrides already on record. The run screen used to track only
+        // the ones issued since the page loaded, so a reload re-blocked a check
+        // the saga would happily pass — and for CC-3 the second attempt is
+        // refused outright ("already deferred once"), stranding the PM.
+        StandupOverride.find({ standup: standupId }).lean() as Promise<any[]>
       ])
 
     // `loadAllocationBoard` already resolves each allocation row's task
@@ -121,6 +133,11 @@ export const GET = withStandupIdPermission(
       standupId,
       standupVersion: board.standupVersion,
       checks,
+      overridesIssued: overrideDocs.map((override) => ({
+        type: String(override.type),
+        affectedMemberIds: (override.affectedMemberIds ?? []).map(String),
+        affectedTaskIds: (override.affectedTaskIds ?? []).map(String)
+      })),
       blocking: blockingFailures(checks).map((check) => check.checkId),
       canComplete: blockingFailures(checks).length === 0
     })
