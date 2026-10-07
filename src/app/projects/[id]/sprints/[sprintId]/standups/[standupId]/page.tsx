@@ -11,8 +11,16 @@
  *
  * The degradation banner is first, per §3 rule 1: the module says what it
  * cannot currently do before it shows anything it can.
+ *
+ * **This page owns no stand-up state after the first load.** It used to render
+ * the revise / reason / ledger dialogs itself, save them with the version it
+ * loaded the board with, and refresh its own copy of the board — which the run
+ * screen never reads again after mount. So the first edit on the screen made
+ * every one of those saves STALE_STANDUP, and a save that did land never
+ * appeared. Every call below now takes `expectedVersion` from the screen, and
+ * the screen reloads itself.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
@@ -23,23 +31,12 @@ import {
   type RunScreenApi,
   type RunScreenData
 } from '@/components/standup/run/StandupRunScreen'
-import {
-  DebtLedgerDrawer,
-  type LedgerEntryView
-} from '@/components/standup/run/DebtLedgerDrawer'
-import {
-  ReviseEstimateModal,
-  type ReviseEstimateTarget
-} from '@/components/standup/run/ReviseEstimateModal'
-import { ModalOverlay } from '@/components/standup/primitives/ModalOverlay'
 import type { VariancePanelMember, VariancePanelRow } from '@/components/standup/run/VariancePanel'
 import type { CarryForwardItemRow } from '@/components/standup/run/CarryForwardPanel'
 import type { BlockerRow } from '@/components/standup/run/BlockerPanel'
 import type { Degradation } from '@/lib/standup/degradation'
-import type { DebtPosition } from '@/lib/standup/debt'
 import { minutes, type Minutes } from '@/lib/standup/minutes'
 import { STANDUP_VERSION_HEADER } from '@/lib/standup/version-header'
-import { standupStrings } from '@/lib/standup/strings'
 
 export default function StandupRunPage({
   params
@@ -140,24 +137,6 @@ export default function StandupRunPage({
   }, [load, projectId])
 
   const router = useRouter()
-  const [revising, setRevising] = useState<ReviseEstimateTarget | null>(null)
-  const [givingReason, setGivingReason] = useState<{
-    allocationId: string
-    taskKey?: string
-    title: string
-  } | null>(null)
-  const [reasonText, setReasonText] = useState('')
-  const [ledger, setLedger] = useState<{
-    memberId: string
-    memberName: string
-    position: DebtPosition
-    entries: LedgerEntryView[]
-    canWriteOff: boolean
-  } | null>(null)
-  const [panelNotice, setPanelNotice] = useState<string | null>(null)
-
-  const varianceRows = useMemo(() => data?.variance?.rows ?? [], [data])
-  const varianceMembers = useMemo(() => data?.variance?.members ?? [], [data])
 
   const api: RunScreenApi = {
     async setAttendance(input) {
@@ -200,12 +179,8 @@ export default function StandupRunPage({
     // way it does on every other mutation outcome, so the board's shape
     // change once `In_Progress` (RUN-26 unlocks members' own rows) is
     // reflected without this function duplicating that fetch.
-    async start() {
-      await unwrap(
-        await mutate(`/api/standups/${standupId}/start`, 'POST', {
-          expectedVersion: data?.standupVersion ?? 0
-        })
-      )
+    async start({ expectedVersion }) {
+      await unwrap(await mutate(`/api/standups/${standupId}/start`, 'POST', { expectedVersion }))
     },
 
     async completeStandup({ notes, expectedVersion }) {
@@ -276,40 +251,39 @@ export default function StandupRunPage({
     openTask(taskId) {
       router.push(`/tasks/${taskId}`)
     },
-    reviseEstimate({ allocationId }) {
-      const row = varianceRows.find((candidate) => candidate.allocationId === allocationId)
-      if (!row) return
-      setRevising({
-        allocationId: row.allocationId,
-        taskKey: row.taskKey,
-        title: row.title,
-        memberName: row.memberName,
-        originalEstimateMinutes: row.originalEstimateMinutes,
-        totalLoggedMinutesOnTask: row.totalLoggedMinutesOnTask,
-        taskVarianceMinutes: row.taskVarianceMinutes
-      })
+    reviseEstimate({ allocationId, newRemainingMinutes, reason, detail, expectedVersion }) {
+      return mutate(`/api/standups/${standupId}/variance/${allocationId}`, 'POST', {
+        newRemainingMinutes,
+        reason,
+        ...(detail ? { detail } : {}),
+        expectedVersion
+      }).then(unwrap)
     },
-    giveNotStartedReason({ allocationId }) {
-      const row = varianceRows.find((candidate) => candidate.allocationId === allocationId)
-      if (!row) return
-      setReasonText('')
-      setGivingReason({ allocationId: row.allocationId, taskKey: row.taskKey, title: row.title })
+    recordNotStartedReason({ allocationId, reason, expectedVersion }) {
+      return mutate(`/api/standups/${standupId}/variance/${allocationId}`, 'POST', {
+        notStartedReason: reason,
+        expectedVersion
+      }).then(unwrap)
     },
-    async viewDebtLedger(memberId) {
-      const member = varianceMembers.find((candidate) => candidate.memberId === memberId)
-      try {
-        const response = await fetch(`/api/standups/${standupId}/debt?memberId=${memberId}`)
-        const payload = await unwrap(response)
-        setLedger({
+    async loadDebtLedger(memberId) {
+      const payload = await unwrap(
+        await fetch(`/api/standups/${standupId}/debt?memberId=${encodeURIComponent(memberId)}`)
+      )
+      // NFR-13: a viewer without `standup:view_debt` gets `{ team }` and no
+      // member position at all. Handing that to the drawer crashed it on
+      // `position.surplusMinutes`; `null` lets the screen say why instead.
+      if (!payload?.position) return null
+      return { position: payload.position, entries: payload.entries ?? [] }
+    },
+    async writeOffDebt({ memberId, minutes: amount, reason, expectedVersion }) {
+      await unwrap(
+        await mutate(`/api/standups/${standupId}/debt`, 'POST', {
           memberId,
-          memberName: member?.memberName ?? memberId,
-          position: payload.position,
-          entries: payload.entries ?? [],
-          canWriteOff: true
+          minutes: amount,
+          reason,
+          expectedVersion
         })
-      } catch {
-        setPanelNotice("That member's estimate debt could not be loaded.")
-      }
+      )
     },
 
     // --- Phase 9 ---------------------------------------------------------
@@ -336,15 +310,16 @@ export default function StandupRunPage({
      * existed — `RunScreenApi.setTaskDisposition` is optional, so its absence
      * failed silently rather than loudly.
      */
-    async setTaskDisposition({ taskId, type }) {
+    // The screen reloads after this resolves, as for every other mutation —
+    // it used to reload here too, into page state the screen never reads.
+    async setTaskDisposition({ taskId, type, expectedVersion }) {
       await unwrap(
         await mutate(
           `/api/standups/${standupId}/sprint-close/tasks/${taskId}`,
           'PATCH',
-          { type, expectedVersion: data?.standupVersion ?? 0 }
+          { type, expectedVersion }
         )
       )
-      setData(await load())
     },
 
     // --- Task 22 (Phase 10's override path) -------------------------------
@@ -402,80 +377,10 @@ export default function StandupRunPage({
     }
   }
 
-  const saveRevision = useCallback(
-    async (input: {
-      allocationId: string
-      newRemainingMinutes: Minutes
-      reason: string
-      detail?: string
-    }) => {
-      if (!data) return
-      try {
-        await mutate(
-          `/api/standups/${standupId}/variance/${input.allocationId}`,
-          'POST',
-          {
-            newRemainingMinutes: input.newRemainingMinutes,
-            reason: input.reason,
-            ...(input.detail ? { detail: input.detail } : {}),
-            expectedVersion: data.standupVersion
-          }
-        )
-        setRevising(null)
-        const fresh = await load()
-        setData(fresh)
-      } catch {
-        setPanelNotice('That revision could not be saved.')
-      }
-    },
-    [data, load, standupId]
-  )
-
-  const saveReason = useCallback(async () => {
-    if (!data || !givingReason) return
-    try {
-      await mutate(`/api/standups/${standupId}/variance/${givingReason.allocationId}`, 'POST', {
-        notStartedReason: reasonText.trim(),
-        expectedVersion: data.standupVersion
-      })
-      setGivingReason(null)
-      const fresh = await load()
-      setData(fresh)
-    } catch {
-      setPanelNotice('That reason could not be saved.')
-    }
-  }, [data, givingReason, load, reasonText, standupId])
-
-  const saveWriteOff = useCallback(
-    async (input: { minutes: Minutes; reason: string }) => {
-      if (!data || !ledger) return
-      try {
-        await mutate(`/api/standups/${standupId}/debt`, 'POST', {
-          memberId: ledger.memberId,
-          minutes: input.minutes,
-          reason: input.reason,
-          expectedVersion: data.standupVersion
-        })
-        setLedger(null)
-        const fresh = await load()
-        setData(fresh)
-      } catch {
-        setPanelNotice('That write-off could not be saved.')
-      }
-    },
-    [data, ledger, load, standupId]
-  )
-
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
       <div className="space-y-5 p-4 md:p-6">
         <DegradationBanner degradations={degradations} />
-
-        {panelNotice && (
-          <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">
-            {panelNotice}
-          </p>
-        )}
 
         {error ? (
           <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">
@@ -486,6 +391,7 @@ export default function StandupRunPage({
             data={data}
             api={api}
             summaryHref={`/projects/${projectId}/sprints/${sprintId}/standups/${standupId}/summary`}
+            planningHref={`/sprints/${sprintId}/planning`}
           />
         ) : (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -494,64 +400,6 @@ export default function StandupRunPage({
           </div>
         )}
 
-        {revising && (
-          <ModalOverlay open onClose={() => setRevising(null)} labelledBy="revise-title">
-            <ReviseEstimateModal
-              target={revising}
-              onSave={saveRevision}
-              onCancel={() => setRevising(null)}
-            />
-          </ModalOverlay>
-        )}
-
-        {givingReason && (
-          <ModalOverlay open onClose={() => setGivingReason(null)} labelledBy="reason-title">
-            <div className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
-              <h3 id="reason-title" className="text-sm font-semibold">
-                {standupStrings.run.panel3()} — {givingReason.taskKey ?? givingReason.title}
-              </h3>
-              <label className="flex flex-col gap-1 text-sm" htmlFor="not-started-reason">
-                Why didn’t this happen?
-                <textarea
-                  id="not-started-reason"
-                  value={reasonText}
-                  onChange={(event) => setReasonText(event.target.value)}
-                  className="min-h-16 rounded-md border border-border bg-background px-2 py-1 text-sm"
-                />
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setGivingReason(null)}
-                  className="rounded-md border border-border px-3 py-1 text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!reasonText.trim()}
-                  onClick={saveReason}
-                  className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground disabled:opacity-50"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          </ModalOverlay>
-        )}
-
-        {ledger && (
-          <ModalOverlay open onClose={() => setLedger(null)} labelledBy="debt-ledger-title">
-            <DebtLedgerDrawer
-              memberName={ledger.memberName}
-              position={ledger.position}
-              entries={ledger.entries}
-              canWriteOff={ledger.canWriteOff}
-              onWriteOff={saveWriteOff}
-              onClose={() => setLedger(null)}
-            />
-          </ModalOverlay>
-        )}
       </div>
     </MainLayout>
   )
@@ -580,13 +428,21 @@ async function mutate(
   })
 }
 
-/** Turns a failed response into the catalogue error the screen switches on. */
-async function asError(response: Response): Promise<Error & { code?: string }> {
+/**
+ * Turns a failed response into the catalogue error the screen switches on.
+ * `details` travels too: a refused Start names the planning items still open
+ * there, and the screen lists them rather than a bare "could not be started".
+ */
+async function asError(
+  response: Response
+): Promise<Error & { code?: string; details?: Record<string, unknown> }> {
   const payload = await response.json().catch(() => null)
   const error = new Error(payload?.error?.message ?? 'Request failed') as Error & {
     code?: string
+    details?: Record<string, unknown>
   }
   error.code = payload?.error?.code
+  error.details = payload?.error?.details
   return error
 }
 
@@ -661,6 +517,7 @@ function toRunScreenData(
     // distinction is what lets `StandupRunScreen` tell "server says nothing
     // is blocking" apart from "we don't actually know."
     ...(checks?.checks ? { checks: checks.checks } : {}),
+    ...(checks?.overridesIssued ? { overridesIssued: checks.overridesIssued } : {}),
     ...(board.dayOne ? { dayOne: board.dayOne } : {}),
     completionState: board.completionState ?? null
   }

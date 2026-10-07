@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Info, RefreshCw, Video, XCircle } from 'lucide-react'
+import { AlertTriangle, Info, Loader2, RefreshCw, Video, XCircle } from 'lucide-react'
 
 import type { QuickAddTask } from '@/components/standup/primitives/QuickAddCombobox'
 import { AttendancePanel, type ReassignPromptView } from './AttendancePanel'
@@ -17,7 +17,18 @@ import {
   type BoardMemberView
 } from './CapacityBoard'
 import { CompletionPanel } from './CompletionPanel'
-import { OverrideModal, type OverridableType, type OverrideModalAffectedMember, type OverrideModalSubmitInput } from './OverrideModal'
+import {
+  OverrideModal,
+  type OverridableType,
+  type OverrideModalAffectedMember,
+  type OverrideModalAffectedTask,
+  type OverrideModalSubmitInput
+} from './OverrideModal'
+import { BackfillDialog, type BackfillDialogSubmitInput } from './BackfillDialog'
+import { anchorFor } from './CompletionPanel'
+import { DebtLedgerDrawer, type LedgerEntryView } from './DebtLedgerDrawer'
+import { NotStartedReasonModal, type NotStartedReasonTarget } from './NotStartedReasonModal'
+import { ReviseEstimateModal, type ReviseEstimateTarget } from './ReviseEstimateModal'
 import { RaiseBlockerModal, type RaiseBlockerSubmitInput } from './RaiseBlockerModal'
 import { ResolveBlockerDialog, type ResolveBlockerSubmitInput } from './ResolveBlockerDialog'
 import { ModalOverlay } from '@/components/standup/primitives/ModalOverlay'
@@ -27,11 +38,20 @@ import { useStandupShortcuts } from './useStandupShortcuts'
 import {
   PlanBanner,
   planButtonClass,
-  planFieldClass,
   planInsetClass,
   planPillClass,
+  scrollToSection,
   type PlanPillTone
 } from '../planning/ui'
+
+/**
+ * The one two-up grid the run screen's three paired sections share — today's
+ * board, yesterday's review, and blockers beside completion. Each used to
+ * pick its own (`lg` with a 1 : 1.15 split for the board, `xl` with 1 : 1 for
+ * the other two), so the gutter between the halves sat at a different place
+ * in each section and the page had no shared middle line.
+ */
+export const RUN_TWO_UP_CLASSES = 'grid items-start gap-5 xl:grid-cols-2'
 
 /** A section heading above a group of cards. */
 const SECTION_TITLE_CLASSES = 'apple-type-headline font-semibold text-[var(--plan-text)]'
@@ -46,7 +66,11 @@ import type { AssignableMemberView, AssignableTaskView } from '../shared/Assigna
 import { formatDualTimezone } from '@/lib/standup/timezone'
 import type { PoolTask } from '@/lib/standup/allocation'
 import type { BucketedRows, YesterdayRow } from '@/lib/standup/yesterday'
-import type { AttendanceStatus, CapacityBreakdown } from '@/lib/standup/capacity'
+import {
+  isAbsentAttendance,
+  type AttendanceStatus,
+  type CapacityBreakdown
+} from '@/lib/standup/capacity'
 import {
   blockingFailures,
   type CompletionCheckResult
@@ -54,13 +78,36 @@ import {
 import { formatMinutesAsHours, type Minutes } from '@/lib/standup/minutes'
 import { isOwnRowReadOnly } from '@/lib/standup/own-row'
 import {
+  backfillNeedsMemberConfirmation,
   filterOverriddenFailures,
   isCheckAcknowledgeableByBackfill,
   OVERRIDE_TABLE,
-  validateJustification,
   type IssuedOverrideForReconciliation
 } from '@/lib/standup/override'
+import type { DebtPosition } from '@/lib/standup/debt'
+import type { RevisionReason } from '@/lib/standup/estimates'
 import { standupStrings } from '@/lib/standup/strings'
+
+/**
+ * The text a failed request should show. The server's `StandupError`
+ * messages are written for the person using the screen ("This stand-up
+ * becomes available at 09:00 on 06 Oct.") — and every failure path here used
+ * to discard them for a generic "That could not be saved", which is how a
+ * refused Start, a too-short reason and a stale version all came to look
+ * identical. The fallback is for errors with no catalogue code: a network
+ * failure, a 500.
+ */
+function messageOf(error: unknown, fallback: string): string {
+  const candidate = error as { code?: string; message?: string } | null
+  return candidate?.code && candidate.message ? candidate.message : fallback
+}
+
+/** Why the server refused to start the stand-up, as the banner renders it. */
+interface StartRefusal {
+  message: string
+  /** PLANNING_GATE_NOT_PASSED's still-open checklist items, by message. */
+  planningItems: string[]
+}
 
 /**
  * checkId -> override type, inverted from `OVERRIDE_TABLE` (§14.2's table).
@@ -80,8 +127,21 @@ const CHECK_ID_TO_OVERRIDE_TYPE: Partial<Record<string, OverridableType>> = Obje
 interface OverrideContext {
   type: OverridableType
   affected: OverrideModalAffectedMember[]
+  /** CC-3/CC-10: what the modal lists instead of a meaningless "0h gap". */
+  affectedTasks: OverrideModalAffectedTask[]
   affectedMemberIds: string[]
   affectedTaskIds: string[]
+}
+
+/** One label per task id, from whichever key field the check's entities carry. */
+function tasksOf(entities: readonly Record<string, unknown>[]): OverrideModalAffectedTask[] {
+  const byId = new Map<string, string>()
+  for (const entity of entities) {
+    if (typeof entity.taskId !== 'string' || byId.has(entity.taskId)) continue
+    const key = entity.taskKey ?? entity.key
+    byId.set(entity.taskId, typeof key === 'string' && key ? key : entity.taskId)
+  }
+  return Array.from(byId, ([taskId, label]) => ({ taskId, label }))
 }
 
 /**
@@ -130,6 +190,7 @@ function deriveOverrideContext(
     return {
       type,
       affected,
+      affectedTasks: [],
       affectedMemberIds: affected.map((member) => member.memberId),
       affectedTaskIds: []
     }
@@ -160,7 +221,13 @@ function deriveOverrideContext(
       allocatedMinutes: 0
     }))
 
-    return { type, affected, affectedMemberIds: memberIds, affectedTaskIds: taskIds }
+    return {
+      type,
+      affected,
+      affectedTasks: tasksOf(check.entities),
+      affectedMemberIds: memberIds,
+      affectedTaskIds: taskIds
+    }
   }
 
   if (check.checkId === 'CC-3') {
@@ -188,7 +255,13 @@ function deriveOverrideContext(
       allocatedMinutes: 0
     }))
 
-    return { type, affected, affectedMemberIds: memberIds, affectedTaskIds: taskIds }
+    return {
+      type,
+      affected,
+      affectedTasks: tasksOf(check.entities),
+      affectedMemberIds: memberIds,
+      affectedTaskIds: taskIds
+    }
   }
 
   return null
@@ -293,6 +366,12 @@ export interface RunScreenData {
    * that case rather than defaulting to an empty (falsely all-clear) list.
    */
   checks?: readonly CompletionCheckResult[]
+  /**
+   * The overrides already on record for this stand-up, from the same checks
+   * fetch. Without them the screen only knew about overrides issued since the
+   * page loaded, so a reload re-blocked a check the saga would pass.
+   */
+  overridesIssued?: readonly IssuedOverrideForReconciliation[]
   /** Phase 11. Present only on `final_day`. */
   sprintClose?: {
     openTasks: OpenTaskReadiness[]
@@ -348,7 +427,7 @@ export interface RunScreenApi {
    * Optional so a caller that has not wired it yet still compiles — the
    * button below only renders when it is present.
    */
-  start?(): Promise<void>
+  start?(input: { expectedVersion: number }): Promise<void>
 
   /**
    * RUN-19..22 (Task 17). Resuming an interrupted completion is the same
@@ -382,7 +461,15 @@ export interface RunScreenApi {
      * issues a real `under_allocation` override, exactly as the live
      * completion path does. Omitting this leaves the check blocking.
      */
-    acknowledgedChecks?: { checkId: string; justification: string }[]
+    acknowledgedChecks?: {
+      checkId: string
+      justification: string
+      /**
+       * CC-6 only. The facilitator's confirmation that the affected members
+       * agreed to the overtime — a backfill cannot get their own tick.
+       */
+      memberAcknowledged?: boolean
+    }[]
   }): Promise<{ status: string; summaryId: string }>
 
   // --- Phase 8 -------------------------------------------------------------
@@ -412,9 +499,39 @@ export interface RunScreenApi {
     expectedVersion: number
   }): Promise<{ standupVersion: number }>
   openTask?(taskId: string): void
-  reviseEstimate?(row: { allocationId: string; taskId: string }): void
-  giveNotStartedReason?(row: { allocationId: string; taskId: string }): void
-  viewDebtLedger?(memberId: string): void
+  /**
+   * VAR-15/16 and AC-18 — the two answers a variance row asks for, and the
+   * ledger. These used to be fire-and-forget callbacks that the route page
+   * answered with its own dialogs, its own copy of the stand-up version and
+   * its own board state. The page's version went stale after the first edit
+   * here (so every save after it was refused as STALE_STANDUP), and the board
+   * it refreshed was not the one on screen (so a save that did land never
+   * showed). They now carry the screen's version and return the new one, like
+   * every other mutation, and the screen owns the dialogs.
+   */
+  reviseEstimate?(input: {
+    allocationId: string
+    newRemainingMinutes: Minutes
+    reason: RevisionReason
+    detail?: string
+    expectedVersion: number
+  }): Promise<{ standupVersion: number }>
+  recordNotStartedReason?(input: {
+    allocationId: string
+    reason: string
+    expectedVersion: number
+  }): Promise<{ standupVersion: number }>
+  /** `null` when the viewer may only see the team total (NFR-13). */
+  loadDebtLedger?(memberId: string): Promise<{
+    position: DebtPosition
+    entries: LedgerEntryView[]
+  } | null>
+  writeOffDebt?(input: {
+    memberId: string
+    minutes: Minutes
+    reason: string
+    expectedVersion: number
+  }): Promise<void>
 
   // --- Phase 9 ---------------------------------------------------------------
   addCarryForwardNote?(input: { itemId: string; text: string }): Promise<void>
@@ -441,7 +558,7 @@ export interface RunScreenApi {
   }): Promise<IssuedOverrideForReconciliation>
 
   // --- Phase 11 --------------------------------------------------------------
-  setTaskDisposition?(input: { taskId: string; type: string }): Promise<void>
+  setTaskDisposition?(input: { taskId: string; type: string; expectedVersion: number }): Promise<void>
 
   /**
    * RUN-14..18 (Task 4). `POST /api/standups/:id/blockers`. Optional so a
@@ -495,9 +612,18 @@ export interface StandupRunScreenProps {
    * route for it yet still compiles.
    */
   summaryHref?: string
+  /** Where a refused Start sends the PM when sprint planning is unfinished. */
+  planningHref?: string
 }
 
-export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: StandupRunScreenProps) {
+export function StandupRunScreen({
+  data,
+  api,
+  viewer,
+  locale,
+  summaryHref,
+  planningHref
+}: StandupRunScreenProps) {
   const [board, setBoard] = useState(data)
   const notify = useNotify()
 
@@ -537,6 +663,25 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
   }, [api])
 
   /**
+   * The header's Refresh. It used to be `void reload()` — no spinner, no
+   * confirmation, and a failure swallowed as an unhandled rejection — so on a
+   * board that had not changed it was indistinguishable from a dead button.
+   */
+  const [refreshing, setRefreshing] = useState(false)
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    setNotice(null)
+    try {
+      await reload()
+      notify.success({ title: standupStrings.run.refreshed(), duration: 2000 })
+    } catch {
+      setNotice(standupStrings.run.refreshFailed())
+    } finally {
+      setRefreshing(false)
+    }
+  }, [reload, notify])
+
+  /**
    * Runs an optimistic mutation: apply locally, call the server, and on failure
    * put the local state back with a visible notice.
    */
@@ -568,10 +713,24 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         }
 
         setNotice(standupStrings.run.editRejected())
+        // The banner above is at the top of a long page, where a PM working
+        // the board further down never sees it — the row just snapped back,
+        // with no word why. A toast shows where they are, and carries the
+        // server's own reason (forbidden, wrong status, ...) when it gave one.
+        // One short line: the server's own reason when it gave one, else a
+        // brief fallback. The banner above already carries the full sentence.
+        notify.error({
+          title:
+            (error as { code?: string; message?: string })?.code &&
+            (error as { message?: string }).message
+              ? (error as { message: string }).message
+              : standupStrings.run.editRejectedToast(),
+          duration: 4000
+        })
         return null
       }
     },
-    [board, reload]
+    [board, reload, notify]
   )
 
   const onChangeHours = useCallback(
@@ -606,9 +765,14 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           }))
         }),
         (expectedVersion) => api.removeAllocation({ allocationId, expectedVersion })
-      )
+      ).then(async (result) => {
+        // Reloaded on success, as adding is: the task goes back into the
+        // backlog and the member's capacity, the checklist and the meter all
+        // move, none of which the optimistic row removal alone could show.
+        if (result) await reload().catch(() => undefined)
+      })
     },
-    [api, optimistic]
+    [api, optimistic, reload]
   )
 
   /**
@@ -641,7 +805,8 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         })
         versionRef.current = result.standupVersion
         notify.success({
-          title: standupStrings.run.allocationAdded({ task: taskLabel, name: memberName })
+          title: standupStrings.run.allocationAdded({ task: taskLabel, name: memberName }),
+          duration: 2500
         })
         await reload()
       } catch (error) {
@@ -654,6 +819,144 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
       }
     },
     [api, board.members, board.pool, notify, reload]
+  )
+
+  /**
+   * The variance row behind a yesterday row, for the revise dialog's estimate
+   * figures. Matched on the allocation first, then on the task, since an
+   * unplanned row (E39) has no allocation of its own.
+   */
+  const varianceRowFor = useCallback(
+    (row: { allocationId?: string; taskId: string }) =>
+      board.variance?.rows.find(
+        (candidate) =>
+          (row.allocationId && candidate.allocationId === row.allocationId) ||
+          candidate.taskId === row.taskId
+      ),
+    [board.variance]
+  )
+
+  const [revising, setRevising] = useState<ReviseEstimateTarget | null>(null)
+  const [givingReason, setGivingReason] = useState<NotStartedReasonTarget | null>(null)
+  const [dialogError, setDialogError] = useState<string | null>(null)
+  const [dialogSaving, setDialogSaving] = useState(false)
+
+  const openRevise = useCallback((row: VariancePanelRow) => {
+    setDialogError(null)
+    setRevising({
+      allocationId: row.allocationId,
+      taskKey: row.taskKey,
+      title: row.title,
+      memberName: row.memberName,
+      originalEstimateMinutes: row.originalEstimateMinutes,
+      totalLoggedMinutesOnTask: row.totalLoggedMinutesOnTask,
+      taskVarianceMinutes: row.taskVarianceMinutes
+    })
+  }, [])
+
+  const openReason = useCallback((row: VariancePanelRow) => {
+    setDialogError(null)
+    setGivingReason({
+      allocationId: row.allocationId,
+      taskKey: row.taskKey,
+      title: row.title,
+      memberName: row.memberName,
+      plannedMinutes: row.plannedMinutes
+    })
+  }, [])
+
+  const closeDialogs = useCallback(() => {
+    setRevising(null)
+    setGivingReason(null)
+    setDialogError(null)
+  }, [])
+
+  /**
+   * Runs one dialog's save against the screen's version, then reloads so the
+   * answered row leaves the "needs an answer" list and CC-3 re-evaluates. A
+   * stale version reloads and asks the PM to save again rather than guessing.
+   */
+  const saveFromDialog = useCallback(
+    async (call: (expectedVersion: number) => Promise<{ standupVersion: number } | void>) => {
+      setDialogSaving(true)
+      setDialogError(null)
+      try {
+        const result = await call(versionRef.current)
+        if (result) versionRef.current = result.standupVersion
+        closeDialogs()
+        await reload()
+      } catch (error) {
+        if ((error as { code?: string })?.code === 'STALE_STANDUP') {
+          await reload().catch(() => undefined)
+          setDialogError(standupStrings.run.staleReload())
+        } else {
+          setDialogError(messageOf(error, standupStrings.variance.saveFailed()))
+        }
+      } finally {
+        setDialogSaving(false)
+      }
+    },
+    [closeDialogs, reload]
+  )
+
+  const [ledger, setLedger] = useState<{
+    memberId: string
+    memberName: string
+    position: DebtPosition
+    entries: LedgerEntryView[]
+  } | null>(null)
+  const [ledgerError, setLedgerError] = useState<string | null>(null)
+  const [ledgerSaving, setLedgerSaving] = useState(false)
+
+  const openLedger = useCallback(
+    async (memberId: string) => {
+      if (!api.loadDebtLedger) return
+      const memberName =
+        board.variance?.members.find((member) => member.memberId === memberId)?.memberName ??
+        board.members.find((member) => member.memberId === memberId)?.name ??
+        memberId
+      setNotice(null)
+      try {
+        const loaded = await api.loadDebtLedger(memberId)
+        if (!loaded) {
+          setNotice(standupStrings.debt.noAccess())
+          return
+        }
+        setLedgerError(null)
+        setLedger({ memberId, memberName, ...loaded })
+      } catch (error) {
+        setNotice(messageOf(error, standupStrings.debt.loadFailed()))
+      }
+    },
+    [api, board.members, board.variance]
+  )
+
+  const onWriteOff = useCallback(
+    async (input: { minutes: Minutes; reason: string }) => {
+      if (!ledger || !api.writeOffDebt) return
+      setLedgerSaving(true)
+      setLedgerError(null)
+      try {
+        await api.writeOffDebt({
+          memberId: ledger.memberId,
+          minutes: input.minutes,
+          reason: input.reason,
+          expectedVersion: versionRef.current
+        })
+        setLedger(null)
+        await reload()
+      } catch (error) {
+        if ((error as { code?: string })?.code === 'STALE_STANDUP') {
+          await reload().catch(() => undefined)
+          setLedgerError(standupStrings.run.staleReload())
+        } else {
+          setLedgerError(messageOf(error, standupStrings.debt.writeOffFailed()))
+        }
+      } finally {
+        setLedgerSaving(false)
+      }
+    },
+    [api, ledger, reload]
   )
 
   /**
@@ -696,10 +999,14 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         api.openTask?.(taskId)
       },
       reviseEstimate(row) {
-        api.reviseEstimate?.({ allocationId: row.allocationId ?? '', taskId: row.taskId })
+        const target = varianceRowFor(row)
+        if (target) openRevise(target)
+      },
+      canRevise(row) {
+        return Boolean(api.reviseEstimate && varianceRowFor(row))
       }
     }),
-    [api, reload]
+    [api, reload, varianceRowFor, openRevise]
   )
 
   const onSetAttendance = useCallback(
@@ -710,6 +1017,18 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
       reason?: string
     }) => {
       setNotice(null)
+      // Applied at once: the assignment board drops an absent member (and
+      // brings a returning one back) the moment the state is chosen, rather
+      // than after the round trip. The reload below replaces it with the
+      // server's own capacity figures; a failure reloads to put it right.
+      setBoard((current) => ({
+        ...current,
+        members: current.members.map((member) =>
+          member.memberId === input.memberId
+            ? { ...member, attendance: input.state, partialMinutes: input.partialMinutes }
+            : member
+        )
+      }))
       try {
         const result = await api.setAttendance({
           ...input,
@@ -725,6 +1044,8 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           return
         }
         setNotice(standupStrings.run.editRejected())
+        // Put back what the optimistic edit above changed.
+        await reload().catch(() => undefined)
       }
     },
     [api, reload]
@@ -778,8 +1099,12 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
    */
   const [overridesIssued, setOverridesIssued] = useState<IssuedOverrideForReconciliation[]>([])
   const blocking = useMemo(
-    () => filterOverriddenFailures(blockingFailures(checks), overridesIssued),
-    [checks, overridesIssued]
+    () =>
+      filterOverriddenFailures(blockingFailures(checks), [
+        ...(board.overridesIssued ?? []),
+        ...overridesIssued
+      ]),
+    [checks, board.overridesIssued, overridesIssued]
   )
 
   /**
@@ -815,7 +1140,12 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     [board.members]
   )
 
-  const onCancelOverride = useCallback(() => setOverridingCheck(null), [])
+  const [overrideError, setOverrideError] = useState<string | null>(null)
+  const [overrideSaving, setOverrideSaving] = useState(false)
+  const onCancelOverride = useCallback(() => {
+    setOverridingCheck(null)
+    setOverrideError(null)
+  }, [])
 
   /**
    * Task 4 (RUN-14..18). Mirrors `overridingCheck`'s show/hide pattern above
@@ -885,6 +1215,8 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     async (input: OverrideModalSubmitInput) => {
       if (!overridingCheck || !overrideContext || !api.issueOverride) return
       setNotice(null)
+      setOverrideError(null)
+      setOverrideSaving(true)
       try {
         const created = await api.issueOverride({
           type: overrideContext.type,
@@ -898,42 +1230,66 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         setOverridingCheck(null)
         setNotice(standupStrings.run.overrideSuccess())
         await reload()
-      } catch {
+      } catch (error) {
         // Deliberately left open on failure (INVALID_JUSTIFICATION,
-        // OVERRIDE_NOT_PERMITTED, ...) — the PM's in-progress reason and
-        // justification text stay put so they can fix it, rather than losing
-        // the input to a silently closed modal.
-        setNotice(standupStrings.run.overrideFailed())
+        // OVERRIDE_NOT_PERMITTED, "already deferred once", ...) — the PM's
+        // in-progress reason and justification stay put so they can fix it,
+        // and the reason is shown inside the modal, not behind it.
+        setOverrideError(messageOf(error, standupStrings.run.overrideFailed()))
+      } finally {
+        setOverrideSaving(false)
       }
     },
     [api, overridingCheck, overrideContext, reload]
   )
 
   const [starting, setStarting] = useState(false)
+  const [startRefusal, setStartRefusal] = useState<StartRefusal | null>(null)
 
   /**
-   * RUN-2/3, AC-5 (Task 1). Mirrors `onComplete`'s error handling below:
-   * a `PLANNING_GATE_NOT_PASSED` refusal gets its own named notice — a PM
-   * clicking Start on an unplanned sprint needs to know *why*, not just that
-   * it failed — everything else falls back to the generic failure notice.
+   * RUN-2/3, AC-5 (Task 1). A refusal is shown as its own banner with the
+   * server's reason — "available at 09:00", "Tuesday's stand-up is still in
+   * progress", or the planning items still open — instead of the one generic
+   * "That could not be started." that used to cover all of them.
+   *
+   * The version comes from `versionRef`, like every other write. The route page
+   * used to send the version it loaded with, so after any edit on a `Ready`
+   * board (attendance, say) Start was refused as stale, reloaded, and refused
+   * again on every retry.
    */
   const onStart = useCallback(async () => {
     if (!api.start) return
     setStarting(true)
     setNotice(null)
+    setStartRefusal(null)
     try {
-      await api.start()
+      await api.start({ expectedVersion: versionRef.current })
       setNotice(standupStrings.run.startSuccess())
       await reload()
     } catch (error) {
-      const code = (error as { code?: string })?.code
-      if (code === 'PLANNING_GATE_NOT_PASSED') {
-        setNotice(standupStrings.run.startPlanningGateFailed())
-      } else if (code === 'STALE_STANDUP') {
+      const failure = error as {
+        code?: string
+        details?: { failingChecks?: { message?: string; checkId?: string }[]; sprintState?: string }
+      }
+      if (failure?.code === 'STALE_STANDUP') {
         setNotice(standupStrings.run.staleReload())
         await reload()
+      } else if (failure?.code === 'PLANNING_GATE_NOT_PASSED') {
+        const planningItems = (failure.details?.failingChecks ?? [])
+          .map((item) => item.message ?? item.checkId ?? '')
+          .filter(Boolean)
+        setStartRefusal({
+          message:
+            planningItems.length === 0 && failure.details?.sprintState
+              ? standupStrings.run.startBlockedSprintState({ state: failure.details.sprintState })
+              : standupStrings.run.startPlanningGateFailed(),
+          planningItems
+        })
       } else {
-        setNotice(standupStrings.run.startFailed())
+        setStartRefusal({
+          message: messageOf(error, standupStrings.run.startFailed()),
+          planningItems: []
+        })
       }
     } finally {
       setStarting(false)
@@ -948,58 +1304,40 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
    * underneath, the same saga.
    */
   const [backfilling, setBackfilling] = useState(false)
-  const [backfillNotes, setBackfillNotes] = useState('')
-  // Keyed by memberId; a member missing from the map is simply unrecorded,
-  // which the Backfill button refuses to submit (CC-7 would reject it anyway,
-  // and a 422 after the fact is a worse way to learn it).
-  const [backfillAttendance, setBackfillAttendance] = useState<
-    Record<string, AttendanceStatus>
-  >({})
   const [backfillSubmitting, setBackfillSubmitting] = useState(false)
-  // Ruling 21: one attestation covering every failing overridable check, in
-  // the facilitator's own words. Validated with the same `validateJustification`
-  // the server applies, so the button does not promise a 422.
-  const [backfillJustification, setBackfillJustification] = useState('')
-
-  // CC-7 needs every expected attendee recorded, so the dialog refuses to
-  // submit a half-filled room rather than letting the saga 422 on it.
-  const backfillAttendanceComplete = board.members.every((member) =>
-    Boolean(backfillAttendance[member.memberId])
-  )
+  const [backfillError, setBackfillError] = useState<string | null>(null)
 
   /**
    * Ruling 21. The checks are already on screen — `blocking` is
-   * `filterOverriddenFailures(blockingFailures(checks), overridesIssued)`
-   * above — so the dialog reuses them rather than fetching anything.
+   * `filterOverriddenFailures(blockingFailures(checks), overrides)` above — so
+   * the dialog reuses them rather than fetching anything.
    *
    * Split two ways, because the two halves need opposite affordances:
    *
-   * - what a backfill may actually attest to, which is what the justification
-   *   field below collects. The test is `isCheckAcknowledgeableByBackfill`, the
+   * - what a backfill may actually attest to, which the dialog's justification
+   *   field collects. The test is `isCheckAcknowledgeableByBackfill`, the
    *   *same* rule the service enforces — not `check.overridable`, which is
    *   wider. CC-6 and CC-3 are overridable on a live run but need something a
-   *   backfill cannot supply (a member's own tick; a one-task deferral), and a
-   *   dialog that offered a tick for them would have the server reject the
-   *   whole payload — including a valid CC-1 attestation — with nothing on
-   *   screen explaining why.
+   *   backfill cannot supply (a member's own tick; a one-task deferral).
    *
-   *   Note these are evaluated against the board as stored (no attendance
-   *   yet), so CC-1 may appear here even for a room the facilitator is about to
-   *   mark entirely absent. Harmless: the service re-evaluates after writing
-   *   the attendance and issues nothing for a check that is no longer failing.
-   * - everything else blocking, which no attestation can clear here, so the
-   *   dialog says so instead of offering a tick that cannot work. CC-7 is
-   *   excluded: it is failing precisely because the attendance is unrecorded,
-   *   which is what the selects above are for.
+   *   These are evaluated against the board as stored (no attendance yet), so
+   *   CC-1 may appear here even for a room the facilitator is about to mark
+   *   entirely absent. Harmless: the service re-evaluates after writing the
+   *   attendance and issues nothing for a check that is no longer failing.
+   * - everything else blocking, which no attestation can clear. The dialog
+   *   gives each a Fix action that closes it on the panel that clears it
+   *   (CC-3's answers are accepted on a `Missed` stand-up for this reason).
+   *   CC-7 is excluded: it is failing precisely because the attendance is
+   *   unrecorded, which is what the dialog's selects are for.
    */
-  const backfillOverridableFailures = useMemo(
+  const backfillAttestable = useMemo(
     () =>
       blocking.filter(
         (check) => check.overridable && isCheckAcknowledgeableByBackfill(check.checkId)
       ),
     [blocking]
   )
-  const backfillUnwaivableFailures = useMemo(
+  const backfillUnwaivable = useMemo(
     () =>
       blocking.filter(
         (check) =>
@@ -1009,62 +1347,62 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
     [blocking]
   )
 
-  const backfillJustificationValid = validateJustification(backfillJustification).valid
-  const backfillAcknowledgementReady =
-    backfillOverridableFailures.length === 0 || backfillJustificationValid
-
-  const onBackfill = useCallback(async () => {
-    if (!api.backfill) return
-    setBackfillSubmitting(true)
-    setNotice(null)
-    try {
-      await api.backfill({
-        notes: backfillNotes.trim() || undefined,
-        attendance: Object.entries(backfillAttendance).map(([memberId, state]) => ({
-          memberId,
-          state
-        })),
-        // Ruling 21. Sent only for the checks actually shown as failing and
-        // overridable — the service refuses an acknowledgement for anything
-        // else, and issues nothing for a check that stops failing once the
-        // attendance lands.
-        ...(backfillOverridableFailures.length > 0
-          ? {
-              acknowledgedChecks: backfillOverridableFailures.map((check) => ({
-                checkId: check.checkId,
-                justification: backfillJustification.trim()
-              }))
-            }
-          : {})
-      })
-      setBackfilling(false)
-      setBackfillNotes('')
-      setBackfillAttendance({})
-      setBackfillJustification('')
-      setNotice(standupStrings.run.backfillSuccess())
-      await reload()
-    } catch (error) {
-      const code = (error as { code?: string })?.code
-      if (code === 'STANDUP_ALREADY_COMPLETED') {
-        setNotice(standupStrings.run.completeAlreadyDone())
+  const onBackfill = useCallback(
+    async (input: BackfillDialogSubmitInput) => {
+      if (!api.backfill) return
+      setBackfillSubmitting(true)
+      setBackfillError(null)
+      setNotice(null)
+      try {
+        await api.backfill({
+          notes: input.notes || undefined,
+          attendance: input.attendance,
+          // Ruling 21. Sent only for the checks actually shown as failing and
+          // attestable — the service refuses an acknowledgement for anything
+          // else, and issues nothing for a check that stops failing once the
+          // attendance lands.
+          ...(backfillAttestable.length > 0
+            ? {
+                acknowledgedChecks: backfillAttestable.map((check) => ({
+                  checkId: check.checkId,
+                  justification: input.justification,
+                  ...(backfillNeedsMemberConfirmation(check.checkId)
+                    ? { memberAcknowledged: input.memberAcknowledged }
+                    : {})
+                }))
+              }
+            : {})
+        })
         setBackfilling(false)
+        setNotice(standupStrings.run.backfillSuccess())
         await reload()
-      } else if (code === 'COMPLETION_CHECKS_FAILED') {
-        setNotice(standupStrings.run.completeChecksFailed())
-      } else {
-        setNotice(standupStrings.run.backfillFailed())
+      } catch (error) {
+        const code = (error as { code?: string })?.code
+        if (code === 'STANDUP_ALREADY_COMPLETED') {
+          setNotice(standupStrings.run.completeAlreadyDone())
+          setBackfilling(false)
+          await reload()
+        } else {
+          // Shown inside the dialog: the window has passed, a check still
+          // fails, the attestation was refused — the server says which.
+          setBackfillError(messageOf(error, standupStrings.run.backfillFailed()))
+          // A refused backfill may still have written the room (it is
+          // persisted before the saga runs), so the checks on screen move.
+          await reload().catch(() => undefined)
+        }
+      } finally {
+        setBackfillSubmitting(false)
       }
-    } finally {
-      setBackfillSubmitting(false)
-    }
-  }, [
-    api,
-    backfillAttendance,
-    backfillJustification,
-    backfillNotes,
-    backfillOverridableFailures,
-    reload
-  ])
+    },
+    [api, backfillAttestable, reload]
+  )
+
+  const onBackfillFix = useCallback((checkId: string) => {
+    setBackfilling(false)
+    setBackfillError(null)
+    // After the overlay unmounts, or its focus-return would pull the page back.
+    window.setTimeout(() => scrollToSection(anchorFor(checkId)), 0)
+  }, [])
 
   /**
    * E57/§15.8.2. A live, client-side-only elapsed-time indicator — advisory
@@ -1152,17 +1490,22 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
   const completeDisabled = completionPanelDisabled || blocking.length > 0
 
   useStandupShortcuts({
-    'jump-panel-1': () => document.getElementById('panel-1')?.scrollIntoView(),
-    'jump-panel-2': () => document.getElementById('panel-2')?.scrollIntoView(),
-    'jump-panel-3': () => document.getElementById('panel-3')?.scrollIntoView(),
-    'jump-panel-4': () => document.getElementById('panel-4')?.scrollIntoView(),
-    'jump-panel-5': () => document.getElementById('panel-5')?.scrollIntoView(),
-    'jump-panel-6': () => document.getElementById('panel-6')?.scrollIntoView(),
-    'jump-panel-7': () => document.getElementById('panel-7')?.scrollIntoView(),
+    'jump-panel-1': () => scrollToSection('panel-1'),
+    'jump-panel-2': () => scrollToSection('panel-2'),
+    'jump-panel-3': () => scrollToSection('panel-3'),
+    'jump-panel-4': () => scrollToSection('panel-4'),
+    'jump-panel-5': () => scrollToSection('panel-5'),
+    'jump-panel-6': () => scrollToSection('panel-6'),
+    'jump-panel-7': () => scrollToSection('panel-7'),
     'attempt-complete': () => {
       if (!completeDisabled) void onComplete()
     }
   })
+
+  const assignableMembers = useMemo(
+    () => board.members.filter((member) => !isAbsentAttendance(member.attendance)),
+    [board.members]
+  )
 
   const presentCount = board.members.filter(
     (member) => member.attendance === 'present' || member.attendance === 'partial'
@@ -1383,7 +1726,11 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
       <UnassignedPool
         unassigned={board.pool.unassigned}
         assignedNotPlanned={board.pool.assignedNotPlanned}
-        members={board.members}
+        // Not the absent: nobody out for the day can be given work, so their
+        // card (and its drop target, picker option and quick-add) is gone from
+        // the board while they are. Their stranded work is still handled in
+        // the attendance panel above. Recomputed on every attendance change.
+        members={assignableMembers}
         totalCount={board.poolTotal}
         sprintLabel={board.sprintName}
         readOnly={readOnly}
@@ -1515,8 +1862,21 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
               {standupStrings.run.joinCall()}
             </a>
           )}
-          <button type="button" onClick={() => void reload()} className={planButtonClass('secondary')}>
-            <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+          <button
+            type="button"
+            onClick={() => void onRefresh()}
+            disabled={refreshing}
+            aria-busy={refreshing}
+            className={planButtonClass('secondary')}
+          >
+            <RefreshCw
+              className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+            {/* The label never changes width: swapping it for "Refreshing…"
+                widened the button and wrapped the whole action group onto a
+                new row mid-click. The spinning icon and `aria-busy` carry it. */}
             {standupStrings.run.refresh()}
           </button>
           {(board.status === 'Ready' || board.status === 'Scheduled') && api.start && (
@@ -1526,6 +1886,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
               disabled={starting}
               className={planButtonClass('primary')}
             >
+              {starting && <Loader2 className="animate-spin" aria-hidden="true" />}
               {standupStrings.run.start()}
             </button>
           )}
@@ -1536,7 +1897,10 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           {board.status === 'Missed' && api.backfill && (
             <button
               type="button"
-              onClick={() => setBackfilling(true)}
+              onClick={() => {
+                setBackfillError(null)
+                setBackfilling(true)
+              }}
               className={planButtonClass('danger')}
             >
               {standupStrings.run.backfill()}
@@ -1557,6 +1921,37 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           <PlanBanner tone="info" bordered icon={<Info strokeWidth={2} />}>
             <span className="font-semibold">{standupStrings.run.noticeLead()} </span>
             {notice}
+          </PlanBanner>
+        </div>
+      )}
+
+      {startRefusal && (
+        <div data-testid="start-refusal">
+          <PlanBanner
+            tone="danger"
+            bordered
+            role="alert"
+            icon={<XCircle strokeWidth={2} />}
+            actions={
+              planningHref && startRefusal.planningItems.length > 0 ? (
+                <a href={planningHref} className={planButtonClass('secondary', undefined, 'sm')}>
+                  {standupStrings.run.startOpenPlanning()}
+                </a>
+              ) : undefined
+            }
+          >
+            <span className="font-semibold">{standupStrings.run.startBlockedTitle()}. </span>
+            {startRefusal.message}
+            {startRefusal.planningItems.length > 0 && (
+              <>
+                <span className="mt-1 block">{standupStrings.run.startBlockedPlanningItems()}</span>
+                <ul className="mt-0.5 list-disc pl-5">
+                  {startRefusal.planningItems.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </>
+            )}
           </PlanBanner>
         </div>
       )}
@@ -1625,17 +2020,15 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
             <h3 id="review-heading" className={SECTION_TITLE_CLASSES}>
               {standupStrings.run.reviewTitle()}
             </h3>
-            <p className={SECTION_SUBTITLE_CLASSES}>{standupStrings.run.reviewSubtitle()}</p>
           </div>
 
           {/* One column below `xl`, and also whenever only one of the two
               panels loaded — a soft-failed variance fetch should leave
               yesterday at full width, not beside an empty half. */}
           <div
-            className={cn(
-              'grid items-start gap-5',
-              showYesterday && showVariance && 'xl:grid-cols-2'
-            )}
+            className={
+              showYesterday && showVariance ? RUN_TWO_UP_CLASSES : 'grid items-start gap-5'
+            }
           >
             {board.yesterday && showYesterday && (
               <YesterdayPanel
@@ -1651,9 +2044,9 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
               <VariancePanel
                 className="min-w-0"
                 data={board.variance}
-                onRevise={(row) => api.reviseEstimate?.(row)}
-                onGiveReason={(row) => api.giveNotStartedReason?.(row)}
-                onViewLedger={(memberId) => api.viewDebtLedger?.(memberId)}
+                onRevise={openRevise}
+                onGiveReason={openReason}
+                onViewLedger={(memberId) => void openLedger(memberId)}
                 disabled={readOnly}
                 locale={locale}
               />
@@ -1690,7 +2083,11 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           onSetDisposition={(taskId, type) => {
             void (async () => {
               try {
-                await api.setTaskDisposition?.({ taskId, type })
+                await api.setTaskDisposition?.({
+                  taskId,
+                  type,
+                  expectedVersion: versionRef.current
+                })
                 await reload()
               } catch {
                 setNotice(standupStrings.run.editRejected())
@@ -1700,7 +2097,7 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
         />
       )}
 
-      <div className="grid items-start gap-5 xl:grid-cols-2">
+      <div className={RUN_TWO_UP_CLASSES}>
         <BlockerPanel
           className="min-w-0"
           blockers={openBlockers}
@@ -1759,8 +2156,11 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
           <OverrideModal
             type={overrideContext.type}
             affected={overrideContext.affected}
+            affectedTasks={overrideContext.affectedTasks}
             onCancel={onCancelOverride}
             onSubmit={(input) => void onSubmitOverride(input)}
+            error={overrideError}
+            saving={overrideSaving}
           />
         </ModalOverlay>
       )}
@@ -1768,143 +2168,70 @@ export function StandupRunScreen({ data, api, viewer, locale, summaryHref }: Sta
       {backfilling && (
         <ModalOverlay
           open
+          size="lg"
           onClose={() => (backfillSubmitting ? undefined : setBackfilling(false))}
           labelledBy="backfill-title"
         >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-5">
-            <div>
-              <h3 id="backfill-title" className="apple-type-body font-semibold text-[var(--plan-text)]">
-                {standupStrings.run.backfillTitle()}
-              </h3>
-              <p className="mt-1 apple-type-subheadline text-[var(--plan-secondary)]">
-                {standupStrings.run.backfillDescription()}
-              </p>
-            </div>
+          <BackfillDialog
+            members={board.members}
+            attestable={backfillAttestable}
+            unwaivable={backfillUnwaivable}
+            submitting={backfillSubmitting}
+            error={backfillError}
+            onCancel={() => setBackfilling(false)}
+            onSubmit={(input) => void onBackfill(input)}
+            onFix={onBackfillFix}
+          />
+        </ModalOverlay>
+      )}
 
-            <fieldset className="flex flex-col gap-2">
-              <legend className="apple-type-subheadline font-medium text-[var(--plan-text)]">
-                {standupStrings.run.backfillAttendanceLegend()}
-              </legend>
-              {board.members.map((member) => (
-                <label
-                  key={member.memberId}
-                  className="flex items-center justify-between gap-3 apple-type-subheadline text-[var(--plan-text)]"
-                >
-                  <span className="truncate">{member.name}</span>
-                  <select
-                    aria-label={standupStrings.run.backfillAttendanceFor(member.name)}
-                    value={backfillAttendance[member.memberId] ?? ''}
-                    onChange={(event) =>
-                      setBackfillAttendance((current) => ({
-                        ...current,
-                        [member.memberId]: event.target.value as AttendanceStatus
-                      }))
-                    }
-                    className={cn(planFieldClass, 'w-40 px-2')}
-                    disabled={backfillSubmitting}
-                  >
-                    <option value="" disabled>
-                      {standupStrings.run.backfillAttendanceUnrecorded()}
-                    </option>
-                    <option value="present">{standupStrings.run.statePresent()}</option>
-                    <option value="absent_planned">
-                      {standupStrings.run.stateAbsentPlanned()}
-                    </option>
-                    <option value="absent_unplanned">
-                      {standupStrings.run.stateAbsentUnplanned()}
-                    </option>
-                  </select>
-                </label>
-              ))}
-            </fieldset>
+      {revising && (
+        <ModalOverlay open onClose={closeDialogs} labelledBy="revise-title">
+          <ReviseEstimateModal
+            target={revising}
+            error={dialogError}
+            saving={dialogSaving}
+            locale={locale}
+            onCancel={closeDialogs}
+            onSave={(input) =>
+              void saveFromDialog((expectedVersion) =>
+                api.reviseEstimate!({ ...input, expectedVersion })
+              )
+            }
+          />
+        </ModalOverlay>
+      )}
 
-            {backfillUnwaivableFailures.length > 0 && (
-              <div className="flex flex-col gap-1.5 rounded-[var(--apple-radius-md)] border border-[var(--plan-danger)] p-3">
-                <p className="apple-type-subheadline font-medium text-[var(--plan-text)]">
-                  {standupStrings.run.backfillBlockedByChecks()}
-                </p>
-                <ul className="flex flex-col gap-1 apple-type-footnote text-[var(--plan-secondary)]">
-                  {backfillUnwaivableFailures.map((check) => (
-                    <li key={check.checkId}>
-                      {check.checkId} — {check.message}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+      {givingReason && (
+        <ModalOverlay open onClose={closeDialogs} labelledBy="reason-title">
+          <NotStartedReasonModal
+            target={givingReason}
+            error={dialogError}
+            saving={dialogSaving}
+            locale={locale}
+            onCancel={closeDialogs}
+            onSave={(input) =>
+              void saveFromDialog((expectedVersion) =>
+                api.recordNotStartedReason!({ ...input, expectedVersion })
+              )
+            }
+          />
+        </ModalOverlay>
+      )}
 
-            {backfillOverridableFailures.length > 0 && (
-              <fieldset className="flex flex-col gap-2">
-                <legend className="apple-type-subheadline font-medium text-[var(--plan-text)]">
-                  {standupStrings.run.backfillChecksLegend()}
-                </legend>
-                <p className="apple-type-footnote text-[var(--plan-secondary)]">
-                  {standupStrings.run.backfillChecksDescription()}
-                </p>
-                <ul className="flex flex-col gap-1 apple-type-footnote text-[var(--plan-secondary)]">
-                  {backfillOverridableFailures.map((check) => (
-                    <li key={check.checkId}>
-                      {check.checkId} — {check.message}
-                    </li>
-                  ))}
-                </ul>
-                <label className="flex flex-col gap-1.5 apple-type-subheadline text-[var(--plan-text)]">
-                  {standupStrings.run.backfillJustificationLabel()}
-                  <textarea
-                    value={backfillJustification}
-                    onChange={(event) => setBackfillJustification(event.target.value)}
-                    className={cn(planFieldClass, 'h-auto min-h-20 px-2.5 py-2')}
-                    disabled={backfillSubmitting}
-                  />
-                </label>
-                {!backfillJustificationValid && (
-                  <p className="apple-type-footnote text-[var(--plan-secondary)]">
-                    {standupStrings.run.backfillJustificationHint()}
-                  </p>
-                )}
-              </fieldset>
-            )}
-
-            <label className="flex flex-col gap-1.5 apple-type-subheadline text-[var(--plan-text)]">
-              {standupStrings.run.backfillNotesLabel()}
-              <textarea
-                value={backfillNotes}
-                onChange={(event) => setBackfillNotes(event.target.value)}
-                className={cn(planFieldClass, 'h-auto min-h-20 px-2.5 py-2')}
-                disabled={backfillSubmitting}
-              />
-            </label>
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setBackfilling(false)}
-                disabled={backfillSubmitting}
-                className={planButtonClass('secondary')}
-              >
-                {standupStrings.run.backfillCancel()}
-              </button>
-              <button
-                type="button"
-                onClick={() => void onBackfill()}
-                disabled={
-                  backfillSubmitting ||
-                  !backfillAttendanceComplete ||
-                  // Ruling 21: a failing overridable check needs an attestation
-                  // the server will actually accept before Backfill can be
-                  // pressed, rather than a 422 after the fact.
-                  !backfillAcknowledgementReady ||
-                  // An unwaivable failure (CC-3, CC-5, CC-6...) means the saga
-                  // will 422 after backfill-service has already persisted the
-                  // attendance, so do not start the attempt at all.
-                  backfillUnwaivableFailures.length > 0
-                }
-                className={planButtonClass('danger')}
-              >
-                {standupStrings.run.backfillConfirm()}
-              </button>
-            </div>
-          </div>
+      {ledger && (
+        <ModalOverlay open onClose={() => setLedger(null)} labelledBy="debt-ledger-title">
+          <DebtLedgerDrawer
+            memberName={ledger.memberName}
+            position={ledger.position}
+            entries={ledger.entries}
+            canWriteOff={Boolean(api.writeOffDebt)}
+            onWriteOff={(input) => void onWriteOff(input)}
+            onClose={() => setLedger(null)}
+            error={ledgerError}
+            saving={ledgerSaving}
+            locale={locale}
+          />
         </ModalOverlay>
       )}
     </div>

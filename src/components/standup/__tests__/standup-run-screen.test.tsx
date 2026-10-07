@@ -330,9 +330,72 @@ describe('Start stand-up (RUN-2/3, AC-5, Task 1)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
 
-    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
-      standupStrings.run.startPlanningGateFailed()
+    const refusal = await screen.findByTestId('start-refusal')
+    expect(refusal).toHaveTextContent(standupStrings.run.startBlockedTitle())
+    expect(refusal).toHaveTextContent(standupStrings.run.startPlanningGateFailed())
+  })
+
+  it('lists the planning items still open, with a way to go and finish them', async () => {
+    const api = {
+      ...okApi(),
+      start: jest.fn().mockRejectedValue({
+        code: 'PLANNING_GATE_NOT_PASSED',
+        details: {
+          failingChecks: [
+            { checkId: 'PC-3', message: '2 tasks have no estimate.' },
+            { checkId: 'PC-5', message: 'Capacity has not been confirmed.' }
+          ]
+        }
+      })
+    }
+    renderScreen({ status: 'Ready' }, api, { planningHref: '/sprints/sprint-1/planning' })
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
+
+    const refusal = await screen.findByTestId('start-refusal')
+    expect(refusal).toHaveTextContent('2 tasks have no estimate.')
+    expect(refusal).toHaveTextContent('Capacity has not been confirmed.')
+    expect(
+      within(refusal).getByRole('link', { name: standupStrings.run.startOpenPlanning() })
+    ).toHaveAttribute('href', '/sprints/sprint-1/planning')
+  })
+
+  it("shows the server's own reason for any other refusal", async () => {
+    const api = {
+      ...okApi(),
+      start: jest.fn().mockRejectedValue({
+        code: 'STANDUP_NOT_STARTABLE',
+        message: 'This stand-up becomes available at 09:00 on 06 Oct.'
+      })
+    }
+    renderScreen({ status: 'Ready' }, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
+
+    expect(await screen.findByTestId('start-refusal')).toHaveTextContent(
+      'This stand-up becomes available at 09:00 on 06 Oct.'
     )
+  })
+
+  it('starts with the version the screen holds now, not the one it loaded with', async () => {
+    const api = {
+      ...okApi(),
+      start: jest.fn().mockResolvedValue(undefined),
+      setAttendance: jest.fn().mockResolvedValue({ standupVersion: 8, reassignPrompt: null }),
+      refresh: jest.fn().mockResolvedValue(data({ status: 'Ready', standupVersion: 8 }))
+    }
+    renderScreen({ status: 'Ready', standupVersion: 7 }, api)
+
+    // Any write first moves the version on. The route page used to keep
+    // sending the one it loaded with, so Start was refused as stale forever.
+    fireEvent.change(
+      screen.getByLabelText(standupStrings.run.attendanceFor({ name: 'Kasun' })),
+      { target: { value: 'absent_planned' } }
+    )
+    await waitFor(() => expect(api.refresh).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
+    await waitFor(() => expect(api.start).toHaveBeenCalledWith({ expectedVersion: 8 }))
   })
 
   it('reloads rather than guessing when the version was stale', async () => {
@@ -347,13 +410,13 @@ describe('Start stand-up (RUN-2/3, AC-5, Task 1)', () => {
     await waitFor(() => expect(api.refresh).toHaveBeenCalled())
   })
 
-  it('shows the generic failure notice for anything else', async () => {
+  it('falls back to the generic failure for an error with no catalogue code', async () => {
     const api = { ...okApi(), start: jest.fn().mockRejectedValue(new Error('nope')) }
     renderScreen({ status: 'Ready' }, api)
 
     fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
 
-    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
+    expect(await screen.findByTestId('start-refusal')).toHaveTextContent(
       standupStrings.run.startFailed()
     )
   })
@@ -1062,7 +1125,7 @@ describe('Panel 7 — the Override action (Task 22)', () => {
     expect(api.issueOverride).not.toHaveBeenCalled()
   })
 
-  it('shows an error notice and keeps the modal open when the server refuses', async () => {
+  it('shows the refusal inside the modal and keeps it open when the server refuses', async () => {
     const api = okApi()
     api.issueOverride.mockRejectedValue({ code: 'INVALID_JUSTIFICATION' })
     renderScreen({ members: underAllocatedMember() }, api)
@@ -1075,10 +1138,27 @@ describe('Panel 7 — the Override action (Task 22)', () => {
     )
     fireEvent.click(within(dialog).getByRole('button', { name: standupStrings.override.submit() }))
 
-    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
+    // Inside the dialog: a banner at the top of the page sat behind the
+    // overlay, where nobody could read it.
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       standupStrings.run.overrideFailed()
     )
     expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('treats a check as overridden when the override is already on record', () => {
+    renderScreen({
+      members: underAllocatedMember(),
+      overridesIssued: [
+        { type: 'under_allocation', affectedMemberIds: ['kasun'], affectedTaskIds: [] }
+      ]
+    })
+
+    // A reload used to forget overrides issued earlier in the session and
+    // block on the same check again.
+    expect(
+      screen.queryByRole('button', { name: standupStrings.run.override() })
+    ).not.toBeInTheDocument()
   })
 
   it('does not render an Override action for a non-overridable failing check', () => {
@@ -1550,7 +1630,7 @@ describe('the backfill dialog (Ruling 21)', () => {
     openDialog(unplannedMissedBoard())
 
     expect(screen.getByText(standupStrings.run.backfillChecksLegend())).toBeInTheDocument()
-    expect(screen.getByText(/CC-1 — .*not planned to full capacity/)).toBeInTheDocument()
+    expect(screen.getByText(/not planned to full capacity/)).toBeInTheDocument()
   })
 
   it('keeps Backfill disabled until both the room and a real justification are given', () => {
@@ -1627,51 +1707,121 @@ describe('the backfill dialog (Ruling 21)', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('lists CC-6 as unwaivable rather than taking an attestation the server refuses', () => {
-    // CC-6 is `overridable: true`, so filtering on that alone offered a tick,
-    // enabled Backfill, and had the service hard-refuse the whole payload with
-    // `overrideNotPermitted('CC-6')` — losing a valid CC-1 attestation alongside
-    // it and telling the facilitator only "That could not be backfilled."
-    // OVR-6 needs the member's own tick, which a backfill cannot obtain, so the
-    // dialog has to render the same rule the service enforces.
+  const overAllocatedBoard = () => ({
+    members: [
+      {
+        memberId: 'kasun',
+        name: 'Kasun',
+        attendance: 'present' as const,
+        capacity: capacity({
+          allocatedMinutes: m(600),
+          gapMinutes: m(-120) as never,
+          status: 'over' as const
+        }),
+        allocations: [
+          {
+            allocationId: 'a7',
+            taskId: 't7',
+            taskKey: 'KAN-700',
+            title: 'Too much',
+            plannedMinutes: m(600),
+            remainingEstimateMinutes: m(600),
+            source: 'assigned_in_standup' as const,
+            isBlocked: false,
+            excludedFromCapacity: false,
+            pairedDeliberately: false
+          }
+        ]
+      }
+    ]
+  })
+
+  it('lets the facilitator attest to CC-6, but only after confirming the members agreed', () => {
+    // Allocations cannot be edited on a Missed stand-up, so an over-allocated
+    // missed day used to have no way through. OVR-6's member tick still cannot
+    // be obtained, so the facilitator's explicit confirmation stands in for it.
+    openDialog(overAllocatedBoard())
+
+    expect(screen.getByText(/over allocated/)).toBeInTheDocument()
+    expect(screen.queryByText(standupStrings.run.backfillBlockedByChecks())).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(standupStrings.run.backfillJustificationLabel()), {
+      target: { value: JUSTIFICATION }
+    })
+    const confirm = screen.getByRole('button', { name: standupStrings.run.backfillConfirm() })
+    expect(confirm).toBeDisabled()
+    expect(screen.getByText(standupStrings.run.backfillConfirmNeeded())).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText(standupStrings.run.backfillMembersAgreed()))
+    expect(confirm).toBeEnabled()
+  })
+
+  it('sends the facilitator’s confirmation with the CC-6 acknowledgement', async () => {
+    const api = openDialog(overAllocatedBoard())
+
+    fireEvent.change(screen.getByLabelText(standupStrings.run.backfillJustificationLabel()), {
+      target: { value: JUSTIFICATION }
+    })
+    fireEvent.click(screen.getByLabelText(standupStrings.run.backfillMembersAgreed()))
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.backfillConfirm() }))
+
+    await waitFor(() => expect(api.backfill).toHaveBeenCalled())
+    expect(api.backfill).toHaveBeenCalledWith(
+      expect.objectContaining({
+        acknowledgedChecks: [
+          { checkId: 'CC-6', justification: JUSTIFICATION, memberAcknowledged: true }
+        ]
+      })
+    )
+  })
+
+  it('shows attendance that is already on record, locked, instead of asking for it again', () => {
     openDialog({
       members: [
-        {
-          memberId: 'kasun',
-          name: 'Kasun',
-          attendance: 'present' as const,
-          capacity: capacity({
-            allocatedMinutes: m(600),
-            gapMinutes: m(-120) as never,
-            status: 'over' as const
-          }),
-          allocations: [
-            {
-              allocationId: 'a7',
-              taskId: 't7',
-              taskKey: 'KAN-700',
-              title: 'Too much',
-              plannedMinutes: m(600),
-              remainingEstimateMinutes: m(600),
-              source: 'assigned_in_standup' as const,
-              isBlocked: false,
-              excludedFromCapacity: false,
-              pairedDeliberately: false
-            }
-          ]
-        }
+        { ...underAllocatedMember()[0], memberId: 'kasun', name: 'Kasun', attendance: 'absent_planned' },
+        { ...underAllocatedMember()[0], memberId: 'amal', name: 'Amal', attendance: undefined }
       ]
     })
 
-    expect(screen.getByText(standupStrings.run.backfillBlockedByChecks())).toBeInTheDocument()
-    expect(screen.getByText(/CC-6 — .*over allocated/)).toBeInTheDocument()
-    // No tick, and no field inviting one.
+    const kasun = screen.getByLabelText(standupStrings.run.backfillAttendanceFor('Kasun'))
+    expect(kasun).toHaveValue('absent_planned')
+    expect(kasun).toBeDisabled()
+    expect(screen.getByLabelText(standupStrings.run.backfillAttendanceFor('Amal'))).toBeEnabled()
+
+    // Only the one still unrecorded is counted as missing.
     expect(
-      screen.queryByLabelText(standupStrings.run.backfillJustificationLabel())
-    ).not.toBeInTheDocument()
-    expect(
-      screen.queryByText(standupStrings.run.backfillChecksLegend())
-    ).not.toBeInTheDocument()
+      screen.getByText(standupStrings.run.backfillAttendanceRemaining({ count: 1 }))
+    ).toBeInTheDocument()
+  })
+
+  it('does not re-send recorded attendance, and “everyone present” leaves it alone', async () => {
+    const api = openDialog({
+      members: [
+        { ...underAllocatedMember()[0], memberId: 'kasun', name: 'Kasun', attendance: 'absent_planned' },
+        { ...underAllocatedMember()[0], memberId: 'amal', name: 'Amal', attendance: undefined }
+      ]
+    })
+
+    fireEvent.click(
+      screen.getByRole('button', { name: standupStrings.run.backfillMarkAllPresent() })
+    )
+
+    expect(screen.getByLabelText(standupStrings.run.backfillAttendanceFor('Kasun'))).toHaveValue(
+      'absent_planned'
+    )
+    expect(screen.getByLabelText(standupStrings.run.backfillAttendanceFor('Amal'))).toHaveValue(
+      'present'
+    )
+
+    fireEvent.change(screen.getByLabelText(standupStrings.run.backfillJustificationLabel()), {
+      target: { value: JUSTIFICATION }
+    })
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.backfillConfirm() }))
+
+    await waitFor(() => expect(api.backfill).toHaveBeenCalled())
+    expect(api.backfill.mock.calls[0][0].attendance).toEqual([
+      { memberId: 'amal', state: 'present' }
+    ])
   })
 
   it('disables Backfill while an unwaivable check is failing, even with the room recorded', () => {
@@ -1703,7 +1853,7 @@ describe('the backfill dialog (Ruling 21)', () => {
       ]
     })
 
-    expect(screen.getByText(/CC-5 — .*empty allocation/)).toBeInTheDocument()
+    expect(screen.getByText(/empty allocation/)).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(standupStrings.run.backfillAttendanceFor('Kasun')), {
       target: { value: 'present' }
     })
@@ -1764,7 +1914,7 @@ describe('the backfill dialog (Ruling 21)', () => {
     })
 
     expect(screen.getByText(standupStrings.run.backfillBlockedByChecks())).toBeInTheDocument()
-    expect(screen.getByText(/CC-5 — .*empty allocation/)).toBeInTheDocument()
+    expect(screen.getByText(/empty allocation/)).toBeInTheDocument()
     expect(screen.queryByText(/CC-7 — /)).not.toBeInTheDocument()
   })
 })
@@ -1798,5 +1948,415 @@ describe('StandupRunScreen — completion action by status', () => {
     renderScreen({ status: 'Missed' }, api)
 
     expect(screen.getByRole('button', { name: standupStrings.run.backfill() })).toBeEnabled()
+  })
+})
+
+/**
+ * The variance answers, the ledger and Refresh — all four used to look dead.
+ *
+ * The revise / reason / ledger dialogs lived on the route page, saved with the
+ * version the page loaded with, and refreshed a copy of the board the screen
+ * never read again. These pin the replacement: the screen owns the dialogs,
+ * every save carries the screen's current version, a refusal is shown inside
+ * the dialog, and success reloads the board on screen.
+ */
+describe('answering the variance log', () => {
+  const varianceRow = (overrides: Record<string, unknown> = {}) => ({
+    allocationId: 'y1',
+    taskId: 't1',
+    taskKey: 'KAN-214',
+    title: 'Invoice model',
+    memberId: 'kasun',
+    memberName: 'Kasun Perera',
+    outcome: 'open_over_consumed' as const,
+    plannedMinutes: m(360),
+    loggedMinutesOnDay: m(480),
+    dayVarianceMinutes: m(120),
+    originalEstimateMinutes: m(360),
+    totalLoggedMinutesOnTask: m(480),
+    taskVarianceMinutes: m(120),
+    requiresRevision: true,
+    requiresReason: false,
+    spillChainLength: 1,
+    chronicSpill: false,
+    explanation: 'Planned 6.0h, logged 8.0h.',
+    ...overrides
+  })
+
+  const varianceData = (rows = [varianceRow()]): Partial<RunScreenData> => ({
+    variance: {
+      rows: rows as NonNullable<RunScreenData['variance']>['rows'],
+      members: [
+        {
+          memberId: 'kasun',
+          memberName: 'Kasun Perera',
+          plannedMinutes: m(360),
+          loggedMinutesOnDay: m(480),
+          dayVarianceMinutes: m(120),
+          outstandingDebtMinutes: m(120),
+          surplusMinutes: m(0),
+          needingRevision: 1
+        }
+      ]
+    }
+  })
+
+  it('saves a revision with the current version, closes, and reloads the board', async () => {
+    const api = {
+      ...okApi(),
+      reviseEstimate: jest.fn().mockResolvedValue({ standupVersion: 4 })
+    }
+    renderScreen(varianceData(), api)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revise KAN-214' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(
+      within(dialog).getByLabelText(standupStrings.variance.reviseHoursLabel()),
+      { target: { value: '3' } }
+    )
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(api.reviseEstimate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allocationId: 'y1',
+          newRemainingMinutes: 180,
+          expectedVersion: 3
+        })
+      )
+    )
+    await waitFor(() => expect(api.refresh).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it("shows the server's refusal inside the revise dialog and keeps it open", async () => {
+    const api = {
+      ...okApi(),
+      reviseEstimate: jest.fn().mockRejectedValue({
+        code: 'VALIDATION_FAILED',
+        message: 'Remaining estimates are entered in quarter-hour steps.'
+      })
+    }
+    renderScreen(varianceData(), api)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revise KAN-214' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(
+      within(dialog).getByLabelText(standupStrings.variance.reviseHoursLabel()),
+      { target: { value: '3' } }
+    )
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Remaining estimates are entered in quarter-hour steps.'
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('holds a not-started reason to the same ten characters the server does', async () => {
+    const api = {
+      ...okApi(),
+      recordNotStartedReason: jest.fn().mockResolvedValue({ standupVersion: 4 })
+    }
+    renderScreen(
+      varianceData([
+        varianceRow({
+          taskKey: 'KAN-231',
+          outcome: 'not_started',
+          requiresRevision: false,
+          requiresReason: true
+        })
+      ]),
+      api
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Give a reason for KAN-231' }))
+    const dialog = screen.getByRole('dialog')
+    const save = within(dialog).getByRole('button', { name: 'Save' })
+
+    fireEvent.change(within(dialog).getByLabelText(standupStrings.variance.notStartedLabel()), {
+      target: { value: 'sick' }
+    })
+    expect(save).toBeDisabled()
+
+    fireEvent.change(within(dialog).getByLabelText(standupStrings.variance.notStartedLabel()), {
+      target: { value: 'Pulled onto the production incident.' }
+    })
+    fireEvent.click(save)
+
+    await waitFor(() =>
+      expect(api.recordNotStartedReason).toHaveBeenCalledWith({
+        allocationId: 'y1',
+        reason: 'Pulled onto the production incident.',
+        expectedVersion: 3
+      })
+    )
+  })
+
+  it('opens the ledger for a member', async () => {
+    const api = {
+      ...okApi(),
+      loadDebtLedger: jest.fn().mockResolvedValue({
+        position: {
+          outstandingMinutes: m(120),
+          surplusMinutes: m(0),
+          accruedMinutes: m(120),
+          creditedMinutes: m(0),
+          settledMinutes: m(0),
+          writtenOffMinutes: m(0),
+          carriedInMinutes: m(0)
+        },
+        entries: []
+      })
+    }
+    renderScreen(varianceData(), api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.debt.ledgerTitle() }))
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Kasun Perera')
+    expect(screen.getByTestId('debt-balance')).toHaveTextContent('2.0h outstanding')
+  })
+
+  it('says why when the viewer may only see the team total, rather than crashing', async () => {
+    const api = { ...okApi(), loadDebtLedger: jest.fn().mockResolvedValue(null) }
+    renderScreen(varianceData(), api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.debt.ledgerTitle() }))
+
+    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
+      standupStrings.debt.noAccess()
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('the Refresh button', () => {
+  it('reloads the board and confirms it did', async () => {
+    const api = renderScreen()
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.refresh() }))
+
+    await waitFor(() => expect(api.refresh).toHaveBeenCalled())
+    expect(await screen.findByText(standupStrings.run.refreshed())).toBeInTheDocument()
+  })
+
+  it('says so when the reload fails', async () => {
+    const api = { ...okApi(), refresh: jest.fn().mockRejectedValue(new Error('offline')) }
+    renderScreen({}, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.refresh() }))
+
+    expect(await screen.findByTestId('run-notice')).toHaveTextContent(
+      standupStrings.run.refreshFailed()
+    )
+  })
+})
+
+describe('the backfill dialog — getting unstuck', () => {
+  const openBackfill = (overrides: Partial<RunScreenData> = {}) => {
+    const api = {
+      ...okApi(),
+      backfill: jest.fn().mockResolvedValue({ status: 'completed', summaryId: 's' })
+    }
+    renderScreen({ status: 'Missed', ...overrides }, api)
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.backfill() }))
+    return api
+  }
+
+  it('records the whole room in one click', () => {
+    openBackfill({ members: underAllocatedMember() })
+
+    fireEvent.click(
+      screen.getByRole('button', { name: standupStrings.run.backfillMarkAllPresent() })
+    )
+
+    expect(screen.getByLabelText(standupStrings.run.backfillAttendanceFor('Kasun'))).toHaveValue(
+      'present'
+    )
+  })
+
+  it('says what is still missing instead of leaving a silently disabled button', () => {
+    openBackfill({
+      members: underAllocatedMember().map((member) => ({ ...member, attendance: undefined }))
+    })
+
+    expect(
+      screen.getByRole('button', { name: standupStrings.run.backfillConfirm() })
+    ).toBeDisabled()
+    expect(
+      screen.getByText(standupStrings.run.backfillAttendanceRemaining({ count: 1 }))
+    ).toBeInTheDocument()
+  })
+
+  it('offers a Fix for a check no attestation can clear, which closes the dialog', () => {
+    openBackfill({
+      members: [
+        {
+          memberId: 'kasun',
+          name: 'Kasun',
+          attendance: undefined,
+          capacity: capacity(),
+          allocations: [
+            {
+              allocationId: 'a1',
+              taskId: 't1',
+              taskKey: 'KAN-214',
+              title: 'Invoice model',
+              plannedMinutes: m(0),
+              remainingEstimateMinutes: m(480),
+              source: 'carried_forward',
+              isBlocked: false,
+              excludedFromCapacity: false,
+              pairedDeliberately: false
+            }
+          ]
+        }
+      ]
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.backfillGoFix() }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * The assignment board follows attendance, and the ✕ on an assigned task.
+ */
+describe('the assignment board and attendance', () => {
+  const twoMembers = () =>
+    ['kasun', 'amal'].map((id) => ({
+      memberId: id,
+      name: id === 'kasun' ? 'Kasun' : 'Amal',
+      attendance: 'present' as const,
+      capacity: capacity(),
+      allocations: [] as never[]
+    }))
+
+  /**
+   * An api whose server remembers attendance, so the reload that follows each
+   * change returns the board the way a real one would.
+   */
+  const stateful = () => {
+    const members = twoMembers() as any[]
+    const api = {
+      ...okApi(),
+      setAttendance: jest.fn().mockImplementation(async (input: any) => {
+        members.find((member) => member.memberId === input.memberId).attendance = input.state
+        return { standupVersion: 4 }
+      }),
+      refresh: jest.fn().mockImplementation(async () => data({ members: [...members] }))
+    }
+    return { api, members }
+  }
+
+  const cardNames = () =>
+    screen.getAllByTestId('member-card').map((card) => card.getAttribute('data-member-id'))
+
+  const choose = (name: string, state: string) =>
+    fireEvent.change(screen.getByLabelText(standupStrings.run.attendanceFor({ name })), {
+      target: { value: state }
+    })
+
+  it.each(['absent_planned', 'absent_unplanned'])(
+    'drops a member marked %s from the board, and brings them back when present',
+    async (state) => {
+      const { api } = stateful()
+      renderScreen({ members: twoMembers() }, api)
+      expect(cardNames()).toEqual(['kasun', 'amal'])
+
+      choose('Kasun', state)
+      await waitFor(() => expect(cardNames()).toEqual(['amal']))
+      await waitFor(() => expect(api.refresh).toHaveBeenCalled())
+      // And it stays gone once the server's own board has replaced the local edit.
+      expect(cardNames()).toEqual(['amal'])
+
+      choose('Kasun', 'present')
+      await waitFor(() => expect(cardNames()).toEqual(['kasun', 'amal']))
+    }
+  )
+
+  it('keeps a partial-day member on the board — they still have hours to give', async () => {
+    const members = twoMembers() as any[]
+    members[0].attendance = 'partial'
+    members[0].partialMinutes = m(240)
+    renderScreen({ members })
+
+    expect(cardNames()).toEqual(['kasun', 'amal'])
+  })
+
+  it('removes the absent member from the picker and quick-add targets too', async () => {
+    const { api } = stateful()
+    renderScreen({ members: twoMembers() }, api)
+
+    choose('Kasun', 'absent_planned')
+    await waitFor(() => expect(cardNames()).toEqual(['amal']))
+
+    // Their card is the only place a drop, picker option or quick-add could
+    // have targeted them.
+    expect(screen.queryByRole('button', { name: "Expand Kasun's details" })).not.toBeInTheDocument()
+  })
+})
+
+describe('removing an assigned task (✕)', () => {
+  const withTask = () => ({
+    members: [
+      {
+        memberId: 'kasun',
+        name: 'Kasun',
+        attendance: 'present' as const,
+        capacity: capacity(),
+        allocations: [
+          {
+            allocationId: 'a1',
+            taskId: 't1',
+            taskKey: 'KAN-214',
+            title: 'Invoice model',
+            plannedMinutes: m(240),
+            remainingEstimateMinutes: m(480),
+            source: 'assigned_in_standup' as const,
+            isBlocked: false,
+            excludedFromCapacity: false,
+            pairedDeliberately: false
+          }
+        ]
+      }
+    ]
+  })
+
+  const removeButton = () =>
+    screen.getByRole('button', { name: standupStrings.allocation.removeRow({ task: 'KAN-214' }) })
+
+  it('removes the row with the screen’s current version, then reloads the board', async () => {
+    const api = renderScreen(withTask())
+    expandMember()
+
+    fireEvent.click(removeButton())
+
+    await waitFor(() =>
+      expect(api.removeAllocation).toHaveBeenCalledWith({ allocationId: 'a1', expectedVersion: 3 })
+    )
+    // Reloaded: the task goes back to the backlog and capacity recomputes —
+    // neither of which hiding the row locally could show.
+    await waitFor(() => expect(api.refresh).toHaveBeenCalled())
+  })
+
+  it('says why in a toast, where the PM is looking, and puts the row back', async () => {
+    const api = {
+      ...okApi(),
+      removeAllocation: jest.fn().mockRejectedValue({
+        code: 'FORBIDDEN',
+        message: 'You do not have permission to do that.'
+      })
+    }
+    renderScreen(withTask(), api)
+    expandMember()
+
+    fireEvent.click(removeButton())
+
+    expect(
+      await screen.findByText('You do not have permission to do that.')
+    ).toBeInTheDocument()
+    await waitFor(() => expect(removeButton()).toBeInTheDocument())
   })
 })
