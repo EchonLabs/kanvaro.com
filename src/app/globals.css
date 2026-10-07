@@ -929,6 +929,30 @@
   --plan-shadow: none;
 }
 
+/* Native selects on the stand-up and planning surfaces.
+
+   The app declares no `color-scheme`, so the browser drew every opened option
+   list in its light theme even in dark mode, and the options inherited their
+   select's ink — a green or orange status colour on a default white list. The
+   scheme follows the app's theme here, and the options get the card surface
+   and the label ink explicitly so the list reads the same in both. */
+.plan-select {
+  color-scheme: light;
+}
+
+.dark .plan-select {
+  color-scheme: dark;
+}
+
+.plan-select option {
+  background-color: hsl(var(--card));
+  color: var(--plan-text);
+}
+
+.plan-select option:disabled {
+  color: var(--plan-muted);
+}
+
 /* A fixed-height task list on the planning screen: the scope panes and the
    assignment lanes. Same reasoning as the stand-up run screen's lists — the
    global hairline scrollbar gives no signal that a clipped list has more
