@@ -25,7 +25,12 @@ import { Task } from '@/models/Task'
 import { recordAudit, type AuditActor } from './audit'
 import { findPreviousStandup } from './debt-position'
 import { StandupError } from './errors'
-import { REVISION_REASONS, MIN_REVISION_DETAIL_LENGTH, type RevisionReason } from './estimates'
+import {
+  MIN_NOT_STARTED_REASON_LENGTH,
+  MIN_REVISION_DETAIL_LENGTH,
+  REVISION_REASONS,
+  type RevisionReason
+} from './estimates'
 import { minutes, type Minutes } from './minutes'
 import { loadTotalLoggedOnTasks } from './time-logs'
 
@@ -33,12 +38,8 @@ import { loadTotalLoggedOnTasks } from './time-logs'
 export const REVISION_STEP_MINUTES = 15
 /** §15.8.5: 0 to 999 hours. */
 export const MAX_REVISION_MINUTES = 999 * 60
-/**
- * AC-18's reason floor. Ten characters, the same floor a carry-forward note
- * carries in Phase 9 — enough to be a sentence, short enough not to invite
- * padding.
- */
-export const MIN_NOT_STARTED_REASON_LENGTH = 10
+/** AC-18's reason floor — defined beside the other estimate rules, re-exported here. */
+export { MIN_NOT_STARTED_REASON_LENGTH }
 
 export interface ReviseRemainingEstimateInput {
   standupId: string
@@ -207,7 +208,16 @@ export async function recordNotStartedReason(
 
 // --- internals --------------------------------------------------------------
 
-const MUTABLE_STATUSES = new Set(['Scheduled', 'Ready', 'In_Progress', 'Reopened'])
+/**
+ * `Missed` is here on purpose. Backfilling a missed day runs the full
+ * completion saga, and CC-3 is one of the checks a backfill may not attest
+ * away (Ruling 21, `BACKFILL_UNSUPPORTED_OVERRIDE_TYPES`): "re-estimates have
+ * to be answered". Refusing the answers themselves on a `Missed` stand-up made
+ * every missed non-day-one stand-up with an overrun permanently unbackfillable.
+ * The answers write to the task and to yesterday's allocation — never to the
+ * missed day's own record — so `Missed` stays immutable everywhere else.
+ */
+const MUTABLE_STATUSES = new Set(['Scheduled', 'Ready', 'In_Progress', 'Reopened', 'Missed'])
 
 /**
  * Finds the allocation a revision is about, and guards the stand-up it is

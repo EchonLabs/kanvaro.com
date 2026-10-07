@@ -237,6 +237,41 @@ describe('reviseRemainingEstimate', () => {
       ).rejects.toMatchObject({ code: 'IMMUTABLE_COMPLETED_STANDUP' })
     })
 
+    it('accepts an answer on a missed stand-up, so a backfill can clear CC-3', async () => {
+      // Ruling 21 keeps CC-3 out of a backfill's attestation — re-estimates
+      // have to be answered — so refusing the answer itself on a `Missed` day
+      // made every missed day with an overrun permanently unbackfillable.
+      const { day4, kan214, pmId, allocations } = await seedWorkedExample()
+      await Standup.updateOne({ _id: day4 }, { $set: { status: 'Missed' } })
+
+      await reviseRemainingEstimate({
+        standupId: day4,
+        allocationId: allocations['KAN-214'],
+        newRemainingMinutes: 180,
+        reason: 'underestimated',
+        expectedVersion: 1,
+        actor: { userId: pmId }
+      })
+
+      const task = (await Task.findById(kan214).lean()) as any
+      expect(task.remainingEstimateMinutes).toBe(180)
+    })
+
+    it('still refuses a cancelled stand-up', async () => {
+      const { day4, pmId, allocations } = await seedWorkedExample()
+      await Standup.updateOne({ _id: day4 }, { $set: { status: 'Cancelled' } })
+      await expect(
+        reviseRemainingEstimate({
+          standupId: day4,
+          allocationId: allocations['KAN-214'],
+          newRemainingMinutes: 180,
+          reason: 'underestimated',
+          expectedVersion: 1,
+          actor: { userId: pmId }
+        })
+      ).rejects.toMatchObject({ code: 'STANDUP_NOT_STARTABLE' })
+    })
+
     it('refuses an allocation from an unrelated stand-up', async () => {
       const { day4, day5, pmId, allocations, sprintId, projectId, organizationId, kasunId, kan231 } =
         await seedWorkedExample()
