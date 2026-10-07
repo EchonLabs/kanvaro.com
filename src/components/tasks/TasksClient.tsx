@@ -461,16 +461,24 @@ export default function TasksClient({
         [hasPermission]
     )
 
-    // Fetch current user for creator checks
+    // Only update filters on mount if query parameters are explicitly provided in the URL
     useEffect(() => {
-        const q = searchParams.get('search') || ''
-        const s = searchParams.get('status') || 'all'
-        const p = searchParams.get('priority') || 'all'
-        const proj = searchParams.get('project') || 'all'
-        setSearchQuery(q)
-        setStatusFilter(s)
-        setPriorityFilter(p)
-        setProjectFilter(proj)
+        const q = searchParams.get('search')
+        const s = searchParams.get('status')
+        const p = searchParams.get('priority')
+        const proj = searchParams.get('project')
+        const type = searchParams.get('type')
+        const cat = searchParams.get('category')
+        const assigned = searchParams.get('assignedTo')
+        const created = searchParams.get('createdBy')
+        if (q !== null) setSearchQuery(q)
+        if (s !== null) setStatusFilter(s)
+        if (p !== null) setPriorityFilter(p)
+        if (proj !== null) setProjectFilter(proj)
+        if (type !== null) setTypeFilter(type)
+        if (cat !== null) setCategoryFilter(cat)
+        if (assigned !== null) setAssignedToFilter(assigned)
+        if (created !== null) setCreatedByFilter(created)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -802,6 +810,7 @@ export default function TasksClient({
 
     useEffect(() => {
         if (categoryFilter === 'all') return
+        if (categoryOptions.length === 0) return
         const isValid = categoryOptions.some(c => c.key === categoryFilter)
         if (!isValid) {
             setCategoryFilter('all')
