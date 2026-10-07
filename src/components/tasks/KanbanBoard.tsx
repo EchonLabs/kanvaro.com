@@ -120,11 +120,12 @@ export interface KanbanBoardProps {
   onCreateTask: () => void
   onEditTask?: (task: PopulatedTask) => void
   onDeleteTask?: (taskId: string) => void
+  onViewTask?: (task: PopulatedTask) => void
 }
 
 const defaultColumns = DEFAULT_KANBAN_COLUMNS
 
-export default function KanbanBoard({ projectId, filters, onProjectChange, onCreateTask, onEditTask, onDeleteTask }: KanbanBoardProps) {
+export default function KanbanBoard({ projectId, filters, onProjectChange, onCreateTask, onEditTask, onDeleteTask, onViewTask }: KanbanBoardProps) {
   const { error: notifyError } = useNotify()
   const [project, setProject] = useState<Project | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
@@ -765,8 +766,11 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
                    getPriorityColor={getPriorityColor}
                    getTypeColor={getTypeColor}
                    onTaskClick={(task) => {
-                     // Navigate to task detail page
-                     router.push(`/tasks/${task._id}`)
+                     if (onViewTask) {
+                       onViewTask(task)
+                     } else {
+                       router.push(`/tasks/${task._id}`)
+                     }
                    }}
                    onEditTask={onEditTask}
                    onDeleteTask={onDeleteTask}

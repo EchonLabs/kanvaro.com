@@ -84,6 +84,7 @@ type KanbanBoardComponentProps = {
     onCreateTask: () => void
     onEditTask?: (task: any) => void
     onDeleteTask?: (taskId: string) => void
+    onViewTask?: (task: any) => void
 }
 
 const KanbanBoard = dynamic<KanbanBoardComponentProps>(() => import('./KanbanBoard'), { ssr: false })
@@ -1184,7 +1185,7 @@ const handlePageChange = (newPage: number) => {
 
     // Kanban actions
     const handleKanbanEditTask = (task: any) => {
-        router.push(`/tasks/${task._id}/edit`)
+        window.open(`/tasks/${task._id}/edit`, '_blank')
     }
 
     const handleKanbanDeleteTask = (taskId: string) => {
@@ -1780,7 +1781,7 @@ const handlePageChange = (newPage: number) => {
                                                             target.closest('.dropdown-menu') ||
                                                             target.closest('[data-radix-popper-content-wrapper]')
                                                         ) return
-                                                        router.push(`/tasks/${task._id}`)
+                                                        window.open(`/tasks/${task._id}`, '_blank')
                                                     }}
                                                 >
                                                     {/* Left: status dot circle */}
@@ -1933,7 +1934,7 @@ const handlePageChange = (newPage: number) => {
                                                             <DropdownMenuContent align="end">
                                                                 <DropdownMenuItem onClick={(e) => {
                                                                     e.stopPropagation()
-                                                                    router.push(`/tasks/${task._id}`)
+                                                                    window.open(`/tasks/${task._id}`, '_blank')
                                                                 }}>
                                                                     <Eye className="h-4 w-4 mr-2" />
                                                                     View Task
@@ -1943,7 +1944,7 @@ const handlePageChange = (newPage: number) => {
                                                                     onClick={(e) => {
                                                                         e.stopPropagation()
                                                                         if (!canEditTask(task)) return
-                                                                        router.push(`/tasks/${task._id}/edit`)
+                                                                        window.open(`/tasks/${task._id}/edit`, '_blank')
                                                                     }}
                                                                 >
                                                                     <Edit className="h-4 w-4 mr-2" />
@@ -2006,7 +2007,7 @@ const handlePageChange = (newPage: number) => {
                                                             <DropdownMenuContent align="end">
                                                                 <DropdownMenuItem onClick={(e) => {
                                                                     e.stopPropagation()
-                                                                    router.push(`/tasks/${task._id}`)
+                                                                    window.open(`/tasks/${task._id}`, '_blank')
                                                                 }}>
                                                                     <Eye className="h-4 w-4 mr-2" />
                                                                     View Task
@@ -2016,7 +2017,7 @@ const handlePageChange = (newPage: number) => {
                                                                     onClick={(e) => {
                                                                         e.stopPropagation()
                                                                         if (!canEditTask(task)) return
-                                                                        router.push(`/tasks/${task._id}/edit`)
+                                                                        window.open(`/tasks/${task._id}/edit`, '_blank')
                                                                     }}
                                                                 >
                                                                     <Edit className="h-4 w-4 mr-2" />
@@ -2099,7 +2100,7 @@ const handlePageChange = (newPage: number) => {
                                                             target.closest('[role="menuitem"]') ||
                                                             target.closest('[data-radix-popper-content-wrapper]')
                                                         ) return
-                                                        router.push(`/tasks/${task._id}`)
+                                                        window.open(`/tasks/${task._id}`, '_blank')
                                                     }}
                                                 >
                                                     {/* Card header: title + priority badge + actions */}
@@ -2130,7 +2131,7 @@ const handlePageChange = (newPage: number) => {
                                                                 <DropdownMenuContent align="end">
                                                                     <DropdownMenuItem onClick={(e) => {
                                                                         e.stopPropagation()
-                                                                        router.push(`/tasks/${task._id}`)
+                                                                        window.open(`/tasks/${task._id}`, '_blank')
                                                                     }}>
                                                                         <Eye className="h-4 w-4 mr-2" />
                                                                         View Task
@@ -2140,7 +2141,7 @@ const handlePageChange = (newPage: number) => {
                                                                         onClick={(e) => {
                                                                             e.stopPropagation()
                                                                             if (!canEditTask(task)) return
-                                                                            router.push(`/tasks/${task._id}/edit`)
+                                                                            window.open(`/tasks/${task._id}/edit`, '_blank')
                                                                         }}
                                                                     >
                                                                         <Edit className="h-4 w-4 mr-2" />
@@ -2271,6 +2272,7 @@ const handlePageChange = (newPage: number) => {
                                 onProjectChange={setProjectFilter}
                                 onCreateTask={() => router.push('/tasks/create-new-task')}
                                 onEditTask={handleKanbanEditTask}
+                                onViewTask={(task) => window.open(`/tasks/${task._id}`, '_blank')}
                                 onDeleteTask={handleKanbanDeleteTask}
                             />
                             {tasks.length === 0 && !loading && (
