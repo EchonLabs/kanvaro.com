@@ -250,7 +250,7 @@ export function ExpandableMemberCard({
                 Daily workload
               </h5>
               {member.capacityBreakdown ? (
-                <dl className="apple-type-caption grid grid-cols-2 gap-x-3 gap-y-0.5">
+                <dl className="grid grid-cols-2 gap-2">
                   <WorkloadRow
                     label="Nominal"
                     minutes={member.capacityBreakdown.nominalMinutes}
@@ -274,7 +274,7 @@ export function ExpandableMemberCard({
                   />
                 </dl>
               ) : (
-                <dl className="apple-type-caption grid grid-cols-2 gap-x-3 gap-y-0.5">
+                <dl className="grid grid-cols-2 gap-2">
                   <WorkloadRow
                     label="Assigned"
                     minutes={assignedMinutes as Minutes}
@@ -312,9 +312,9 @@ function WorkloadRow({
   signed?: boolean
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-[var(--plan-secondary)]">{label}</dt>
-      <dd className="font-apple-mono tabular-nums text-[var(--plan-text)]">
+    <div className="flex flex-col gap-0.5 rounded-[var(--apple-radius-md)] bg-[var(--plan-raised)] px-3 py-2">
+      <dt className="apple-type-caption text-[var(--plan-muted)]">{label}</dt>
+      <dd className="apple-type-subheadline font-semibold tabular-nums text-[var(--plan-text)]">
         {formatMinutesAsHours(minutes, { locale, signed })}
       </dd>
     </div>

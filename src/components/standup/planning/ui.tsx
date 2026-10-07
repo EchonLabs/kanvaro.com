@@ -415,10 +415,48 @@ export function PlanAvatar({
   )
 }
 
+/**
+ * The nearest ancestor that actually scrolls — in the app shell, `MainLayout`'s
+ * `<main className="overflow-auto">`.
+ */
+function scrollContainerOf(element: HTMLElement): HTMLElement | null {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    const { overflowY } = window.getComputedStyle(node)
+    if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight) return node
+  }
+  return null
+}
+
+/**
+ * Brings a panel into view by scrolling **only** its own scroll container.
+ *
+ * `scrollIntoView` scrolls every scrollable ancestor, and `overflow: hidden`
+ * still counts — so inside the app shell it also scrolled the `h-screen
+ * overflow-hidden` frame around `<main>`. The whole page slid up and the
+ * fixed backdrop showed as a black bar along the bottom. Honours the target's
+ * `scroll-margin-top`, as `scrollIntoView` did.
+ */
 export function scrollToSection(id: string) {
   const target = document.getElementById(id)
   if (!target) return
-  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  const margin = parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0
+  const container = scrollContainerOf(target)
+
+  if (container) {
+    const top =
+      target.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      container.scrollTop -
+      margin
+    container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+  } else {
+    window.scrollTo({
+      top: Math.max(0, target.getBoundingClientRect().top + window.scrollY - margin),
+      behavior: 'smooth'
+    })
+  }
+
   target.focus({ preventScroll: true })
 }
 
@@ -514,7 +552,7 @@ export const planInsetClass =
 
 /** A form control: search inputs, selects, the filter row. */
 export const planFieldClass =
-  'apple-type-subheadline h-8 rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-2 text-[var(--plan-text)] disabled:opacity-40'
+  'plan-select apple-type-subheadline h-8 rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-2 text-[var(--plan-text)] disabled:opacity-40'
 
 /** A text-weight action inside a row — "Fix", "Resolve", "Revise". */
 export const planLinkClass =

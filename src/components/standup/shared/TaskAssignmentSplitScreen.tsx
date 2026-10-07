@@ -214,7 +214,17 @@ export interface TaskAssignmentSplitScreenProps {
   teamTitle?: string
   headingClassName?: string
   panelClassName?: string
+  /**
+   * Which optional filters the repository offers, beside search and sort.
+   * Each still only renders when the tasks carry that field. Planning keeps
+   * all three; the run screen's backlog asks for type only.
+   */
+  filters?: readonly RepositoryFilter[]
 }
+
+export type RepositoryFilter = 'priority' | 'type' | 'skill'
+
+const ALL_FILTERS: readonly RepositoryFilter[] = ['priority', 'type', 'skill']
 
 const DEFAULT_HEADING_CLASSES = 'apple-section-label text-[var(--plan-muted)]'
 
@@ -234,7 +244,8 @@ export function TaskAssignmentSplitScreen({
   repositoryTitle = 'Task repository',
   teamTitle = 'Team assignment',
   headingClassName = DEFAULT_HEADING_CLASSES,
-  panelClassName = 'p-3.5'
+  panelClassName = 'p-3.5',
+  filters = ALL_FILTERS
 }: TaskAssignmentSplitScreenProps) {
   const sensors = useSensors(
     // Same activation distance as every other board in the module: without
@@ -255,23 +266,28 @@ export function TaskAssignmentSplitScreen({
   const filtersActive = Boolean(search.trim() || priority || skill || type)
 
   const skillOptions = useMemo(() => {
+    if (!filters.includes('skill')) return []
     const all = new Set<string>()
     for (const task of tasks) for (const value of task.skills ?? []) all.add(value)
     return Array.from(all).sort()
-  }, [tasks])
+  }, [tasks, filters])
 
   const typeOptions = useMemo(() => {
+    if (!filters.includes('type')) return []
     const all = new Set<string>()
     for (const task of tasks) if (task.type) all.add(task.type)
     return Array.from(all).sort()
-  }, [tasks])
+  }, [tasks, filters])
 
   // Same rule as type and skill: planning-context tasks (ScopeTask via
   // fromScopeTask) carry no priority, so a hardcoded list would filter every
   // task away. Keep PRIORITIES' severity order rather than sorting.
   const priorityOptions = useMemo(
-    () => PRIORITIES.filter((value) => tasks.some((task) => task.priority === value)),
-    [tasks]
+    () =>
+      filters.includes('priority')
+        ? PRIORITIES.filter((value) => tasks.some((task) => task.priority === value))
+        : [],
+    [tasks, filters]
   )
 
   const visible = useMemo(() => {
