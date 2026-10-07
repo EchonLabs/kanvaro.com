@@ -349,6 +349,12 @@ export const standupStrings = {
 
     /** Opens the capacity breakdown. Named per member so the board's buttons differ. */
     breakdownTrigger: ({ name }: { name: string }) => `Show capacity breakdown for ${name}`,
+    capacityToday: () => 'Capacity today',
+    viewBreakdown: () => 'View breakdown',
+    /** After the hours stepper: "3.0h left on task". */
+    leftOnTask: () => 'left on task',
+    blockedTag: () => 'Blocked',
+    removeTitle: () => 'Remove from today',
     breakdownNominal: () => 'Full day',
     breakdownEffective: () => 'Available today',
     breakdownNoAdjustments: () => 'Nothing is reducing this day.',
@@ -423,6 +429,9 @@ export const standupStrings = {
       `Present ${present} of ${total}`,
     joinCall: () => 'Join call',
     refresh: () => 'Refresh',
+    /** The Refresh button used to give no sign it had done anything. */
+    refreshed: () => 'Refreshed',
+    refreshFailed: () => "Couldn't refresh. Check your connection.",
     complete: () => 'Complete stand-up',
     viewSummary: () => 'View summary',
 
@@ -438,8 +447,6 @@ export const standupStrings = {
     allocationBacklogTitle: () => 'Unassigned Backlog',
     allocationBoardTitle: () => 'Active Assignments & Capacity',
     reviewTitle: () => "Yesterday's Review & Variance Log",
-    reviewSubtitle: () =>
-      'Analysis of planned versus completed work from the previous stand-up.',
     noticeLead: () => 'Update:',
     lockedLead: () => 'Read-only:',
 
@@ -449,6 +456,16 @@ export const standupStrings = {
     startPlanningGateFailed: () =>
       'This sprint has not completed planning, so this stand-up cannot start.',
     startFailed: () => 'That could not be started.',
+    /**
+     * The refusal banner. `startFailed` alone threw away the server's reason —
+     * "available at 09:00", "Tuesday's stand-up is still running", the
+     * planning items left open — which is the one thing the PM needed.
+     */
+    startBlockedTitle: () => "This stand-up can't start yet",
+    startBlockedPlanningItems: () => 'Still open in sprint planning:',
+    startBlockedSprintState: ({ state }: { state: string }) =>
+      `The sprint is ${state.replace(/_/g, ' ').toLowerCase()}. Stand-ups only run while the sprint is in progress.`,
+    startOpenPlanning: () => 'Open sprint planning',
 
     /**
      * E49. The only path a `Missed` stand-up has back to `Completed` — before
@@ -479,7 +496,7 @@ export const standupStrings = {
      */
     backfillChecksLegend: () => 'What this day cannot satisfy',
     backfillChecksDescription: () =>
-      'Work cannot be planned retroactively, so these checks will never pass for a past day. Say what happened and they will be recorded as overridden, with your name against them.',
+      'A past day cannot be replanned, so these will not pass. Say what happened and they are recorded as overridden, under your name.',
     backfillJustificationLabel: () => 'Why these could not be met',
     backfillJustificationHint: () =>
       'At least 20 characters, and specific enough to explain the day.',
@@ -491,6 +508,20 @@ export const standupStrings = {
      */
     backfillBlockedByChecks: () =>
       'These must be fixed before this day can be backfilled; no attestation can clear them:',
+    backfillMarkAllPresent: () => 'Mark everyone present',
+    /** An attendance row that is already on record, shown locked. */
+    backfillRecorded: () => 'Recorded',
+    /** CC-6: the facilitator's word that the members agreed, in the member's absence. */
+    backfillMembersAgreed: () => 'The affected members agreed to this overtime.',
+    backfillConfirmNeeded: () => 'Confirm the members agreed to continue.',
+    backfillAttendanceRemaining: ({ count }: { count: number }) =>
+      `Record attendance for ${count} more ${plural(count, 'member', 'members')} to continue.`,
+    backfillJustificationNeeded: () =>
+      'Explain why the checks above could not be met to continue.',
+    backfillFixFirst: () => 'Fix the items above to continue.',
+    backfillReady: () => 'Ready to backfill.',
+    /** CC-3 can't be attested away (Ruling 21) — but it can be answered, here. */
+    backfillGoFix: () => 'Fix',
     backfillNotesLabel: () => 'Notes (optional)',
     backfillCancel: () => 'Cancel',
     backfillConfirm: () => 'Backfill',
@@ -546,13 +577,13 @@ export const standupStrings = {
      * alone cannot say whether the allocation actually stuck.
      */
     allocationAdded: ({ task, name }: { task: string; name: string }) =>
-      `Added ${task} to ${name}'s day`,
+      `${task} added to ${name}`,
 
     /** RUN-25's rollback toast. */
-    editRejected: () => 'That change was not saved. The board has been put back.',
+    editRejected: () => 'Change not saved. Board restored.',
+    editRejectedToast: () => 'Change not saved',
     /** RUN-23 lost the race. */
-    staleReload: () =>
-      'Somebody else changed this stand-up. Reloading so you are working from their version.',
+    staleReload: () => 'Someone else changed this stand-up. Reloaded.',
     /** RUN-26. */
     lockedForMembers: () =>
       'The stand-up has started, so your own row is now read-only.',
@@ -621,14 +652,16 @@ export const standupStrings = {
     override: () => 'Override',
     overrideSuccess: () => 'Override recorded.',
     overrideFailed: () => 'That override could not be recorded.',
-    overrideUnavailable: () =>
-      "This check can't be overridden from here yet — the affected task couldn't be identified.",
+    /** Between Fix and Override, so Fix reads as the usual answer and Override as the exception. */
+    overrideHint: () => 'or',
+    /** A failing check an issued override has lifted. */
+    overridden: () => 'Overridden',
+    overrideUnavailable: () => "This check can't be overridden from here.",
 
     /** Task 17 — `POST /complete`'s outcomes. */
     completeSuccess: () => 'Stand-up completed.',
     completeAlreadyDone: () => 'This stand-up has already been completed.',
-    completeChecksFailed: () =>
-      'This stand-up cannot be completed until its failing checks above are resolved.',
+    completeChecksFailed: () => 'Resolve the failing checks to complete.',
     completeFailed: () => 'That could not be completed.',
     /** R2's blocking banner: a previous attempt did not finish. */
     completionInterruptedBanner: () =>
@@ -1134,7 +1167,43 @@ export const standupStrings = {
     reviseDetailRequired: ({ minLength }: { minLength: number }) =>
       `Say a little more — at least ${minLength} characters.`,
     reasonRequired: ({ minLength }: { minLength: number }) =>
-      `Give a reason of at least ${minLength} characters for the planned time that did not happen.`
+      `Give a reason of at least ${minLength} characters for the planned time that did not happen.`,
+
+    /**
+     * The panel's "answer these first" queue. The rows that block completion
+     * (CC-3) used to sit in one list with every other row, marked only by a red
+     * pill, so the PM had to read every row to find the two that mattered.
+     */
+    needsAnswerTitle: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'row needs', 'rows need')} an answer before you can complete`,
+    needsAnswerHelp: () =>
+      'Work that ran over needs a new estimate of the time left. Planned work that never started needs a reason.',
+    allAnswered: () => 'Every row from yesterday is explained.',
+    /** The one question each flagged row is asking, in the PM's words. */
+    revisionQuestion: ({ name }: { name: string }) =>
+      `How much time does ${name} still need on this?`,
+    reasonQuestion: ({ name }: { name: string }) =>
+      `Why didn\u2019t ${name}\u2019s planned time on this happen?`,
+    answeredRevision: ({ minutes: value, locale }: { minutes: Minutes; locale?: string }) =>
+      `Revised: ${formatMinutesAsHours(value, { locale })} left`,
+    answeredReason: () => 'Reason given',
+    giveReason: () => 'Give a reason',
+    showExplained: ({ count }: { count: number }) =>
+      `Show ${count} other ${plural(count, 'row', 'rows')}`,
+    hideExplained: () => 'Hide other rows',
+    debtByMember: () => 'Estimate debt by member',
+
+    /** AC-18's dialog. The floor mirrors `MIN_NOT_STARTED_REASON_LENGTH`. */
+    notStartedTitle: () => 'Why didn\u2019t this happen?',
+    notStartedLabel: () => 'Reason',
+    notStartedPlaceholder: () => 'e.g. Pulled onto a production incident all afternoon.',
+    notStartedHint: ({ minLength, remaining }: { minLength: number; remaining: number }) =>
+      remaining > 0
+        ? `At least ${minLength} characters \u2014 ${remaining} more to go.`
+        : 'Looks good.',
+
+    /** Dialog-level failures, shown inside the dialog the PM is looking at. */
+    saveFailed: () => 'That could not be saved. Try again.'
   },
 
   /**
@@ -1171,7 +1240,17 @@ export const standupStrings = {
     changedOnBehalfOf: ({ name }: { name: string }) => `Changed by the facilitator for ${name}`,
     /** RUN-10 — the one-line note action. */
     saveNote: () => 'Add note',
-    noteSaved: () => 'Saved'
+    noteSaved: () => 'Saved',
+    /** The row's actions, as buttons rather than link-styled text. */
+    goToTask: () => 'Go to Task',
+    /** Visible label; the button's accessible name keeps the full "Revise remaining estimate". */
+    reviseShort: () => 'Revise estimate',
+    /** Before the previous status, shown only when the status moved. */
+    was: () => 'was',
+    editRow: () => 'Hours & note',
+    loggedLabel: () => 'Logged (h)',
+    notePlaceholder: () => 'Add a note for the team',
+    onPlan: () => 'on plan'
   },
 
   /**
@@ -1202,6 +1281,12 @@ export const standupStrings = {
     writeOffTooLarge: ({ outstanding, locale }: { outstanding: Minutes; locale?: string }) =>
       `Only ${formatMinutesAsHours(outstanding, { locale })} is outstanding, so no more than that can be written off.`,
     writeOffNotPermitted: () => 'Only a project manager can write estimate debt off.',
+    /** NFR-13: the API answers with the team total only, never a member's rows. */
+    noAccess: () => "You don't have access to individual members' estimate debt.",
+    loadFailed: () => "That member's estimate debt could not be loaded.",
+    writeOffFailed: () => 'That write-off could not be saved.',
+    writeOffHoursLabel: () => 'Hours to write off',
+    close: () => 'Close',
     /** VAR-9's confirmation, shown at the new sprint's planning completion. */
     carryInConfirm: ({ count }: { count: number }) =>
       `${count} ${plural(count, 'person carries', 'people carry')} estimate debt into this sprint.`
@@ -1430,8 +1515,6 @@ export const standupStrings = {
    */
   carryForward: {
     title: () => 'Carry Forward Register',
-    subtitle: () =>
-      'Anything open that did not close. It keeps appearing until it is resolved.',
     ownedBy: ({ name }: { name: string }) => `Owned by ${name}`,
     empty: () => 'Nothing carried forward. A clean board.',
 
@@ -1485,6 +1568,10 @@ export const standupStrings = {
     noteRequired: () =>
       'This item has been open long enough that a note is mandatory before completion (CC-4).',
     notePlaceholder: () => "What's the update today?",
+    /** The short pill an owed note shows; `noteRequired` is its tooltip. */
+    noteDue: () => 'Note due today',
+    allTypes: () => 'All types',
+    allAges: () => 'All ages',
     noteTooShort: ({ minLength }: { minLength: number }) =>
       `Add at least ${minLength} characters.`,
     noteUnchanged: () => 'Add today’s update, not yesterday’s.',
@@ -1504,8 +1591,7 @@ export const standupStrings = {
     filterType: () => 'Type',
     filterOwner: () => 'Owner',
     filterAgeBand: () => 'Age',
-    filterStatus: () => 'Status',
-    sortedByAge: () => 'Sorted oldest first'
+    filterStatus: () => 'Status'
   },
 
   /**
@@ -1574,12 +1660,57 @@ export const standupStrings = {
           return 'Critical deadline'
         case 'task_will_split':
           return 'Task will be split tomorrow'
+        case 'owner_unavailable':
+          return 'The person who knows is not here today'
+        case 'needs_investigation':
+          return 'Needs investigation before it can be estimated'
+        case 'will_split_task':
+          return 'The task will be split instead'
+        case 'deliberate_pairing':
+          return 'Deliberate pairing'
+        case 'handover_in_progress':
+          return 'Handover between two people'
+        case 'review_or_qa':
+          return 'One person builds, the other reviews or tests'
         case 'other':
         default:
           return 'Other'
       }
     },
 
+    /**
+     * What the override actually does, before the PM commits to it. The modal
+     * used to open on a title and a form, leaving "what am I agreeing to?"
+     * to guesswork.
+     */
+    explanation: ({ type }: { type: string }) => {
+      switch (type) {
+        case 'over_allocation':
+          return 'Lets this stand-up complete with these members planned beyond their capacity today.'
+        case 'skip_reestimate':
+          return 'Lets this stand-up complete without a new estimate on these tasks. They are added to the carry-forward register to be re-estimated tomorrow \u2014 a task can only be deferred once.'
+        case 'duplicate_allocation':
+          return 'Lets this stand-up complete with the same task planned for more than one person today.'
+        case 'under_allocation':
+        default:
+          return 'Lets this stand-up complete with these members planned below their capacity today.'
+      }
+    },
+    usualFix: ({ type }: { type: string }) => {
+      switch (type) {
+        case 'over_allocation':
+          return 'Usually it is better to move or shorten work on the board.'
+        case 'skip_reestimate':
+          return 'Usually it is better to revise the estimate in the variance log.'
+        case 'duplicate_allocation':
+          return 'Usually it is better to remove one of the two allocations.'
+        case 'under_allocation':
+        default:
+          return 'Usually it is better to give them more work from the backlog.'
+      }
+    },
+    affectedMembers: () => 'Affected members',
+    affectedTasks: () => 'Affected tasks',
     justificationLabel: () => 'Why is this being overridden?',
     justificationPlaceholder: () => 'Explain what actually happened. This is recorded on the audit trail.',
 

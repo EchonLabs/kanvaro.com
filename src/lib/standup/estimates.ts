@@ -43,6 +43,14 @@ export type RevisionReason = typeof REVISION_REASONS[number]
 /** VAR-15: `other` requires free text of at least this length. */
 export const MIN_REVISION_DETAIL_LENGTH = 10
 
+/**
+ * AC-18's reason floor. Ten characters, the same floor a carry-forward note
+ * carries in Phase 9 — enough to be a sentence, short enough not to invite
+ * padding. Lives here rather than in `revision-service` so the run screen's
+ * reason dialog can enforce the same number without importing the models.
+ */
+export const MIN_NOT_STARTED_REASON_LENGTH = 10
+
 export interface DeriveEstimateInput {
   /** The raw agreed value — a poker card, or hours typed directly. */
   value: number

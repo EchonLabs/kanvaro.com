@@ -35,6 +35,15 @@ export const ATTENDANCE_STATUSES = [
 ] as const
 export type AttendanceStatus = typeof ATTENDANCE_STATUSES[number]
 
+/**
+ * Out for the whole day, planned or not. `partial` is not absent — a partial
+ * day still has hours to give — and neither is an unrecorded member, who is
+ * assumed present until somebody says otherwise (RUN-6).
+ */
+export function isAbsentAttendance(state: AttendanceStatus | undefined): boolean {
+  return state === 'absent_planned' || state === 'absent_unplanned'
+}
+
 /** Allocation status thresholds (spec ALO-3). */
 export type AllocationStatus = 'full' | 'under' | 'over' | 'zero' | 'unavailable'
 
