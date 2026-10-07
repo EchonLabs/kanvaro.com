@@ -18,7 +18,7 @@ import { standupStrings } from '@/lib/standup/strings'
  */
 
 const SELECT_CLASS =
-  'h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-raised)] px-2.5 apple-type-subheadline text-[var(--plan-text)] transition-all focus-visible:border-[var(--plan-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--plan-accent)]/40 disabled:cursor-not-allowed disabled:opacity-50'
+  'plan-select h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-raised)] px-2.5 apple-type-subheadline text-[var(--plan-text)] transition-all focus-visible:border-[var(--plan-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--plan-accent)]/40 disabled:cursor-not-allowed disabled:opacity-50'
 
 const MIN_RESOLUTION_NOTE_LENGTH = 10
 

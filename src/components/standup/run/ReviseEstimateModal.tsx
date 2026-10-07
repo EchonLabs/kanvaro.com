@@ -28,15 +28,18 @@ import { standupStrings } from '@/lib/standup/strings'
  * drives it with `fireEvent.change(getByLabelText('Reason'), { target:
  * { value } })`, which only works on a native form control.
  *
- * Unlike `RaiseBlockerModal`/`ResolveBlockerDialog`/`OverrideModal`, nothing
- * currently mounts this inside `ModalOverlay` (grep confirms no import in
- * `StandupRunScreen.tsx` or `VariancePanel.tsx` — `onRevise` there calls the
- * API directly), so its own root keeps a self-contained card shell rather
- * than assuming a wrapper supplies one.
+ * Mounted inside `ModalOverlay` by `StandupRunScreen`, which supplies the card
+ * shell — so this root draws none of its own. It used to, while it was mounted
+ * from the route page, and the result was a bordered card inside a bordered
+ * card.
+ *
+ * A refusal is shown here, inside the dialog, via `error`. It used to land in
+ * a banner at the top of the page — behind the overlay, where nobody could
+ * read it — while the dialog sat open looking as if Save had done nothing.
  */
 
 const SELECT_CLASS =
-  'h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-raised)] px-2.5 apple-type-subheadline text-[var(--plan-text)] transition-all focus-visible:border-[var(--plan-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--plan-accent)]/40 disabled:cursor-not-allowed disabled:opacity-50'
+  'plan-select h-8 w-full rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-raised)] px-2.5 apple-type-subheadline text-[var(--plan-text)] transition-all focus-visible:border-[var(--plan-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--plan-accent)]/40 disabled:cursor-not-allowed disabled:opacity-50'
 
 export interface ReviseEstimateTarget {
   allocationId: string
@@ -58,6 +61,10 @@ export interface ReviseEstimateModalProps {
     detail?: string
   }) => void
   onCancel: () => void
+  /** The server's refusal, shown inside the dialog. */
+  error?: string | null
+  /** True while the save is in flight, so Save cannot be pressed twice. */
+  saving?: boolean
   locale?: string
 }
 
@@ -65,6 +72,8 @@ export function ReviseEstimateModal({
   target,
   onSave,
   onCancel,
+  error,
+  saving = false,
   locale
 }: ReviseEstimateModalProps) {
   const [hours, setHours] = useState('')
@@ -82,7 +91,7 @@ export function ReviseEstimateModal({
   const projectedTotal = minutes(target.totalLoggedMinutesOnTask + remaining)
 
   return (
-    <div className="flex w-full flex-col gap-4 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] p-5 shadow-[var(--plan-shadow)]">
+    <div className="flex w-full flex-col gap-4 p-5">
       <div>
         <h3 id="revise-title" className="apple-type-body font-semibold text-[var(--plan-text)]">
           {standupStrings.variance.reviseTitle()}
@@ -138,7 +147,7 @@ export function ReviseEstimateModal({
         >
           {REVISION_REASONS.map((option) => (
             <option key={option} value={option}>
-              {option.replace(/_/g, ' ')}
+              {sentenceCase(option)}
             </option>
           ))}
         </select>
@@ -178,13 +187,22 @@ export function ReviseEstimateModal({
         </p>
       )}
 
+      {error && (
+        <p
+          role="alert"
+          className="rounded-[var(--apple-radius-md)] border border-[var(--plan-danger)] bg-[var(--plan-danger-bg)] px-3 py-2 apple-type-subheadline text-[var(--plan-danger)]"
+        >
+          {error}
+        </p>
+      )}
+
       <div className="flex justify-end gap-2 pt-1">
         <PlanButton tone="secondary" onClick={onCancel}>
           Cancel
         </PlanButton>
         <PlanButton tone="primary"
           type="button"
-          disabled={!canSave}
+          disabled={!canSave || saving}
           onClick={() =>
             onSave({
               allocationId: target.allocationId,
@@ -199,4 +217,10 @@ export function ReviseEstimateModal({
       </div>
     </div>
   )
+}
+
+/** "scope_change" -> "Scope change": the stored code, readable. */
+function sentenceCase(code: string): string {
+  const words = code.replace(/_/g, ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
 }
