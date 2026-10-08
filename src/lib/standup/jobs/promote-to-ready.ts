@@ -108,7 +108,7 @@ export async function promoteToReady(now: Date = new Date()): Promise<JobResult>
             Math.round((standup.scheduledStartAt.getTime() - now.getTime()) / 60_000)
           )
         }),
-        url: `/standups/${standupId}`
+        url: `/my/standup/${standupId}`
       })
 
       await recordAudit({

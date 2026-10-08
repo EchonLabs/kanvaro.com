@@ -215,6 +215,13 @@ export interface TaskAssignmentSplitScreenProps {
   headingClassName?: string
   panelClassName?: string
   /**
+   * Lets a context make the repository panel take the team panel's height
+   * rather than its own content's: `repositoryClassName` goes on the panel,
+   * `repositoryListClassName` on its scrolling list.
+   */
+  repositoryClassName?: string
+  repositoryListClassName?: string
+  /**
    * Which optional filters the repository offers, beside search and sort.
    * Each still only renders when the tasks carry that field. Planning keeps
    * all three; the run screen's backlog asks for type only.
@@ -245,6 +252,8 @@ export function TaskAssignmentSplitScreen({
   teamTitle = 'Team assignment',
   headingClassName = DEFAULT_HEADING_CLASSES,
   panelClassName = 'p-3.5',
+  repositoryClassName,
+  repositoryListClassName,
   filters = ALL_FILTERS
 }: TaskAssignmentSplitScreenProps) {
   const sensors = useSensors(
@@ -376,6 +385,8 @@ export function TaskAssignmentSplitScreen({
           title={repositoryTitle}
           headingClassName={headingClassName}
           panelClassName={panelClassName}
+          className={repositoryClassName}
+          listClassName={repositoryListClassName}
           onSearch={setSearch}
           onPriority={setPriority}
           onSkill={setSkill}
@@ -483,6 +494,8 @@ function TaskRepository({
   title,
   headingClassName,
   panelClassName,
+  className,
+  listClassName,
   onSearch,
   onPriority,
   onSkill,
@@ -510,6 +523,8 @@ function TaskRepository({
   title: string
   headingClassName: string
   panelClassName: string
+  className?: string
+  listClassName?: string
   onSearch: (value: string) => void
   onPriority: (value: string) => void
   onSkill: (value: string) => void
@@ -528,6 +543,7 @@ function TaskRepository({
       className={cn(
         'apple-transition flex flex-col gap-3 rounded-[var(--apple-radius-lg)] border border-[var(--plan-border)] bg-[var(--plan-surface)] ring-2 ring-transparent',
         panelClassName,
+        className,
         isOver && 'ring-[var(--plan-accent)]'
       )}
     >
@@ -628,7 +644,13 @@ function TaskRepository({
           onClearFilters={onClearFilters}
         />
       ) : (
-        <ul role="list" className="plan-scroll flex max-h-[34rem] flex-col gap-2 overflow-y-auto pr-0.5">
+        <ul
+          role="list"
+          className={cn(
+            'plan-scroll flex max-h-[34rem] flex-col gap-2 overflow-y-auto pr-0.5',
+            listClassName
+          )}
+        >
           {tasks.map((task) => (
             <li key={task.id}>
               <TaskCard

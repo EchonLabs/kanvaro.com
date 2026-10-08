@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ClipboardCopy, ExternalLink, Printer } from 'lucide-react'
+import { Check, ClipboardCopy, ExternalLink, Printer } from 'lucide-react'
 
 import { planButtonClass, planCardClass, planPillClass } from '@/components/standup/planning/ui'
 import { standupStrings } from '@/lib/standup/strings'
@@ -17,7 +17,7 @@ const s = standupStrings.summary
  * parse returns nothing rather than "Invalid Date": the day badge and the
  * facilitator line beneath still say what this document is.
  */
-function formatStandupDate(standupDate: string): string | null {
+export function formatStandupDate(standupDate: string): string | null {
   const parsed = new Date(`${standupDate}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return null
   const day = parsed.getDate()
@@ -38,11 +38,14 @@ export function SummaryHero({
   headerFacts,
   standupHref,
   onCopy,
+  copied = false,
   onPrint
 }: {
   headerFacts: HeaderFacts
   standupHref: string
   onCopy: () => void
+  /** True for a moment after a successful copy: the button turns green. */
+  copied?: boolean
   onPrint: () => void
 }) {
   const heading = formatStandupDate(headerFacts.standupDate) ?? s.title()
@@ -80,9 +83,23 @@ export function SummaryHero({
 
       {/* Hidden from print: a printed summary has nothing to click. */}
       <div className="standup-summary-no-print flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onCopy} className={planButtonClass('secondary')}>
-          <ClipboardCopy className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
-          {s.copyAsText()}
+        <button
+          type="button"
+          onClick={onCopy}
+          data-copied={copied || undefined}
+          className={planButtonClass(
+            'secondary',
+            copied
+              ? 'border-[var(--apple-system-green)] bg-[var(--apple-system-green)] text-white hover:bg-[var(--apple-system-green)] hover:text-white'
+              : undefined
+          )}
+        >
+          {copied ? (
+            <Check className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
+          ) : (
+            <ClipboardCopy className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+          )}
+          {copied ? 'Copied' : s.copyAsText()}
         </button>
         <Link href={standupHref} className={planButtonClass('secondary')}>
           <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />

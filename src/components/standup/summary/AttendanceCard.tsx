@@ -6,7 +6,6 @@ import {
   planPillClass,
   type PlanPillTone
 } from '@/components/standup/planning/ui'
-import { RingGauge } from '@/components/standup/my/shared/RingGauge'
 import { formatMinutesAsHours, minutes as toMinutes } from '@/lib/standup/minutes'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
@@ -40,6 +39,16 @@ function statusLabel(status: string): string {
 
 function statusTone(status: string): PlanPillTone {
   return STATUS[status]?.tone ?? 'neutral'
+}
+
+const STATUS_COLOR: Record<string, string> = {
+  present: 'var(--apple-system-green)',
+  absent_planned: 'var(--apple-system-orange)',
+  absent_unplanned: 'var(--apple-system-red)'
+}
+
+function statusColor(status: string): string {
+  return STATUS_COLOR[status] ?? 'var(--apple-tertiary-label)'
 }
 
 function isAbsent(status: string): boolean {
@@ -155,35 +164,21 @@ export function AttendanceCard({
       }
     >
       <div className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-center gap-6">
-          <div className="flex flex-col gap-1">
-            <span className="apple-section-label text-[var(--plan-muted)]">Attended</span>
-            <span
-              data-testid="attendance-ratio"
-              className="apple-type-title2 font-apple-mono font-bold leading-none tabular-nums text-[var(--plan-text)]"
-            >
-              {stats.presentCount}/{stats.attendanceTotal}
-            </span>
-            <span className="apple-type-caption text-[var(--plan-muted)]">
-              {stats.fullAttendance
-                ? 'Everyone joined'
-                : `${absentCount} ${absentCount === 1 ? 'person' : 'people'} missing`}
-            </span>
-          </div>
-
-          {/* Full attendance is the expected case, not a celebration — the
-              ring stays neutral there and only turns when somebody is out. */}
-          <RingGauge
-            percentage={stats.attendancePercent}
-            tone={stats.fullAttendance ? 'neutral' : 'red'}
-            size={72}
-            strokeWidth={7}
-          >
-            <span className="apple-type-caption font-semibold text-[var(--plan-muted)]">
-              {stats.fullAttendance ? 'Full' : `${stats.attendancePercent}%`}
-            </span>
-          </RingGauge>
-        </div>
+        {/* A one-line header, not a dashboard: the member cards below are the
+            content, this only says how the day's turnout added up. */}
+        <p
+          data-testid="attendance-ratio"
+          className="apple-type-subheadline flex flex-wrap items-center gap-x-4 gap-y-1 text-[var(--plan-muted)]"
+        >
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: statusColor('present') }} />
+            <span className="font-semibold text-[var(--plan-text)]">{stats.presentCount}</span> attended
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: absentCount > 0 ? statusColor('absent_unplanned') : 'var(--apple-tertiary-label)' }} />
+            <span className="font-semibold text-[var(--plan-text)]">{absentCount}</span> absent
+          </span>
+        </p>
 
         {/* Rows on a grid rather than pills on a wrap line: a pill sizes itself
             to the name inside it, so a roster of eight ragged widths reads as

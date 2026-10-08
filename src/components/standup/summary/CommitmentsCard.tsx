@@ -47,6 +47,14 @@ export function CommitmentsCard({ members }: { members: MemberCommitment[] }) {
               >
                 {member.name}
               </span>
+              <span className="apple-type-caption ml-auto font-apple-mono tabular-nums text-[var(--plan-muted)]">
+                {member.allocations.length} {member.allocations.length === 1 ? 'task' : 'tasks'} ·{' '}
+                {formatMinutesAsHours(
+                  toMinutes(
+                    Math.round(member.allocations.reduce((sum, a) => sum + (a.plannedMinutes || 0), 0))
+                  )
+                )}
+              </span>
             </div>
             <ul className="flex flex-col gap-1.5">
               {member.allocations.map((allocation, index) => {
@@ -62,6 +70,10 @@ export function CommitmentsCard({ members }: { members: MemberCommitment[] }) {
                     className={cn(planInsetClass, 'flex flex-wrap items-center gap-4 px-4 py-2.5')}
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-2">
+                      {/* The key and the title are two different facts. The
+                          key alone repeated itself here once (badge, then the
+                          same key as the label), telling the reader nothing
+                          about what the work was. */}
                       {allocation.taskKey && (
                         <span
                           className="apple-type-caption font-apple-mono shrink-0 rounded-[var(--apple-radius-sm)] bg-[var(--plan-track)] px-2 py-0.5 font-bold text-[var(--plan-muted)]"
@@ -69,8 +81,11 @@ export function CommitmentsCard({ members }: { members: MemberCommitment[] }) {
                           {allocation.taskKey}
                         </span>
                       )}
-                      <span className={'apple-type-subheadline min-w-0 truncate text-[var(--plan-text)]'}>
-                        {allocation.taskKey ?? allocation.taskId}
+                      <span
+                        title={allocation.taskTitle}
+                        className={'apple-type-subheadline min-w-0 truncate text-[var(--plan-text)]'}
+                      >
+                        {allocation.taskTitle ?? (allocation.taskKey ? '' : allocation.taskId)}
                       </span>
                     </div>
                     <div className="flex w-[180px] shrink-0 items-center gap-3">
