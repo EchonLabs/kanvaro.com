@@ -1,3 +1,12 @@
+## [1.46.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.0...v1.46.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* add alphabetical sorting to missed project and assignee dropdowns ([5f717e2](https://github.com/EchonLabs/kanvaro.com/commit/5f717e291aa41c655663cea9770db15d3bf58682))
+* add client timezone support across all timer operations ([ea85c40](https://github.com/EchonLabs/kanvaro.com/commit/ea85c40d0ad27daae8c51fe4ed249a6d0581c3cf))
+* redirect to backlog page after successful task creation ([f8eb0e4](https://github.com/EchonLabs/kanvaro.com/commit/f8eb0e44300a352240c9254eac8bc25756aad953))
+
 # [1.46.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.7...v1.46.0) (2026-10-08)
 
 
