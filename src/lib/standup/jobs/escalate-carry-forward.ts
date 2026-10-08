@@ -133,7 +133,7 @@ export async function escalateCarryForward(now: Date = new Date()): Promise<JobR
                   label,
                   age: item.ageInStandups
                 }),
-            url: `/standups/${String(item.originStandup)}`,
+            url: `/my/standup/${String(item.originStandup)}`,
             priority: 'high'
           })
           result.created += sent

@@ -108,7 +108,7 @@ export async function checkSprintHealth(
     recipientIds: recipients,
     title: 'Sprint scope now exceeds remaining capacity',
     message: `Remaining sprint scope exceeds remaining capacity by ${overageHours}h.`,
-    url: `/standups/${String(anchor._id)}`,
+    url: `/my/standup/${String(anchor._id)}`,
     priority: 'high'
   })
 

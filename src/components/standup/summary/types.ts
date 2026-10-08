@@ -40,7 +40,13 @@ export interface CompletedYesterdayRow {
 export interface MemberCommitment extends MemberIdentity {
   memberId: string
   name: string
-  allocations: Array<{ taskId: string; taskKey?: string; plannedMinutes: number }>
+  allocations: Array<{
+    taskId: string
+    taskKey?: string
+    /** Joined on read by `getSummary`; absent for a task that no longer exists. */
+    taskTitle?: string
+    plannedMinutes: number
+  }>
 }
 
 /** A row the schema stores as `Mixed`, optionally hydrated with its member. */

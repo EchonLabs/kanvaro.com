@@ -143,7 +143,7 @@ export async function markMissed(
         recipientIds: [String(standup.facilitator)],
         title: standupStrings.notifications.missedTitle(),
         message: standupStrings.notifications.missedMessage({ date: standup.standupDate }),
-        url: `/standups/${standupId}`,
+        url: `/my/standup/${standupId}`,
         priority: 'high'
       })
 
@@ -215,7 +215,7 @@ async function escalate(
     message: isThird
       ? standupStrings.notifications.missedThriceMessage({ count: streak })
       : standupStrings.notifications.missedTwiceMessage({ count: streak }),
-    url: `/standups/${standupId}`,
+    url: `/my/standup/${standupId}`,
     priority: 'high'
   })
 

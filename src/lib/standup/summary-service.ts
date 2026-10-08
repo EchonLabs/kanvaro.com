@@ -11,6 +11,7 @@
  * against a fixture the way `summary.ts`'s own tests are.
  */
 import { StandupSummary, type IStandupSummary } from '@/models/StandupSummary'
+import { Task } from '@/models/Task'
 import { User } from '@/models/User'
 import { StandupError } from './errors'
 import { standupStrings } from './strings'
@@ -37,7 +38,14 @@ export type HydratedSummary = Omit<
   'attendance' | 'memberCommitments' | 'debtMovements'
 > & {
   attendance: Array<IStandupSummary['attendance'][number] & MemberIdentity>
-  memberCommitments: Array<IStandupSummary['memberCommitments'][number] & MemberIdentity>
+  memberCommitments: Array<
+    Omit<IStandupSummary['memberCommitments'][number], 'allocations'> &
+      MemberIdentity & {
+        allocations: Array<
+          IStandupSummary['memberCommitments'][number]['allocations'][number] & { taskTitle?: string }
+        >
+      }
+  >
   debtMovements: Array<Record<string, unknown> & MemberIdentity>
 }
 
@@ -101,10 +109,37 @@ async function hydrateMembers(summary: IStandupSummary): Promise<HydratedSummary
     return { ...identity, ...row, name: (fields.name as string | undefined) ?? identity.name }
   }
 
+  // Allocations persist only `{ taskId, taskKey, plannedMinutes }`, so a
+  // commitment can name its task by key and nothing else. The title is joined
+  // on read, for the same reason the identity is: it is current, and older
+  // summaries gain it without being rewritten.
+  const taskIds = Array.from(
+    new Set(
+      (summary.memberCommitments ?? [])
+        .flatMap((member) => member.allocations ?? [])
+        .map((allocation) => allocation?.taskId)
+        .filter(Boolean)
+        .map(String)
+    )
+  )
+  const tasks = taskIds.length
+    ? await Task.find({ _id: { $in: taskIds } })
+        .select('title')
+        .lean<Array<{ _id: unknown; title?: string }>>()
+    : []
+  const titleById = new Map(tasks.map((task) => [String(task._id), task.title]))
+  const withTitles = <T extends { allocations?: Array<{ taskId: unknown }> }>(member: T): T => ({
+    ...member,
+    allocations: (member.allocations ?? []).map((allocation) => {
+      const taskTitle = titleById.get(String(allocation.taskId))
+      return taskTitle ? { ...allocation, taskTitle } : allocation
+    })
+  })
+
   return {
     ...summary,
     attendance: (summary.attendance ?? []).map(merge),
-    memberCommitments: (summary.memberCommitments ?? []).map(merge),
+    memberCommitments: (summary.memberCommitments ?? []).map((member) => withTitles(merge(member))),
     debtMovements: ((summary.debtMovements ?? []) as unknown as Record<string, unknown>[]).map(merge)
   } as HydratedSummary
 }
@@ -210,7 +245,10 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
   for (const member of summary.memberCommitments) {
     lines.push(`**${member.name}**`)
     for (const a of member.allocations) {
-      lines.push(`- ${a.taskKey ?? a.taskId} (${(a.plannedMinutes / 60).toFixed(1)}h)`)
+      const title = (a as { taskTitle?: string }).taskTitle
+      lines.push(
+        `- ${a.taskKey ?? a.taskId}${title ? ` ${title}` : ''} (${(a.plannedMinutes / 60).toFixed(1)}h)`
+      )
     }
   }
   lines.push('')

@@ -256,7 +256,7 @@ export async function assembleCompletionContext(input: {
     memberCommitments,
     overridesIssued,
     summaryInputs,
-    summaryUrl: `/projects/${projectId}/sprints/${sprintId}/standups/${standupId}`,
+    summaryUrl: `/my/standup/${standupId}`,
     carryForwardCloseItems: sprintCloseReadiness.carryForwardItems
   }
 }

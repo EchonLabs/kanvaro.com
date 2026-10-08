@@ -187,10 +187,10 @@ describe('AttendanceCard', () => {
     expect(screen.getByText(standupStrings.summary.emptyAttendance())).toBeInTheDocument()
   })
 
-  it('reads out the attended ratio', () => {
+  it('reads out how many attended and how many were absent', () => {
     renderCard([member(), member({ memberId: '2', name: 'QA Bashith' })])
 
-    expect(screen.getByTestId('attendance-ratio')).toHaveTextContent('2/2')
+    expect(screen.getByTestId('attendance-ratio')).toHaveTextContent('2 attended')
   })
 
   it('calls out full attendance', () => {
