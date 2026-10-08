@@ -1,3 +1,12 @@
+# [1.46.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.7...v1.46.0) (2026-10-08)
+
+
+### Features
+
+* add refresh button ([a54f464](https://github.com/EchonLabs/kanvaro.com/commit/a54f46417a3c41b843366ec1933a3c3e1a96a1fa))
+* open task view and edit actions in new tab from tasks page ([6452121](https://github.com/EchonLabs/kanvaro.com/commit/645212163c759c6b5eed5a047d7eb50b92246a72))
+* preserve filters across navigation ([c94f01a](https://github.com/EchonLabs/kanvaro.com/commit/c94f01ae6045406f0c9506937056f86867cbd26c))
+
 ## [1.45.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.6...v1.45.7) (2026-10-06)
 
 
