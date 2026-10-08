@@ -5,6 +5,7 @@ import { useNotifications } from '@/hooks/useNotifications'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { resolveNotificationUrl } from '@/lib/standup/notification-url'
 
 const TYPE_CONFIG: Record<string, { Icon: any; color: string; bg: string }> = {
   time_tracking: { Icon: Clock,        color: 'var(--apple-system-purple)', bg: 'rgba(175,82,222,0.13)' },
@@ -25,7 +26,8 @@ export function NotificationsWidget() {
 
   const handleNotificationClick = (notification: any) => {
     if (!notification.isRead) markAsRead((notification._id as any).toString())
-    if (notification.data?.url) router.push(notification.data.url)
+    const url = resolveNotificationUrl(notification)
+    if (url) router.push(url)
   }
 
   return (

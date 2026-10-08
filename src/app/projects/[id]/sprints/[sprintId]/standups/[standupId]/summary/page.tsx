@@ -36,7 +36,8 @@ import { CommitmentsCard } from '@/components/standup/summary/CommitmentsCard'
 import { CompletedYesterdayCard } from '@/components/standup/summary/CompletedYesterdayCard'
 import { DebtMovementsCard } from '@/components/standup/summary/DebtMovementsCard'
 import { OverridesCard } from '@/components/standup/summary/OverridesCard'
-import { SummaryHero } from '@/components/standup/summary/SummaryHero'
+import { SummaryPrintDocument } from '@/components/standup/summary/SummaryPrintDocument'
+import { SummaryHero, formatStandupDate } from '@/components/standup/summary/SummaryHero'
 import { SummarySection } from '@/components/standup/summary/SummarySection'
 import { SummaryStatGrid } from '@/components/standup/summary/SummaryStatGrid'
 import { VarianceCard } from '@/components/standup/summary/VarianceCard'
@@ -59,6 +60,8 @@ export default function StandupSummaryPage({
   const [notAvailable, setNotAvailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copyNotice, setCopyNotice] = useState<string | null>(null)
+  // Drives the button's green "done" state; reverts on its own.
+  const [copied, setCopied] = useState(false)
 
   const standupHref = `/projects/${projectId}/sprints/${sprintId}/standups/${standupId}`
 
@@ -107,10 +110,18 @@ export default function StandupSummaryPage({
       const text = await response.text()
       await navigator.clipboard.writeText(text)
       setCopyNotice(s.copied())
+      setCopied(true)
     } catch {
       setCopyNotice(s.copyFailed())
+      setCopied(false)
     }
   }, [standupId])
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 2500)
+    return () => clearTimeout(timer)
+  }, [copied])
 
   const printSummary = useCallback(() => {
     window.print()
@@ -155,6 +166,7 @@ export default function StandupSummaryPage({
               headerFacts={summary.headerFacts}
               standupHref={standupHref}
               onCopy={copyAsText}
+              copied={copied}
               onPrint={printSummary}
             />
 
@@ -164,6 +176,13 @@ export default function StandupSummaryPage({
               </p>
             )}
 
+            {/* Screen-hidden; the only thing a print shows. */}
+            <SummaryPrintDocument
+              summary={summary}
+              stats={stats}
+              heading={formatStandupDate(summary.headerFacts.standupDate) ?? s.title()}
+            />
+
             <SummaryStatGrid stats={stats} />
 
             <AttendanceCard
@@ -171,8 +190,10 @@ export default function StandupSummaryPage({
               commitments={summary.memberCommitments}
               stats={stats}
             />
-            <CompletedYesterdayCard rows={summary.completedYesterday} />
-            <VarianceCard rows={summary.varianceTable} />
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+              <CompletedYesterdayCard rows={summary.completedYesterday} />
+              <VarianceCard rows={summary.varianceTable} />
+            </div>
             <CommitmentsCard members={summary.memberCommitments} />
 
             {/* Lighter, naturally-paired sections share a row on desktop

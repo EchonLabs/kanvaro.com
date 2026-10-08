@@ -32,6 +32,12 @@ import { cn } from '@/lib/utils'
  * only authority for that — it renders the breakdown it is handed.
  */
 
+/*
+ * Fills are written as `color-mix` or a bare token, never `bg-[var(--x)]/60`:
+ * Tailwind cannot apply an opacity modifier to a `var()` colour and silently
+ * emits no rule, which left the carried and new segments with no background —
+ * a member with assigned tasks showed an empty track.
+ */
 const TONE: Record<AllocationStatus, string> = {
   full: 'text-[var(--apple-system-green)]',
   under: 'text-[var(--apple-system-orange)]',
@@ -123,7 +129,7 @@ export function CapacityMeter({
             'h-full rounded-l-full',
             overMinutes > 0
               ? 'bg-[var(--apple-system-red)]'
-              : 'bg-[var(--apple-system-blue)]/60'
+              : 'bg-[color-mix(in_srgb,var(--apple-system-blue)_70%,transparent)]'
           )}
           style={{ width: `${percent(carried)}%` }}
         />
@@ -137,7 +143,7 @@ export function CapacityMeter({
             'h-full',
             overMinutes > 0
               ? 'bg-[var(--apple-system-red)]'
-              : 'bg-[var(--apple-system-green)]/70'
+              : 'bg-[var(--apple-system-green)]'
           )}
           style={{ width: `${percent(fresh)}%` }}
         />

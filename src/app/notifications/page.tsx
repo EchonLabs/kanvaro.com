@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useNotifications } from '@/hooks/useNotifications'
 import { formatDistanceToNow } from 'date-fns'
+import { resolveNotificationUrl } from '@/lib/standup/notification-url'
 import { Bell, RefreshCw, Filter } from 'lucide-react'
 
 type DateRangeKey = 'all' | '24h' | '7d' | '30d'
@@ -200,8 +201,8 @@ export default function NotificationsPage() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                        {n.data?.url ? (
-                          <a className="text-primary hover:underline" href={n.data.url}>
+                        {resolveNotificationUrl(n) ? (
+                          <a className="text-primary hover:underline" href={resolveNotificationUrl(n)}>
                             Open
                           </a>
                         ) : <span />}

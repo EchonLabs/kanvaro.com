@@ -182,7 +182,12 @@ export function UnassignedPool({
         // from `xl`, matching the run screen's other paired sections
         // (`RUN_TWO_UP_CLASSES`) instead of the split screen's own 1 : 1.15
         // split from `lg`, so every section's halves meet at one middle line.
-        className="grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-2"
+        className="grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-2 xl:items-stretch"
+        // Side by side, the backlog is exactly as tall as the team panel: its
+        // own content is taken out of the row's height (`contain: size`) so
+        // the team cards set it, and the task list scrolls inside.
+        repositoryClassName="xl:min-h-[28rem] xl:[contain:size]"
+        repositoryListClassName="xl:max-h-none xl:min-h-0 xl:flex-1"
         // Type and sort only. Priority and skill made five controls for a
         // list the PM scans in a meeting; sort already orders by priority.
         filters={['type']}
