@@ -121,7 +121,10 @@ export default function TestManagementPage() {
       setLoading(true)
       const response = await fetch('/api/projects')
       const data = await response.json()
-      if (data.success) setProjects(Array.isArray(data.data) ? data.data : [])
+      if (data.success) {
+        const list = Array.isArray(data.data) ? data.data : []
+        setProjects([...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true })))
+      }
     } catch (error) {
       console.error('Error fetching projects:', error)
     } finally {

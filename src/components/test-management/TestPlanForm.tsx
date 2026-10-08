@@ -163,7 +163,7 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
       setQaUsers(Array.from(byId.values()).sort((a, b) => {
         const an = `${a.firstName ?? ''} ${a.lastName ?? ''}`.trim()
         const bn = `${b.firstName ?? ''} ${b.lastName ?? ''}`.trim()
-        return an.localeCompare(bn)
+        return an.localeCompare(bn, undefined, { sensitivity: 'base', numeric: true })
       }))
     } catch (error) {
       console.error('Error fetching project QAs:', error)
