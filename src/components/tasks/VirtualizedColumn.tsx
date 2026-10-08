@@ -4,9 +4,8 @@ import { useRef, useMemo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { Target, Plus, AlertTriangle } from 'lucide-react'
+import { Target, AlertTriangle } from 'lucide-react'
 import SortableTask from './SortableTask'
 import { ITask } from '@/models/Task'
 import { usePermissions } from '@/lib/permissions/permission-context'
@@ -35,7 +34,7 @@ interface Column {
 interface VirtualizedColumnProps {
   column: Column
   tasks: PopulatedTask[]
-  onCreateTask: (status?: string) => void
+  onCreateTask?: (status?: string) => void
   getPriorityColor: (priority: string) => string
   getTypeColor: (type: string) => string
   onTaskClick?: (task: PopulatedTask) => void
@@ -103,23 +102,10 @@ export default function VirtualizedColumn({
              {tasks.length}
            </span>
            {overdueCount > 0 && (
-             <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5 flex ite whitespace-nowrap flex-shrink-0">
+             <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 whitespace-nowrap flex-shrink-0">
                <AlertTriangle className="h-2.5 w-2.5" />
                {overdueCount} overdue
              </Badge>
-           )}
-         </div>
-         <div className="flex items-center gap-2">
-           {hasPermission(Permission.TASK_CREATE) && (
-             <Button 
-               variant="ghost" 
-               size="sm"
-               onClick={() => onCreateTask(column.key)}
-               className="flex items-center gap-1 h-8 px-3 text-xs"
-             >
-               <Plus className="h-3 w-3" />
-               <span className="hidden sm:inline">Add Task</span>
-             </Button>
            )}
          </div>
        </div>
@@ -149,7 +135,7 @@ export default function VirtualizedColumn({
                   <div className="text-center space-y-2">
                     <Target className="h-9 w-9 mx-auto opacity-50" />
                     <p className="text-sm font-medium">No tasks here</p>
-                 <p className="text-xs opacity-70">Drag tasks to this column or click "Add Task"</p>
+                 <p className="text-xs opacity-70">Drag tasks to this column</p>
                   </div>
                 </div>
               ) : (
