@@ -62,7 +62,13 @@ export const SCHEDULER_STALE_AFTER_MS = 15 * 60 * 1000
 // Docs are served under /docs/internal/<slug> (see src/app/docs/internal/[...slug]).
 // A bare /docs/operations/... path 404s, and a degradation whose action link is
 // broken is a broken degradation.
-const SCHEDULER_DOCS = '/docs/internal/operations/background-jobs'
+//
+// The scheduler's own page was folded into the stand-up module reference, so
+// this points at that document's section rather than a file of its own. The
+// fragment is the heading id `DocsLoader.extractHeadings` derives from
+// "## Scheduler and background jobs" — renaming that heading breaks this link.
+const SCHEDULER_DOCS =
+  '/docs/internal/reference/standup-module#scheduler-and-background-jobs'
 const HOLIDAY_ADMIN = '/settings?tab=holidays'
 
 export async function getActiveDegradations(

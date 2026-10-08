@@ -77,7 +77,9 @@ describe('getActiveDegradations', () => {
     // Plan §3 rule 3: the effect on the reader, not the cause.
     expect(stale?.message).toMatch(/not being promoted automatically/i)
     expect(stale?.message).toMatch(/47 minutes ago/)
-    expect(stale?.action?.href).toBe('/docs/internal/operations/background-jobs')
+    expect(stale?.action?.href).toBe(
+      '/docs/internal/reference/standup-module#scheduler-and-background-jobs'
+    )
   })
 
   it('reports CRON_ROUTES_UNAUTHENTICATED as info when CRON_SECRET is unset', async () => {

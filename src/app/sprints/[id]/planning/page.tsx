@@ -5,7 +5,8 @@
  *
  * Route: `/sprints/[id]/planning`, alongside `/sprints/[id]` rather than nested
  * under a project — Kanvaro addresses sprints directly by their own id, and the
- * planning screen belongs to the sprint (see docs/api-route-structure.md).
+ * planning screen belongs to the sprint (see docs/standup-module.md, "API
+ * surface", for the route-placement rule).
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
