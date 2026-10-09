@@ -208,6 +208,19 @@ export async function POST(request: NextRequest) {
       effectiveMaxSession = Math.min(settings.maxSessionHours, remainingDailyHours)
     }
 
+    const minSessionHours = (ActiveTimer.schema.path('maxSessionHours') as any)?.options?.min || 1
+    if (effectiveMaxSession < minSessionHours) {
+      const remainingMinutes = Math.round(effectiveMaxSession * 60)
+      const minSessionHoursLabel = minSessionHours === 1 ? '1 hour' : `${minSessionHours} hours`
+      return NextResponse.json(
+        {
+          error: `Daily limit almost reached. You only have ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'} remaining today, which is less than the minimum session duration of ${minSessionHoursLabel}.`
+        },
+        { status: 400 }
+      )
+    }
+
+
     // Create active timer
     const activeTimer = new ActiveTimer({
       user: userId,
@@ -253,8 +266,12 @@ export async function POST(request: NextRequest) {
         isPaused: false
       }
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error starting timer:', error)
+    if (error?.name === 'ValidationError') {
+      const messages = Object.values(error.errors || {}).map((e: any) => e.message).join(', ')
+      return NextResponse.json({ error: messages || 'Active timer validation failed' }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

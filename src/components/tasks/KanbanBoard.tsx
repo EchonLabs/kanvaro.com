@@ -107,6 +107,7 @@ export interface KanbanFilters {
   status?: string
   priority?: string
   type?: string
+  category?: string
   assignedTo?: string
   createdBy?: string
   createdAtFrom?: string
@@ -302,6 +303,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
       if (filters?.status && filters.status !== 'all') params.set('status', filters.status)
       if (filters?.priority && filters.priority !== 'all') params.set('priority', filters.priority)
       if (filters?.type && filters.type !== 'all') params.set('type', filters.type)
+      if (filters?.category && filters.category !== 'all') params.set('category', filters.category)
       if (filters?.assignedTo) params.set('assignedTo', filters.assignedTo)
       if (filters?.createdBy) params.set('createdBy', filters.createdBy)
       if (filters?.createdAtFrom) params.set('createdAtFrom', filters.createdAtFrom)

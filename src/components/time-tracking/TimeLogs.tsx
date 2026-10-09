@@ -1069,9 +1069,11 @@ export function TimeLogs({
   const loadActiveTimer = useCallback(async () => {
     if (!resolvedUserId || !resolvedOrgId) return
     try {
+      const tz = detectClientTimezone()
       const params = new URLSearchParams({
         userId: resolvedUserId,
-        organizationId: resolvedOrgId
+        organizationId: resolvedOrgId,
+        timezone: tz
       })
       const response = await fetch(`/api/time-tracking/timer?${params}`)
       const data = await response.json()
