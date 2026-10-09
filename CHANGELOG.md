@@ -1,3 +1,12 @@
+## [1.46.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.1...v1.46.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* add missing timezone parameter to timer poll requests ([36d4de9](https://github.com/EchonLabs/kanvaro.com/commit/36d4de981b9b7855dc3b06b322eaa0616d427695))
+* apply category filter to task fetching in kanban board ([78586d0](https://github.com/EchonLabs/kanvaro.com/commit/78586d0a3183c56f139780ae0480962ca7e73a76))
+* validate remaining daily time against schema min session limit ([81eeed5](https://github.com/EchonLabs/kanvaro.com/commit/81eeed5d34c7722708becd61e64d88cb896d4af6))
+
 ## [1.46.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.0...v1.46.1) (2026-10-08)
 
 
