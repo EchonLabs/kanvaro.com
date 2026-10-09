@@ -1857,7 +1857,12 @@ export function StandupRunScreen({
 
         <div className="flex flex-wrap items-center gap-3">
           {board.meetingUrl && (
-            <a href={board.meetingUrl} className={planButtonClass('secondary')}>
+            <a
+              href={board.meetingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={planButtonClass('secondary')}
+            >
               <Video className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
               {standupStrings.run.joinCall()}
             </a>
