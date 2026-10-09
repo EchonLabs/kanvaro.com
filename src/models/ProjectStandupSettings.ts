@@ -1,5 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
+import { ESTIMATE_UNITS, type EstimateUnit } from '@/lib/standup/estimates'
+
 /**
  * CFW-2 thresholds. Named because the cross-field rule between them is enforced
  * in two places — the field validator for `save()`, the pre-hook for updates —
@@ -101,7 +103,15 @@ export interface IProjectStandupSettings extends Document {
    */
   ceremoniesConsumeCapacity: boolean
 
-  /** Story-point conversion factor (PLN-13). */
+  /**
+   * What a planning-poker card means for this project (PLN-10/13). Story points
+   * are multiplied by `pointsToHours` to reach the allocation engine's minutes;
+   * hours are taken as voted. Read when a session opens, so changing it never
+   * touches a session already running or an estimate already finalised.
+   */
+  estimationUnit: EstimateUnit
+
+  /** Story-point conversion factor (PLN-13). Unused while estimating in hours. */
   pointsToHours: number
 
   /** Per-project notification switches keyed N1..N13; user prefs take precedence. */
@@ -198,6 +208,9 @@ const ProjectStandupSettingsSchema = new Schema<IProjectStandupSettings>(
     requireOverAllocationAck: { type: Boolean, default: true },
     ceremoniesConsumeCapacity: { type: Boolean, default: true },
 
+    // Story points stays the default so projects configured before this
+    // setting existed keep estimating the way they always have.
+    estimationUnit: { type: String, enum: [...ESTIMATE_UNITS], default: 'story_points' },
     pointsToHours: { type: Number, default: 4, min: 0.5, max: 40 },
 
     notificationSwitches: {

@@ -10,11 +10,11 @@ import { SprintPlanningSession } from '@/models/SprintPlanningSession'
 import { Task } from '@/models/Task'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { StandupError } from '@/lib/standup/errors'
-import { ESTIMATE_UNITS, type EstimateUnit } from '@/lib/standup/estimates'
+import { type EstimateUnit } from '@/lib/standup/estimates'
 import {
   CONSENSUS_RULES,
-  DECK_TYPES,
   deckCards,
+  resolveEstimationSetup,
   resolveParticipants,
   type ConsensusRule,
   type DeckType
@@ -55,13 +55,6 @@ export const POST = withSprintPermission(
       throw new StandupError('VALIDATION_FAILED', 'Choose at least one task to estimate.')
     }
 
-    const deckType = body.deckType ?? 'fibonacci'
-    if (!DECK_TYPES.includes(deckType)) {
-      throw new StandupError('VALIDATION_FAILED', `"${deckType}" is not a deck.`, {
-        allowed: DECK_TYPES
-      })
-    }
-
     const consensusRule = body.consensusRule ?? 'facilitator_decides'
     if (!CONSENSUS_RULES.includes(consensusRule)) {
       throw new StandupError('VALIDATION_FAILED', `"${consensusRule}" is not a consensus rule.`, {
@@ -69,10 +62,17 @@ export const POST = withSprintPermission(
       })
     }
 
-    const estimationUnit = body.estimationUnit ?? 'story_points'
-    if (!ESTIMATE_UNITS.includes(estimationUnit)) {
-      throw new StandupError('VALIDATION_FAILED', `"${estimationUnit}" is not an estimation unit.`)
-    }
+    const settings = await ProjectStandupSettings.findOne({ project: projectId })
+      .select('pointsToHours estimationUnit')
+      .lean()
+
+    // The planning screen sends neither, so the project's unit decides whether
+    // a card is points (multiplied by `pointsToHours`) or hours as voted.
+    const { deckType, estimationUnit } = resolveEstimationSetup({
+      deckType: body.deckType,
+      estimationUnit: body.estimationUnit,
+      projectUnit: (settings as any)?.estimationUnit
+    })
 
     // Only tasks actually in this sprint, and only ones not already frozen —
     // a poker round over a locked estimate could not be applied (DAT-6).
@@ -91,10 +91,6 @@ export const POST = withSprintPermission(
         { taskIds: body.taskIds }
       )
     }
-
-    const settings = await ProjectStandupSettings.findOne({ project: projectId })
-      .select('pointsToHours')
-      .lean()
 
     const planningSession = await SprintPlanningSession.findOne({
       sprint: sprintId,

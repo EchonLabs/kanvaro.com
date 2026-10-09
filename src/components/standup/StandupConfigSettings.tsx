@@ -42,6 +42,7 @@ interface Settings {
   blockedTasksConsumeCapacity: boolean
   requireOverAllocationAck: boolean
   ceremoniesConsumeCapacity: boolean
+  estimationUnit: 'story_points' | 'hours'
   pointsToHours: number
 }
 
@@ -358,23 +359,49 @@ export function StandupConfigSettings({
       </Section>
 
       <Section title="Estimation">
-        <NumberField
-          label="Points to hours"
-          hint="Conversion factor when estimating in story points"
-          min={0.5}
-          max={40}
-          step={0.5}
-          value={settings.pointsToHours}
-          // PLN-14 — changing this after estimates exist must never recompute
-          // silently. The value is routed through the migration dialog, which
-          // previews every affected task first. Committed on blur, not per
-          // keystroke: the preview is a deliberate step, not a live search.
-          onCommit={(value) => setPendingFactor(value)}
-        />
-        {pendingFactor !== null && pendingFactor !== settings.pointsToHours && (
-          <p className="text-[12px] text-[var(--apple-secondary-label)]">
-            Reviewing what {pendingFactor}h per point would change…
-          </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <PolicyCard
+            selected={settings.estimationUnit === 'story_points'}
+            onSelect={() => update('estimationUnit', 'story_points')}
+            title="Story points"
+            summary={`Each point is ${settings.pointsToHours}h of capacity.`}
+            detail="Planning poker deals the Fibonacci deck, and the agreed card is multiplied by the points-to-hours factor below. Choose this if your team sizes relative effort."
+          />
+          <PolicyCard
+            selected={settings.estimationUnit === 'hours'}
+            onSelect={() => update('estimationUnit', 'hours')}
+            title="Hours"
+            summary="A card is the hours it says."
+            detail="Planning poker deals the hours deck and the agreed card is used as voted, with no conversion. Choose this if your team estimates in time."
+          />
+        </div>
+        <p className="mt-3 text-[12px] text-[var(--apple-tertiary-label)]">
+          Applies to poker sessions opened after saving. Estimates already agreed keep their hours.
+        </p>
+
+        {/* Only meaningful for points: hiding it under hours stops a PM
+            tuning a factor that no longer affects anything. */}
+        {settings.estimationUnit !== 'hours' && (
+          <div className="mt-4">
+            <NumberField
+              label="Points to hours"
+              hint="Conversion factor when estimating in story points"
+              min={0.5}
+              max={40}
+              step={0.5}
+              value={settings.pointsToHours}
+              // PLN-14 — changing this after estimates exist must never recompute
+              // silently. The value is routed through the migration dialog, which
+              // previews every affected task first. Committed on blur, not per
+              // keystroke: the preview is a deliberate step, not a live search.
+              onCommit={(value) => setPendingFactor(value)}
+            />
+            {pendingFactor !== null && pendingFactor !== settings.pointsToHours && (
+              <p className="text-[12px] text-[var(--apple-secondary-label)]">
+                Reviewing what {pendingFactor}h per point would change…
+              </p>
+            )}
+          </div>
         )}
       </Section>
 

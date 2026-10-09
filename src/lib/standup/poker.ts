@@ -7,6 +7,7 @@
  * outliers" — can be tested without a database or a socket.
  */
 import { StandupError } from './errors'
+import { ESTIMATE_UNITS, type EstimateUnit } from './estimates'
 
 export const DECK_TYPES = [
   'fibonacci',
@@ -46,13 +47,103 @@ const NUMERIC_DECKS: Record<Exclude<DeckType, 'tshirt'>, Array<number | string>>
   // reveal/variance logic already treats as an abstention.
   fibonacci: [1, 2, 3, 5, 8, 13, 21, '?', 'coffee'],
   modified_fibonacci: [0.5, 1, 2, 3, 5, 8, 12, 14, 16, 40, 100],
-  hours: [0.5, 1, 2, 4, 8, 16, 24, 40],
+  // Denser at the low end, where most task estimates land: 3 and 6 are common
+  // answers a team voting in time reaches for, and leaving them off forced a
+  // 6h task onto 4 or 8. Carries '?' and 'coffee' like Fibonacci — a team
+  // estimating in hours can be unsure or need a break just the same.
+  hours: [0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 40, '?', 'coffee'],
   powers_of_two: [1, 2, 4, 8, 16, 32, 64]
 }
 
 /** The cards a deck offers, in order. */
 export function deckCards(deckType: DeckType): Array<string | number> {
   return deckType === 'tshirt' ? Object.keys(TSHIRT_POINTS) : [...NUMERIC_DECKS[deckType]]
+}
+
+/**
+ * The deck and unit a new poker session runs with (PLN-10/13).
+ *
+ * The unit decides whether a card is multiplied by `pointsToHours` when the
+ * estimate is finalised, so it must agree with the deck: the `hours` deck
+ * used to run under the `story_points` default, which turned a 4h card into
+ * a 16h estimate. Hence the rules —
+ *
+ * - unit: the request's, else the `hours` deck's own, else the project's;
+ * - deck: the request's, else the one that matches the unit;
+ * - the `hours` deck with a `story_points` unit is refused outright.
+ */
+export function resolveEstimationSetup(input: {
+  deckType?: DeckType
+  estimationUnit?: EstimateUnit
+  projectUnit?: EstimateUnit
+}): { deckType: DeckType; estimationUnit: EstimateUnit } {
+  const estimationUnit =
+    input.estimationUnit ??
+    (input.deckType === 'hours' ? 'hours' : input.projectUnit ?? 'story_points')
+  if (!ESTIMATE_UNITS.includes(estimationUnit)) {
+    throw new StandupError('VALIDATION_FAILED', `"${estimationUnit}" is not an estimation unit.`, {
+      allowed: ESTIMATE_UNITS
+    })
+  }
+
+  const deckType = input.deckType ?? (estimationUnit === 'hours' ? 'hours' : 'fibonacci')
+  if (!DECK_TYPES.includes(deckType)) {
+    throw new StandupError('VALIDATION_FAILED', `"${deckType}" is not a deck.`, {
+      allowed: DECK_TYPES
+    })
+  }
+
+  if (deckType === 'hours' && estimationUnit !== 'hours') {
+    throw new StandupError(
+      'VALIDATION_FAILED',
+      'The hours deck estimates in hours. Choose a points deck to estimate in story points.',
+      { deckType, estimationUnit }
+    )
+  }
+
+  return { deckType, estimationUnit }
+}
+
+/**
+ * What a non-numeric card says (spec §15.6: "? means unsure, coffee means
+ * break"). Both abstain from the numbers, but they ask the room for different
+ * things — `?` for the task to be explained, coffee for a pause — so the screens
+ * name them rather than lumping both under "abstained".
+ */
+export function abstentionOf(card: string | number): 'unsure' | 'break' | null {
+  if (card === '?') return 'unsure'
+  if (card === 'coffee') return 'break'
+  return null
+}
+
+/** Trims a number for display: 4, 0.5, 1.25 — never 4.0. */
+export function formatNumber(value: number): string {
+  return String(Math.round(value * 100) / 100)
+}
+
+/**
+ * An estimate in the unit it was voted in: "6 hours", "1 hour", "5 points".
+ *
+ * Hours are shown as-is. This is the line that used to read "≈ 6 hours"
+ * under an hours deck: the approximation sign implied a conversion that
+ * never happened.
+ */
+export function formatEstimate(value: number, unit: EstimateUnit): string {
+  const noun = unit === 'hours' ? 'hour' : 'point'
+  return `${formatNumber(value)} ${value === 1 ? noun : `${noun}s`}`
+}
+
+/**
+ * The hours a points estimate converts to, as shown beside it ("≈ 16 hours").
+ * `null` under hours, where there is no conversion to show.
+ */
+export function convertedHours(
+  value: number,
+  unit: EstimateUnit,
+  pointsToHours: number
+): string | null {
+  if (unit === 'hours') return null
+  return `≈ ${formatEstimate(value * pointsToHours, 'hours')}`
 }
 
 /** Whether a card belongs to a deck. */

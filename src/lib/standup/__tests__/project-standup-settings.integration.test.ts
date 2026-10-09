@@ -105,3 +105,33 @@ describe('ProjectStandupSettings — carry-forward threshold validation', () => 
     ).rejects.toThrow(/Escalation threshold must exceed the note threshold/)
   })
 })
+
+describe('ProjectStandupSettings — estimation unit', () => {
+  useMongo()
+
+  it('defaults to story points so existing projects keep their behaviour', async () => {
+    const settings = await ProjectStandupSettings.create(base())
+
+    expect(settings.estimationUnit).toBe('story_points')
+  })
+
+  it('stores hours through findOneAndUpdate', async () => {
+    const updated = (await ProjectStandupSettings.findOneAndUpdate(
+      { project: ids.project },
+      { $set: { ...base(), estimationUnit: 'hours' } },
+      { new: true, upsert: true, runValidators: true }
+    ).lean()) as IProjectStandupSettings | null
+
+    expect(updated?.estimationUnit).toBe('hours')
+  })
+
+  it('rejects an unknown unit on the update path', async () => {
+    await expect(
+      ProjectStandupSettings.findOneAndUpdate(
+        { project: ids.project },
+        { $set: { ...base(), estimationUnit: 'days' } },
+        { new: true, upsert: true, runValidators: true }
+      )
+    ).rejects.toThrow(/estimationUnit/)
+  })
+})

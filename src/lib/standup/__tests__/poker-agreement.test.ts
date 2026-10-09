@@ -91,6 +91,8 @@ describe('describeAgreement', () => {
     // 8 and 16 are adjacent on powers-of-two but three cards apart on
     // Fibonacci — the deck decides, not the numbers.
     expect(describeAgreement('powers_of_two', { min: 8, max: 16, numericCount: 3 }).key).toBe('near')
-    expect(describeAgreement('hours', { min: 8, max: 16, numericCount: 3 }).key).toBe('near')
+    // The hours deck deals 12 between them, so there they are two cards apart.
+    expect(describeAgreement('hours', { min: 8, max: 16, numericCount: 3 }).key).toBe('some')
+    expect(describeAgreement('hours', { min: 4, max: 6, numericCount: 3 }).key).toBe('near')
   })
 })

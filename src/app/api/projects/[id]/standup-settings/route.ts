@@ -14,6 +14,7 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { auditSnapshot, recordAudit } from '@/lib/standup/audit'
 import { listUnattendedCeremonies } from '@/lib/standup/ceremonies'
 import { StandupError } from '@/lib/standup/errors'
+import { ESTIMATE_UNITS } from '@/lib/standup/estimates'
 import { hoursToMinutes, minutesToHours } from '@/lib/standup/minutes'
 import { ok, readJson, withStandupPermission } from '@/lib/standup/route-helpers'
 
@@ -27,7 +28,8 @@ const AUDITED_FIELDS = [
   'carryForwardNoteThreshold',
   'allowSelfSelect',
   'blockedTasksConsumeCapacity',
-  'ceremoniesConsumeCapacity'
+  'ceremoniesConsumeCapacity',
+  'estimationUnit'
 ] as const
 
 export const GET = withStandupPermission(
@@ -69,6 +71,13 @@ export const PUT = withStandupPermission(
       )
     }
 
+    if (body.estimationUnit !== undefined && !ESTIMATE_UNITS.includes(body.estimationUnit)) {
+      throw new StandupError(
+        'VALIDATION_FAILED',
+        `Estimation unit must be one of ${ESTIMATE_UNITS.join(', ')}.`
+      )
+    }
+
     if (body.standupLocalTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.standupLocalTime)) {
       throw new StandupError('VALIDATION_FAILED', 'Stand-up time must be in HH:mm format.')
     }
@@ -100,6 +109,7 @@ export const PUT = withStandupPermission(
       'blockedTasksConsumeCapacity',
       'requireOverAllocationAck',
       'ceremoniesConsumeCapacity',
+      'estimationUnit',
       'pointsToHours',
       'notificationSwitches'
     ]) {
@@ -144,6 +154,9 @@ function serialise(settings: any) {
     project: settings.project?.toString(),
     organization: settings.organization?.toString(),
     defaultFacilitator: settings.defaultFacilitator?.toString(),
+    // Lean reads skip schema defaults, and documents saved before the unit
+    // existed have none — the screen would show neither option selected.
+    estimationUnit: settings.estimationUnit ?? 'story_points',
     // Read-only display conveniences (§17.1).
     underToleranceHours: minutesToHours(settings.underToleranceMinutes ?? 15),
     overToleranceHours: minutesToHours(settings.overToleranceMinutes ?? 15)
