@@ -20,7 +20,13 @@ import { ChevronDown, ChevronRight, Download, Loader2 } from 'lucide-react'
 import { PlanAvatar, PlanButton } from '@/components/standup/planning/ui'
 import { PokerBadge, PokerDialogShell, pokerPanelClass } from '@/components/standup/poker/ui'
 import { useNotify } from '@/lib/notify'
-import { describeAgreement, type DeckType } from '@/lib/standup/poker'
+import {
+  abstentionOf,
+  convertedHours,
+  describeAgreement,
+  formatEstimate,
+  type DeckType
+} from '@/lib/standup/poker'
 import { cn } from '@/lib/utils'
 
 interface ResultVote {
@@ -109,11 +115,17 @@ export function PokerResultsModal({
     }
   }, [open, sessionId, notify])
 
-  const unit = data?.estimationUnit === 'hours' ? 'h' : ' pts'
+  const estimationUnit = data?.estimationUnit ?? 'story_points'
+  const unit = estimationUnit === 'hours' ? 'h' : ' pts'
   const toHours = useCallback(
     (value: number) =>
       data?.estimationUnit === 'story_points' ? value * (data?.pointsToHours ?? 0) : value,
     [data?.estimationUnit, data?.pointsToHours]
+  )
+  /** `null` under hours: the value already is the time, so there is nothing to convert. */
+  const conversionOf = useCallback(
+    (value: number) => convertedHours(value, estimationUnit, data?.pointsToHours ?? 0),
+    [estimationUnit, data?.pointsToHours]
   )
 
   const estimated = useMemo(
@@ -125,11 +137,10 @@ export function PokerResultsModal({
     const points = estimated.reduce((sum, task) => sum + (task.finalValue ?? 0), 0)
     return {
       points,
-      hours: toHours(points),
       consensus: estimated.filter((task) => task.consensusReached).length,
       spread: estimated.filter((task) => !task.consensusReached).length
     }
-  }, [estimated, toHours])
+  }, [estimated])
 
   const exportCsv = () => {
     const rows = [
@@ -197,11 +208,13 @@ export function PokerResultsModal({
     >
       {/* Summary band — the three numbers a PM reads before any single row. */}
       <div className="flex shrink-0 flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--plan-border)] bg-[var(--plan-raised)] px-5 py-4 sm:px-7">
-        <SummaryItem label="Total estimate" value={`${totals.points}${unit}`} />
         <SummaryItem
-          label="Converted time"
-          value={`≈ ${totals.hours.toFixed(1).replace(/\.0$/, '')} hours`}
+          label="Total estimate"
+          value={formatEstimate(totals.points, estimationUnit)}
         />
+        {conversionOf(totals.points) && (
+          <SummaryItem label="Converted time" value={conversionOf(totals.points)!} />
+        )}
         <div className="flex min-w-0 flex-col gap-1.5">
           <span className="apple-type-caption font-semibold uppercase tracking-[0.06em] text-[var(--plan-muted)]">
             Alignment
@@ -253,7 +266,7 @@ export function PokerResultsModal({
                   onToggle={() =>
                     setExpandedTaskId((current) => (current === task.taskId ? null : task.taskId))
                   }
-                  toHours={toHours}
+                  conversionOf={conversionOf}
                 />
               ))}
             </ul>
@@ -284,7 +297,7 @@ function ResultRow({
   deckType,
   expanded,
   onToggle,
-  toHours
+  conversionOf
 }: {
   task: ResultTask
   unit: string
@@ -292,8 +305,9 @@ function ResultRow({
   deckType: DeckType
   expanded: boolean
   onToggle: () => void
-  toHours: (value: number) => number
+  conversionOf: (value: number) => string | null
 }) {
+  const conversion = conversionOf(task.finalValue ?? 0)
   // The same reading the reveal screen shows, from the same rule — these two
   // screens used to disagree about the same round because each had its own
   // threshold on `max - min`.
@@ -351,10 +365,13 @@ function ResultRow({
         <span className="flex w-[124px] shrink-0 items-center justify-end gap-2.5">
           <span className="flex h-[34px] min-w-[34px] items-center justify-center rounded-[var(--apple-radius-sm)] border border-[var(--plan-accent)] bg-[var(--plan-info-bg)] px-2 font-bold tabular-nums text-[var(--plan-accent)]">
             {task.finalValue}
+            {unit === 'h' && 'h'}
           </span>
-          <span className="apple-type-footnote tabular-nums text-[var(--plan-muted)]">
-            ≈ {toHours(task.finalValue ?? 0).toFixed(1).replace(/\.0$/, '')}h
-          </span>
+          {conversion && (
+            <span className="apple-type-footnote tabular-nums text-[var(--plan-muted)]">
+              {conversion}
+            </span>
+          )}
         </span>
       </button>
 
@@ -407,12 +424,20 @@ function ResultRow({
                       vote.isOutlier ? 'text-[var(--plan-danger)]' : 'text-[var(--plan-text)]'
                     )}
                   >
-                    <span className="apple-type-callout font-bold tabular-nums">{vote.card}</span>
-                    {vote.isOutlier && (
+                    <span className="apple-type-callout font-bold tabular-nums">
+                      {/* The raw card for coffee is the word "coffee"; the
+                          reveal screen shows the cup, so this does too. */}
+                      {vote.card === 'coffee' ? '☕' : vote.card}
+                    </span>
+                    {vote.isOutlier ? (
                       <span className="text-[9px] font-bold uppercase tracking-[0.06em]">
                         Outlier
                       </span>
-                    )}
+                    ) : abstentionOf(vote.card) ? (
+                      <span className="text-[9px] font-bold uppercase tracking-[0.06em] text-[var(--plan-muted)]">
+                        {abstentionOf(vote.card) === 'unsure' ? 'Unsure' : 'Break'}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               ))}

@@ -28,7 +28,10 @@ import {
 } from '@/components/standup/poker/ui'
 import { useNotify } from '@/lib/notify'
 import {
+  abstentionOf,
+  convertedHours,
   describeAgreement,
+  formatEstimate,
   resolveVisibleTask,
   type Agreement,
   type DeckType
@@ -92,6 +95,8 @@ interface RevealedVote {
 }
 
 interface RevealState {
+  /** The task these votes were cast on — stamped client-side when the reveal arrives. */
+  taskId: string
   round?: number
   spread: number | null
   min: number | null
@@ -169,7 +174,11 @@ export function PokerModal({
     Record<string, { title?: string | null; displayId?: string | null; description?: string | null }>
   >({})
   const [descriptionOpen, setDescriptionOpen] = useState(false)
-  const [reveal, setReveal] = useState<RevealState | null>(null)
+  const [storedReveal, setReveal] = useState<RevealState | null>(null)
+  // A reveal is only ever shown on the task it was fetched for. Polls and the
+  // finalize response race when the round moves on, and a reveal that landed
+  // for the previous task used to be rendered — and preselected — on the next.
+  const reveal = storedReveal && storedReveal.taskId === taskId ? storedReveal : null
   const [finalValue, setFinalValue] = useState('')
   const [busy, setBusy] = useState(false)
   const [serverCurrentTask, setServerCurrentTask] = useState<string | null>(null)
@@ -179,6 +188,32 @@ export function PokerModal({
   // from — the poll below does it instead. This guards against calling reveal
   // twice for the same round once every poller notices it is ready.
   const autoRevealedForRef = useRef<string | null>(null)
+  /** The latest voting round any response has reported for the task on screen. */
+  const seenRoundRef = useRef<{ taskId: string; round: number } | null>(null)
+
+  /**
+   * A revote opens a new round on the same task. Votes are stored per round,
+   * so whatever this viewer cast last round no longer counts — but only the
+   * facilitator's own screen used to forget it. Everyone else kept it as "your
+   * vote", and picking the same card again left Confirm disabled: they could
+   * not vote at all unless they changed their answer.
+   *
+   * Fed from every response that names a round (the poll, the reveal, the
+   * viewer's own vote), because a quick round can open and reveal between two
+   * polls and the poll alone would never see it.
+   */
+  //
+  // Only the cast vote is cleared. A card the viewer is browsing to right now
+  // is left alone: the poll can land a few seconds after the revote, and
+  // wiping a pick made in that gap made people choose again for no reason.
+  const noteRound = (forTask: string, round: unknown) => {
+    if (typeof round !== 'number') return
+    const previous = seenRoundRef.current
+    if (previous && previous.taskId === forTask && previous.round !== round) {
+      setSelected(null)
+    }
+    seenRoundRef.current = { taskId: forTask, round }
+  }
 
   const task = queue.find((entry) => entry.taskId === taskId)
   // Falls back to the already-cast vote when nothing new has been browsed to
@@ -238,10 +273,24 @@ export function PokerModal({
   // `autoRevealOnAllVoted` fire, or who reopened the modal on an
   // already-revealed task, learns about the reveal from the poll instead and
   // would otherwise be left with nothing picked and Set estimate disabled.
+  //
+  // Seeded once per task and round, never merely "when empty": an empty check
+  // let a previous round's value survive into the next one — a revote kept the
+  // old median instead of the new, and a task where nobody voted a number
+  // offered the previous task's estimate as one click away from being saved.
+  // A facilitator's own edit still stands, since it does not change the key.
+  const seededForRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!reveal) return
+    if (!reveal) {
+      seededForRef.current = null
+      setFinalValue('')
+      return
+    }
+    const key = `${reveal.taskId}:${reveal.round ?? 1}`
+    if (seededForRef.current === key) return
+    seededForRef.current = key
     const suggested = reveal.suggestedValue ?? reveal.median
-    if (suggested != null) setFinalValue((current) => (current === '' ? String(suggested) : current))
+    setFinalValue(suggested != null ? String(suggested) : '')
   }, [reveal])
 
   // A Back/Next preview is only ever meaningful relative to the live task at
@@ -330,6 +379,10 @@ export function PokerModal({
           )
           if (revealResponse.ok) {
             const revealPayload = await revealResponse.json()
+            // A poll started for the previous task can land after the round
+            // has moved on. Applying it would put that task's reveal — and its
+            // preselected estimate — back on the screen of the next one.
+            if (cancelled) return
             // Replace, never merely set-if-null: a re-vote (`finalize({
             // revote: true })`) puts the same task back into `voting` without
             // changing `taskId`, so `revealed: false` (or a new `round`) must
@@ -337,8 +390,12 @@ export function PokerModal({
             // is stuck looking at round 1's reveal forever, with the card grid
             // (rendered under `!reveal`) never coming back (Critical 2).
             if (revealPayload?.data?.revealed) {
+              const forTask = taskId
+              noteRound(forTask, revealPayload.data.round)
               setReveal((current) =>
-                current && current.round === revealPayload.data.round ? current : revealPayload.data
+                current && current.taskId === forTask && current.round === revealPayload.data.round
+                  ? current
+                  : { ...revealPayload.data, taskId: forTask }
               )
             } else {
               setReveal((current) => (current === null ? current : null))
@@ -351,6 +408,8 @@ export function PokerModal({
         // without it their "Reveal" control never appears at all.
         if (session.progress) {
           const { voted, expected, round, votedVoterIds: castBy } = session.progress
+
+          if (String(session.currentTask) === taskId) noteRound(taskId, round)
           setProgress((current) =>
             current && current.voted === voted && current.expected === expected
               ? current
@@ -427,8 +486,15 @@ export function PokerModal({
     setBusy(true)
     try {
       const data = await post('vote', { card })
+      // Noted before re-asserting the pick: if this vote is the first this
+      // screen has heard of a new round, noteRound clears the old one.
+      noteRound(taskId, data.round)
+      setSelected(card)
       setCandidate(null)
       setProgress({ voted: data.voted, expected: data.expected })
+      // Without this the footer read "1 of 3 voted" beside "Waiting for 3
+      // people" until the next poll, still counting the voter themselves.
+      if (Array.isArray(data.votedIds) && data.votedIds.length) setVotedVoterIds(data.votedIds)
       if (data.readyToReveal && data.autoReveal && isFacilitator) await doReveal()
     } catch (error) {
       setSelected(null)
@@ -444,9 +510,11 @@ export function PokerModal({
   const doReveal = async () => {
     setBusy(true)
     try {
+      const forTask = taskId
       const data = await post('reveal')
-      setReveal(data)
-      if (data.suggestedValue != null) setFinalValue(String(data.suggestedValue))
+      noteRound(forTask, data.round)
+      // The seeding effect above preselects the suggested value from this.
+      setReveal({ ...data, taskId: forTask })
     } catch (error) {
       notify.error({
         title: 'Could not reveal the votes',
@@ -480,8 +548,19 @@ export function PokerModal({
       notify.success({ title: `${task?.key ?? 'Task'} estimated` })
       onEstimated()
 
-      if (data.nextTaskId) setTaskId(data.nextTaskId)
-      else onOpenChange(false)
+      if (data.nextTaskId) {
+        // Record the move locally before the next poll confirms it. The last
+        // poll still names this task as current, and the visible-task rule
+        // below would otherwise bounce the screen straight back to it.
+        const estimatedTask = taskId
+        setServerCurrentTask(data.nextTaskId)
+        setLiveQueue((current) =>
+          current.map((entry) =>
+            entry.taskId === estimatedTask ? { ...entry, status: 'estimated' } : entry
+          )
+        )
+        setTaskId(data.nextTaskId)
+      } else onOpenChange(false)
     } catch (error) {
       notify.error({
         title: 'Could not set the estimate',
@@ -492,11 +571,27 @@ export function PokerModal({
     }
   }
 
-  /** Points become hours; hours are already hours. */
-  const toHours = useCallback(
-    (value: number) => (estimationUnit === 'story_points' ? value * pointsToHours : value),
+  /** "≈ 16 hours" beside a points value; `null` under hours, which need no conversion. */
+  const conversionOf = useCallback(
+    (value: number) => convertedHours(value, estimationUnit, pointsToHours),
     [estimationUnit, pointsToHours]
   )
+
+  /** The "Your estimate" line under the card fan. */
+  const candidateSummary = (() => {
+    if (effectiveCandidate == null) return 'Not chosen yet'
+    if (typeof effectiveCandidate === 'number') {
+      const conversion = conversionOf(effectiveCandidate)
+      const value = formatEstimate(effectiveCandidate, estimationUnit)
+      return conversion ? `${value} · ${conversion}` : value
+    }
+    // '?' and coffee are choices too. Reporting them as "Not chosen yet" told a
+    // voter who had picked one that nothing had happened.
+    const abstention = abstentionOf(effectiveCandidate)
+    if (abstention === 'unsure') return 'Unsure — no number from you this round'
+    if (abstention === 'break') return 'Asking the room for a break'
+    return String(effectiveCandidate)
+  })()
 
   // The quick-pick row only offers numeric deck values — '?' and 'coffee'
   // aren't estimates, so they'd have nothing sensible to fill into the input.
@@ -574,9 +669,11 @@ export function PokerModal({
             <div className="flex min-w-0 flex-wrap items-center gap-2.5">
               {agreement && <PokerBadge tone={agreement.tone}>{agreement.label}</PokerBadge>}
               <span className="apple-type-footnote text-[var(--plan-muted)]">
-                {isFacilitator
-                  ? 'The median is preselected as the final estimate.'
-                  : 'Waiting for the facilitator to set the estimate.'}
+                {!isFacilitator
+                  ? 'Waiting for the facilitator to set the estimate.'
+                  : reveal.median == null
+                    ? 'Nobody voted a number. Enter the final estimate, or revote.'
+                    : 'The median is preselected as the final estimate.'}
               </span>
             </div>
             {isFacilitator && (
@@ -587,7 +684,9 @@ export function PokerModal({
                 </PlanButton>
                 <PlanButton tone="primary" onClick={setEstimate} disabled={busy || !hasRevealedValue}>
                   {busy ? <Loader2 className="animate-spin" /> : <Check />}
-                  {hasRevealedValue ? `Set estimate · ${finalValue}` : 'Set estimate'}
+                  {hasRevealedValue
+                    ? `Set estimate · ${formatEstimate(revealedValue, estimationUnit)}`
+                    : 'Set estimate'}
                 </PlanButton>
               </div>
             )}
@@ -680,7 +779,7 @@ export function PokerModal({
             finalValue={finalValue}
             onPickFinal={setFinalValue}
             estimationUnit={estimationUnit}
-            toHours={toHours}
+            conversionOf={conversionOf}
             agreement={agreement}
             outlierNames={outlierNames}
             description={displayDetails.description}
@@ -731,10 +830,11 @@ export function PokerModal({
                         <span className="apple-type-footnote text-[var(--plan-muted)]">
                           Your estimate
                         </span>
-                        <span className="apple-type-subheadline font-medium text-[var(--plan-text)]">
-                          {typeof effectiveCandidate === 'number'
-                            ? `≈ ${toHours(effectiveCandidate).toFixed(1).replace(/\.0$/, '')} hours`
-                            : 'Not chosen yet'}
+                        <span
+                          data-testid="poker-candidate-summary"
+                          className="apple-type-subheadline font-medium text-[var(--plan-text)]"
+                        >
+                          {candidateSummary}
                         </span>
                       </div>
                     </div>
@@ -969,7 +1069,7 @@ function RevealScreen({
   finalValue,
   onPickFinal,
   estimationUnit,
-  toHours,
+  conversionOf,
   agreement,
   outlierNames,
   description,
@@ -982,7 +1082,7 @@ function RevealScreen({
   finalValue: string
   onPickFinal: (value: string) => void
   estimationUnit: 'story_points' | 'hours'
-  toHours: (value: number) => number
+  conversionOf: (value: number) => string | null
   agreement: Agreement | null
   outlierNames: string[]
   description: string | null
@@ -992,6 +1092,14 @@ function RevealScreen({
   const selectedValue = Number(finalValue)
   const hasSelectedValue = Number.isFinite(selectedValue) && selectedValue > 0
   const unit = estimationUnit === 'story_points' ? 'story points' : 'hours'
+  const conversion = hasSelectedValue ? conversionOf(selectedValue) : null
+
+  // Coffee is a request, not just a missing number: the room should see who
+  // asked for a pause before it carries on to the next task.
+  const breakNames = reveal.votes
+    .filter((entry) => abstentionOf(entry.card) === 'break')
+    .map((entry) => entry.voterName ?? 'Someone')
+  const unsureCount = reveal.votes.filter((entry) => abstentionOf(entry.card) === 'unsure').length
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
@@ -1007,11 +1115,31 @@ function RevealScreen({
                 ` · ${outlierNames.length} ${
                   outlierNames.length === 1 ? 'estimate sits' : 'estimates sit'
                 } outside the central range`}
-              {reveal.abstainCount > 0 && ` · ${reveal.abstainCount} did not vote a number`}
+              {unsureCount > 0 && ` · ${unsureCount} unsure`}
             </p>
           </div>
           {agreement && <PokerBadge tone={agreement.tone}>{agreement.label}</PokerBadge>}
         </div>
+
+        {breakNames.length > 0 && (
+          <div
+            role="status"
+            data-testid="poker-break-request"
+            className="flex items-center gap-2.5 rounded-[var(--apple-radius-sm)] border border-[var(--plan-warning)] bg-[var(--plan-warning-bg)] px-3 py-2.5"
+          >
+            <span aria-hidden="true" className="text-[18px] leading-none">
+              ☕
+            </span>
+            <span className="apple-type-footnote text-[var(--plan-text)]">
+              <span className="font-semibold">
+                {breakNames.length === 1
+                  ? `${breakNames[0]} asked for a break.`
+                  : `${breakNames.length} people asked for a break.`}
+              </span>{' '}
+              Consider pausing before the next task.
+            </span>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {reveal.votes.map((entry, index) => (
@@ -1051,7 +1179,15 @@ function RevealScreen({
                       entry.isOutlier ? 'text-[var(--plan-danger)]' : 'text-[var(--plan-muted)]'
                     )}
                   >
-                    {entry.isOutlier ? 'Outlier' : entry.value === null ? 'Abstained' : 'In range'}
+                    {entry.isOutlier
+                      ? 'Outlier'
+                      : abstentionOf(entry.card) === 'unsure'
+                        ? 'Unsure'
+                        : abstentionOf(entry.card) === 'break'
+                          ? 'Wants a break'
+                          : entry.value === null
+                            ? 'Abstained'
+                            : 'In range'}
                   </span>
                 </div>
               </div>
@@ -1168,9 +1304,12 @@ function RevealScreen({
                 />
                 <span className="apple-type-footnote truncate text-[var(--plan-muted)]">{unit}</span>
               </span>
-              {hasSelectedValue && (
-                <span className="apple-type-subheadline shrink-0 font-semibold tabular-nums text-[var(--plan-text)]">
-                  ≈ {toHours(selectedValue).toFixed(1).replace(/\.0$/, '')} hours
+              {conversion && (
+                <span
+                  data-testid="poker-final-conversion"
+                  className="apple-type-subheadline shrink-0 font-semibold tabular-nums text-[var(--plan-text)]"
+                >
+                  {conversion}
                 </span>
               )}
             </div>

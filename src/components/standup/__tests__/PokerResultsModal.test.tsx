@@ -102,7 +102,7 @@ describe('PokerResultsModal', () => {
     renderResults()
 
     // 8 + 5 = 13 points, at 4 hours a point.
-    await waitFor(() => expect(screen.getByText('13 pts')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('13 points')).toBeInTheDocument())
     expect(screen.getByText('≈ 52 hours')).toBeInTheDocument()
     expect(screen.getByText('1 consensus')).toBeInTheDocument()
     expect(screen.getByText('1 spread')).toBeInTheDocument()
@@ -173,5 +173,69 @@ describe('PokerResultsModal', () => {
     expect(click).toHaveBeenCalled()
 
     click.mockRestore()
+  })
+})
+
+describe('PokerResultsModal — an hours round', () => {
+  const originalFetch = global.fetch
+
+  const hoursResults = {
+    estimationUnit: 'hours' as const,
+    pointsToHours: 4,
+    participantCount: 3,
+    deckType: 'hours' as const,
+    tasks: [
+      {
+        ...results.tasks[0],
+        finalValue: 4,
+        min: 4,
+        max: 4,
+        median: 4,
+        votes: [
+          { voterId: 'u1', voterName: 'Kasun', card: 4, value: 4, isOutlier: false },
+          { voterId: 'u2', voterName: 'Maya', card: '?', value: null, isOutlier: false },
+          { voterId: 'u3', voterName: 'Iris', card: 'coffee', value: null, isOutlier: false }
+        ]
+      },
+      { ...results.tasks[1], finalValue: 6, min: 6, max: 6, median: 6, votes: [] }
+    ]
+  }
+
+  beforeEach(() => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ data: hoursResults }) })
+    ) as any
+  })
+
+  afterEach(() => {
+    global.fetch = originalFetch
+  })
+
+  it('totals in hours as voted, with no conversion and no multiplier', async () => {
+    renderResults()
+
+    // 4h + 6h. At the session's 4h-per-point factor a multiplied total would be 40.
+    await waitFor(() => expect(screen.getByText('10 hours')).toBeInTheDocument())
+    expect(screen.queryByText('Converted time')).not.toBeInTheDocument()
+    expect(screen.queryByText(/≈/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/40/)).not.toBeInTheDocument()
+  })
+
+  it('shows each final estimate in hours', async () => {
+    renderResults()
+
+    await waitFor(() => expect(screen.getByText('Add SSO to the workspace')).toBeInTheDocument())
+    const row = screen.getByText('Create audit log export').closest('button') as HTMLElement
+    expect(within(row).getByText('6h')).toBeInTheDocument()
+  })
+
+  it('shows the coffee card as a cup and names both abstentions', async () => {
+    renderResults()
+
+    await waitFor(() => expect(screen.getByText('Per-voter breakdown')).toBeInTheDocument())
+    expect(screen.getByText('☕')).toBeInTheDocument()
+    expect(screen.queryByText('coffee')).not.toBeInTheDocument()
+    expect(screen.getByText('Unsure')).toBeInTheDocument()
+    expect(screen.getByText('Break')).toBeInTheDocument()
   })
 })

@@ -617,7 +617,7 @@ describe('PokerModal — reveal layout (votes grid, median stat, quick-pick esti
     const input = screen.getByLabelText('Final estimate') as HTMLInputElement
     await waitFor(() => expect(input.value).toBe('3'))
     expect(screen.getByRole('button', { name: '3' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Set estimate · 3' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Set estimate · 3 points' })).toBeEnabled()
 
     const chip = screen.getByRole('button', { name: '5' })
     expect(chip).toHaveAttribute('aria-pressed', 'false')
@@ -626,7 +626,7 @@ describe('PokerModal — reveal layout (votes grid, median stat, quick-pick esti
 
     expect(chip).toHaveAttribute('aria-pressed', 'true')
     expect(input.value).toBe('5')
-    expect(screen.getByRole('button', { name: 'Set estimate · 5' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Set estimate · 5 points' })).toBeEnabled()
   })
 
   it('still accepts an off-deck estimate typed into the field (E16)', async () => {
@@ -644,7 +644,7 @@ describe('PokerModal — reveal layout (votes grid, median stat, quick-pick esti
     expect(input.value).toBe('6.5')
     // No deck chip claims it, and the footer action carries it regardless.
     expect(screen.getByRole('button', { name: '5' })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('button', { name: 'Set estimate · 6.5' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Set estimate · 6.5 points' })).toBeEnabled()
   })
 })
 
@@ -726,5 +726,508 @@ describe('PokerModal — Back/Next task preview', () => {
       interval: 250
     })
     expect(screen.queryByText('(preview)')).not.toBeInTheDocument()
+  }, 10000)
+})
+
+describe('PokerModal — estimating in hours', () => {
+  const originalFetch = global.fetch
+  const hoursDeck = [0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 40, '?', 'coffee']
+
+  afterEach(() => {
+    global.fetch = originalFetch
+    jest.clearAllMocks()
+  })
+
+  function votingFetch() {
+    return jest.fn((url: string, _init?: RequestInit) => {
+      if (url.includes('/vote')) {
+        return jsonResponse({ voted: 1, expected: 2, readyToReveal: false, autoReveal: true })
+      }
+      if (url.includes('/reveal-state')) return jsonResponse({ revealed: false })
+      if (url === '/api/poker-sessions/session-1') {
+        return jsonResponse({
+          session: {
+            queue: baseQueue.map((entry) => ({ task: entry.taskId, status: 'voting', roundCount: 1 })),
+            currentTask: 't1',
+            status: 'open'
+          }
+        })
+      }
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+  }
+
+  const renderHours = (props: Partial<React.ComponentProps<typeof PokerModal>> = {}) =>
+    renderModal({
+      cards: hoursDeck,
+      deckType: 'hours',
+      estimationUnit: 'hours',
+      // A factor that would visibly inflate the number if it were applied.
+      pointsToHours: 4,
+      ...props
+    })
+
+  const summary = () => screen.getByTestId('poker-candidate-summary')
+
+  it('reads a 4 card as four hours, not sixteen', () => {
+    global.fetch = votingFetch() as any
+    renderHours()
+
+    fireEvent.click(screen.getByRole('option', { name: 'Card 4' }))
+
+    expect(summary()).toHaveTextContent(/^4 hours$/)
+    expect(summary()).not.toHaveTextContent('16')
+    expect(summary()).not.toHaveTextContent('≈')
+  })
+
+  it('reads a 6 card as six hours', () => {
+    global.fetch = votingFetch() as any
+    renderHours()
+
+    fireEvent.click(screen.getByRole('option', { name: 'Card 6' }))
+
+    expect(summary()).toHaveTextContent(/^6 hours$/)
+  })
+
+  it('reads a 1 card in the singular', () => {
+    global.fetch = votingFetch() as any
+    renderHours()
+
+    fireEvent.click(screen.getByRole('option', { name: 'Card 1' }))
+
+    expect(summary()).toHaveTextContent(/^1 hour$/)
+  })
+
+  it('offers ? and coffee on the hours deck', () => {
+    global.fetch = votingFetch() as any
+    renderHours()
+
+    expect(screen.getByRole('option', { name: 'Unsure card' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Coffee break card' })).toBeInTheDocument()
+  })
+
+  it('says what ? means once picked, and casts it as a vote', async () => {
+    const fetchMock = votingFetch()
+    global.fetch = fetchMock as any
+    renderHours()
+
+    fireEvent.click(screen.getByRole('option', { name: 'Unsure card' }))
+    expect(summary()).toHaveTextContent('Unsure')
+    expect(summary()).not.toHaveTextContent('Not chosen yet')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/poker-sessions/session-1/tasks/t1/vote',
+        expect.objectContaining({ body: JSON.stringify({ card: '?' }) })
+      )
+    )
+  })
+
+  it('says what coffee means once picked, and casts it as a vote', async () => {
+    const fetchMock = votingFetch()
+    global.fetch = fetchMock as any
+    renderHours()
+
+    fireEvent.click(screen.getByRole('option', { name: 'Coffee break card' }))
+    expect(summary()).toHaveTextContent('Asking the room for a break')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/poker-sessions/session-1/tasks/t1/vote',
+        expect.objectContaining({ body: JSON.stringify({ card: 'coffee' }) })
+      )
+    )
+  })
+
+  const hoursReveal = {
+    revealed: true,
+    round: 1,
+    spread: 4,
+    min: 4,
+    max: 8,
+    median: 6,
+    unanimous: false,
+    suggestedValue: 6,
+    abstainCount: 2,
+    votes: [
+      { voterId: 'u1', voterName: 'Kasun', card: 4, value: 4, isOutlier: false },
+      { voterId: 'u2', voterName: 'Maya', card: 8, value: 8, isOutlier: false },
+      { voterId: 'u3', voterName: 'Iris', card: '?', value: null, isOutlier: false },
+      { voterId: 'u4', voterName: 'Ravi', card: 'coffee', value: null, isOutlier: false }
+    ]
+  }
+
+  function revealedFetch() {
+    return jest.fn((url: string, _init?: RequestInit) => {
+      if (url.includes('/finalize')) return jsonResponse({ nextTaskId: null })
+      if (url.includes('/reveal-state')) return jsonResponse(hoursReveal)
+      if (url === '/api/poker-sessions/session-1') {
+        return jsonResponse({
+          session: {
+            queue: baseQueue.map((entry) => ({ task: entry.taskId, status: 'revealed', roundCount: 1 })),
+            currentTask: 't1',
+            status: 'open'
+          }
+        })
+      }
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+  }
+
+  it('preselects the 6h median and labels the action in hours, with no conversion', async () => {
+    global.fetch = revealedFetch() as any
+    renderHours({ isFacilitator: true })
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Set estimate · 6 hours' })).toBeEnabled()
+    )
+    expect(screen.getByRole('button', { name: '6' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByTestId('poker-final-conversion')).not.toBeInTheDocument()
+  })
+
+  it('sends the hours exactly as chosen when the estimate is set', async () => {
+    const fetchMock = revealedFetch()
+    global.fetch = fetchMock as any
+    renderHours({ isFacilitator: true })
+
+    const chip = await screen.findByRole('button', { name: '4' })
+    fireEvent.click(chip)
+    fireEvent.click(screen.getByRole('button', { name: 'Set estimate · 4 hours' }))
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/poker-sessions/session-1/tasks/t1/finalize',
+        expect.objectContaining({ body: JSON.stringify({ finalValue: 4 }) })
+      )
+    )
+  })
+
+  it('names the unsure and break votes, and tells the room someone wants a break', async () => {
+    global.fetch = revealedFetch() as any
+    renderHours({ isFacilitator: true })
+
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
+
+    const tiles = screen.getAllByTestId('poker-vote-tile')
+    expect(tiles[2]).toHaveTextContent('Unsure')
+    expect(tiles[3]).toHaveTextContent('Wants a break')
+    expect(screen.getByTestId('poker-break-request')).toHaveTextContent('Ravi asked for a break.')
+    expect(screen.getByText(/1 unsure/)).toBeInTheDocument()
+  })
+
+  it('keeps abstentions out of the numbers', async () => {
+    global.fetch = revealedFetch() as any
+    renderHours({ isFacilitator: true })
+
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
+
+    expect(screen.getByTestId('poker-stat-min')).toHaveTextContent('4')
+    expect(screen.getByTestId('poker-stat-median')).toHaveTextContent('6')
+    expect(screen.getByTestId('poker-stat-max')).toHaveTextContent('8')
+  })
+
+  it('shows no break banner when nobody played coffee', async () => {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes('/reveal-state')) return jsonResponse(revealedRound1)
+      return jsonResponse({
+        session: {
+          queue: baseQueue.map((entry) => ({ task: entry.taskId, status: 'revealed', roundCount: 1 })),
+          currentTask: 't1',
+          status: 'open'
+        }
+      })
+    }) as any
+    renderHours({ isFacilitator: true })
+
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
+    expect(screen.queryByTestId('poker-break-request')).not.toBeInTheDocument()
+  })
+})
+
+describe('PokerModal — estimating in story points', () => {
+  const originalFetch = global.fetch
+
+  afterEach(() => {
+    global.fetch = originalFetch
+  })
+
+  it('shows the points and what they convert to', () => {
+    global.fetch = jest.fn(() => jsonResponse({ revealed: false })) as any
+    renderModal({ pointsToHours: 4 })
+
+    fireEvent.click(screen.getByRole('option', { name: 'Card 3' }))
+
+    expect(screen.getByTestId('poker-candidate-summary')).toHaveTextContent(
+      '3 points · ≈ 12 hours'
+    )
+  })
+})
+
+describe('PokerModal — the preselected final estimate belongs to one task and round', () => {
+  const originalFetch = global.fetch
+
+  afterEach(() => {
+    global.fetch = originalFetch
+    jest.clearAllMocks()
+  })
+
+  const twoTasks = [
+    { taskId: 't1', key: 'KAN-1', title: 'Invoice model', status: 'voting' },
+    { taskId: 't2', key: 'KAN-2', title: 'Payment webhook', status: 'pending' }
+  ]
+
+  const nobodyVotedANumber = {
+    revealed: true,
+    round: 1,
+    spread: null,
+    min: null,
+    max: null,
+    median: null,
+    unanimous: false,
+    suggestedValue: null,
+    abstainCount: 2,
+    votes: [
+      { voterId: 'u1', voterName: 'Kasun', card: '?', value: null, isOutlier: false },
+      { voterId: 'u2', voterName: 'Maya', card: 'coffee', value: null, isOutlier: false }
+    ]
+  }
+
+  it("never carries the previous task's estimate into a task nobody put a number on", async () => {
+    // The live regression: setting task 1's estimate moved the round to task 2,
+    // but a poll for task 1 already in flight landed afterwards and put task 1's
+    // reveal — and its preselected 3 — back on screen. Task 2, where nobody
+    // voted a number, then offered "Set estimate · 3" one click from saving.
+    let current = 't1'
+    let t1Polls = 0
+    let releaseStaleT1: (() => void) | null = null
+
+    global.fetch = jest.fn((url: string) => {
+      if (url.endsWith('/tasks/t1/finalize')) {
+        current = 't2'
+        return jsonResponse({ nextTaskId: 't2' })
+      }
+      if (url.endsWith('/tasks/t1/reveal-state')) {
+        t1Polls += 1
+        if (t1Polls === 1) return jsonResponse(revealedRound1)
+        // Every later poll for task 1 hangs until the test releases it.
+        return new Promise((resolve) => {
+          releaseStaleT1 = () => resolve({ ok: true, json: () => Promise.resolve({ data: revealedRound1 }) })
+        })
+      }
+      if (url.endsWith('/tasks/t2/reveal-state')) return jsonResponse(nobodyVotedANumber)
+      if (url === '/api/poker-sessions/session-1') {
+        return jsonResponse({
+          session: {
+            queue: twoTasks.map((entry) => ({
+              task: entry.taskId,
+              status: entry.taskId === current ? 'revealed' : entry.taskId === 't1' ? 'estimated' : 'pending',
+              roundCount: 1
+            })),
+            currentTask: current,
+            status: 'open'
+          }
+        })
+      }
+      throw new Error(`Unexpected fetch: ${url}`)
+    }) as any
+
+    renderModal({ isFacilitator: true, queue: twoTasks })
+
+    // Task 1 reveals with 3 preselected.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Set estimate · 3 points' })).toBeEnabled()
+    )
+
+    // Let the next poll for task 1 start and hang.
+    await waitFor(() => expect(releaseStaleT1).not.toBeNull(), { timeout: 6000, interval: 100 })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set estimate · 3 points' }))
+    await waitFor(() => expect(screen.getByText('Task 2 of 2')).toBeInTheDocument())
+
+    // The stale task-1 poll now lands.
+    releaseStaleT1!()
+
+    await waitFor(() => expect(screen.getByText('No numeric votes')).toBeInTheDocument(), {
+      timeout: 6000,
+      interval: 100
+    })
+    expect((screen.getByLabelText('Final estimate') as HTMLInputElement).value).toBe('')
+    expect(screen.getByRole('button', { name: 'Set estimate' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /Set estimate · 3/ })).not.toBeInTheDocument()
+    expect(
+      screen.getByText('Nobody voted a number. Enter the final estimate, or revote.')
+    ).toBeInTheDocument()
+  }, 15000)
+
+  it("preselects the new round's median after a revote, not the old one", async () => {
+    let round = 1
+    global.fetch = jest.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith('/finalize') && String(init?.body).includes('revote')) {
+        round = 2
+        return jsonResponse({ round: 2, status: 'voting' })
+      }
+      if (url.includes('/reveal-state')) {
+        return round === 1
+          ? jsonResponse(revealedRound1)
+          : jsonResponse({ ...revealedRound1, round: 2, median: 8, suggestedValue: 8, min: 8, max: 8 })
+      }
+      if (url === '/api/poker-sessions/session-1') {
+        return jsonResponse({
+          session: {
+            queue: baseQueue.map((entry) => ({ task: entry.taskId, status: 'revealed', roundCount: round })),
+            currentTask: 't1',
+            status: 'open'
+          }
+        })
+      }
+      throw new Error(`Unexpected fetch: ${url}`)
+    }) as any
+
+    renderModal({ isFacilitator: true })
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Set estimate · 3 points' })).toBeEnabled()
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Revote/ }))
+
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Set estimate · 8 points' })).toBeEnabled(),
+      { timeout: 8000, interval: 100 }
+    )
+    expect((screen.getByLabelText('Final estimate') as HTMLInputElement).value).toBe('8')
+  }, 15000)
+
+  it('lets a voter cast the same card again after a revote', async () => {
+    // Found end to end: after a revote, a voter whose new answer matched the
+    // old one saw Confirm disabled — their round-1 vote was still held as
+    // "your vote", though round 2 had none from them.
+    let round = 1
+    let revealed = false
+    const fetchMock = jest.fn((url: string, _init?: RequestInit) => {
+      if (url.includes('/vote')) {
+        return jsonResponse({ round, voted: 1, expected: 2, readyToReveal: false, autoReveal: true })
+      }
+      if (url.includes('/reveal-state')) {
+        return revealed ? jsonResponse(revealedRound1) : jsonResponse({ revealed: false })
+      }
+      if (url === '/api/poker-sessions/session-1') {
+        return jsonResponse({
+          session: {
+            queue: baseQueue.map((entry) => ({
+              task: entry.taskId,
+              status: revealed ? 'revealed' : 'voting',
+              roundCount: round
+            })),
+            currentTask: 't1',
+            status: 'open',
+            autoRevealOnAllVoted: false,
+            // As in the live run: round 1 voted and revealed between two polls,
+            // so the poll never reported it — only the vote response did.
+            progress: round === 2 ? { round, voted: 0, expected: 2, votedVoterIds: [] } : undefined
+          }
+        })
+      }
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    global.fetch = fetchMock as any
+
+    renderModal({ isFacilitator: false })
+
+    fireEvent.click(screen.getByRole('option', { name: 'Card 5' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Update vote' })).toBeDisabled())
+
+    // Round 1 reveals, then the facilitator revotes into round 2.
+    revealed = true
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument(), {
+      timeout: 6000,
+      interval: 100
+    })
+    revealed = false
+    round = 2
+    await waitFor(() => expect(screen.getByText('Your card')).toBeInTheDocument(), {
+      timeout: 6000,
+      interval: 100
+    })
+
+    fireEvent.click(screen.getByRole('option', { name: 'Card 5' }))
+    const confirm = screen.getByRole('button', { name: 'Confirm' })
+    expect(confirm).toBeEnabled()
+    fireEvent.click(confirm)
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter(([url]) => String(url).includes('/vote'))
+      ).toHaveLength(2)
+    )
+  }, 20000)
+
+  it('keeps a pick made before the revote reaches this screen, and lets it be cast', async () => {
+    // The voter never saw the reveal — round 1 revealed and was revoted
+    // between two of their polls — and re-picked their card in that gap.
+    let round = 1
+    const fetchMock = jest.fn((url: string, _init?: RequestInit) => {
+      if (url.includes('/vote')) {
+        return jsonResponse({ round, voted: 1, expected: 2, readyToReveal: false, autoReveal: true })
+      }
+      if (url.includes('/reveal-state')) return jsonResponse({ revealed: false })
+      if (url === '/api/poker-sessions/session-1') {
+        return jsonResponse({
+          session: {
+            queue: baseQueue.map((entry) => ({ task: entry.taskId, status: 'voting', roundCount: round })),
+            currentTask: 't1',
+            status: 'open',
+            autoRevealOnAllVoted: false,
+            progress: round === 2 ? { round, voted: 0, expected: 2, votedVoterIds: [] } : undefined
+          }
+        })
+      }
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    global.fetch = fetchMock as any
+
+    renderModal({ isFacilitator: false })
+
+    fireEvent.click(screen.getByRole('option', { name: 'Card 5' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(screen.getByText('1 of 2 voted')).toBeInTheDocument())
+
+    // The revote happens server-side; this screen re-picks 5 before it knows.
+    round = 2
+    fireEvent.click(screen.getByRole('option', { name: 'Card 3' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Card 5' }))
+
+    // Once the poll reports round 2, the old vote is gone but the pick stays.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm' })).toBeEnabled(), {
+      timeout: 6000,
+      interval: 100
+    })
+    expect(screen.getByTestId('poker-candidate-summary')).toHaveTextContent('5 points')
+  }, 15000)
+
+  it("keeps the facilitator's own edit while the same round is on screen", async () => {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes('/reveal-state')) return jsonResponse(revealedRound1)
+      return jsonResponse({
+        session: {
+          queue: baseQueue.map((entry) => ({ task: entry.taskId, status: 'revealed', roundCount: 1 })),
+          currentTask: 't1',
+          status: 'open'
+        }
+      })
+    }) as any
+
+    renderModal({ isFacilitator: true })
+
+    const input = (await screen.findByLabelText('Final estimate')) as HTMLInputElement
+    await waitFor(() => expect(input.value).toBe('3'))
+    fireEvent.change(input, { target: { value: '5' } })
+
+    // Survives the next poll of the same round.
+    await new Promise((resolve) => setTimeout(resolve, 4500))
+    expect(input.value).toBe('5')
   }, 10000)
 })
