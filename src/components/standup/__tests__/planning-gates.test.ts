@@ -112,6 +112,22 @@ describe('completeGate', () => {
     expect(completeGate(input({ hasSession: false, blockers: [check('PC-1', false)] })))
       .toMatchObject({ enabled: false, reason: expect.stringMatching(/planning session/i) })
   })
+
+  // The server refuses completion over an unacknowledged advisory (PLN-7). A
+  // gate that ignored them showed Complete as ready, then failed on click.
+  it('stays closed while an advisory is unacknowledged', () => {
+    expect(completeGate(input({ unacknowledgedCount: 2 }))).toMatchObject({
+      enabled: false,
+      reason: 'Acknowledge or fix the 2 remaining advisories before completing.'
+    })
+  })
+
+  it('names blockers ahead of advisories', () => {
+    const gate = completeGate(
+      input({ blockers: [check('PC-3', false, '1 task has no estimate.')], unacknowledgedCount: 1 })
+    )
+    expect(gate.reason).toBe('PC-3: 1 task has no estimate.')
+  })
 })
 
 describe('stepStates', () => {

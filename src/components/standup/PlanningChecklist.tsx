@@ -56,6 +56,8 @@ interface Props {
   onEstimateTask: (taskId: string, hours: number) => Promise<void>
   /** Opens the task for the fixes an inline control cannot do (PC-4, PC-5). */
   onOpenTask: (taskId: string) => void
+  /** Takes a task row's Fix to the edit form. Falls back to `onOpenTask`. */
+  onFixTask?: (taskId: string) => void
   /** Scrolls to the section that fixes a check. */
   onJump?: (target: ChecklistFixTarget) => void
   busy?: boolean
@@ -120,6 +122,7 @@ export function PlanningChecklist({
   onAcknowledge,
   onEstimateTask,
   onOpenTask,
+  onFixTask,
   onJump,
   busy,
   readOnly = false
@@ -129,8 +132,17 @@ export function PlanningChecklist({
   const blocking = items.filter((item) => item.kind === 'mandatory' && !item.passed)
   const advisory = items.filter((item) => item.kind === 'advisory' && !item.passed)
   const passed = items.filter((item) => item.passed)
+  const acknowledgedCount = advisory.filter((item) => acknowledged.includes(item.checkId)).length
 
-  const rowProps = { offendingTasks, offendingMembers, onEstimateTask, onOpenTask, onJump, readOnly }
+  const rowProps = {
+    offendingTasks,
+    offendingMembers,
+    onEstimateTask,
+    onOpenTask,
+    onFixTask: onFixTask ?? onOpenTask,
+    onJump,
+    readOnly
+  }
 
   return (
     <PlanCard
@@ -153,7 +165,14 @@ export function PlanningChecklist({
         )}
 
         {advisory.length > 0 && (
-          <ChecklistGroup label={`Advisory · ${advisory.length}`} tone="warning">
+          <ChecklistGroup
+            label={
+              acknowledgedCount > 0
+                ? `Advisory · ${advisory.length} · ${acknowledgedCount} acknowledged`
+                : `Advisory · ${advisory.length}`
+            }
+            tone="warning"
+          >
             {advisory.map((item) => (
               <CheckRows
                 key={item.checkId}
@@ -239,6 +258,7 @@ interface CheckRowsProps {
   onAcknowledge?: (checkId: string, next: boolean) => void
   onEstimateTask: (taskId: string, hours: number) => Promise<void>
   onOpenTask: (taskId: string) => void
+  onFixTask: (taskId: string) => void
   onJump?: (target: ChecklistFixTarget) => void
   readOnly: boolean
 }
@@ -255,6 +275,7 @@ function CheckRows({
   onAcknowledge,
   onEstimateTask,
   onOpenTask,
+  onFixTask,
   onJump,
   readOnly
 }: CheckRowsProps) {
@@ -303,7 +324,7 @@ function CheckRows({
               (item.checkId === 'PC-3' ? (
                 <EstimateEntry task={task} onEstimateTask={onEstimateTask} />
               ) : (
-                <PlanButton size="sm" onClick={() => onOpenTask(task.id)}>Fix</PlanButton>
+                <PlanButton size="sm" onClick={() => onFixTask(task.id)}>Fix</PlanButton>
               ))}
             {acknowledge}
           </IssueRow>

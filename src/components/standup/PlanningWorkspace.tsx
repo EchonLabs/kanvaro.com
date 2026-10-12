@@ -267,6 +267,11 @@ export function PlanningWorkspace({
         if (sessionPayload.data.session?.sprintGoal !== undefined) {
           setGoal(sessionPayload.data.session.sprintGoal ?? '')
         }
+        // The session is the source of truth for acknowledgements: local state
+        // alone was wiped by any reload, including a round trip through Fix.
+        setAcknowledged(
+          (sessionPayload.data.session?.acknowledgements ?? []).map((entry: any) => entry.checkId)
+        )
       }
     } catch {
       notify.error({ title: 'Could not load the planning checklist' })
@@ -394,6 +399,16 @@ export function PlanningWorkspace({
     refresh()
   }, [refresh])
 
+  // A task opened from the checklist is edited in another tab. Coming back
+  // must show the result, or a fixed task still reads as failing.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [refresh])
+
   // Scope and members load unconditionally, not only once a session is open:
   // a voter arriving to join a round has no session in view but still needs
   // the scope map to see task titles and assignees, and the assignment board
@@ -446,6 +461,32 @@ export function PlanningWorkspace({
       })
     } finally {
       setBusy(false)
+    }
+  }
+
+  /** Ticks or un-ticks an advisory and saves it straight away (PLN-7). */
+  const toggleAcknowledged = async (checkId: string, next: boolean) => {
+    const previous = acknowledged
+    const updated = next
+      ? Array.from(new Set([...previous, checkId]))
+      : previous.filter((id) => id !== checkId)
+    setAcknowledged(updated)
+    try {
+      const response = await fetch(`/api/sprints/${sprintId}/planning-session`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acknowledgedCheckIds: updated })
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? 'Could not save the acknowledgement')
+      }
+    } catch (error) {
+      setAcknowledged(previous)
+      notify.error({
+        title: 'Could not save the acknowledgement',
+        message: error instanceof Error ? error.message : undefined
+      })
     }
   }
 
@@ -539,9 +580,19 @@ export function PlanningWorkspace({
       scopeCount: scope.length,
       items: data?.checklist.items ?? [],
       blockers: data?.checklist.blockers ?? [],
-      unpokeredCount: unpokered.length
+      unpokeredCount: unpokered.length,
+      unacknowledgedCount: (data?.checklist.items ?? []).filter(
+        (item) => item.kind === 'advisory' && !item.passed && !acknowledged.includes(item.checkId)
+      ).length
     }),
-    [session, scope.length, data?.checklist.items, data?.checklist.blockers, unpokered.length]
+    [
+      session,
+      scope.length,
+      data?.checklist.items,
+      data?.checklist.blockers,
+      unpokered.length,
+      acknowledged
+    ]
   )
 
   /**
@@ -958,13 +1009,16 @@ export function PlanningWorkspace({
           offendingTasks={data.offendingTasks}
           offendingMembers={data.offendingMembers}
           acknowledged={acknowledged}
-          onAcknowledge={(checkId, next) =>
-            setAcknowledged((current) =>
-              next ? current.concat(checkId) : current.filter((id) => id !== checkId)
-            )
-          }
+          onAcknowledge={toggleAcknowledged}
           onEstimateTask={estimateTask}
           onOpenTask={(taskId) => window.open(`/tasks/${taskId}`, '_blank')}
+          // Same tab, carrying the way back: a new tab had no history for the
+          // edit form's Back to return to, and saving sent the PM to /tasks.
+          onFixTask={(taskId) =>
+            window.location.assign(
+              `/tasks/${taskId}/edit?returnTo=${encodeURIComponent(`/sprints/${sprintId}/planning`)}`
+            )
+          }
           onJump={jumpTo}
           busy={busy}
           readOnly={readOnly}

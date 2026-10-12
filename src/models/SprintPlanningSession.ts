@@ -27,6 +27,13 @@ export interface IChecklistResult {
   acknowledgedAt?: Date
 }
 
+/** An advisory the PM has waived while the session is still open (PLN-7). */
+export interface IAdvisoryAcknowledgement {
+  checkId: string
+  acknowledgedBy: mongoose.Types.ObjectId
+  acknowledgedAt: Date
+}
+
 export interface ISprintPlanningSession extends Document {
   organization: mongoose.Types.ObjectId
   project: mongoose.Types.ObjectId
@@ -70,6 +77,12 @@ export interface ISprintPlanningSession extends Document {
   }
 
   checklistResults: IChecklistResult[]
+
+  /**
+   * Live acknowledgements. `checklistResults` is only written at completion,
+   * so ticks made before then need their own home or a reload loses them.
+   */
+  acknowledgements: IAdvisoryAcknowledgement[]
 
   createdBy: mongoose.Types.ObjectId
   completedBy?: mongoose.Types.ObjectId
@@ -154,6 +167,19 @@ const SprintPlanningSessionSchema = new Schema<ISprintPlanningSession>(
     },
 
     checklistResults: { type: [ChecklistResultSchema], default: [] },
+    acknowledgements: {
+      type: [
+        new Schema<IAdvisoryAcknowledgement>(
+          {
+            checkId: { type: String, required: true },
+            acknowledgedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+            acknowledgedAt: { type: Date, required: true }
+          },
+          { _id: false }
+        )
+      ],
+      default: []
+    },
 
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     completedBy: { type: Schema.Types.ObjectId, ref: 'User' }

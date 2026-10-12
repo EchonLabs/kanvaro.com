@@ -24,6 +24,12 @@ export interface GateInput {
   blockers: ChecklistItemView[]
   /** Tasks still needing a poker round: unlocked and not yet covered. */
   unpokeredCount: number
+  /**
+   * Failing advisories nobody has acknowledged. Completion refuses these
+   * server-side (PLN-7), so a gate that ignored them showed Complete as ready
+   * and then failed.
+   */
+  unacknowledgedCount?: number
 }
 
 export interface GateVerdict {
@@ -89,6 +95,14 @@ export function completeGate(input: GateInput): GateVerdict {
     }
   }
 
+  const unacknowledged = input.unacknowledgedCount ?? 0
+  if (unacknowledged > 0) {
+    return {
+      enabled: false,
+      reason: planning.completeNeedsAcknowledgement({ count: unacknowledged })
+    }
+  }
+
   return { enabled: true, reason: planning.completeReady() }
 }
 
@@ -104,7 +118,8 @@ export function stepStates(input: GateInput): Record<StepId, StepState> {
   const assignDone = scopeDone && passed(input.items, 'PC-8')
   const estimateDone =
     assignDone && passed(input.items, 'PC-3') && passed(input.items, 'PC-9')
-  const completeDone = estimateDone && input.blockers.length === 0
+  const completeDone =
+    estimateDone && input.blockers.length === 0 && (input.unacknowledgedCount ?? 0) === 0
 
   const order: Array<[StepId, boolean]> = [
     ['scope', scopeDone],

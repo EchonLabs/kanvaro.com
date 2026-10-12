@@ -16,6 +16,7 @@ import { logActivity } from '@/lib/activity-logger'
 import { resolveBaseUrl } from '@/lib/request-base-url'
 import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
 import { closeCarryForwardItemsForDeletedTask } from '@/lib/standup/carry-forward-service'
+import { hoursToMinutes } from '@/lib/standup/minutes'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
@@ -510,6 +511,27 @@ export async function PUT(
       currentStatus: currentTask.status,
       currentSprint: currentTask.sprint
     })
+
+    // `estimatedHours` is only a mirror of `originalEstimateMinutes`, so an edit
+    // that wrote it alone changed nothing planning reads — the checklist's Fix
+    // led here and its warning never cleared. A changed value is a manual
+    // estimate in hours, the same as the planning screen's inline entry
+    // (PLN-15). A frozen original (DAT-6) is left to the revise flow.
+    if (
+      typeof updateData.estimatedHours === 'number' &&
+      updateData.estimatedHours > 0 &&
+      updateData.estimatedHours !== currentTask.estimatedHours &&
+      !currentTask.estimateLockedAt
+    ) {
+      const minutes = hoursToMinutes(updateData.estimatedHours)
+      updateData.originalEstimateMinutes = minutes
+      updateData.remainingEstimateMinutes = minutes
+      updateData.estimateUnit = 'hours'
+      updateData.estimateValue = updateData.estimatedHours
+      updateData.estimateMethod = 'manual'
+      updateData.estimatedAt = new Date()
+      updateData.estimatedBy = userId
+    }
 
     // Handle project changes - regenerate taskNumber and displayId for new project
     if (updateData.project && updateData.project !== currentTask.project.toString()) {

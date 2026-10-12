@@ -142,6 +142,10 @@ export const standupStrings = {
     pokerReady: () => 'Every task has an assignee. Ready to estimate.',
     pokerNothingToEstimate: () => 'Every task has already been through planning poker.',
     completeReady: () => 'Every check passed. Completing takes this sprint to Planned.',
+    completeNeedsAcknowledgement: ({ count }: { count: number }) =>
+      count === 1
+        ? 'Acknowledge or fix the remaining advisory before completing.'
+        : `Acknowledge or fix the ${count} remaining advisories before completing.`,
     startBlockedNotPlanned: () =>
       'This sprint cannot start until planning is complete. Open Plan Sprint and finish the checklist.',
     startUseStartSprint: () => 'Use Start Sprint to start a sprint.',

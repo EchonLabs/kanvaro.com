@@ -109,7 +109,8 @@ export const PATCH = withSprintPermission(
 
     const before = {
       sprintGoal: session.sprintGoal,
-      participants: session.participants
+      participants: session.participants,
+      acknowledgedCheckIds: (session.acknowledgements ?? []).map((entry: any) => entry.checkId)
     }
 
     if (body.sprintGoal !== undefined) {
@@ -128,6 +129,32 @@ export const PATCH = withSprintPermission(
       session.participants = body.participantIds.map(
         (id) => new mongoose.Types.ObjectId(id)
       )
+    }
+
+    // PLN-7 — the full set of ticked advisories, so un-ticking is a write too.
+    // Kept on the open session; an acknowledgement that already exists keeps
+    // its original author and time.
+    if (Array.isArray(body.acknowledgedCheckIds)) {
+      const ids = Array.from(new Set(body.acknowledgedCheckIds))
+      if (ids.some((id) => typeof id !== 'string' || !/^PA-\d+$/.test(id))) {
+        throw new StandupError(
+          'VALIDATION_FAILED',
+          'Only advisory checks can be acknowledged.',
+          { acknowledgedCheckIds: body.acknowledgedCheckIds }
+        )
+      }
+      const now = new Date()
+      const existing = new Map(
+        (session.acknowledgements ?? []).map((entry: any) => [entry.checkId, entry])
+      )
+      session.acknowledgements = ids.map(
+        (checkId) =>
+          existing.get(checkId) ?? {
+            checkId,
+            acknowledgedBy: new mongoose.Types.ObjectId(userId),
+            acknowledgedAt: now
+          }
+      ) as any
     }
 
     // PLN-7 acknowledgements are recorded on the checklist results so they
@@ -152,7 +179,11 @@ export const PATCH = withSprintPermission(
       entityType: 'planning_session',
       entityId: session._id.toString(),
       before,
-      after: { sprintGoal: session.sprintGoal, participants: session.participants }
+      after: {
+        sprintGoal: session.sprintGoal,
+        participants: session.participants,
+        acknowledgedCheckIds: (session.acknowledgements ?? []).map((entry: any) => entry.checkId)
+      }
     })
 
     return ok({ session })
