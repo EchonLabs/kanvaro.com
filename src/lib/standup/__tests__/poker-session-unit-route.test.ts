@@ -85,7 +85,7 @@ describe('POST /api/sprints/:id/poker-sessions â€” estimation unit', () => 
     jest.resetModules()
   })
 
-  it('opens an hours session on the hours deck when the project estimates in hours', async () => {
+  it('opens an hours session on the Fibonacci deck when the project estimates in hours', async () => {
     const { POST, create } = loadRoute({ settings: { estimationUnit: 'hours', pointsToHours: 4 } })
 
     const response = await post(POST, { taskIds: ['task-1'] })
@@ -93,9 +93,9 @@ describe('POST /api/sprints/:id/poker-sessions â€” estimation unit', () => 
 
     expect(response.status).toBe(201)
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ estimationUnit: 'hours', deckType: 'hours' })
+      expect.objectContaining({ estimationUnit: 'hours', deckType: 'fibonacci' })
     )
-    expect(body.data.cards).toEqual([0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 40, '?', 'coffee'])
+    expect(body.data.cards).toEqual([1, 2, 3, 5, 8, 13, 21, '?', 'coffee'])
   })
 
   it('opens a story-points session when the project estimates in points', async () => {

@@ -141,9 +141,9 @@ describe('resolveEstimationSetup', () => {
     })
   })
 
-  it("uses the project's hours unit and deals the hours deck", () => {
+  it("uses the project's hours unit and still deals the Fibonacci deck", () => {
     expect(resolveEstimationSetup({ projectUnit: 'hours' })).toEqual({
-      deckType: 'hours',
+      deckType: 'fibonacci',
       estimationUnit: 'hours'
     })
   })
@@ -155,7 +155,7 @@ describe('resolveEstimationSetup', () => {
 
     expect(
       resolveEstimationSetup({ estimationUnit: 'hours', projectUnit: 'story_points' })
-    ).toEqual({ deckType: 'hours', estimationUnit: 'hours' })
+    ).toEqual({ deckType: 'fibonacci', estimationUnit: 'hours' })
   })
 
   it('treats the hours deck as hours even on a story-points project', () => {

@@ -69,7 +69,8 @@ export function deckCards(deckType: DeckType): Array<string | number> {
  * a 16h estimate. Hence the rules —
  *
  * - unit: the request's, else the `hours` deck's own, else the project's;
- * - deck: the request's, else the one that matches the unit;
+ * - deck: the request's, else Fibonacci — under either unit, so a team that
+ *   switches to hours keeps the cards it knows and only the meaning changes;
  * - the `hours` deck with a `story_points` unit is refused outright.
  */
 export function resolveEstimationSetup(input: {
@@ -86,7 +87,7 @@ export function resolveEstimationSetup(input: {
     })
   }
 
-  const deckType = input.deckType ?? (estimationUnit === 'hours' ? 'hours' : 'fibonacci')
+  const deckType = input.deckType ?? 'fibonacci'
   if (!DECK_TYPES.includes(deckType)) {
     throw new StandupError('VALIDATION_FAILED', `"${deckType}" is not a deck.`, {
       allowed: DECK_TYPES

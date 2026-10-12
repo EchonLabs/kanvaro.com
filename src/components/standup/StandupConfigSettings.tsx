@@ -372,7 +372,7 @@ export function StandupConfigSettings({
             onSelect={() => update('estimationUnit', 'hours')}
             title="Hours"
             summary="A card is the hours it says."
-            detail="Planning poker deals the hours deck and the agreed card is used as voted, with no conversion. Choose this if your team estimates in time."
+            detail="Planning poker deals the same Fibonacci deck and the agreed card is used as hours, with no conversion. Choose this if your team estimates in time."
           />
         </div>
         <p className="mt-3 text-[12px] text-[var(--apple-tertiary-label)]">
