@@ -421,7 +421,7 @@ export default function CreateTaskPage() {
 
       if (data.success) {
         notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
-        router.push('/tasks')
+        router.push('/backlog')
         setAttachments([])
       } else {
         notifyError({ title: 'Failed to Create Task', message: data.error || 'Failed to create task' })
@@ -581,11 +581,16 @@ export default function CreateTaskPage() {
     return categories.filter(c => c.title.toLowerCase().includes(q))
   }, [categories, categoryQuery])
 
-  const handleCategoriesUpdated = useCallback((updatedCategories: Array<{ key: string; title: string; order: number }>) => {
+  const handleCategoriesUpdated = useCallback((updatedCategories: Array<{ key: string; title: string; order: number }>, deleteInfo?: { deletedKey: string; targetKey?: string }) => {
     setCategories(updatedCategories)
-    setFormData(prev => updatedCategories.some(category => category.key === prev.category)
-      ? prev
-      : { ...prev, category: '' })
+    setFormData(prev => {
+      if (deleteInfo && (prev.category === deleteInfo.deletedKey || prev.category?.toLowerCase() === deleteInfo.deletedKey?.toLowerCase())) {
+        return { ...prev, category: deleteInfo.targetKey || '' }
+      }
+      return updatedCategories.some(category => category.key === prev.category)
+        ? prev
+        : { ...prev, category: '' }
+    })
   }, [])
 
   // Memoize filtered project members to avoid recalculating on every render

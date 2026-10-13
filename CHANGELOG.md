@@ -1,3 +1,39 @@
+## [1.46.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.1...v1.46.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* add missing timezone parameter to timer poll requests ([36d4de9](https://github.com/EchonLabs/kanvaro.com/commit/36d4de981b9b7855dc3b06b322eaa0616d427695))
+* apply category filter to task fetching in kanban board ([78586d0](https://github.com/EchonLabs/kanvaro.com/commit/78586d0a3183c56f139780ae0480962ca7e73a76))
+* validate remaining daily time against schema min session limit ([81eeed5](https://github.com/EchonLabs/kanvaro.com/commit/81eeed5d34c7722708becd61e64d88cb896d4af6))
+
+## [1.46.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.0...v1.46.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* add alphabetical sorting to missed project and assignee dropdowns ([5f717e2](https://github.com/EchonLabs/kanvaro.com/commit/5f717e291aa41c655663cea9770db15d3bf58682))
+* add client timezone support across all timer operations ([ea85c40](https://github.com/EchonLabs/kanvaro.com/commit/ea85c40d0ad27daae8c51fe4ed249a6d0581c3cf))
+* redirect to backlog page after successful task creation ([f8eb0e4](https://github.com/EchonLabs/kanvaro.com/commit/f8eb0e44300a352240c9254eac8bc25756aad953))
+
+# [1.46.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.7...v1.46.0) (2026-10-08)
+
+
+### Features
+
+* add refresh button ([a54f464](https://github.com/EchonLabs/kanvaro.com/commit/a54f46417a3c41b843366ec1933a3c3e1a96a1fa))
+* open task view and edit actions in new tab from tasks page ([6452121](https://github.com/EchonLabs/kanvaro.com/commit/645212163c759c6b5eed5a047d7eb50b92246a72))
+* preserve filters across navigation ([c94f01a](https://github.com/EchonLabs/kanvaro.com/commit/c94f01ae6045406f0c9506937056f86867cbd26c))
+
+## [1.45.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.6...v1.45.7) (2026-10-06)
+
+
+### Bug Fixes
+
+* prevent duplicate task overdue reminders ([f32c201](https://github.com/EchonLabs/kanvaro.com/commit/f32c20151908127c860d58c09e3aef171b67eeb9))
+* sync daily hours logged with client timezone in timer API ([6c948db](https://github.com/EchonLabs/kanvaro.com/commit/6c948dbbb2eeb69d4de98957fbf172a1896bfbe6))
+* update task category dropdown on delete and category migration in task forms ([dd35b8e](https://github.com/EchonLabs/kanvaro.com/commit/dd35b8eca52087d6e662c71fcd6deefa6a91599b))
+
 ## [1.45.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.5...v1.45.6) (2026-10-05)
 
 

@@ -310,6 +310,17 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     void loadCategories()
   }, [loadCategories])
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      void loadCategories()
+      void fetchTasks()
+    }
+    window.addEventListener('project-tasks-updated', handleRefresh)
+    return () => {
+      window.removeEventListener('project-tasks-updated', handleRefresh)
+    }
+  }, [loadCategories])
+
   // Tasks are already paginated and filtered from the server
   const paginatedTasks = tasks
 
@@ -807,6 +818,10 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         onClose={() => setShowCreateModal(false)}
         projectId={projectId}
         onTaskCreated={handleTaskCreated}
+        onRefreshTasks={() => {
+          loadCategories()
+          fetchTasks()
+        }}
       />
 
       <TaskCategoryManagerModal

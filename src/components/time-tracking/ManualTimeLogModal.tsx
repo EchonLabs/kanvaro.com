@@ -191,7 +191,7 @@ export function ManualTimeLogModal({
 
   const filteredTasks = useMemo(() => {
     // We now fetch tasks from the server based on search, so we display the server results directly
-    return tasks.slice().sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+    return tasks.slice().sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [tasks])
 
   const selectedTask = useMemo(() =>

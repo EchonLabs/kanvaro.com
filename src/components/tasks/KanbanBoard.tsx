@@ -107,6 +107,7 @@ export interface KanbanFilters {
   status?: string
   priority?: string
   type?: string
+  category?: string
   assignedTo?: string
   createdBy?: string
   createdAtFrom?: string
@@ -120,11 +121,12 @@ export interface KanbanBoardProps {
   onCreateTask: () => void
   onEditTask?: (task: PopulatedTask) => void
   onDeleteTask?: (taskId: string) => void
+  onViewTask?: (task: PopulatedTask) => void
 }
 
 const defaultColumns = DEFAULT_KANBAN_COLUMNS
 
-export default function KanbanBoard({ projectId, filters, onProjectChange, onCreateTask, onEditTask, onDeleteTask }: KanbanBoardProps) {
+export default function KanbanBoard({ projectId, filters, onProjectChange, onCreateTask, onEditTask, onDeleteTask, onViewTask }: KanbanBoardProps) {
   const { error: notifyError } = useNotify()
   const [project, setProject] = useState<Project | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
@@ -301,6 +303,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
       if (filters?.status && filters.status !== 'all') params.set('status', filters.status)
       if (filters?.priority && filters.priority !== 'all') params.set('priority', filters.priority)
       if (filters?.type && filters.type !== 'all') params.set('type', filters.type)
+      if (filters?.category && filters.category !== 'all') params.set('category', filters.category)
       if (filters?.assignedTo) params.set('assignedTo', filters.assignedTo)
       if (filters?.createdBy) params.set('createdBy', filters.createdBy)
       if (filters?.createdAtFrom) params.set('createdAtFrom', filters.createdAtFrom)
@@ -765,8 +768,11 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
                    getPriorityColor={getPriorityColor}
                    getTypeColor={getTypeColor}
                    onTaskClick={(task) => {
-                     // Navigate to task detail page
-                     router.push(`/tasks/${task._id}`)
+                     if (onViewTask) {
+                       onViewTask(task)
+                     } else {
+                       router.push(`/tasks/${task._id}`)
+                     }
                    }}
                    onEditTask={onEditTask}
                    onDeleteTask={onDeleteTask}

@@ -494,7 +494,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       options.push(selectedTaskDetails)
     }
 
-    options.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+    options.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
 
     // Apply smart truncation with capital letter detection
     return options.map(task => {

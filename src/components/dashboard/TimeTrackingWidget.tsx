@@ -271,7 +271,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
       const response = await fetch('/api/time-tracking/timer', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, organizationId, action })
+        body: JSON.stringify({ userId, organizationId, action, timezone: detectClientTimezone() })
       })
       const data = await response.json()
       if (!response.ok) {

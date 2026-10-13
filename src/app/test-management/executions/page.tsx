@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
@@ -94,6 +94,12 @@ export default function TestExecutionsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const { formatDate, formatTime } = useDateTime()
+
+  const filteredProjects = useMemo(() => {
+    const q = projectQuery.trim().toLowerCase()
+    const list = !q ? projects : projects.filter((p) => (p.name || '').toLowerCase().includes(q))
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
+  }, [projects, projectQuery])
 
   useEffect(() => {
     setItems([{ label: 'Test Management', href: '/test-management' }, { label: 'Test Executions' }])
@@ -226,12 +232,11 @@ export default function TestExecutionsPage() {
                     onClick={(e) => e.stopPropagation()}
                   />
                   <div className="max-h-56 overflow-y-auto">
-                    {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).length === 0 ? (
+                    {filteredProjects.length === 0 ? (
                       <div className="px-2 py-2 text-[13px] text-[var(--apple-tertiary-label)]">No matching projects</div>
-                    ) : projects
-                        .filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))
-                        .map(p => <SelectItem key={p._id} value={p._id} className="text-[13px]">{p.name}</SelectItem>)
-                    }
+                    ) : (
+                      filteredProjects.map(p => <SelectItem key={p._id} value={p._id} className="text-[13px]">{p.name}</SelectItem>)
+                    )}
                   </div>
                 </div>
               </SelectContent>

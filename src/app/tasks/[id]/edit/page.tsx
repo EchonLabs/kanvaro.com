@@ -402,13 +402,17 @@ export default function EditTaskPage() {
     })
   }, [])
 
-  const handleCategoriesUpdated = useCallback((updatedCategories: Array<{ key: string; title: string; order: number }>) => {
+  const handleCategoriesUpdated = useCallback((updatedCategories: Array<{ key: string; title: string; order: number }>, deleteInfo?: { deletedKey: string; targetKey?: string }) => {
     setCategories(updatedCategories)
-    setTask(prev => prev && updatedCategories.some(category => category.key === prev.category)
-      ? prev
-      : prev
-        ? { ...prev, category: undefined }
-        : prev)
+    setTask(prev => {
+      if (!prev) return prev
+      if (deleteInfo && (prev.category === deleteInfo.deletedKey || prev.category?.toLowerCase() === deleteInfo.deletedKey?.toLowerCase())) {
+        return { ...prev, category: deleteInfo.targetKey || undefined }
+      }
+      return updatedCategories.some(category => category.key === prev.category)
+        ? prev
+        : { ...prev, category: undefined }
+    })
   }, [])
 
   const fetchTask = useCallback(async () => {

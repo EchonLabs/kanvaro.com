@@ -340,7 +340,7 @@ export function Timer({
       const response = await fetch('/api/time-tracking/timer', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, organizationId, action: 'stop', description })
+        body: JSON.stringify({ userId, organizationId, action: 'stop', description, timezone: detectClientTimezone() })
       })
 
       const data = await response.json()

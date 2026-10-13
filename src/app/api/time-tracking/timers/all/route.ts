@@ -64,11 +64,13 @@ export async function GET(request: NextRequest) {
       .populate('task', 'title')
       .sort({ startTime: -1 })
 
+    const clientTimezone = searchParams.get('timezone') || request.headers.get('x-timezone') || undefined
+
     // Calculate current duration for each timer and perform real-time cleanup
     const timersWithDuration = []
     for (const timer of activeTimers) {
       // Check if timer should be auto-stopped
-      const autoStopResult = await enforceTimerLimitsInternal(timer)
+      const autoStopResult = await enforceTimerLimitsInternal(timer, clientTimezone)
       if (autoStopResult && autoStopResult.success) {
         // Timer was auto-stopped, skip it for the active timers list
         continue

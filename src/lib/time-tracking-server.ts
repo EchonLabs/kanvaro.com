@@ -155,6 +155,7 @@ export interface StopTimerOptions {
   reason?: StopTimerReason
   stopSettings?: EffectiveTimeTrackingSettings
   now?: Date
+  deviceTimezone?: string
 }
 
 export async function stopTimerInternal(
@@ -203,7 +204,7 @@ export async function stopTimerInternal(
       const uId = getIdString(activeTimer.user)
       const oId = getIdString(activeTimer.organization)
       if (uId && oId) {
-        const dailyHoursLogged = await getDailyHoursLogged(uId, oId)
+        const dailyHoursLogged = await getDailyHoursLogged(uId, oId, options.deviceTimezone)
         const remainingHours = Math.max(0, stopSettings.maxDailyHours - dailyHoursLogged)
         dailyRemainingMinutes = remainingHours * MINUTES_PER_HOUR
       }
@@ -339,7 +340,8 @@ export async function stopTimerInternal(
 }
 
 export async function enforceTimerLimitsInternal(
-  activeTimer: IActiveTimer
+  activeTimer: IActiveTimer,
+  deviceTimezone?: string
 ): Promise<{ success: boolean; result?: any } | null> {
   const organizationId = getIdString(activeTimer.organization)
   if (!organizationId) return null
@@ -358,7 +360,8 @@ export async function enforceTimerLimitsInternal(
       const result = await stopTimerInternal(activeTimer, {
         stopSettings,
         now,
-        reason: 'auto_max_session'
+        reason: 'auto_max_session',
+        deviceTimezone
       })
       return { success: true, result }
     }
@@ -368,7 +371,7 @@ export async function enforceTimerLimitsInternal(
   if (stopSettings.maxDailyHours && stopSettings.allowOvertime === false) {
     const userId = getIdString(activeTimer.user)
     if (userId) {
-      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId, deviceTimezone)
       const currentSessionHours = currentDuration / MINUTES_PER_HOUR
       const totalDailyHours = dailyHoursLogged + currentSessionHours
 
@@ -376,7 +379,8 @@ export async function enforceTimerLimitsInternal(
         const result = await stopTimerInternal(activeTimer, {
           stopSettings,
           now,
-          reason: 'auto_max_daily'
+          reason: 'auto_max_daily',
+          deviceTimezone
         })
         return { success: true, result }
       }

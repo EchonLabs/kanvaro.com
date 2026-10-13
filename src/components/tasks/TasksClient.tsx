@@ -40,7 +40,8 @@ import {
     Upload,
     ListTodo,
     CheckSquare,
-    ChevronDown
+    ChevronDown,
+    RefreshCw
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -84,6 +85,7 @@ type KanbanBoardComponentProps = {
     onCreateTask: () => void
     onEditTask?: (task: any) => void
     onDeleteTask?: (taskId: string) => void
+    onViewTask?: (task: any) => void
 }
 
 const KanbanBoard = dynamic<KanbanBoardComponentProps>(() => import('./KanbanBoard'), { ssr: false })
@@ -366,6 +368,7 @@ export default function TasksClient({
     const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
+    const [refreshKey, setRefreshKey] = useState(0)
     const [projectCategories, setProjectCategories] = useState<Record<string, Array<{ key: string; title: string; order: number }>>>({})
     const { statusMap: projectsWithStatuses } = useProjectKanbanStatuses()
     const { success: notifySuccess, error: notifyError } = useNotify()
@@ -458,16 +461,24 @@ export default function TasksClient({
         [hasPermission]
     )
 
-    // Fetch current user for creator checks
+    // Only update filters on mount if query parameters are explicitly provided in the URL
     useEffect(() => {
-        const q = searchParams.get('search') || ''
-        const s = searchParams.get('status') || 'all'
-        const p = searchParams.get('priority') || 'all'
-        const proj = searchParams.get('project') || 'all'
-        setSearchQuery(q)
-        setStatusFilter(s)
-        setPriorityFilter(p)
-        setProjectFilter(proj)
+        const q = searchParams.get('search')
+        const s = searchParams.get('status')
+        const p = searchParams.get('priority')
+        const proj = searchParams.get('project')
+        const type = searchParams.get('type')
+        const cat = searchParams.get('category')
+        const assigned = searchParams.get('assignedTo')
+        const created = searchParams.get('createdBy')
+        if (q !== null) setSearchQuery(q)
+        if (s !== null) setStatusFilter(s)
+        if (p !== null) setPriorityFilter(p)
+        if (proj !== null) setProjectFilter(proj)
+        if (type !== null) setTypeFilter(type)
+        if (cat !== null) setCategoryFilter(cat)
+        if (assigned !== null) setAssignedToFilter(assigned)
+        if (created !== null) setCreatedByFilter(created)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -799,6 +810,7 @@ export default function TasksClient({
 
     useEffect(() => {
         if (categoryFilter === 'all') return
+        if (categoryOptions.length === 0) return
         const isValid = categoryOptions.some(c => c.key === categoryFilter)
         if (!isValid) {
             setCategoryFilter('all')
@@ -1184,7 +1196,7 @@ const handlePageChange = (newPage: number) => {
 
     // Kanban actions
     const handleKanbanEditTask = (task: any) => {
-        router.push(`/tasks/${task._id}/edit`)
+        window.open(`/tasks/${task._id}/edit`, '_blank')
     }
 
     const handleKanbanDeleteTask = (taskId: string) => {
@@ -1228,6 +1240,11 @@ const handlePageChange = (newPage: number) => {
             setStatusUpdatingId(null)
         }
     }
+    const handleRefresh = async () => {
+        setRefreshKey((prev) => prev + 1)
+        await fetchTasks(false)
+    }
+
     const shouldShowInitialLoader = loading && tasks.length === 0
     const shouldShowInlineLoader = loading && tasks.length > 0
 
@@ -1735,18 +1752,32 @@ const handlePageChange = (newPage: number) => {
                 <p className="text-[13px] text-[var(--apple-secondary-label)] font-apple-mono">
                     {totalCount} task{totalCount !== 1 ? 's' : ''}
                 </p>
-                <ViewSwitcher
-                    value={viewMode}
-                    onChange={(v) => {
-                        setViewMode(v)
-                        if (v === 'list' || v === 'grid') {
-                            setTasks([])
-                            setPagination({})
-                            fetchTasks(true)
-                        }
-                    }}
-                    options={['list', 'grid', 'kanban']}
-                />
+                <div className="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefresh}
+                        disabled={loading}
+                        className="rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-3 py-1.5 text-[13px] font-medium text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition flex items-center gap-1.5 h-8"
+                        title="Refresh tasks"
+                    >
+                        <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+                        Refresh
+                    </Button>
+                    <ViewSwitcher
+                        value={viewMode}
+                        onChange={(v) => {
+                            setViewMode(v)
+                            if (v === 'list' || v === 'grid') {
+                                setTasks([])
+                                setPagination({})
+                                fetchTasks(true)
+                            }
+                        }}
+                        options={['list', 'grid', 'kanban']}
+                    />
+                </div>
             </div>
 
             {/* ── List View ─────────────────────────────────────────────────────── */}
@@ -1780,7 +1811,7 @@ const handlePageChange = (newPage: number) => {
                                                             target.closest('.dropdown-menu') ||
                                                             target.closest('[data-radix-popper-content-wrapper]')
                                                         ) return
-                                                        router.push(`/tasks/${task._id}`)
+                                                        window.open(`/tasks/${task._id}`, '_blank')
                                                     }}
                                                 >
                                                     {/* Left: status dot circle */}
@@ -1933,7 +1964,7 @@ const handlePageChange = (newPage: number) => {
                                                             <DropdownMenuContent align="end">
                                                                 <DropdownMenuItem onClick={(e) => {
                                                                     e.stopPropagation()
-                                                                    router.push(`/tasks/${task._id}`)
+                                                                    window.open(`/tasks/${task._id}`, '_blank')
                                                                 }}>
                                                                     <Eye className="h-4 w-4 mr-2" />
                                                                     View Task
@@ -1943,7 +1974,7 @@ const handlePageChange = (newPage: number) => {
                                                                     onClick={(e) => {
                                                                         e.stopPropagation()
                                                                         if (!canEditTask(task)) return
-                                                                        router.push(`/tasks/${task._id}/edit`)
+                                                                        window.open(`/tasks/${task._id}/edit`, '_blank')
                                                                     }}
                                                                 >
                                                                     <Edit className="h-4 w-4 mr-2" />
@@ -2006,7 +2037,7 @@ const handlePageChange = (newPage: number) => {
                                                             <DropdownMenuContent align="end">
                                                                 <DropdownMenuItem onClick={(e) => {
                                                                     e.stopPropagation()
-                                                                    router.push(`/tasks/${task._id}`)
+                                                                    window.open(`/tasks/${task._id}`, '_blank')
                                                                 }}>
                                                                     <Eye className="h-4 w-4 mr-2" />
                                                                     View Task
@@ -2016,7 +2047,7 @@ const handlePageChange = (newPage: number) => {
                                                                     onClick={(e) => {
                                                                         e.stopPropagation()
                                                                         if (!canEditTask(task)) return
-                                                                        router.push(`/tasks/${task._id}/edit`)
+                                                                        window.open(`/tasks/${task._id}/edit`, '_blank')
                                                                     }}
                                                                 >
                                                                     <Edit className="h-4 w-4 mr-2" />
@@ -2099,7 +2130,7 @@ const handlePageChange = (newPage: number) => {
                                                             target.closest('[role="menuitem"]') ||
                                                             target.closest('[data-radix-popper-content-wrapper]')
                                                         ) return
-                                                        router.push(`/tasks/${task._id}`)
+                                                        window.open(`/tasks/${task._id}`, '_blank')
                                                     }}
                                                 >
                                                     {/* Card header: title + priority badge + actions */}
@@ -2130,7 +2161,7 @@ const handlePageChange = (newPage: number) => {
                                                                 <DropdownMenuContent align="end">
                                                                     <DropdownMenuItem onClick={(e) => {
                                                                         e.stopPropagation()
-                                                                        router.push(`/tasks/${task._id}`)
+                                                                        window.open(`/tasks/${task._id}`, '_blank')
                                                                     }}>
                                                                         <Eye className="h-4 w-4 mr-2" />
                                                                         View Task
@@ -2140,7 +2171,7 @@ const handlePageChange = (newPage: number) => {
                                                                         onClick={(e) => {
                                                                             e.stopPropagation()
                                                                             if (!canEditTask(task)) return
-                                                                            router.push(`/tasks/${task._id}/edit`)
+                                                                            window.open(`/tasks/${task._id}/edit`, '_blank')
                                                                         }}
                                                                     >
                                                                         <Edit className="h-4 w-4 mr-2" />
@@ -2266,11 +2297,13 @@ const handlePageChange = (newPage: number) => {
                         <>
                             {shouldShowInlineLoader && <InlineLoader label="Refreshing board..." />}
                             <KanbanBoard
+                                key={refreshKey}
                                 projectId={projectFilter}
                                 filters={kanbanFilters}
                                 onProjectChange={setProjectFilter}
                                 onCreateTask={() => router.push('/tasks/create-new-task')}
                                 onEditTask={handleKanbanEditTask}
+                                onViewTask={(task) => window.open(`/tasks/${task._id}`, '_blank')}
                                 onDeleteTask={handleKanbanDeleteTask}
                             />
                             {tasks.length === 0 && !loading && (
