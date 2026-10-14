@@ -50,6 +50,7 @@ import {
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/lib/permissions/permission-context'
+import { isNavPathActive } from '@/lib/nav-active'
 import packageJson from '../../../package.json'
 
 interface SidebarProps {
@@ -349,17 +350,6 @@ const navigationItems = [
     permission: Permission.SETTINGS_VIEW
   }
 ]
-
-/**
- * Some nav items (e.g. `/my/standup`) point at a server redirector rather
- * than a landable URL, so the browser's actual pathname is a nested route
- * (`/my/standup/[standupId]`) that never strictly equals `child.path`.
- * A prefix match keeps those items highlighted/expanded without affecting
- * siblings whose paths are exact, landable routes.
- */
-function isNavPathActive(pathname: string, itemPath: string): boolean {
-  return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
-}
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([])

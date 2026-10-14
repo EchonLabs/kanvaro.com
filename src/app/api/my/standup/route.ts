@@ -28,7 +28,7 @@ export async function GET() {
 
   const candidates = (await Standup.find({
     organization: authResult.user.organization,
-    expectedAttendees: authResult.user.id,
+    $or: [{ expectedAttendees: authResult.user.id }, { facilitator: authResult.user.id }],
     status: { $in: PRIORITY_ORDER }
   })
     .select('status scheduledStartAt')

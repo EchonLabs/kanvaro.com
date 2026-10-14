@@ -12,6 +12,9 @@ import { standupStrings } from '@/lib/standup/strings'
 
 const OVERSIGHT_ROLES: string[] = [Role.ADMIN, Role.SUPER_ADMIN]
 
+// Resolves the caller from cookies, so it can never be prerendered.
+export const dynamic = 'force-dynamic'
+
 /**
  * UI-12. The N1 reminder's one-click destination. Resolves the caller's
  * open stand-up server-side via the same priority `GET /api/my/standup`

@@ -89,12 +89,29 @@ describe('GET /api/my/standup', () => {
   })
 
   it('returns null when the caller is not expected at any open stand-up', async () => {
-    await seedStandup({ status: 'Scheduled', expectedAttendees: [otherMember] })
+    await seedStandup({
+      status: 'Scheduled',
+      expectedAttendees: [otherMember],
+      facilitator: otherMember
+    })
 
     const response = await GET()
     const payload = await response.json()
 
     expect(payload.data.standupId).toBeNull()
+  })
+
+  it('returns a stand-up the caller facilitates without being on its team', async () => {
+    const facilitated = await seedStandup({
+      status: 'Scheduled',
+      expectedAttendees: [otherMember],
+      facilitator: caller
+    })
+
+    const response = await GET()
+    const payload = await response.json()
+
+    expect(payload.data.standupId).toBe(String(facilitated._id))
   })
 
   it('ignores a Completed stand-up entirely', async () => {

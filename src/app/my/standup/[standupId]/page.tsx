@@ -158,6 +158,14 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
 
         const memberRow = (board.members ?? []).find((m: any) => m.memberId === user.id)
         if (!memberRow) {
+          // Not an attendee. A facilitating PM lands here from the redirector;
+          // the run screen is their working view and enforces its own access.
+          if (board.projectId && board.sprintId && !cancelled) {
+            router.replace(
+              `/projects/${board.projectId}/sprints/${board.sprintId}/standups/${standupId}`
+            )
+            return
+          }
           if (!cancelled) setError(standupStrings.my.noStandup())
           return
         }

@@ -29,7 +29,11 @@ export async function findOpenStandupCandidates(input: {
 }): Promise<StandupCandidate[]> {
   const rows = (await Standup.find({
     organization: input.organizationId,
-    expectedAttendees: input.userId,
+    // A PM who facilitates a sprint's stand-up is often not on its team
+    // (`expectedAttendees` mirrors `sprint.teamMembers`), and was otherwise
+    // left with the empty state. They are routed to the run screen instead of
+    // the member view — see `MyStandupDetailPage`.
+    $or: [{ expectedAttendees: input.userId }, { facilitator: input.userId }],
     status: { $in: PRIORITY }
   })
     .select('status scheduledStartAt project sprint')
