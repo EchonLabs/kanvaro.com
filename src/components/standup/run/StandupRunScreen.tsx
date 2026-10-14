@@ -747,9 +747,15 @@ export function StandupRunScreen({
         }),
         (expectedVersion) =>
           api.changeHours({ allocationId, plannedMinutes, expectedVersion })
-      )
+      ).then(async (result) => {
+        // The optimistic edit only moves the one row. The member's capacity
+        // bar, the plan percentage, the completion checks and the variance
+        // panel are all derived server-side, so without this reload they stay
+        // at their old figures until the PM refreshes by hand.
+        if (result) await reload().catch(() => undefined)
+      })
     },
-    [api, optimistic]
+    [api, optimistic, reload]
   )
 
   const onRemove = useCallback(
