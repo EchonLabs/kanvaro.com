@@ -427,7 +427,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
       return includes
     })
     console.log('selected attendees:', selected)
-    return selected
+    return selected.sort((a, b) => `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`))
   }
 
   const getAvailableAttendees = () => {
@@ -444,7 +444,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
 
   
 
-    return available
+    return available.sort((a, b) => `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`))
   }
 
   const addDecision = () => {

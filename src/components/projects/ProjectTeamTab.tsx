@@ -423,6 +423,11 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
     const fullName = `${member.firstName} ${member.lastName}`.toLowerCase()
     return fullName.includes(normalizedSearch) || member.email.toLowerCase().includes(normalizedSearch)
   })
+  .sort((a, b) => {
+    const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+    const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+    return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+  })
   useEffect(() => {
     if (showAddMember) {
       scrollToAddMemberSection()

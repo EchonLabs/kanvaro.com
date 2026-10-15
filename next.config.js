@@ -122,7 +122,7 @@ const nextConfig = {
     // reminders, or marked missed on self-hosted deployments.
     instrumentationHook: true,
   },
-  // The stand-up scheduler is Node-only, and the Edge build must not walk into it.
+  // The stand-up scheduler and the cron scheduler (nodemailer, node-cron) are Node-only, and the Edge build must not walk into it.
   //
   // Next compiles src/instrumentation.ts for BOTH runtimes whenever the app has
   // middleware, which this one does. The `NEXT_RUNTIME !== 'nodejs'` guard in
@@ -142,7 +142,7 @@ const nextConfig = {
     if (nextRuntime === 'edge') {
       config.plugins.push(
         new webpack.IgnorePlugin({
-          resourceRegExp: /^@\/lib\/standup\/jobs\/scheduler$/,
+          resourceRegExp: /^@\/lib\/(standup\/jobs\/scheduler|cron-scheduler)$/,
         })
       )
     }

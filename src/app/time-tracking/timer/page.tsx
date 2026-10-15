@@ -29,6 +29,7 @@ import {
 import { useToast } from '@/components/ui/Toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn, focusSearchInput } from '@/lib/utils'
+import { detectClientTimezone } from '@/lib/timezone'
 
 interface Project {
   _id: string
@@ -147,7 +148,7 @@ export default function TimerPage() {
 
   const filteredProjects = projects.filter((project) =>
     project.name.toLowerCase().includes(projectSearch.toLowerCase())
-  )
+  ).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
 
   const showInitialTasksLoading = tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)
 
@@ -194,24 +195,18 @@ export default function TimerPage() {
     if (!user?.id || !user?.organization) return
 
     try {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-
+      const tz = detectClientTimezone()
       const params = new URLSearchParams({
         userId: user.id,
         organizationId: user.organization,
-        startDate: today.toISOString(),
-        endDate: tomorrow.toISOString()
+        timezone: tz
       })
 
-      const response = await fetch(`/api/time-tracking/entries?${params.toString()}`)
+      const response = await fetch(`/api/time-tracking/timer?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
-        if (data?.totals?.totalDuration) {
-          const hours = data.totals.totalDuration / 60
-          setDailyHoursLogged(hours)
+        if (typeof data?.dailyHoursLogged === 'number') {
+          setDailyHoursLogged(data.dailyHoursLogged)
         }
       }
     } catch (err) {
@@ -558,12 +553,16 @@ export default function TimerPage() {
     try {
       const params = new URLSearchParams({
         userId: effectiveUser.id,
-        organizationId: effectiveUser.organization
+        organizationId: effectiveUser.organization,
+        timezone: detectClientTimezone()
       })
       const response = await fetch(`/api/time-tracking/timer?${params.toString()}`)
       const data = await response.json()
 
       if (response.ok) {
+        if (typeof data?.dailyHoursLogged === 'number') {
+          setDailyHoursLogged(data.dailyHoursLogged)
+        }
         if (data.activeTimer === null && data.hasTimeLogged !== undefined) {
           setActiveTimerSnapshot(null)
           setLiveActiveTimer(null)
@@ -908,7 +907,7 @@ export default function TimerPage() {
                                 if (taskNumStr.includes(searchLower) || (searchNormalized !== searchLower && taskNumStr.includes(searchNormalized))) return true
                               }
                               return false
-                            }).map((task) => {
+                            }).sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true })).map((task) => {
                               const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
                               return (
                                 <SelectItem

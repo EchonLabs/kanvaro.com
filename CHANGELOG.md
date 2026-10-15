@@ -1,3 +1,292 @@
+## [1.46.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.1...v1.46.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* add missing timezone parameter to timer poll requests ([36d4de9](https://github.com/EchonLabs/kanvaro.com/commit/36d4de981b9b7855dc3b06b322eaa0616d427695))
+* apply category filter to task fetching in kanban board ([78586d0](https://github.com/EchonLabs/kanvaro.com/commit/78586d0a3183c56f139780ae0480962ca7e73a76))
+* validate remaining daily time against schema min session limit ([81eeed5](https://github.com/EchonLabs/kanvaro.com/commit/81eeed5d34c7722708becd61e64d88cb896d4af6))
+
+## [1.46.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.0...v1.46.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* add alphabetical sorting to missed project and assignee dropdowns ([5f717e2](https://github.com/EchonLabs/kanvaro.com/commit/5f717e291aa41c655663cea9770db15d3bf58682))
+* add client timezone support across all timer operations ([ea85c40](https://github.com/EchonLabs/kanvaro.com/commit/ea85c40d0ad27daae8c51fe4ed249a6d0581c3cf))
+* redirect to backlog page after successful task creation ([f8eb0e4](https://github.com/EchonLabs/kanvaro.com/commit/f8eb0e44300a352240c9254eac8bc25756aad953))
+
+# [1.46.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.7...v1.46.0) (2026-10-08)
+
+
+### Features
+
+* add refresh button ([a54f464](https://github.com/EchonLabs/kanvaro.com/commit/a54f46417a3c41b843366ec1933a3c3e1a96a1fa))
+* open task view and edit actions in new tab from tasks page ([6452121](https://github.com/EchonLabs/kanvaro.com/commit/645212163c759c6b5eed5a047d7eb50b92246a72))
+* preserve filters across navigation ([c94f01a](https://github.com/EchonLabs/kanvaro.com/commit/c94f01ae6045406f0c9506937056f86867cbd26c))
+
+## [1.45.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.6...v1.45.7) (2026-10-06)
+
+
+### Bug Fixes
+
+* prevent duplicate task overdue reminders ([f32c201](https://github.com/EchonLabs/kanvaro.com/commit/f32c20151908127c860d58c09e3aef171b67eeb9))
+* sync daily hours logged with client timezone in timer API ([6c948db](https://github.com/EchonLabs/kanvaro.com/commit/6c948dbbb2eeb69d4de98957fbf172a1896bfbe6))
+* update task category dropdown on delete and category migration in task forms ([dd35b8e](https://github.com/EchonLabs/kanvaro.com/commit/dd35b8eca52087d6e662c71fcd6deefa6a91599b))
+
+## [1.45.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.5...v1.45.6) (2026-10-05)
+
+
+### Bug Fixes
+
+* resolve daily limit reset issue with dual timezone check ([39b459e](https://github.com/EchonLabs/kanvaro.com/commit/39b459e8cbcad663d4ec1054dd7972cc41dea5f9))
+* timezone-aware daily time limit enforcement for timer and manual logs ([d751ca4](https://github.com/EchonLabs/kanvaro.com/commit/d751ca4fecd979ca15c990d004bd6076f9e36bd5))
+
+## [1.45.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.4...v1.45.5) (2026-10-02)
+
+
+### Bug Fixes
+
+* add periodic timer sync ([e173e8a](https://github.com/EchonLabs/kanvaro.com/commit/e173e8a02f9a33b2f3538a92c3628ac9ebe3c741))
+
+## [1.45.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.3...v1.45.4) (2026-10-02)
+
+
+### Bug Fixes
+
+* add alphabetical sorting with natural ordering to all project dropdowns ([63c9cc5](https://github.com/EchonLabs/kanvaro.com/commit/63c9cc57546facf319ee41df65c8144ee39ba7e1))
+* fix column visibility in "All Projects" view ([012f67e](https://github.com/EchonLabs/kanvaro.com/commit/012f67e8110f5da02df1729709d8705819115866))
+* sort dropdown options alphabetically across the application ([bc066a1](https://github.com/EchonLabs/kanvaro.com/commit/bc066a122eb1a882ec0342f221ca5db7d93bbb02))
+
+## [1.45.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.2...v1.45.3) (2026-09-30)
+
+
+### Bug Fixes
+
+* resolve TypeScript errors and missing types in CreateTaskModal ([23e4fd3](https://github.com/EchonLabs/kanvaro.com/commit/23e4fd3ede5a4a23ad95d0473ee20182b59500be))
+
+## [1.45.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.1...v1.45.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* add default task categories for new projects ([f878dfe](https://github.com/EchonLabs/kanvaro.com/commit/f878dfe9c8a2e05b14221cb9cca51feb5fa0ad35))
+* add reordering for task categories ([88bb1c7](https://github.com/EchonLabs/kanvaro.com/commit/88bb1c7f2aeadc2639145b94e1b7a2315e35f1a1))
+* add total deleted count to notification cleanup ([e514984](https://github.com/EchonLabs/kanvaro.com/commit/e51498423f0df3aae2478512f0a96bce869e178c))
+* category title display and update on deletion ([4c8a7f4](https://github.com/EchonLabs/kanvaro.com/commit/4c8a7f4143a972cea35ec5c728203aad5c29283e))
+
+## [1.45.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.45.0...v1.45.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* refine email delivery for comment mentions and replies ([5100a48](https://github.com/EchonLabs/kanvaro.com/commit/5100a486448ad9457f6c9fbbf66b604302752a07))
+* resolve flase unassign notifcation and imporve status update formating ([f2ffc41](https://github.com/EchonLabs/kanvaro.com/commit/f2ffc41d40b0c1f03dc898178cab3073df049bdb))
+
+# [1.45.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.44.0...v1.45.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* add node-cron background schedulers for all tasks ([0367a75](https://github.com/EchonLabs/kanvaro.com/commit/0367a759f04ddb3287b56ee995742607e97bf33d))
+* filter overdue task notifications by 7-day window ([36e377e](https://github.com/EchonLabs/kanvaro.com/commit/36e377eb61a572e2d47463ef10034d9c2af5dd0c))
+* kanban board ui ([c029167](https://github.com/EchonLabs/kanvaro.com/commit/c029167b1447653f3c5c24849141f3030a2a94dd))
+* update task schema for notifications ([500ea26](https://github.com/EchonLabs/kanvaro.com/commit/500ea2616240046b627357aabaf53395391e410f))
+
+
+### Features
+
+* add due-date reminder notifications ([21e16b1](https://github.com/EchonLabs/kanvaro.com/commit/21e16b178581bc0f4084409ed49cbb665fbb2b62))
+
+# [1.44.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.43.0...v1.44.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* assignee notifications and add status transition details ([9d8116e](https://github.com/EchonLabs/kanvaro.com/commit/9d8116e1633e84ad70d4a09c43704cd3fd2ace89))
+* handle unassignment and prevent duplicate task notifications ([96a1add](https://github.com/EchonLabs/kanvaro.com/commit/96a1add500ec9e4dd0c40bab160deafed3818430))
+
+
+### Features
+
+* [@mention](https://github.com/mention) notifications from general assignee alerts ([a0c9f40](https://github.com/EchonLabs/kanvaro.com/commit/a0c9f40a4606838c1aa326ab6a28b34f609fed14))
+
+# [1.43.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.4...v1.43.0) (2026-09-28)
+
+
+### Features
+
+* implement task category filtering be ([de9ab34](https://github.com/EchonLabs/kanvaro.com/commit/de9ab347039b9e773dd704a45aa30db45c34cf62))
+* implement task category management ([5bab0d2](https://github.com/EchonLabs/kanvaro.com/commit/5bab0d26801e069353cf76d6e33c62e534fd12e7))
+* implement task category management FE ([7f08cf3](https://github.com/EchonLabs/kanvaro.com/commit/7f08cf3fc65ae14bfba23f1ea7bd9e2feb56063c))
+* interfact to create, rename, delete ([526c98a](https://github.com/EchonLabs/kanvaro.com/commit/526c98a83b505ca3572a1abf2f402c559131eb4c))
+
+## [1.42.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.3...v1.42.4) (2026-09-28)
+
+
+### Bug Fixes
+
+* Kanban board functionality ([82aaa4c](https://github.com/EchonLabs/kanvaro.com/commit/82aaa4c538c8a5bbece6ca830f50d4eb35fa21a3))
+* virtualized task card spacing and height ([eaf724c](https://github.com/EchonLabs/kanvaro.com/commit/eaf724cdfd2343472147fa5d25427ec97017fe0b))
+
+## [1.42.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.2...v1.42.3) (2026-09-10)
+
+
+### Bug Fixes
+
+* showing memo instead of task title in timelogs ([4968b09](https://github.com/EchonLabs/kanvaro.com/commit/4968b0982ac6165d751eae8f4fb025aabee7b3e9))
+
+## [1.42.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.1...v1.42.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* correct timer time-logging status response ([f2d1ea9](https://github.com/EchonLabs/kanvaro.com/commit/f2d1ea91ab57bdf52b1cf5fcfcca498b88449b58))
+* document preview, requires the mammoth npm package ([887dfcd](https://github.com/EchonLabs/kanvaro.com/commit/887dfcdfb939d588c3537994b96e31afa6722587))
+* sync package lockfile ([dcc4bb2](https://github.com/EchonLabs/kanvaro.com/commit/dcc4bb29566408393d34ec5cb63b2f24b616f59b))
+* update document templates route path ([888afd3](https://github.com/EchonLabs/kanvaro.com/commit/888afd38bf7c70c80f7de7dbdc5f57edd5b49868))
+
+## [1.42.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.42.0...v1.42.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* Kanban board dropdown alphabetically ([6532def](https://github.com/EchonLabs/kanvaro.com/commit/6532def4c3dd39495567c7ea4a874346ff7d2a21))
+* sort dropdowns alphabetically ([9cc1ebe](https://github.com/EchonLabs/kanvaro.com/commit/9cc1ebe967e75779e7a6b37c37bfdd3befdfa82d))
+* update kanban board dropdown ([e75bef1](https://github.com/EchonLabs/kanvaro.com/commit/e75bef12d7ca07c3cc874afde4cf1d9e7ff8f7a2))
+
+# [1.42.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.7...v1.42.0) (2026-08-07)
+
+
+### Bug Fixes
+
+* add ClipboardList icon to enhance no test cases found message ([562296a](https://github.com/EchonLabs/kanvaro.com/commit/562296a0b03a3a3ea0b9422609dcc2567b374ddb))
+* add past time limit cutoff time to time tracking settings and update related logic ([0c4aa05](https://github.com/EchonLabs/kanvaro.com/commit/0c4aa053a3c8c6148f8176138ea9eeb988f8149b))
+* add viewport configuration to improve layout stability on Android devices ([334df76](https://github.com/EchonLabs/kanvaro.com/commit/334df76c34c30aa1a9b5c5f1ac8ab332a5ec908f))
+* enhance past date logging messages with friendly time format and error handling ([a125569](https://github.com/EchonLabs/kanvaro.com/commit/a12556942e2f3f017624c9bb9fcfa9edb1708be7))
+* enhance project selection UI with scrollable dropdown for better usability ([d68555a](https://github.com/EchonLabs/kanvaro.com/commit/d68555ac408753839f5ae61c24a85ab84fcbb0cf))
+* improve date handling for time tracking to avoid timezone issues ([3419e56](https://github.com/EchonLabs/kanvaro.com/commit/3419e56ee44be4932a1fd9e7b066b3c166146fd9))
+* improve member ID extraction logic for better robustness in team member handling ([95b6f28](https://github.com/EchonLabs/kanvaro.com/commit/95b6f2854be3d4ac4e766a888ebbd15f82a9d568))
+* remove unused focusSearchInput function and import it from utils ([9ffac70](https://github.com/EchonLabs/kanvaro.com/commit/9ffac703e87e872a4d657ffcb95004cb4be9fd80))
+* update GanttChart styles for improved header visibility and layout consistency ([6b5b5e8](https://github.com/EchonLabs/kanvaro.com/commit/6b5b5e85aad4eeb3e3be6422b501e1970c201529))
+* update pagination control to display items when tasks are present ([d6e85ac](https://github.com/EchonLabs/kanvaro.com/commit/d6e85ac70dfb55f8591b6abe1161e18989518970))
+
+
+### Features
+
+* add Manual Time Log modal and enhance time tracking permissions ([e328198](https://github.com/EchonLabs/kanvaro.com/commit/e328198e989f211b523dc24ccd33494da874e895))
+
+## [1.41.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.6...v1.41.7) (2026-07-31)
+
+
+### Bug Fixes
+
+* add max height to project selection dropdown in TimerPage ([ed9c3a8](https://github.com/EchonLabs/kanvaro.com/commit/ed9c3a86933c7e9fd64454cff718fe604f479d03))
+
+## [1.41.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.5...v1.41.6) (2026-07-31)
+
+
+### Bug Fixes
+
+* allow past dates for sprint creation and update validation messages ([1b69941](https://github.com/EchonLabs/kanvaro.com/commit/1b69941780295455c78e37df6a60442eaf9686d4))
+* enhance searchable filters by adding unfiltered options for projects, assignees, and creators in TasksClient ([e593516](https://github.com/EchonLabs/kanvaro.com/commit/e593516a4f23a096600dea3e5cd589f45beed439))
+* remove status update from task when starting sprint ([5824e7f](https://github.com/EchonLabs/kanvaro.com/commit/5824e7fa8e00b113c0bac941ed0d056a27ab6194))
+* searchable filters mobile close fix for project, assignee, and creator in TasksClient ([83d73f8](https://github.com/EchonLabs/kanvaro.com/commit/83d73f88bc65db5abe413d9bab5772bd7f65b7ae))
+
+## [1.41.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.4...v1.41.5) (2026-07-27)
+
+
+### Bug Fixes
+
+* handle null or undefined user in GravatarAvatar and getAvatarData functions ([888b093](https://github.com/EchonLabs/kanvaro.com/commit/888b09334005516b616ce97817ad569540af2668))
+
+## [1.41.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.3...v1.41.4) (2026-07-27)
+
+
+### Bug Fixes
+
+* add memo copy functionality and improve task report layout ([7c27cee](https://github.com/EchonLabs/kanvaro.com/commit/7c27ceebb000adf655cf20bcbe6413f2e8fc13e1))
+* add permission check for task creation button in calendar page ([44a592a](https://github.com/EchonLabs/kanvaro.com/commit/44a592aa822e21fc982bf68b4e4ba3d88114f870))
+* enhance duration formatting in time entries to include hours and minutes ([006df6e](https://github.com/EchonLabs/kanvaro.com/commit/006df6ece1d87056ade17f18a6722fb1079215c3))
+* increase task limit for improved data retrieval ([a03c6a6](https://github.com/EchonLabs/kanvaro.com/commit/a03c6a650564492123d593a9bd11a134e29b1270))
+* optimize status badge animations and improve performance for live project indicators ([04efbda](https://github.com/EchonLabs/kanvaro.com/commit/04efbda0025bad493ac041afa04f563fe358f740))
+* remove unnecessary animation classes from status badges for improved performance ([f5ca638](https://github.com/EchonLabs/kanvaro.com/commit/f5ca638dd4da33a8432a498e25461880ad7a399c))
+* simplify profile page icons and improve layout consistency ([4c13d69](https://github.com/EchonLabs/kanvaro.com/commit/4c13d698acb3e545537d0891478b5bb19f9055e1))
+* update badge styling for active timer to improve visual feedback ([234ed8a](https://github.com/EchonLabs/kanvaro.com/commit/234ed8a6debabd31eac7d4f5b34b109d146cee34))
+
+## [1.41.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.2...v1.41.3) (2026-07-24)
+
+
+### Bug Fixes
+
+* remove unused daily progress calculation and related UI elements from TimerPage ([d5afe0a](https://github.com/EchonLabs/kanvaro.com/commit/d5afe0a4fff5ae14d4601943d4b3bd20119d0956))
+
+## [1.41.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.1...v1.41.2) (2026-07-21)
+
+
+### Bug Fixes
+
+* add permission checks for creating projects and tasks in RecentProjects and RecentTasks components ([17615b2](https://github.com/EchonLabs/kanvaro.com/commit/17615b224ba2f148030bcfdcde6cac105846b35a))
+* add taskType property to BacklogItem interface and update TypeBadge rendering ([2405816](https://github.com/EchonLabs/kanvaro.com/commit/2405816f98874606d4227777ff1a132a680280ff))
+* add validation for first and last name length across member-related APIs and components ([0d0907b](https://github.com/EchonLabs/kanvaro.com/commit/0d0907b6699848d2d6891c0fc58fca4981411689))
+* changed ui and layout of the pages to follow the current design of the project. ([29c1f9d](https://github.com/EchonLabs/kanvaro.com/commit/29c1f9dfa01c532d7514706b97c1b267c5b71d81))
+* enhance time entry deletion permissions and management capabilities in TimeLogs component ([104edec](https://github.com/EchonLabs/kanvaro.com/commit/104edec7efd453629d72abf7d8f0557e4b6bb293))
+* enhance timer stop functionality to ensure time entries are saved correctly ([8635c36](https://github.com/EchonLabs/kanvaro.com/commit/8635c362251d4c92da3932c47b22fbf7fbb398bc))
+* implement cross-field validation for time tracking limits in settings and organization components ([84d4a9a](https://github.com/EchonLabs/kanvaro.com/commit/84d4a9a7f00aa8ee367fbcd0b5ef9be6a478d3c0))
+* improve date validation logic and synchronization in AddSprintEventModal ([a9359cf](https://github.com/EchonLabs/kanvaro.com/commit/a9359cfb87f554db76d9ef4150f44da46f84a1a1))
+* remove running timer minutes from week and month duration calculations in TimeTrackingWidget ([b3d9952](https://github.com/EchonLabs/kanvaro.com/commit/b3d9952615a68bebd4183ddef72563f7f3af88d6))
+* restore permission checks for member deletion and update confirmation message for member removal ([c82da98](https://github.com/EchonLabs/kanvaro.com/commit/c82da9841e9f74bcc7ab4d991f9920123fe630c4))
+* restore SPRINT_DELETE permission for roles and adjust project permission checks ([8155204](https://github.com/EchonLabs/kanvaro.com/commit/8155204b402c2b1929fdecdda5c88b427986d6ed))
+* simplify button rendering for creating new sprints based on permission ([da413e8](https://github.com/EchonLabs/kanvaro.com/commit/da413e82748bac529858bcda66bc45afea85041f))
+* update date calculations for start of week in multiple components and restore TASK_DELETE permission for roles ([422db6d](https://github.com/EchonLabs/kanvaro.com/commit/422db6d556b0e08bfbc7c62e3ccccf78bd39d021))
+* update time entry deletion logic to require delete permission for all users and integrate ConfirmationModal for deletion confirmation ([e2cdeea](https://github.com/EchonLabs/kanvaro.com/commit/e2cdeeacbdbc6047a6a901881a4f480afb85a98d))
+
+## [1.41.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.41.0...v1.41.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* remove description display from task component for cleaner UI ([e6c6e4e](https://github.com/EchonLabs/kanvaro.com/commit/e6c6e4e036669ae7ab243aac91b6bc93997fa154))
+* update button styles in Timer and TimeTrackingPage for consistency and improved UI ([647b827](https://github.com/EchonLabs/kanvaro.com/commit/647b827e66a8062a6089d8124b559d6848610de8))
+
+# [1.41.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.40.1...v1.41.0) (2026-07-07)
+
+
+### Bug Fixes
+
+* add excludeStatus filter to task retrieval and update TimerPage parameters ([c44e87a](https://github.com/EchonLabs/kanvaro.com/commit/c44e87a988b26698cec12cad925d573a5b59d2ea))
+* enhance income handling by adding custom subcategory support and validation ([51d8c04](https://github.com/EchonLabs/kanvaro.com/commit/51d8c04b35136ac325c0a957c12d182b8b9d14fd))
+* income and expenses logic in project budget tab ([2fb29aa](https://github.com/EchonLabs/kanvaro.com/commit/2fb29aa5580f5801324099d4214ab438d3ea47a8))
+* logic related to financial reports and related sub pages ([5f55bfc](https://github.com/EchonLabs/kanvaro.com/commit/5f55bfcee34837fabfff7a833be0a42854a2cd6d))
+* persistent data in filters and incorrect Backlog sprint task addition ([835da7c](https://github.com/EchonLabs/kanvaro.com/commit/835da7c993acd6893105b52ee1c9c4f800fc9cbe))
+* project backlog incorrect stat and info cards ([2446e15](https://github.com/EchonLabs/kanvaro.com/commit/2446e155ccf64693fc8f945bce79b2f29cd42bd9))
+* reworked logic on all four sub pages of Team Reports page ([621d5bc](https://github.com/EchonLabs/kanvaro.com/commit/621d5bc016aeb82e5a4c2c0594c41817c87a3117))
+* reworked the logic of the team tab to restrict Team members and QAs from removing members from the project ([d254674](https://github.com/EchonLabs/kanvaro.com/commit/d2546747aff5b749359f0a3ac8c12e14665bec8b))
+* sprint completion and task transfer logic ([d0ba516](https://github.com/EchonLabs/kanvaro.com/commit/d0ba516a09893e5ebb2c946790f5d41514b4b9a3))
+* update excludeStatus filter in TimerPage to remove backlog status ([4c5e4de](https://github.com/EchonLabs/kanvaro.com/commit/4c5e4de7407e684fab6679d4d8006987f20c464d))
+
+
+### Features
+
+* add example configuration file and remove existing config ([fbcabf2](https://github.com/EchonLabs/kanvaro.com/commit/fbcabf27ac13acd71e693df526b9a6076c8ca834))
+* enhance configuration management with environment variables support ([fe438e8](https://github.com/EchonLabs/kanvaro.com/commit/fe438e888a9641aaaef3adaed2e8499bdefc705a))
+
+## [1.40.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.40.0...v1.40.1) (2026-06-24)
+
+
+### Bug Fixes
+
+* application error due to sprint event duration exceeding ([daa2510](https://github.com/EchonLabs/kanvaro.com/commit/daa251072754dfd4033e5442b626e621bb1e835c))
+* calender page formatting and layout issues ([854360f](https://github.com/EchonLabs/kanvaro.com/commit/854360fd84b4245f9e620b235a2266672a9fa6fc))
+* fixed the scrollbar popup in sprint events page. ([5017987](https://github.com/EchonLabs/kanvaro.com/commit/5017987ff95f218f00887ee7f970703623e48e44))
+* fixed vertical scrollbar in Toast Notifications and added new info for Info cards in Project view page ([5c0c37b](https://github.com/EchonLabs/kanvaro.com/commit/5c0c37bbaee63e4646634bd150a209350ab5e5f4))
+* handled the duplicate toast notifications and fixed the UI issue in the sprint event view page ([c07d856](https://github.com/EchonLabs/kanvaro.com/commit/c07d856c9a0291ae74b5e47e05c3bd1052ab7f54))
+* layout and spacing issues in the Sprint page List View ([fbb49f0](https://github.com/EchonLabs/kanvaro.com/commit/fbb49f03480a732b020e3bf1a913d68e5def62f3))
+* reworked the logic in the reports tab in the project view page. ([fff765a](https://github.com/EchonLabs/kanvaro.com/commit/fff765ab6b23d1a7cc9cc8a107a0abe48b03fe22))
+* reworked the logic on all four sub pages of the Project Reports page ([0f4e7c1](https://github.com/EchonLabs/kanvaro.com/commit/0f4e7c1a4a4e9154769c2a2a1d8b71070cb95a60))
+* scrollbar popup issue when no results were found ([e126c3f](https://github.com/EchonLabs/kanvaro.com/commit/e126c3f18bf8e2dfdb864c697044ea103eb2f025))
+* showing unformatted task descriptions in the Tasks page List view ([8c11d6d](https://github.com/EchonLabs/kanvaro.com/commit/8c11d6d62ef55a334489876b3e63f6b842681c91))
+
 # [1.40.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.39.1...v1.40.0) (2026-06-15)
 
 

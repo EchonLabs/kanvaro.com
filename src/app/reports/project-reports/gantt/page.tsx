@@ -121,17 +121,24 @@ export default function GanttReportPage() {
 
   const filteredProjects = useMemo(() => {
     const q = projectSearchQuery.trim().toLowerCase()
-    return q ? projects.filter(p => p.name.toLowerCase().includes(q)) : projects
+    const list = q ? projects.filter(p => p.name?.toLowerCase().includes(q)) : projects
+    return list.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectSearchQuery])
 
   const filteredSprints = useMemo(() => {
     const q = sprintSearchQuery.trim().toLowerCase()
-    return q ? sprints.filter(s => s.name.toLowerCase().includes(q)) : sprints
+    const list = q ? sprints.filter(s => s.name?.toLowerCase().includes(q)) : sprints
+    return list.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [sprints, sprintSearchQuery])
 
   const filteredAssignees = useMemo(() => {
     const q = assigneeSearchQuery.trim().toLowerCase()
-    return q ? assignees.filter(a => a.name.toLowerCase().includes(q)) : assignees
+    const list = q ? assignees.filter(a => (a.name || `${a.firstName || ''} ${a.lastName || ''}`).toLowerCase().includes(q)) : assignees
+    return list.slice().sort((a, b) => {
+      const nameA = a.name || `${a.firstName || ''} ${a.lastName || ''}`.trim()
+      const nameB = b.name || `${b.firstName || ''} ${b.lastName || ''}`.trim()
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+    })
   }, [assignees, assigneeSearchQuery])
 
   // Sprints first (past first), then regular tasks

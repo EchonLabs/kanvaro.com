@@ -6,6 +6,7 @@ import { Organization } from '@/models/Organization'
 import { applyRoundingRules } from '@/lib/utils'
 import { logActivity } from '@/lib/activity-logger'
 import mongoose from 'mongoose'
+import { zonedTimeToUtc } from 'date-fns-tz'
 
 const MINUTES_PER_HOUR = 60
 
@@ -83,11 +84,26 @@ export async function getEffectiveTimeTrackingSettings(
   return organization?.settings?.timeTracking ?? null
 }
 
-export async function getDailyHoursLogged(userId: string, organizationId: string): Promise<number> {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
+async function getHoursLoggedForTimezone(userId: string, organizationId: string, tz: string): Promise<number> {
+  let todayStr: string
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    })
+    todayStr = formatter.format(new Date())
+  } catch {
+    tz = 'UTC'
+    todayStr = new Date().toISOString().slice(0, 10)
+  }
+
+  const [year, month, day] = todayStr.split('-').map(Number)
+  const nextDayStr = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10)
+
+  const today = zonedTimeToUtc(`${todayStr} 00:00:00`, tz)
+  const tomorrow = zonedTimeToUtc(`${nextDayStr} 00:00:00`, tz)
 
   const result = await TimeEntry.aggregate([
     {
@@ -241,6 +257,29 @@ export async function getTotalLoggedMinutesForTask(taskId: string): Promise<numb
   return Math.round(result.length > 0 ? result[0].totalDuration : 0)
 }
 
+export async function getDailyHoursLogged(
+  userId: string,
+  organizationId: string,
+  deviceTimezone?: string
+): Promise<number> {
+  const org = await Organization.findById(organizationId).select('timezone').lean()
+  const orgTz = (org as any)?.timezone || 'UTC'
+
+  const orgHours = await getHoursLoggedForTimezone(userId, organizationId, orgTz)
+
+  if (deviceTimezone && deviceTimezone !== orgTz) {
+    try {
+      Intl.DateTimeFormat('en-US', { timeZone: deviceTimezone }).format()
+      const deviceHours = await getHoursLoggedForTimezone(userId, organizationId, deviceTimezone)
+      return Math.min(orgHours, deviceHours)
+    } catch {
+      return orgHours
+    }
+  }
+
+  return orgHours
+}
+
 export interface StopTimerOptions {
   description?: string
   category?: string
@@ -248,12 +287,13 @@ export interface StopTimerOptions {
   reason?: StopTimerReason
   stopSettings?: EffectiveTimeTrackingSettings
   now?: Date
+  deviceTimezone?: string
 }
 
 export async function stopTimerInternal(
   activeTimer: IActiveTimer,
   options: StopTimerOptions = {}
-): Promise<{ success: boolean; timeEntry?: any; duration?: number; error?: string; alreadyStopped?: boolean; autoStopped?: boolean; reason?: string }> {
+): Promise<{ success: boolean; timeEntry?: any; duration?: number; error?: string; alreadyStopped?: boolean; autoStopped?: boolean; reason?: string; hasTimeLogged?: boolean }> {
   const organizationId = getIdString(activeTimer.organization)
   const projectId = getIdString(activeTimer.project)
 
@@ -296,7 +336,7 @@ export async function stopTimerInternal(
       const uId = getIdString(activeTimer.user)
       const oId = getIdString(activeTimer.organization)
       if (uId && oId) {
-        const dailyHoursLogged = await getDailyHoursLogged(uId, oId)
+        const dailyHoursLogged = await getDailyHoursLogged(uId, oId, options.deviceTimezone)
         const remainingHours = Math.max(0, stopSettings.maxDailyHours - dailyHoursLogged)
         dailyRemainingMinutes = remainingHours * MINUTES_PER_HOUR
       }
@@ -334,11 +374,12 @@ export async function stopTimerInternal(
   if (finalDuration <= 0) {
     const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
     if (!deletedTimer) {
-      return { success: true, alreadyStopped: true, duration: 0 }
+      return { success: true, alreadyStopped: true, duration: 0, hasTimeLogged: false }
     }
     return {
       success: true,
       duration: 0,
+      hasTimeLogged: false,
       autoStopped: isAutoStop,
       reason: options.reason ?? 'manual'
     }
@@ -383,7 +424,7 @@ export async function stopTimerInternal(
     // the ActiveTimer if it's still there and report this as already stopped
     // rather than surfacing a raw error and losing the session.
     await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
-    return { success: true, alreadyStopped: true, duration: 0 }
+    return { success: true, alreadyStopped: true, duration: 0, hasTimeLogged: false }
   }
 
   const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
@@ -394,6 +435,7 @@ export async function stopTimerInternal(
       success: true,
       timeEntry: timeEntry.toObject(),
       duration: finalDuration,
+      hasTimeLogged: true,
       autoStopped: isAutoStop,
       reason: options.reason ?? 'manual'
     }
@@ -423,13 +465,15 @@ export async function stopTimerInternal(
     success: true,
     timeEntry: timeEntry.toObject(),
     duration: finalDuration,
+    hasTimeLogged: true,
     autoStopped: isAutoStop,
     reason: options.reason ?? 'manual'
   }
 }
 
 export async function enforceTimerLimitsInternal(
-  activeTimer: IActiveTimer
+  activeTimer: IActiveTimer,
+  deviceTimezone?: string
 ): Promise<{ success: boolean; result?: any } | null> {
   const organizationId = getIdString(activeTimer.organization)
   if (!organizationId) return null
@@ -448,7 +492,8 @@ export async function enforceTimerLimitsInternal(
       const result = await stopTimerInternal(activeTimer, {
         stopSettings,
         now,
-        reason: 'auto_max_session'
+        reason: 'auto_max_session',
+        deviceTimezone
       })
       return { success: true, result }
     }
@@ -458,7 +503,7 @@ export async function enforceTimerLimitsInternal(
   if (stopSettings.maxDailyHours && stopSettings.allowOvertime === false) {
     const userId = getIdString(activeTimer.user)
     if (userId) {
-      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId, deviceTimezone)
       const currentSessionHours = currentDuration / MINUTES_PER_HOUR
       const totalDailyHours = dailyHoursLogged + currentSessionHours
 
@@ -466,7 +511,8 @@ export async function enforceTimerLimitsInternal(
         const result = await stopTimerInternal(activeTimer, {
           stopSettings,
           now,
-          reason: 'auto_max_daily'
+          reason: 'auto_max_daily',
+          deviceTimezone
         })
         return { success: true, result }
       }

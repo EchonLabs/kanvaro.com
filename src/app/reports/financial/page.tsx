@@ -95,7 +95,7 @@ export default function FinancialReportsPage() {
   useEffect(() => {
     fetch('/api/projects?limit=1000&page=1')
       .then(r => r.ok ? r.json() : null)
-      .then(d => d && setProjects((d?.data || []).map((p: any) => ({ _id: p._id, name: p.name }))))
+      .then(d => d && setProjects((d?.data || []).map((p: any) => ({ _id: p._id, name: p.name })).sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))))
       .catch(() => {})
   }, [])
 
@@ -261,7 +261,7 @@ export default function FinancialReportsPage() {
                   </SelectTrigger>
                   <SelectContent className="rounded-[var(--apple-radius-md)]">
                     <SelectItem value="all" className="text-[13px]">All Projects</SelectItem>
-                    {projects.map(p => (
+                    {projects.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true })).map(p => (
                       <SelectItem key={p._id} value={p._id} className="text-[13px]">{p.name}</SelectItem>
                     ))}
                   </SelectContent>

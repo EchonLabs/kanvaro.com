@@ -15,7 +15,7 @@ describe('computeIsFormValid (create-new-task page)', () => {
       computeIsFormValid({
         title: 'Write onboarding docs',
         project: 'project-1',
-        dueDate: '2026-12-31',
+        dueDate: '2026-12-31', category: 'feature',
         subtasks: []
       })
     ).toBe(true)
@@ -26,7 +26,7 @@ describe('computeIsFormValid (create-new-task page)', () => {
       computeIsFormValid({
         title: 'Write onboarding docs',
         project: 'project-1',
-        dueDate: '2026-12-31',
+        dueDate: '2026-12-31', category: 'feature',
         subtasks: [{ title: 'Draft outline' }, { title: 'Review with team' }]
       })
     ).toBe(true)
@@ -34,19 +34,19 @@ describe('computeIsFormValid (create-new-task page)', () => {
 
   it('is invalid when the title is missing or blank', () => {
     expect(
-      computeIsFormValid({ title: '   ', project: 'project-1', dueDate: '2026-12-31', subtasks: [] })
+      computeIsFormValid({ title: '   ', project: 'project-1', dueDate: '2026-12-31', category: 'feature', subtasks: [] })
     ).toBe(false)
   })
 
   it('is invalid when no project is selected', () => {
     expect(
-      computeIsFormValid({ title: 'Write onboarding docs', project: '', dueDate: '2026-12-31', subtasks: [] })
+      computeIsFormValid({ title: 'Write onboarding docs', project: '', dueDate: '2026-12-31', category: 'feature', subtasks: [] })
     ).toBe(false)
   })
 
   it('is invalid when no due date is set', () => {
     expect(
-      computeIsFormValid({ title: 'Write onboarding docs', project: 'project-1', dueDate: '', subtasks: [] })
+      computeIsFormValid({ title: 'Write onboarding docs', project: 'project-1', dueDate: '', category: 'feature', subtasks: [] })
     ).toBe(false)
   })
 
@@ -55,8 +55,32 @@ describe('computeIsFormValid (create-new-task page)', () => {
       computeIsFormValid({
         title: 'Write onboarding docs',
         project: 'project-1',
-        dueDate: '2026-12-31',
+        dueDate: '2026-12-31', category: 'feature',
         subtasks: [{ title: 'Draft outline' }, { title: '   ' }]
+      })
+    ).toBe(false)
+  })
+
+  it('is invalid when no category is selected', () => {
+    expect(
+      computeIsFormValid({
+        title: 'Write onboarding docs',
+        project: 'project-1',
+        dueDate: '2026-12-31',
+        category: '',
+        subtasks: []
+      })
+    ).toBe(false)
+  })
+
+  it('is invalid when a nested subtask has a blank title', () => {
+    expect(
+      computeIsFormValid({
+        title: 'Write onboarding docs',
+        project: 'project-1',
+        dueDate: '2026-12-31',
+        category: 'feature',
+        subtasks: [{ title: 'Draft outline', subtasks: [{ title: '  ' }] }]
       })
     ).toBe(false)
   })

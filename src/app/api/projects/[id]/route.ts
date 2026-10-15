@@ -36,9 +36,10 @@ export async function GET(
       organization: organizationId,
       is_deleted: { $ne: true } // Only return non-deleted projects
     })
-      .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers.memberId', 'firstName lastName email')
-      .populate('client', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email avatar')
+      .populate('teamMembers.memberId', 'firstName lastName email avatar role hourlyRate billingRate')
+      .populate('client', 'firstName lastName email avatar')
+      .populate('projectRoles.user', 'firstName lastName email avatar')
 
     if (!project) {
       return NextResponse.json(
@@ -89,14 +90,65 @@ export async function GET(
       totalTasks
     }
 
-    // Calculate stats for reports tab
+    // Calculate stats for reports tab and budget consumption
     const timeEntries = await TimeEntry.find({ project: projectId })
     const totalMinutes = timeEntries.reduce((sum: number, entry: any) => sum + (entry.duration || 0), 0)
 
+    // Build rate map for project team members to resolve individual member hourly rates
+    const memberRateMap = new Map<string, number>()
+
+    // 1. Check project.memberRates overrides
+    if (Array.isArray(project.memberRates)) {
+      for (const mr of project.memberRates) {
+        const userId = mr.user?._id?.toString() || mr.user?.toString()
+        if (userId && typeof mr.hourlyRate === 'number' && mr.hourlyRate > 0) {
+          memberRateMap.set(userId, mr.hourlyRate)
+        }
+      }
+    }
+
+    // 2. Check teamMembers project-specific rate and member's profile default rate
+    if (Array.isArray(project.teamMembers)) {
+      for (const tm of project.teamMembers) {
+        const memberId = tm.memberId?._id?.toString() || tm.memberId?.toString()
+        if (memberId) {
+          if (typeof tm.hourlyRate === 'number' && tm.hourlyRate > 0) {
+            memberRateMap.set(memberId, tm.hourlyRate)
+          } else if (!memberRateMap.has(memberId)) {
+            const memberObj = tm.memberId as any
+            const userRate = memberObj?.hourlyRate ?? memberObj?.billingRate
+            if (typeof userRate === 'number' && userRate > 0) {
+              memberRateMap.set(memberId, userRate)
+            }
+          }
+        }
+      }
+    }
+
+    const defaultHourlyRate = project.budget?.defaultHourlyRate || 0
+
+    // Calculate labor cost from real-time logged hours
+    let loggedHoursLaborCost = 0
+    for (const entry of timeEntries) {
+      const durationHours = (entry.duration || 0) / 60
+      const entryUserId = entry.user?.toString()
+      const rate = (typeof entry.hourlyRate === 'number' && entry.hourlyRate > 0)
+        ? entry.hourlyRate
+        : (entryUserId && memberRateMap.has(entryUserId))
+          ? memberRateMap.get(entryUserId)!
+          : defaultHourlyRate
+      loggedHoursLaborCost += durationHours * rate
+    }
+    loggedHoursLaborCost = Math.round(loggedHoursLaborCost * 100) / 100
+
     const totalBudget = project.budget?.total || 0
-    const budgetSpent = project.budget?.spent || 0
-    const budgetRemaining = totalBudget - budgetSpent
-    const budgetUtilizationRate = totalBudget > 0 ? Math.round((budgetSpent / totalBudget) * 100) : 0
+    const expensesSpent = project.budget?.spent || 0
+    // Total spent: based on real-time logged hours if any, plus expense tracking spent, or fallback
+    const actualSpend = loggedHoursLaborCost > 0
+      ? (expensesSpent > 0 ? loggedHoursLaborCost + expensesSpent : loggedHoursLaborCost)
+      : expensesSpent
+    const budgetRemaining = Math.max(0, totalBudget - actualSpend)
+    const budgetUtilizationRate = totalBudget > 0 ? Math.round((actualSpend / totalBudget) * 1000) / 10 : 0
 
     const stats = {
       tasks: {
@@ -106,7 +158,10 @@ export async function GET(
       },
       budget: {
         total: totalBudget,
-        spent: budgetSpent,
+        spent: actualSpend,
+        actualSpend,
+        loggedHoursCost: loggedHoursLaborCost,
+        expensesSpent,
         remaining: budgetRemaining,
         utilizationRate: budgetUtilizationRate
       },

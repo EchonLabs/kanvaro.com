@@ -120,7 +120,8 @@ function voterRow(dialog: HTMLElement, name: string) {
 }
 
 const isTicked = (dialog: HTMLElement, name: string) =>
-  (within(voterRow(dialog, name)).getByRole('checkbox') as HTMLInputElement).checked
+  // The shared Checkbox is a Radix button, so state lives in aria-checked rather than the DOM `.checked` property.
+  within(voterRow(dialog, name)).getByRole('checkbox').getAttribute('aria-checked') === 'true'
 
 describe('PlanningWorkspace — the voter picker', () => {
   afterEach(() => {

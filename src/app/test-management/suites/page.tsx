@@ -90,7 +90,8 @@ export default function TestSuitesPage() {
 
   const filteredProjects = useMemo(() => {
     const q = projectQuery.trim().toLowerCase()
-    return q ? projects.filter(p => p.name.toLowerCase().includes(q)) : projects
+    const list = q ? projects.filter(p => p.name.toLowerCase().includes(q)) : projects
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectQuery])
 
   const handleProjectChange = (projectId: string) => {

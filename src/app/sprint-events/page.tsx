@@ -608,6 +608,7 @@ export default function SprintEventsPage() {
                             !projectQuery.trim() ||
                             p.name.toLowerCase().includes(projectQuery.toLowerCase())
                           )
+                          .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
                           .map((project) => (
                             <SelectItem key={project._id} value={project._id}>
                               {project.name}

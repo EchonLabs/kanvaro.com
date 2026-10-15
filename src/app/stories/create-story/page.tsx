@@ -72,8 +72,8 @@ export default function CreateStoryPage() {
 
   const filteredProjects = useMemo(() => {
     const query = projectQuery.trim().toLowerCase()
-    if (!query) return projects
-    return projects.filter(project => project.name.toLowerCase().includes(query))
+    if (!query) return [...projects].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
+    return projects.filter(project => project.name.toLowerCase().includes(query)).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
   }, [projects, projectQuery])
 
   // Auth initialization - trigger data loading
@@ -454,6 +454,7 @@ export default function CreateStoryPage() {
                                   !epicQuery.trim() ||
                                   epic.title.toLowerCase().includes(epicQuery.toLowerCase())
                                 )
+                                .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }))
                                 .map(epic => (
                                   <SelectItem key={epic._id} value={epic._id}>
                                     {epic.title}
@@ -512,6 +513,7 @@ export default function CreateStoryPage() {
                                   !sprintQuery.trim() ||
                                   sprint.name.toLowerCase().includes(sprintQuery.toLowerCase())
                                 )
+                                .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
                                 .map(sprint => (
                                   <SelectItem key={sprint._id} value={sprint._id}>
                                     {sprint.name}

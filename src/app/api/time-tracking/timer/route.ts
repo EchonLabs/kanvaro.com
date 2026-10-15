@@ -35,16 +35,32 @@ export async function GET(request: NextRequest) {
       organization: organizationId
     }).populate('project', 'name settings').populate('task', 'title').populate('user', 'firstName lastName')
 
-    if (!activeTimer) {
-      return NextResponse.json({ activeTimer: null })
+    const clientTimezone = searchParams.get('timezone') || request.headers.get('x-timezone') || undefined
+
+    // Calculate remaining daily minutes and daily hours logged for the client
+    const effectiveSettings = await getEffectiveTimeTrackingSettings(organizationId, null)
+    let remainingDailyMinutes: number | null = null
+    let dailyHoursLogged = 0
+    const MINUTES_PER_HOUR = 60
+    if (effectiveSettings?.maxDailyHours) {
+      dailyHoursLogged = await getDailyHoursLogged(userId, organizationId, clientTimezone)
+      if (effectiveSettings.allowOvertime === false) {
+        const remainingHours = Math.max(0, effectiveSettings.maxDailyHours - dailyHoursLogged)
+        remainingDailyMinutes = remainingHours * MINUTES_PER_HOUR
+      }
     }
 
-    const autoStopResult = await enforceTimerLimitsInternal(activeTimer)
+    if (!activeTimer) {
+      return NextResponse.json({ activeTimer: null, dailyHoursLogged })
+    }
+
+    const autoStopResult = await enforceTimerLimitsInternal(activeTimer, clientTimezone)
     if (autoStopResult && autoStopResult.success) {
       return NextResponse.json(
         {
           ...autoStopResult.result,
-          activeTimer: null
+          activeTimer: null,
+          dailyHoursLogged
         },
         { status: 200 }
       )
@@ -52,23 +68,14 @@ export async function GET(request: NextRequest) {
 
     const currentDuration = calculateCurrentDurationMinutes(activeTimer, new Date())
 
-    // Calculate remaining daily minutes for the client
-    const effectiveSettings = await getEffectiveTimeTrackingSettings(organizationId, null)
-    let remainingDailyMinutes: number | null = null
-    const MINUTES_PER_HOUR = 60
-    if (effectiveSettings?.maxDailyHours && effectiveSettings.allowOvertime === false) {
-      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
-      const remainingHours = Math.max(0, effectiveSettings.maxDailyHours - dailyHoursLogged)
-      remainingDailyMinutes = remainingHours * MINUTES_PER_HOUR
-    }
-
     return NextResponse.json({
       activeTimer: {
         ...activeTimer.toObject(),
         currentDuration,
         isPaused: !!activeTimer.pausedAt,
         remainingDailyMinutes
-      }
+      },
+      dailyHoursLogged
     })
   } catch (error) {
     console.error('Error fetching active timer:', error)
@@ -83,8 +90,8 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json()
     
-    const { userId, organizationId, projectId, taskId, description, category, tags, isBillable, hourlyRate } = body
-    
+    const { userId, organizationId, projectId, taskId, description, category, tags, isBillable, hourlyRate, timezone } = body
+    const clientTimezone = timezone || request.headers.get('x-timezone') || undefined
 
     if (!userId || !organizationId || !projectId) {
    
@@ -163,7 +170,7 @@ export async function POST(request: NextRequest) {
 
     // Check daily hours limit before starting timer
     if (settings.allowOvertime === false && settings.maxDailyHours) {
-      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId, clientTimezone)
       if (dailyHoursLogged >= settings.maxDailyHours) {
         return NextResponse.json(
           { error: `Daily time limit reached. You have already logged ${dailyHoursLogged.toFixed(1)} hours today (maximum: ${settings.maxDailyHours} hours). You cannot start a new timer until tomorrow.` },
@@ -196,10 +203,23 @@ export async function POST(request: NextRequest) {
     // Calculate effective max session hours considering daily limit
     let effectiveMaxSession = settings.maxSessionHours
     if (settings.allowOvertime === false && settings.maxDailyHours) {
-      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId, clientTimezone)
       const remainingDailyHours = Math.max(0, settings.maxDailyHours - dailyHoursLogged)
       effectiveMaxSession = Math.min(settings.maxSessionHours, remainingDailyHours)
     }
+
+    const minSessionHours = (ActiveTimer.schema.path('maxSessionHours') as any)?.options?.min || 1
+    if (effectiveMaxSession < minSessionHours) {
+      const remainingMinutes = Math.round(effectiveMaxSession * 60)
+      const minSessionHoursLabel = minSessionHours === 1 ? '1 hour' : `${minSessionHours} hours`
+      return NextResponse.json(
+        {
+          error: `Daily limit almost reached. You only have ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'} remaining today, which is less than the minimum session duration of ${minSessionHoursLabel}.`
+        },
+        { status: 400 }
+      )
+    }
+
 
     // Create active timer
     const activeTimer = new ActiveTimer({
@@ -246,8 +266,12 @@ export async function POST(request: NextRequest) {
         isPaused: false
       }
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error starting timer:', error)
+    if (error?.name === 'ValidationError') {
+      const messages = Object.values(error.errors || {}).map((e: any) => e.message).join(', ')
+      return NextResponse.json({ error: messages || 'Active timer validation failed' }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -257,7 +281,7 @@ export async function PUT(request: NextRequest) {
     await connectDB()
     
     const body = await request.json()
-    const { userId, organizationId, action, description, category, tags } = body
+    const { userId, organizationId, action, description, category, tags, timezone } = body
 
     if (!userId || !organizationId || !action) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -325,11 +349,13 @@ export async function PUT(request: NextRequest) {
         break
 
       case 'stop': {
+        const clientTimezone = timezone || request.headers.get('x-timezone') || undefined
         const stopResult = await stopTimerInternal(activeTimer, {
           description,
           category,
           tags,
-          reason: 'manual'
+          reason: 'manual',
+          deviceTimezone: clientTimezone
         })
         // Log activity: timer stopped (non-blocking)
         if (stopResult.success && !stopResult.alreadyStopped) {

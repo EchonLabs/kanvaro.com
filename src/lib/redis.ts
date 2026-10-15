@@ -1,10 +1,11 @@
 import { createClient } from 'redis'
+import { getEnv } from './config'
 
 let redisClient: ReturnType<typeof createClient> | null = null
 
 export async function getRedisClient() {
   if (!redisClient) {
-    const redisUrl = process.env.REDIS_URL
+    const redisUrl = getEnv('REDIS_URL')
     if (!redisUrl) {
       throw new Error('Redis disabled: REDIS_URL not set')
     }

@@ -62,6 +62,11 @@ export interface IProject extends Document {
       // projects need no migration.
       category?: TaskStatusCategory
     }>
+    taskCategories?: Array<{
+      key: string
+      title: string
+      order: number
+    }>
   }
   tags: string[]
   customFields: Record<string, any>
@@ -162,6 +167,11 @@ const ProjectSchema = new Schema<IProject>({
       color: String,
       order: { type: Number, required: true },
       category: { type: String, enum: TASK_STATUS_CATEGORIES }
+    }],
+    taskCategories: [{
+      key: { type: String, required: true, trim: true, maxlength: 50 },
+      title: { type: String, required: true, trim: true, maxlength: 50 },
+      order: { type: Number, required: true }
     }]
   },
   tags: [{ type: String, trim: true }],

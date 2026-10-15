@@ -107,7 +107,7 @@ async function renderPageFor(status: 'planning' | 'planned' | 'active', totalTas
     </TooltipProvider>
   )
 
-  await screen.findByRole('heading', { name: 'Sprint 1' })
+  await screen.findByRole('heading', { name: 'Sprint 1 - Task Sheet' })
   return fetchMock
 }
 

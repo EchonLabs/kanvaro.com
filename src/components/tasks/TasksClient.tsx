@@ -40,7 +40,8 @@ import {
     Upload,
     ListTodo,
     CheckSquare,
-    ChevronDown
+    ChevronDown,
+    RefreshCw
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -62,7 +63,7 @@ import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
 // Removed bulk upload import
 // import BulkUploadModal from './BulkUploadModal'
 import {
-    StatusBadge, PriorityBadge, TypeBadge,
+    StatusBadge, PriorityBadge, TypeBadge, CategoryBadge,
     PageHeader, SectionLabel, TasksEmptyState,
     PaginationBar, ViewSwitcher, MetaChip, FilterChip,
     InlineLoader, FullPageLoader,
@@ -84,6 +85,7 @@ type KanbanBoardComponentProps = {
     onCreateTask: () => void
     onEditTask?: (task: any) => void
     onDeleteTask?: (taskId: string) => void
+    onViewTask?: (task: any) => void
 }
 
 const KanbanBoard = dynamic<KanbanBoardComponentProps>(() => import('./KanbanBoard'), { ssr: false })
@@ -95,6 +97,7 @@ interface Task {
     status: TaskStatusKey
     priority: 'low' | 'medium' | 'high' | 'critical'
     type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+    category?: string
     displayId?: string
     project: {
         _id: string
@@ -145,6 +148,7 @@ interface TasksClientProps {
         status?: string
         priority?: string
         type?: string
+        category?: string
         project?: string
         assignedTo?: string
         createdBy?: string
@@ -163,6 +167,7 @@ const _myTasksFilters = {
     statusFilter: 'all',
     priorityFilter: 'all',
     typeFilter: 'all',
+    categoryFilter: 'all',
     projectFilter: 'all',
     assignedToFilter: 'all',
     createdByFilter: 'all',
@@ -339,6 +344,8 @@ export default function TasksClient({
     const [statusFilter, setStatusFilter] = useState(initialFilters.status || _myTasksFilters.statusFilter)
     const [priorityFilter, setPriorityFilter] = useState(initialFilters.priority || _myTasksFilters.priorityFilter)
     const [typeFilter, setTypeFilter] = useState(initialFilters.type || _myTasksFilters.typeFilter)
+    const [categoryFilter, setCategoryFilter] = useState(initialFilters.category || _myTasksFilters.categoryFilter)
+    const [categoryFilterQuery, setCategoryFilterQuery] = useState('')
     const [projectFilter, setProjectFilter] = useState(initialFilters.project || _myTasksFilters.projectFilter)
     const [assignedToFilter, setAssignedToFilter] = useState(initialFilters.assignedTo || _myTasksFilters.assignedToFilter)
     const [createdByFilter, setCreatedByFilter] = useState(initialFilters.createdBy || _myTasksFilters.createdByFilter)
@@ -361,6 +368,8 @@ export default function TasksClient({
     const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
+    const [refreshKey, setRefreshKey] = useState(0)
+    const [projectCategories, setProjectCategories] = useState<Record<string, Array<{ key: string; title: string; order: number }>>>({})
     const { statusMap: projectsWithStatuses } = useProjectKanbanStatuses()
     const { success: notifySuccess, error: notifyError } = useNotify()
 
@@ -369,6 +378,7 @@ export default function TasksClient({
         statusFilter !== 'all' ||
         priorityFilter !== 'all' ||
         typeFilter !== 'all' ||
+        categoryFilter !== 'all' ||
         projectFilter !== 'all' ||
         assignedToFilter !== 'all' ||
         createdByFilter !== 'all' ||
@@ -380,6 +390,8 @@ export default function TasksClient({
         setStatusFilter('all')
         setPriorityFilter('all')
         setTypeFilter('all')
+        setCategoryFilter('all')
+        setCategoryFilterQuery('')
         setProjectFilter('all')
         setAssignedToFilter('all')
         setCreatedByFilter('all')
@@ -397,11 +409,12 @@ export default function TasksClient({
         _myTasksFilters.statusFilter = statusFilter
         _myTasksFilters.priorityFilter = priorityFilter
         _myTasksFilters.typeFilter = typeFilter
+        _myTasksFilters.categoryFilter = categoryFilter
         _myTasksFilters.projectFilter = projectFilter
         _myTasksFilters.assignedToFilter = assignedToFilter
         _myTasksFilters.createdByFilter = createdByFilter
         _myTasksFilters.dateRangeFilter = dateRangeFilter
-    }, [searchQuery, statusFilter, priorityFilter, typeFilter, projectFilter, assignedToFilter, createdByFilter, dateRangeFilter])
+    }, [searchQuery, statusFilter, priorityFilter, typeFilter, categoryFilter, projectFilter, assignedToFilter, createdByFilter, dateRangeFilter])
 
     // Handle date range changes with validation and auto-correction
     const handleDateRangeChange = useCallback((range: DateRange | undefined) => {
@@ -448,16 +461,24 @@ export default function TasksClient({
         [hasPermission]
     )
 
-    // Fetch current user for creator checks
+    // Only update filters on mount if query parameters are explicitly provided in the URL
     useEffect(() => {
-        const q = searchParams.get('search') || ''
-        const s = searchParams.get('status') || 'all'
-        const p = searchParams.get('priority') || 'all'
-        const proj = searchParams.get('project') || 'all'
-        setSearchQuery(q)
-        setStatusFilter(s)
-        setPriorityFilter(p)
-        setProjectFilter(proj)
+        const q = searchParams.get('search')
+        const s = searchParams.get('status')
+        const p = searchParams.get('priority')
+        const proj = searchParams.get('project')
+        const type = searchParams.get('type')
+        const cat = searchParams.get('category')
+        const assigned = searchParams.get('assignedTo')
+        const created = searchParams.get('createdBy')
+        if (q !== null) setSearchQuery(q)
+        if (s !== null) setStatusFilter(s)
+        if (p !== null) setPriorityFilter(p)
+        if (proj !== null) setProjectFilter(proj)
+        if (type !== null) setTypeFilter(type)
+        if (cat !== null) setCategoryFilter(cat)
+        if (assigned !== null) setAssignedToFilter(assigned)
+        if (created !== null) setCreatedByFilter(created)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -556,6 +577,15 @@ export default function TasksClient({
                             projects.forEach((p: ProjectSummary) => combined.set(p._id, p))
                             return Array.from(combined.values()).sort((a, b) => a.name.localeCompare(b.name))
                         })
+
+                        const catMap: Record<string, Array<{ key: string; title: string; order: number }>> = {}
+                        data.data.forEach((p: any) => {
+                            const cats = p.settings?.taskCategories
+                            if (Array.isArray(cats)) {
+                                catMap[p._id] = cats
+                            }
+                        })
+                        setProjectCategories(catMap)
                     }
                 }
             } catch (err) {
@@ -611,8 +641,8 @@ export default function TasksClient({
 
     const filteredProjectOptions = useMemo(() => {
         const query = projectFilterQuery.trim().toLowerCase()
-        if (!query) return projectOptions
-        return projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+        const list = !query ? projectOptions : projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+        return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
     }, [projectOptions, projectFilterQuery])
 
     const filteredAssignedToOptions = useMemo(() => {
@@ -621,11 +651,15 @@ export default function TasksClient({
             let options = assignedToOptions.filter(opt => opt._id === user.id)
             
             const query = assignedToFilterQuery.trim().toLowerCase()
-            if (!query) return options
-            return options.filter((member) =>
+            const list = !query ? options : options.filter((member) =>
                 `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
                 member.email.toLowerCase().includes(query)
             )
+            return [...list].sort((a, b) => {
+                const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+                const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+                return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+            })
         }
 
         // For non-QA users, apply normal filtering including project members
@@ -647,11 +681,15 @@ export default function TasksClient({
         }
 
         const query = assignedToFilterQuery.trim().toLowerCase()
-        if (!query) return options
-        return options.filter((member) =>
+        const list = !query ? options : options.filter((member) =>
             `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
             member.email.toLowerCase().includes(query)
         )
+        return [...list].sort((a, b) => {
+            const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+            const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+        })
     }, [assignedToOptions, assignedToFilterQuery, selectedProjectDetails, isQAEngineer, user])
 
     const filteredCreatedByOptions = useMemo(() => {
@@ -660,11 +698,15 @@ export default function TasksClient({
             let options = createdByOptions.filter(opt => opt._id === user.id)
             
             const query = createdByFilterQuery.trim().toLowerCase()
-            if (!query) return options
-            return options.filter((member) =>
+            const list = !query ? options : options.filter((member) =>
                 `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
                 member.email.toLowerCase().includes(query)
             )
+            return [...list].sort((a, b) => {
+                const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+                const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+                return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+            })
         }
 
         // For non-QA users, apply normal filtering including project members
@@ -686,11 +728,15 @@ export default function TasksClient({
         }
 
         const query = createdByFilterQuery.trim().toLowerCase()
-        if (!query) return options
-        return options.filter((member) =>
+        const list = !query ? options : options.filter((member) =>
             `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
             member.email.toLowerCase().includes(query)
         )
+        return [...list].sort((a, b) => {
+            const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim()
+            const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim()
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true })
+        })
     }, [createdByOptions, createdByFilterQuery, selectedProjectDetails, isQAEngineer, user])
 
     // Fetch project details when project filter changes
@@ -729,12 +775,48 @@ export default function TasksClient({
         }
     }, [selectedProjectDetails])
 
+    const categoryOptions = useMemo(() => {
+        if (projectFilter !== 'all') {
+            const list = projectCategories[projectFilter]
+            if (!Array.isArray(list)) return [] as Array<{ key: string; title: string }>
+            return [...list]
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map(c => ({ key: c.key, title: c.title }))
+        }
+        
+        const merged = new Map<string, string>()
+        Object.values(projectCategories).forEach(list => {
+            list.forEach(c => {
+                if (!merged.has(c.key)) merged.set(c.key, c.title)
+            })
+        })
+        return Array.from(merged.entries())
+            .map(([key, title]) => ({ key, title }))
+            .sort((a, b) => a.title.localeCompare(b.title))
+    }, [projectFilter, projectCategories])
+
+    const filteredCategoryOptions = useMemo(() => {
+        const q = categoryFilterQuery.trim().toLowerCase()
+        if (!q) return categoryOptions
+        return categoryOptions.filter(c => c.title.toLowerCase().includes(q))
+    }, [categoryOptions, categoryFilterQuery])
+
     // Reset status filter if current value is not valid for the new context
     useEffect(() => {
         if (statusFilter !== 'all' && !availableStatusOptions.includes(statusFilter as any)) {
             setStatusFilter('all')
         }
     }, [availableStatusOptions, statusFilter])
+
+    useEffect(() => {
+        if (categoryFilter === 'all') return
+        if (categoryOptions.length === 0) return
+        const isValid = categoryOptions.some(c => c.key === categoryFilter)
+        if (!isValid) {
+            setCategoryFilter('all')
+            setCategoryFilterQuery('')
+        }
+    }, [projectFilter, categoryOptions, categoryFilter])
 
     // Virtualization refs
     const parentRef = useRef<HTMLDivElement>(null)
@@ -751,6 +833,7 @@ export default function TasksClient({
             status?: string
             priority?: string
             type?: string
+            category?: string
             assignedTo?: string
             createdBy?: string
             createdAtFrom?: string
@@ -761,6 +844,7 @@ export default function TasksClient({
         if (statusFilter !== 'all') params.status = statusFilter
         if (priorityFilter !== 'all') params.priority = priorityFilter
         if (typeFilter !== 'all') params.type = typeFilter
+        if (categoryFilter !== 'all') params.category = categoryFilter
         if (canFilterUsers) {
             if (assignedToFilter !== 'all') params.assignedTo = assignedToFilter
             if (createdByFilter !== 'all') params.createdBy = createdByFilter
@@ -778,6 +862,7 @@ export default function TasksClient({
         statusFilter,
         priorityFilter,
         typeFilter,
+        categoryFilter,
         assignedToFilter,
         createdByFilter,
         dateRangeFilter,
@@ -799,6 +884,7 @@ export default function TasksClient({
             if (statusFilter !== 'all') params.set('status', statusFilter)
             if (priorityFilter !== 'all') params.set('priority', priorityFilter)
             if (typeFilter !== 'all') params.set('type', typeFilter)
+            if (categoryFilter !== 'all') params.set('category', categoryFilter)
             if (projectFilter !== 'all') params.set('project', projectFilter)
 
             // Only allow assignedTo and createdBy filters if user can filter users
@@ -852,6 +938,7 @@ export default function TasksClient({
         statusFilter,
         priorityFilter,
         typeFilter,
+        categoryFilter,
         projectFilter,
         assignedToFilter,
         createdByFilter,
@@ -869,6 +956,7 @@ export default function TasksClient({
         statusFilter: string
         priorityFilter: string
         typeFilter: string
+        categoryFilter: string
         projectFilter: string
         assignedToFilter: string
         createdByFilter: string
@@ -888,6 +976,7 @@ export default function TasksClient({
                 statusFilter: statusFilter || 'all',
                 priorityFilter: priorityFilter || 'all',
                 typeFilter: typeFilter || 'all',
+                categoryFilter: categoryFilter || 'all',
                 projectFilter: projectFilter || 'all',
                 assignedToFilter: assignedToFilter || 'all',
                 createdByFilter: createdByFilter || 'all',
@@ -910,6 +999,7 @@ export default function TasksClient({
             statusFilter: statusFilter || 'all',
             priorityFilter: priorityFilter || 'all',
             typeFilter: typeFilter || 'all',
+            categoryFilter: categoryFilter || 'all',
             projectFilter: projectFilter || 'all',
             assignedToFilter: assignedToFilter || 'all',
             createdByFilter: createdByFilter || 'all',
@@ -931,6 +1021,7 @@ export default function TasksClient({
             currentFilters.statusFilter !== prevFiltersRef.current.statusFilter ||
             currentFilters.priorityFilter !== prevFiltersRef.current.priorityFilter ||
             currentFilters.typeFilter !== prevFiltersRef.current.typeFilter ||
+            currentFilters.categoryFilter !== prevFiltersRef.current.categoryFilter ||
             currentFilters.projectFilter !== prevFiltersRef.current.projectFilter ||
             currentFilters.assignedToFilter !== prevFiltersRef.current.assignedToFilter ||
             currentFilters.createdByFilter !== prevFiltersRef.current.createdByFilter ||
@@ -946,6 +1037,7 @@ export default function TasksClient({
         statusFilter,
         priorityFilter,
         typeFilter,
+        categoryFilter,
         projectFilter,
         assignedToFilter,
         createdByFilter,
@@ -1005,6 +1097,17 @@ export default function TasksClient({
             case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-800'
             default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800'
         }
+    }
+
+    const getCategoryTitle = (task: Task): string | null => {
+        if (!task.category) return null
+        const pid = task.project?._id
+        const list = pid ? projectCategories[pid] : undefined
+        if (list) {
+            const found = list.find(c => c.key === task.category)
+            if (found) return found.title
+        }
+        return task.category
     }
 
     const getTruncatedTaskTitle = (title?: string) => {
@@ -1093,7 +1196,7 @@ const handlePageChange = (newPage: number) => {
 
     // Kanban actions
     const handleKanbanEditTask = (task: any) => {
-        router.push(`/tasks/${task._id}/edit`)
+        window.open(`/tasks/${task._id}/edit`, '_blank')
     }
 
     const handleKanbanDeleteTask = (taskId: string) => {
@@ -1137,6 +1240,11 @@ const handlePageChange = (newPage: number) => {
             setStatusUpdatingId(null)
         }
     }
+    const handleRefresh = async () => {
+        setRefreshKey((prev) => prev + 1)
+        await fetchTasks(false)
+    }
+
     const shouldShowInitialLoader = loading && tasks.length === 0
     const shouldShowInlineLoader = loading && tasks.length > 0
 
@@ -1263,7 +1371,7 @@ const handlePageChange = (newPage: number) => {
             </div>
 
             {/* Row 2: Project + Type + Assignee + Creator + Date range — Desktop: 20% each, Mobile: 2-col grid */}
-            <div className="hidden sm:grid sm:grid-cols-5 gap-2">
+            <div className="hidden sm:grid sm:grid-cols-6 gap-2">
                 {/* Project filter with search */}
                 <SearchableFilterSelect
                     value={projectFilter}
@@ -1279,6 +1387,23 @@ const handlePageChange = (newPage: number) => {
                     getLabel={(project) => project.name}
                     triggerClassName="h-10 w-full"
                 />
+
+                {/* Category filter */}
+                <SearchableFilterSelect
+                    value={categoryFilter}
+                    onValueChange={setCategoryFilter}
+                    query={categoryFilterQuery}
+                    onQueryChange={setCategoryFilterQuery}
+                    allLabel="All Categories"
+                    placeholder="All Categories"
+                    searchPlaceholder="Search categories"
+                    options={filteredCategoryOptions}
+                    allOptions={categoryOptions}
+                    getValue={(c) => c.key}
+                    getLabel={(c) => c.title}
+                    triggerClassName="h-10 w-full"
+                />
+              
 
                 {/* Type filter */}
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -1443,6 +1568,21 @@ const handlePageChange = (newPage: number) => {
                     triggerClassName="h-9 w-full"
                 />
 
+                <SearchableFilterSelect
+                    value={categoryFilter}
+                    onValueChange={setCategoryFilter}
+                    query={categoryFilterQuery}
+                    onQueryChange={setCategoryFilterQuery}
+                    allLabel="All Categories"
+                    placeholder="All Categories"
+                    searchPlaceholder="Search categories"
+                    options={filteredCategoryOptions}
+                    allOptions={categoryOptions}
+                    getValue={(c) => c.key}
+                    getLabel={(c) => c.title}
+                    triggerClassName="h-9 w-full"
+                />
+
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
                     <SelectTrigger className="h-9 w-full rounded-full border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[13px] font-medium text-[var(--apple-secondary-label)]">
                         <SelectValue placeholder="All Types" />
@@ -1562,6 +1702,11 @@ const handlePageChange = (newPage: number) => {
                         onClear={() => setTypeFilter('all')}
                     />
                     <FilterChip
+                        label={`Category: ${categoryOptions.find(c => c.key === categoryFilter)?.title ?? categoryFilter}`}
+                        active={categoryFilter !== 'all'}
+                        onClear={() => { setCategoryFilter('all'); setCategoryFilterQuery('') }}
+                    />
+                    <FilterChip
                         label={`Project: ${projectOptions.find(p => p._id === projectFilter)?.name ?? projectFilter}`}
                         active={projectFilter !== 'all'}
                         onClear={() => { setProjectFilter('all'); setProjectFilterQuery('') }}
@@ -1607,18 +1752,32 @@ const handlePageChange = (newPage: number) => {
                 <p className="text-[13px] text-[var(--apple-secondary-label)] font-apple-mono">
                     {totalCount} task{totalCount !== 1 ? 's' : ''}
                 </p>
-                <ViewSwitcher
-                    value={viewMode}
-                    onChange={(v) => {
-                        setViewMode(v)
-                        if (v === 'list' || v === 'grid') {
-                            setTasks([])
-                            setPagination({})
-                            fetchTasks(true)
-                        }
-                    }}
-                    options={['list', 'grid', 'kanban']}
-                />
+                <div className="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefresh}
+                        disabled={loading}
+                        className="rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] px-3 py-1.5 text-[13px] font-medium text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)] apple-transition flex items-center gap-1.5 h-8"
+                        title="Refresh tasks"
+                    >
+                        <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+                        Refresh
+                    </Button>
+                    <ViewSwitcher
+                        value={viewMode}
+                        onChange={(v) => {
+                            setViewMode(v)
+                            if (v === 'list' || v === 'grid') {
+                                setTasks([])
+                                setPagination({})
+                                fetchTasks(true)
+                            }
+                        }}
+                        options={['list', 'grid', 'kanban']}
+                    />
+                </div>
             </div>
 
             {/* ── List View ─────────────────────────────────────────────────────── */}
@@ -1652,7 +1811,7 @@ const handlePageChange = (newPage: number) => {
                                                             target.closest('.dropdown-menu') ||
                                                             target.closest('[data-radix-popper-content-wrapper]')
                                                         ) return
-                                                        router.push(`/tasks/${task._id}`)
+                                                        window.open(`/tasks/${task._id}`, '_blank')
                                                     }}
                                                 >
                                                     {/* Left: status dot circle */}
@@ -1702,6 +1861,7 @@ const handlePageChange = (newPage: number) => {
                                                             <StatusBadge status={task.status} />
                                                             <PriorityBadge priority={task.priority} />
                                                             <TypeBadge type={task.type} />
+                                                            <CategoryBadge category={task.category} title={getCategoryTitle(task)} />
                                                         </div>
 
                                                         {/* Meta chips row */}
@@ -1761,6 +1921,7 @@ const handlePageChange = (newPage: number) => {
                                                         <StatusBadge status={task.status} />
                                                         <PriorityBadge priority={task.priority} />
                                                         <TypeBadge type={task.type} />
+                                                        <CategoryBadge category={task.category} title={getCategoryTitle(task)} />
 
                                                         {/* Inline status change */}
                                                         <Select
@@ -1803,7 +1964,7 @@ const handlePageChange = (newPage: number) => {
                                                             <DropdownMenuContent align="end">
                                                                 <DropdownMenuItem onClick={(e) => {
                                                                     e.stopPropagation()
-                                                                    router.push(`/tasks/${task._id}`)
+                                                                    window.open(`/tasks/${task._id}`, '_blank')
                                                                 }}>
                                                                     <Eye className="h-4 w-4 mr-2" />
                                                                     View Task
@@ -1813,7 +1974,7 @@ const handlePageChange = (newPage: number) => {
                                                                     onClick={(e) => {
                                                                         e.stopPropagation()
                                                                         if (!canEditTask(task)) return
-                                                                        router.push(`/tasks/${task._id}/edit`)
+                                                                        window.open(`/tasks/${task._id}/edit`, '_blank')
                                                                     }}
                                                                 >
                                                                     <Edit className="h-4 w-4 mr-2" />
@@ -1876,7 +2037,7 @@ const handlePageChange = (newPage: number) => {
                                                             <DropdownMenuContent align="end">
                                                                 <DropdownMenuItem onClick={(e) => {
                                                                     e.stopPropagation()
-                                                                    router.push(`/tasks/${task._id}`)
+                                                                    window.open(`/tasks/${task._id}`, '_blank')
                                                                 }}>
                                                                     <Eye className="h-4 w-4 mr-2" />
                                                                     View Task
@@ -1886,7 +2047,7 @@ const handlePageChange = (newPage: number) => {
                                                                     onClick={(e) => {
                                                                         e.stopPropagation()
                                                                         if (!canEditTask(task)) return
-                                                                        router.push(`/tasks/${task._id}/edit`)
+                                                                        window.open(`/tasks/${task._id}/edit`, '_blank')
                                                                     }}
                                                                 >
                                                                     <Edit className="h-4 w-4 mr-2" />
@@ -1969,7 +2130,7 @@ const handlePageChange = (newPage: number) => {
                                                             target.closest('[role="menuitem"]') ||
                                                             target.closest('[data-radix-popper-content-wrapper]')
                                                         ) return
-                                                        router.push(`/tasks/${task._id}`)
+                                                        window.open(`/tasks/${task._id}`, '_blank')
                                                     }}
                                                 >
                                                     {/* Card header: title + priority badge + actions */}
@@ -2000,7 +2161,7 @@ const handlePageChange = (newPage: number) => {
                                                                 <DropdownMenuContent align="end">
                                                                     <DropdownMenuItem onClick={(e) => {
                                                                         e.stopPropagation()
-                                                                        router.push(`/tasks/${task._id}`)
+                                                                        window.open(`/tasks/${task._id}`, '_blank')
                                                                     }}>
                                                                         <Eye className="h-4 w-4 mr-2" />
                                                                         View Task
@@ -2010,7 +2171,7 @@ const handlePageChange = (newPage: number) => {
                                                                         onClick={(e) => {
                                                                             e.stopPropagation()
                                                                             if (!canEditTask(task)) return
-                                                                            router.push(`/tasks/${task._id}/edit`)
+                                                                            window.open(`/tasks/${task._id}/edit`, '_blank')
                                                                         }}
                                                                     >
                                                                         <Edit className="h-4 w-4 mr-2" />
@@ -2038,6 +2199,7 @@ const handlePageChange = (newPage: number) => {
                                                     <div className="flex items-center gap-2">
                                                         <StatusBadge status={task.status} />
                                                         <TypeBadge type={task.type} />
+                                                        <CategoryBadge category={task.category} title={getCategoryTitle(task)} />
                                                     </div>
 
                                                     {/* Meta row */}
@@ -2135,11 +2297,13 @@ const handlePageChange = (newPage: number) => {
                         <>
                             {shouldShowInlineLoader && <InlineLoader label="Refreshing board..." />}
                             <KanbanBoard
+                                key={refreshKey}
                                 projectId={projectFilter}
                                 filters={kanbanFilters}
                                 onProjectChange={setProjectFilter}
                                 onCreateTask={() => router.push('/tasks/create-new-task')}
                                 onEditTask={handleKanbanEditTask}
+                                onViewTask={(task) => window.open(`/tasks/${task._id}`, '_blank')}
                                 onDeleteTask={handleKanbanDeleteTask}
                             />
                             {tasks.length === 0 && !loading && (

@@ -20,21 +20,33 @@ import {
   Trash2,
   Paperclip,
   Check,
-  Info
+  Info,
+  Settings2
 } from 'lucide-react'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { AttachmentList } from '@/components/ui/AttachmentList'
 import { useNotify } from '@/lib/notify'
 import { TASK_TITLE_MAX_WORDS, countWords, truncateToMaxWords } from '@/lib/text/word-limit'
+import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
+import { Permission, PermissionGate } from '@/lib/permissions'
+import TaskCategoryManagerModal from './TaskCategoryManagerModal'
+
+interface TaskCategory {
+  key: string
+  title: string
+  order: number
+}
 
 interface CreateTaskModalProps {
   isOpen: boolean
   onClose: () => void
   projectId: string
   onTaskCreated: () => void
+  onRefreshTasks?: () => void
   defaultStatus?: string
   availableStatuses?: Array<{ key: string; title: string }>
   stayOnCurrentPage?: boolean // If true, don't redirect after task creation
+  sprintId?: string
 }
 
 interface User {
@@ -126,6 +138,7 @@ interface TaskFormData {
   story: string
   epic: string
   isBillable: boolean
+  category: string
 }
 
 export default function CreateTaskModal({
@@ -133,9 +146,11 @@ export default function CreateTaskModal({
   onClose,
   projectId,
   onTaskCreated,
-  defaultStatus: _defaultStatus,
-  availableStatuses: _availableStatuses,
-  stayOnCurrentPage = false
+  onRefreshTasks,
+  defaultStatus,
+  availableStatuses,
+  stayOnCurrentPage = false,
+  sprintId
 }: CreateTaskModalProps) {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
 
@@ -149,7 +164,7 @@ export default function CreateTaskModal({
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [projectQuery, setProjectQuery] = useState('')
-  const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [subtasks, setSubtasks] = useState<SubtaskItem[]>([])
   const [assignedTo, setAssignedTo] = useState<string[]>([])
   const [assigneeHourlyRates, setAssigneeHourlyRates] = useState<Record<string, string>>({})
   const [assigneeQuery, setAssigneeQuery] = useState('')
@@ -158,8 +173,12 @@ export default function CreateTaskModal({
   const [epics, setEpics] = useState<Epic[]>([])
   const [loadingStories, setLoadingStories] = useState(false)
   const [loadingEpics, setLoadingEpics] = useState(false)
+  const [loadingCategories, setLoadingCategories] = useState(false)
   const [storyQuery, setStoryQuery] = useState('')
   const [epicQuery, setEpicQuery] = useState('')
+  const [categoryQuery, setCategoryQuery] = useState('')
+  const [categories, setCategories] = useState<TaskCategory[]>([])
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false)
   const [formData, setFormData] = useState<TaskFormData>({
     title: '',
     description: '',
@@ -171,7 +190,8 @@ export default function CreateTaskModal({
     labels: [],
     story: '',
     epic: '',
-    isBillable: false
+    isBillable: false,
+    category: ''
   })
   const [titleWordLimitMessage, setTitleWordLimitMessage] = useState('')
   const [titleWordLimitIsError, setTitleWordLimitIsError] = useState(false)
@@ -325,6 +345,69 @@ export default function CreateTaskModal({
     }
   }, [user])
 
+  const getCategoryTitle = useCallback((categoryKey?: string): string => {
+    if (!categoryKey) return ''
+    const found = categories.find(c =>
+      c.key === categoryKey ||
+      c.key.toLowerCase() === categoryKey.toLowerCase() ||
+      c.title.toLowerCase() === categoryKey.toLowerCase()
+    )
+    return found ? found.title : categoryKey
+  }, [categories])
+
+  const fetchCategories = useCallback(async (projectIdParam: string | undefined) => {
+    if (!projectIdParam) {
+      setCategories([])
+      setLoadingCategories(false)
+      return
+    }
+
+    setLoadingCategories(true)
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(projectIdParam)}/task-categories`)
+      const data = await response.json()
+
+      if (!response.ok || !data.success || !Array.isArray(data.data)) {
+        setCategories([])
+        return
+      }
+
+      const sortedCategories = [...data.data].sort((a: TaskCategory, b: TaskCategory) => a.order - b.order)
+      setCategories(sortedCategories)
+      setFormData(prev => {
+        if (!prev.category) return prev
+        const match = sortedCategories.find(c =>
+          c.key === prev.category ||
+          c.key.toLowerCase() === prev.category.toLowerCase() ||
+          c.title.toLowerCase() === prev.category.toLowerCase()
+        )
+        return match ? { ...prev, category: match.key } : prev
+      })
+    } catch (error) {
+      console.error('Failed to fetch task categories:', error)
+      setCategories([])
+    } finally {
+      setLoadingCategories(false)
+    }
+  }, [])
+
+  const handleCategoriesUpdated = useCallback((updatedCategories: TaskCategory[], deleteInfo?: { deletedKey: string; targetKey?: string }) => {
+    setCategories(updatedCategories)
+    const resolveNext = (current: string) => {
+      if (deleteInfo && (current === deleteInfo.deletedKey || current.toLowerCase() === deleteInfo.deletedKey.toLowerCase())) {
+        return deleteInfo.targetKey || ''
+      }
+      const match = updatedCategories.find(c =>
+        c.key === current ||
+        c.key.toLowerCase() === current.toLowerCase() ||
+        c.title.toLowerCase() === current.toLowerCase()
+      )
+      return match ? match.key : ''
+    }
+    setFormData(prev => ({ ...prev, category: resolveNext(prev.category) }))
+    onRefreshTasks?.()
+  }, [onRefreshTasks])
+
   // Fetch project members when modal opens or project selection changes
   useEffect(() => {
     if (!isOpen) return
@@ -336,16 +419,21 @@ export default function CreateTaskModal({
       fetchProjectMembers(effectiveId)
       fetchStories(effectiveId)
       fetchEpics(effectiveId)
+      fetchCategories(effectiveId)
     } else {
       setProjectMembers([])
       setStories([])
       setEpics([])
+      setCategories([])
+      setCategoryQuery('')
+      setLoadingCategories(false)
+      setFormData(prev => ({ ...prev, category: '' }))
     }
 
     if (!projectId) {
       fetchProjects()
     }
-  }, [isOpen, projectId, selectedProjectId, fetchProjectMembers, fetchCurrentUser, fetchStories, fetchEpics])
+  }, [isOpen, projectId, selectedProjectId, fetchProjectMembers, fetchCurrentUser, fetchStories, fetchEpics, fetchCategories])
 
   // Reset form state whenever modal closes so it opens clean next time
   useEffect(() => {
@@ -362,7 +450,8 @@ export default function CreateTaskModal({
         labels: [],
         story: '',
         epic: '',
-        isBillable: false
+        isBillable: false,
+        category: ''
       })
       setTitleWordLimitMessage('')
       setTitleWordLimitIsError(false)
@@ -385,32 +474,7 @@ export default function CreateTaskModal({
   }, [isOpen, projectId])
 
 
-  const addSubtask = () => {
-    setSubtasks([...subtasks, {
-      title: '',
-      description: '',
-      status: 'backlog',
-      isCompleted: false
-    }])
-  }
 
-  const updateSubtask = (index: number, field: keyof Subtask, value: any) => {
-    setSubtasks(prev => {
-      const updated = [...prev]
-      updated[index] = {
-        ...updated[index],
-        [field]: field === 'status' ? (value as SubtaskStatus) : value
-      }
-      if (field === 'status') {
-        updated[index].isCompleted = (value as SubtaskStatus) === 'done'
-      }
-      return updated
-    })
-  }
-
-  const removeSubtask = (index: number) => {
-    setSubtasks(subtasks.filter((_, i) => i !== index))
-  }
 
   const addLabel = () => {
     const trimmed = newLabel.trim()
@@ -512,16 +576,22 @@ export default function CreateTaskModal({
       return
     }
     // Validate required fields including subtasks titles
-    const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
+    const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0)) ||
+      subtasks.some(st => (st.subtasks || []).some(n => !(n.title && n.title.trim().length > 0)))
     const missingDueDate = !(formData.dueDate && formData.dueDate.trim().length > 0)
+    const missingCategory = !formData.category
     if (
       !formData.title ||
       !hasProjectSelected ||
       missingDueDate ||
-      missingSubtaskTitle
+      missingSubtaskTitle ||
+      missingCategory
     ) {
       setLoading(false)
-      if (missingSubtaskTitle) {
+      if (missingCategory) {
+        notifyError({ title: 'Validation Error', message: 'Please select a task category' })
+        setError('Please select a task category')
+      } else if (missingSubtaskTitle) {
         notifyError({ title: 'Validation Error', message: 'Please fill in all required subtask titles' })
         setError('Please fill in all required subtask titles')
       } else if (missingDueDate) {
@@ -534,12 +604,30 @@ export default function CreateTaskModal({
       return
     }
     try {
-      const preparedSubtasks = subtasks.map(subtask => ({
-        title: subtask.title.trim(),
-        description: subtask.description?.trim() || undefined,
-        status: 'backlog', // Sub-tasks always created with backlog status
-        isCompleted: false
-      }))
+      const preparedSubtasks = subtasks
+        .filter(st => st.title && st.title.trim().length > 0)
+        .map(subtask => ({
+          title: subtask.title.trim(),
+          description: subtask.description?.trim() || undefined,
+          status: subtask.status || 'todo',
+          isCompleted: subtask.status === 'done' ? true : !!subtask.isCompleted,
+          assignedTo: subtask.assignedTo || undefined,
+          story: subtask.story || undefined,
+          dueDate: subtask.dueDate || undefined,
+          type: subtask.type || 'subtask',
+          priority: subtask.priority || 'medium',
+          estimatedHours: subtask.estimatedHours !== undefined && subtask.estimatedHours !== null && subtask.estimatedHours !== ''
+            ? Number(subtask.estimatedHours)
+            : undefined,
+          subtasks: (subtask.subtasks || [])
+            .filter(n => n.title && n.title.trim().length > 0)
+            .map(n => ({
+              title: n.title.trim(),
+              description: n.description?.trim() || undefined,
+              status: n.status || 'todo',
+              isCompleted: n.status === 'done' ? true : !!n.isCompleted
+            }))
+        }))
 
       const assignedToPayload = assignedTo.map(userId => {
         const member = projectMembers.find(m => m._id.toString() === userId.toString())
@@ -558,7 +646,7 @@ export default function CreateTaskModal({
         },
         body: JSON.stringify({
           ...formData,
-          status: 'backlog',
+          status: defaultStatus || 'backlog',
           project: effectiveProjectId,
           assignedTo: assignedToPayload,
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
@@ -589,6 +677,18 @@ export default function CreateTaskModal({
         return
       }
 
+      if (sprintId && data.data?._id) {
+        try {
+          await fetch(`/api/tasks/${data.data._id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sprint: sprintId })
+          })
+        } catch (sprintErr) {
+          console.error('Failed to link task to sprint:', sprintErr)
+        }
+      }
+
       notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
       setError('')
       onTaskCreated()
@@ -605,7 +705,8 @@ export default function CreateTaskModal({
         labels: [],
         story: '',
         epic: '',
-        isBillable: false
+        isBillable: false,
+        category: ''
       })
       setSubtasks([])
       setAssignedTo([])
@@ -649,7 +750,8 @@ export default function CreateTaskModal({
   )
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[700px] flex flex-col max-h-[90vh] overflow-hidden rounded-[var(--apple-radius-xl)] border-[var(--apple-separator)] shadow-2xl bg-[var(--apple-secondary-system-background)]">
         <DialogHeader className="border-b border-[var(--apple-separator)] px-6 py-4 bg-[var(--apple-bg-primary)]">
           <DialogTitle className="text-[17px] font-semibold text-[var(--apple-label)] tracking-tight">Create New Task</DialogTitle>
@@ -672,8 +774,10 @@ export default function CreateTaskModal({
                       ...prev,
                       story: '',
                       epic: '',
+                      category: '',
                       isBillable: false // Reset to unchecked when project changes
                     }))
+                    setCategoryQuery('')
                     setStories([])
                     setEpics([])
                     if (v) {
@@ -705,7 +809,7 @@ export default function CreateTaskModal({
                           className="mb-2"
                         />
                         <div className="max-h-56 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                          {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).map((p) => (
+                          {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true })).map((p) => (
                             <SelectItem key={p._id} value={p._id}>
                               <span className="truncate block">{p.name}</span>
                             </SelectItem>
@@ -828,6 +932,75 @@ export default function CreateTaskModal({
               </div>
 
               {hasProjectSelected && (
+                <div>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Category *</label>
+                    <PermissionGate permission={Permission.PROJECT_UPDATE} projectId={effectiveProjectId}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsCategoryManagerOpen(true)}
+                        disabled={!effectiveProjectId}
+                        className="h-7 px-2 text-xs"
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                        Manage
+                      </Button>
+                    </PermissionGate>
+                  </div>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => {
+                      if (!value) return
+                      setFormData(prev => ({ ...prev, category: value }))
+                    }}
+                    disabled={!effectiveProjectId || loadingCategories}
+                    onOpenChange={(open) => { if (open) setCategoryQuery('') }}
+                  >
+                    <SelectTrigger className="mt-0 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
+                      <SelectValue placeholder={!effectiveProjectId ? 'Select a project first' : loadingCategories ? 'Loading categories...' : 'Select a category'}>
+                        {formData.category ? getCategoryTitle(formData.category) : undefined}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={categoryQuery}
+                          onChange={(e) => setCategoryQuery(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          placeholder="Type to search categories"
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                          {loadingCategories ? (
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading categories...</span>
+                              </div>
+                          ) : (() => {
+                            const query = categoryQuery.toLowerCase().trim()
+                            const filteredCategories = categories.filter(category =>
+                              !query || category.title.toLowerCase().includes(query)
+                            )
+                            return filteredCategories.length === 0 ? (
+                              <div className="px-2 py-1 text-sm text-muted-foreground">No categories found for this project</div>
+                            ) : (
+                              filteredCategories.map((category) => (
+                                <SelectItem key={category.key} value={category.key}>
+                                  <span className="truncate block">{category.title}</span>
+                                </SelectItem>
+                              ))
+                            )
+                          })()}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {hasProjectSelected && (
                 <>
                   <div>
                     <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">User Story</label>
@@ -865,7 +1038,7 @@ export default function CreateTaskModal({
                               const q = storyQuery.toLowerCase().trim()
                               const filtered = stories.filter(s =>
                                 !q || s.title.toLowerCase().includes(q)
-                              )
+                              ).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
                               if (filtered.length === 0) {
                                 return (
@@ -935,7 +1108,7 @@ export default function CreateTaskModal({
 
                               const filtered = availableEpics.filter(e =>
                                 !q || e.title.toLowerCase().includes(q)
-                              )
+                              ).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
                               if (filtered.length === 0) {
                                 return (
@@ -1231,60 +1404,19 @@ export default function CreateTaskModal({
             </div>
 
             {/* Subtasks Section */}
-            <div className="space-y-3 mt-4 pt-4 border-t border-[var(--apple-separator)]">
-              <div className="flex items-center justify-between">
-                <h3 className="text-[14px] font-semibold text-[var(--apple-label)]">Subtasks</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addSubtask} className="rounded-full h-8 px-4 text-[13px] border-[var(--apple-separator)]">
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  Add Subtask
-                </Button>
-              </div>
-
-              {subtasks.map((subtask, index) => (
-                <div key={index} className="p-4 border border-[var(--apple-separator)] rounded-[var(--apple-radius-lg)] space-y-3 bg-[var(--apple-bg-primary)]">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-[13px] font-semibold text-[var(--apple-label)]">Subtask {index + 1}</h4>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeSubtask(index)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div>
-                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Title *</label>
-                    <Input
-                      value={subtask.title}
-                      onChange={(e) => updateSubtask(index, 'title', e.target.value)}
-                      placeholder="Subtask title"
-                      className="mt-1.5 h-9 rounded-[var(--apple-radius-pill)] text-[14px]"
-                      required
-                    />
-                  </div>
-
-                  {/* <div>
-                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Description</label>
-                    <Textarea
-                      value={subtask.description || ''}
-                      onChange={(e) => updateSubtask(index, 'description', e.target.value)}
-                      placeholder="Subtask description"
-                      rows={2}
-                    />
-                  </div> */}
-                </div>
-              ))}
-
-              {subtasks.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Target className="h-12 w-12 mx-auto mb-4" />
-                  <p>No subtasks added yet</p>
-                  <p className="text-sm">Click "Add Subtask" to create subtasks for this task</p>
-                </div>
-              )}
+            <div className="mt-4 pt-4 border-t border-[var(--apple-separator)]">
+              <SubtasksEditor
+                subtasks={subtasks}
+                onChange={setSubtasks}
+                projectMembers={projectMembers}
+                stories={stories}
+                onAssigneeAdded={(newUserId) => {
+                  if (!assignedTo.includes(newUserId)) {
+                    setAssignedTo(prev => [...prev, newUserId])
+                  }
+                }}
+                disabled={loading}
+              />
             </div>
 
           </form>
@@ -1298,7 +1430,9 @@ export default function CreateTaskModal({
             !(formData.title && formData.title.trim().length > 0) ||
             !(projectId || (selectedProjectId && selectedProjectId.trim().length > 0)) ||
             !(formData.dueDate && formData.dueDate.trim().length > 0) ||
-            subtasks.some(st => !(st.title && st.title.trim().length > 0))
+            !formData.category ||
+            subtasks.some(st => !(st.title && st.title.trim().length > 0)) ||
+            subtasks.some(st => (st.subtasks || []).some(n => !(n.title && n.title.trim().length > 0)))
           }>
             {loading ? (
               <>
@@ -1315,5 +1449,12 @@ export default function CreateTaskModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+      <TaskCategoryManagerModal
+        isOpen={isCategoryManagerOpen}
+        onClose={() => setIsCategoryManagerOpen(false)}
+        projectId={effectiveProjectId}
+        onCategoriesUpdated={handleCategoriesUpdated}
+      />
+    </>
   )
 }

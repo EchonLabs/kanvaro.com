@@ -6,16 +6,25 @@
 // Assignee is intentionally excluded: ownership is decided during sprint
 // planning, not at creation time (mirrors CreateTaskModal.tsx, which treats
 // assignedTo as optional).
+interface SubtaskTitle {
+  title: string
+  subtasks?: { title: string }[]
+}
+
+const hasTitle = (item: { title: string }) => !!(item.title && item.title.trim().length > 0)
+
 export function computeIsFormValid(params: {
   title: string
   project: string
   dueDate: string
-  subtasks: { title: string }[]
+  category: string
+  subtasks: SubtaskTitle[]
 }): boolean {
   return (
     !!params.title.trim() &&
     !!params.project &&
     !!params.dueDate &&
-    !params.subtasks.some(st => !(st.title && st.title.trim().length > 0))
+    !!params.category &&
+    params.subtasks.every(st => hasTitle(st) && (st.subtasks || []).every(hasTitle))
   )
 }

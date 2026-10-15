@@ -15,6 +15,7 @@ import { PermissionService } from '@/lib/permissions/permission-service'
 import { getOrgLocalDateString, getOrgLocalTimeString, calendarDayDiff, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
 
 import mongoose from 'mongoose'
+import { zonedTimeToUtc } from 'date-fns-tz'
 import { logActivity } from '@/lib/activity-logger'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
@@ -344,8 +345,10 @@ export async function POST(request: NextRequest) {
       hourlyRate,
       category,
       tags,
-      notes
+      notes,
+      timezone
     } = body
+    const clientTimezone = timezone || request.headers.get('x-timezone') || undefined
 
     if (!userId || !organizationId || !projectId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -511,6 +514,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Start time cannot be after end time' }, { status: 400 })
     }
 
+    const orgForTimezone = await Organization.findById(organizationId).select('timezone').lean()
+    const orgTimezone = (orgForTimezone as any)?.timezone || 'UTC'
+    const isValidDateOnly = typeof startDateOnly === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(startDateOnly)
+
     // Super Admin/Admin/HR can log any date, past or future — skip these checks entirely for them.
     if (!isUnrestrictedRole) {
       const now = new Date()
@@ -519,14 +526,10 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Future time logging not allowed' }, { status: 400 })
         }
       } else {
-        const orgForTimezone = await Organization.findById(organizationId).select('timezone').lean()
-        const orgTimezone = (orgForTimezone as any)?.timezone || 'UTC'
-
         // Prefer the exact calendar date the client picked (unambiguous) over re-deriving one
         // from the converted instant, which can land on the wrong day if the browser's timezone
         // differs from the organization's configured timezone. Fall back for older callers that
         // don't send it.
-        const isValidDateOnly = typeof startDateOnly === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(startDateOnly)
         const todayStr = getOrgLocalDateString(now, orgTimezone)
         const startDateStr = isValidDateOnly ? startDateOnly : getOrgLocalDateString(start, orgTimezone)
         const daysDiff = calendarDayDiff(startDateStr, todayStr)
@@ -570,30 +573,43 @@ export async function POST(request: NextRequest) {
 
     // Check daily hours limit (when overtime is NOT allowed)
     if (settings.allowOvertime === false && settings.maxDailyHours) {
-      // Calculate already logged hours for the day of the start time
-      const entryDay = new Date(start)
-      entryDay.setHours(0, 0, 0, 0)
-      const nextDay = new Date(entryDay)
-      nextDay.setDate(nextDay.getDate() + 1)
+      const getLoggedHoursForDay = async (tz: string) => {
+        const entryDateStr = isValidDateOnly ? startDateOnly : getOrgLocalDateString(start, tz)
+        const [ey, em, ed] = entryDateStr.split('-').map(Number)
+        const nextEntryDateStr = new Date(Date.UTC(ey, em - 1, ed + 1)).toISOString().slice(0, 10)
 
-      const dailyResult = await TimeEntry.aggregate([
-        {
-          $match: {
-            user: new mongoose.Types.ObjectId(userId),
-            organization: new mongoose.Types.ObjectId(organizationId),
-            startTime: { $gte: entryDay, $lt: nextDay }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            totalDuration: { $sum: '$duration' }
-          }
-        }
-      ])
+        const entryDay = zonedTimeToUtc(`${entryDateStr} 00:00:00`, tz)
+        const nextDay = zonedTimeToUtc(`${nextEntryDateStr} 00:00:00`, tz)
 
-      const dailyMinutesLogged = dailyResult.length > 0 ? dailyResult[0].totalDuration : 0
-      const dailyHoursLogged = dailyMinutesLogged / 60
+        const dailyResult = await TimeEntry.aggregate([
+          {
+            $match: {
+              user: new mongoose.Types.ObjectId(userId),
+              organization: new mongoose.Types.ObjectId(organizationId),
+              startTime: { $gte: entryDay, $lt: nextDay }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalDuration: { $sum: '$duration' }
+            }
+          }
+        ])
+
+        const dailyMinutes = dailyResult.length > 0 ? dailyResult[0].totalDuration : 0
+        return dailyMinutes / 60
+      }
+
+      let dailyHoursLogged = await getLoggedHoursForDay(orgTimezone)
+      if (clientTimezone && clientTimezone !== orgTimezone) {
+        try {
+          Intl.DateTimeFormat('en-US', { timeZone: clientTimezone }).format()
+          const deviceHours = await getLoggedHoursForDay(clientTimezone)
+          dailyHoursLogged = Math.min(dailyHoursLogged, deviceHours)
+        } catch { }
+      }
+
       const requestedHours = requestedDuration / 60
 
       if (dailyHoursLogged >= settings.maxDailyHours) {

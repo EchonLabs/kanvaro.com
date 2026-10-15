@@ -13,10 +13,19 @@ interface DatabaseConfig {
   uri: string
 }
 
+interface EnvConfig {
+  GROQ_API_KEY?: string
+  REDIS_URL?: string
+  GROQ_MODEL?: string
+  STANDUP_ANALYSIS_HOUR?: string
+  STANDUP_WORKING_CIRCLE_START_HOUR?: string
+}
+
 interface AppConfig {
   database?: DatabaseConfig
   setupCompleted: boolean
   organizationId?: string
+  env?: EnvConfig
 }
 
 const CONFIG_FILE = path.join(process.cwd(), 'config.json')
@@ -96,3 +105,35 @@ export function getMongoUri(): string | null {
   const dbConfig = getDatabaseConfig()
   return dbConfig?.uri || null
 }
+
+/**
+ * Read an environment value. config.json is the source of truth (it is
+ * gitignored and machine-local, replacing .env.local), but a real OS/Docker
+ * environment variable still takes precedence so deployments can override.
+ */
+export function getEnv(key: keyof EnvConfig): string | undefined {
+  return process.env[key] ?? loadConfig().env?.[key]
+}
+
+/**
+ * Populate process.env from the config.json `env` block so any code that reads
+ * `process.env.X` keeps working without changes. Existing env vars are left
+ * untouched, so OS/Docker values win over config.json.
+ */
+let envHydrated = false
+export function hydrateEnvFromConfig(): void {
+  if (envHydrated) return
+  envHydrated = true
+
+  const { env } = loadConfig()
+  if (!env) return
+
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined && value !== null && value !== '' && process.env[key] === undefined) {
+      process.env[key] = String(value)
+    }
+  }
+}
+
+// Hydrate as soon as this server-only module is first imported.
+hydrateEnvFromConfig()

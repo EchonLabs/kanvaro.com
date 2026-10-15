@@ -123,6 +123,7 @@ export default function TestCasesPage() {
   const filteredProjects = projects.filter(project =>
     !projectQuery.trim() || project.name.toLowerCase().includes(projectQuery.toLowerCase())
   )
+  .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))
 
   return (
     <MainLayout>
