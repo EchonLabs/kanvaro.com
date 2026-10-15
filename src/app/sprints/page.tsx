@@ -54,6 +54,7 @@ import {
   RotateCcw
 } from 'lucide-react'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { isLiveSprint, type SprintState } from '@/lib/standup/sprint-states'
 import {
   StatusBadge, PriorityBadge, GradientProgress,
   PageHeader, SectionLabel, TasksEmptyState, CardGridSkeleton,
@@ -65,7 +66,8 @@ interface Sprint {
   _id: string
   name: string
   description: string
-  status: 'planning' | 'active' | 'completed' | 'cancelled'
+  // Spec §8.1 adds `draft` and `planned` to the four states Kanvaro shipped with.
+  status: SprintState
   project: {
     _id: string
     name: string
@@ -430,7 +432,7 @@ const [searchQuery, setSearchQuery] = useState('')
       const sprintList: Sprint[] = Array.isArray(data.data) ? data.data : []
       const filtered = sprintList.filter(
         sprintOption =>
-          sprintOption._id !== excludeSprintId && ['planning', 'active'].includes(sprintOption.status)
+          sprintOption._id !== excludeSprintId && isLiveSprint(sprintOption.status)
       )
 
       setAvailableSprints(filtered)
@@ -542,7 +544,7 @@ const [searchQuery, setSearchQuery] = useState('')
             const allSprintsList = allSprintsData.data || []
             const nextSprint = allSprintsList.find((s: Sprint) => s.name === nextSprintName)
 
-            if (nextSprint && ['planning', 'active'].includes(nextSprint.status)) {
+            if (nextSprint && isLiveSprint(nextSprint.status)) {
               // Next sprint exists - auto-select it
               setSelectedTargetSprintId(nextSprint._id)
               setCompletionMode('existing')

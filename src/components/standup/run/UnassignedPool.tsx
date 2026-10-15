@@ -1,0 +1,261 @@
+'use client'
+
+import { useMemo, useRef, useState } from 'react'
+
+import type { PoolTask } from '@/lib/standup/allocation'
+import { standupStrings } from '@/lib/standup/strings'
+import { cn } from '@/lib/utils'
+
+import {
+  fromBoardMemberView,
+  fromPoolTask,
+  type AssignableMemberView,
+  type AssignableTaskView
+} from '../shared/AssignableTask'
+import { planButtonClass, planFieldClass } from '../planning/ui'
+import { TaskAssignmentSplitScreen } from '../shared/TaskAssignmentSplitScreen'
+
+import type { BoardMemberView } from './CapacityBoard'
+
+/**
+ * Panel 5's assignment surface (§15.8.7) — ALO-13 … ALO-17.
+ *
+ * The file is still called `UnassignedPool` because the pool is still what
+ * drives it, but since Task 8 it is the whole of Panel 5: the pool's two tabs,
+ * and the shared `TaskAssignmentSplitScreen`,
+ * with the team's cards down its right-hand side. The bespoke pool list, its
+ * own drag wiring and the separate capacity column are gone; what is left here
+ * is the run screen's own business.
+ *
+ * **The tabs stayed outside the split screen.** ALO-14's Unassigned /
+ * Assigned-but-not-planned distinction is not a filter over one list — the two
+ * tabs are two different questions, with different empty-state copy — so this
+ * chooses which `PoolTask[]` the shared component is handed rather than
+ * pushing a third dropdown into its filter row.
+ *
+ * **Pool tasks are handed over with no assignee.** A task in the
+ * assigned-but-not-planned tab does have an `assigneeIds`, but it has no
+ * allocation on *this* stand-up, which is what the right-hand side is about.
+ * Passing its assignee through would make `resolveMemberDrop` treat dropping
+ * it onto that very person as a no-op — precisely the drop a PM makes most
+ * often on that tab.
+ *
+ * **Every task still reaches a member's day by keyboard** (ALO-16/NFR-A2).
+ * The per-row "+" button that only ever targeted one globally selected member
+ * is replaced by the shared card's picker, which offers every member, and by
+ * the quick-add combobox on each member card. ALO-17's fit indicator moved
+ * with it: it is now shown per member, against that member's own gap, which is
+ * what it always meant.
+ */
+
+export interface UnassignedPoolProps {
+  unassigned: readonly PoolTask[]
+  assignedNotPlanned: readonly PoolTask[]
+  /** The stand-up's team. Adapted here, so the run screen keeps its own shape. */
+  members: readonly BoardMemberView[]
+  /** The sprint's full pool size, for the D-K pagination line. */
+  totalCount: number
+  /** Shown once in the split screen's header rather than on every card. */
+  sprintLabel?: string
+  /**
+   * The one call a drop and the picker both make.
+   *
+   * A promise is returned through to the split screen, which keeps its
+   * `assigning` lock raised until it settles. Returning nothing is allowed so a
+   * synchronous caller (a test stub, say) still type-checks — but a caller
+   * doing real work must return its promise or the shell's guard against a
+   * second drop racing the first is silently defeated.
+   */
+  onAssign: (memberId: string, taskId: string) => void | Promise<void>
+  /** Run-only card content — see `CapacityBoard.tsx`'s three exports. */
+  renderMemberAlways?: (member: AssignableMemberView) => React.ReactNode
+  renderMemberExpanded?: (member: AssignableMemberView) => React.ReactNode
+  renderMemberTaskRow?: (
+    member: AssignableMemberView,
+    task: AssignableTaskView
+  ) => React.ReactNode
+  onShowMore?: () => void
+  readOnly?: boolean
+  locale?: string
+  className?: string
+}
+
+type TabId = 'unassigned' | 'assigned_not_planned'
+
+export function UnassignedPool({
+  unassigned,
+  assignedNotPlanned,
+  members,
+  totalCount,
+  sprintLabel,
+  onAssign,
+  renderMemberAlways,
+  renderMemberExpanded,
+  renderMemberTaskRow,
+  onShowMore,
+  readOnly = false,
+  locale,
+  className
+}: UnassignedPoolProps) {
+  // Assignment happens during sprint planning now (PC-8), so the unassigned
+  // tab should normally be empty on day one and the work worth looking at is
+  // the assigned-but-not-yet-planned pile. Opening on an empty tab reads as a
+  // broken panel.
+  const [tab, setTab] = useState<TabId>(
+    unassigned.length > 0 ? 'unassigned' : 'assigned_not_planned'
+  )
+  const tabRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
+    unassigned: null,
+    assigned_not_planned: null
+  })
+
+  const source = tab === 'unassigned' ? unassigned : assignedNotPlanned
+
+  const tasks = useMemo(
+    // `assigneeId: null` deliberately — see the docblock. Nothing in the pool
+    // is planned into anybody's day, which is the only assignment this screen
+    // is about.
+    () => source.map((task) => ({ ...fromPoolTask(task), assigneeId: null })),
+    [source]
+  )
+
+  const memberViews = useMemo(() => members.map(fromBoardMemberView), [members])
+
+  const shown = unassigned.length + assignedNotPlanned.length
+
+  const onTabKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    event.preventDefault()
+    const next: TabId = tab === 'unassigned' ? 'assigned_not_planned' : 'unassigned'
+    setTab(next)
+    tabRefs.current[next]?.focus()
+  }
+
+  return (
+    <section className={cn('flex flex-col gap-3', className)} aria-label="Task pool">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div role="tablist" aria-label="Task pool tabs" className="flex gap-1.5">
+          <PoolTab
+            id="unassigned"
+            selected={tab === 'unassigned'}
+            label={standupStrings.pool.tabUnassigned({ count: unassigned.length })}
+            onSelect={setTab}
+            onKeyDown={onTabKeyDown}
+            register={(node) => {
+              tabRefs.current.unassigned = node
+            }}
+          />
+          <PoolTab
+            id="assigned_not_planned"
+            selected={tab === 'assigned_not_planned'}
+            label={standupStrings.pool.tabAssignedNotPlanned({
+              count: assignedNotPlanned.length
+            })}
+            onSelect={setTab}
+            onKeyDown={onTabKeyDown}
+            register={(node) => {
+              tabRefs.current.assigned_not_planned = node
+            }}
+          />
+        </div>
+
+        {/* D-K — the pool paginates rather than loading an unbounded sprint.
+            Distinct from the split screen's own "showing N of M", which
+            counts what the filters left of the tab currently open. */}
+        <div className="apple-type-caption flex items-center gap-2 text-[var(--plan-muted)]">
+          <span>{standupStrings.pool.showingCount({ shown, total: totalCount })}</span>
+          {onShowMore && shown < totalCount && (
+            <button
+              type="button"
+              onClick={onShowMore}
+              className={planButtonClass('secondary', undefined, 'sm')}
+            >
+              {standupStrings.pool.showMore()}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <TaskAssignmentSplitScreen
+        // `minmax(0,1fr)`: the single column otherwise sizes to the filter
+        // row's content and clips the cards on a phone. Two equal columns
+        // from `xl`, matching the run screen's other paired sections
+        // (`RUN_TWO_UP_CLASSES`) instead of the split screen's own 1 : 1.15
+        // split from `lg`, so every section's halves meet at one middle line.
+        className="grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-2 xl:items-stretch"
+        // Side by side, the backlog is exactly as tall as the team panel: its
+        // own content is taken out of the row's height (`contain: size`) so
+        // the team cards set it, and the task list scrolls inside.
+        repositoryClassName="xl:min-h-[28rem] xl:[contain:size]"
+        repositoryListClassName="xl:max-h-none xl:min-h-0 xl:flex-1"
+        // Type and sort only. Priority and skill made five controls for a
+        // list the PM scans in a meeting; sort already orders by priority.
+        filters={['type']}
+        repositoryTitle={standupStrings.run.allocationBacklogTitle()}
+        teamTitle={standupStrings.run.allocationBoardTitle()}
+        headingClassName="apple-type-body font-semibold text-[var(--plan-text)]"
+        panelClassName="p-5"
+        sprintLabel={sprintLabel}
+        tasks={tasks}
+        members={memberViews}
+        busy={readOnly}
+        locale={locale}
+        emptyPoolMessage={
+          tab === 'unassigned'
+            ? standupStrings.pool.emptyUnassigned()
+            : standupStrings.pool.emptyAssignedNotPlanned()
+        }
+        renderMemberAlways={renderMemberAlways}
+        renderMemberExpanded={renderMemberExpanded}
+        renderMemberTaskRow={renderMemberTaskRow}
+        onAssign={async (taskId, memberId) => {
+          // The pool's own droppable resolves to `null`, which here would mean
+          // "unplan" — but nothing in the pool is planned, so the shared
+          // component's no-op guard has already swallowed it. Guarded anyway
+          // rather than trusting that from a distance.
+          if (!memberId) return
+          // Awaited, not fired-and-forgotten: the split screen keeps its
+          // pickers and droppables locked for exactly as long as this resolves.
+          await onAssign(memberId, taskId)
+        }}
+      />
+    </section>
+  )
+}
+
+function PoolTab({
+  id,
+  selected,
+  label,
+  onSelect,
+  onKeyDown,
+  register
+}: {
+  id: TabId
+  selected: boolean
+  label: string
+  onSelect: (id: TabId) => void
+  onKeyDown: (event: React.KeyboardEvent) => void
+  register: (node: HTMLButtonElement | null) => void
+}) {
+  return (
+    <button
+      ref={register}
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      // Roving tabindex: one stop for the tablist, arrows move within it.
+      tabIndex={selected ? 0 : -1}
+      onClick={() => onSelect(id)}
+      onKeyDown={onKeyDown}
+      className={cn(
+        'apple-transition apple-type-caption rounded-[var(--apple-radius-sm)] px-2.5 py-1 font-semibold',
+        selected
+          ? 'bg-[var(--plan-info-bg)] text-[var(--plan-accent-ink)]'
+          : 'text-[var(--plan-muted)] hover:bg-[var(--plan-surface)] hover:text-[var(--plan-text)]'
+      )}
+    >
+      {label}
+    </button>
+  )
+}

@@ -18,6 +18,7 @@ import { useCurrencies } from '@/hooks/useCurrencies'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useNotify } from '@/lib/notify'
 import { formatToTitleCase } from '@/lib/utils'
+import { shouldTickWizardStep } from '@/lib/project-wizard-steps'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthContext } from '@/contexts/AuthContext'
 import {
@@ -1020,7 +1021,7 @@ export default function CreateProjectPage() {
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground'
                       }`}>
-                      {currentStep > step.id ? (
+                      {shouldTickWizardStep(currentStep, step.id, formData) ? (
                         <CheckCircle className="h-4 w-4" />
                       ) : (
                         step.id

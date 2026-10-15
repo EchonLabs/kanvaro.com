@@ -159,7 +159,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
-    const PAGE_SIZE = Math.min(limit, 100)
+    // See the epics route: a picker asking for every sprint must not be handed
+    // the first page and no indication there are more.
+    const wantsAll = searchParams.get('all') === 'true'
+    const PAGE_SIZE = wantsAll ? 500 : Math.min(limit, 100)
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || ''
     const projectFilter = searchParams.get('project') || ''
@@ -442,6 +445,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Always include the creator as a sprint member, in addition to whoever else was invited
+    const requestedTeamMembers: string[] = Array.isArray(teamMembers) ? teamMembers : []
+    const sprintTeamMembers = Array.from(
+      new Set([userId.toString(), ...requestedTeamMembers.map((id: any) => id.toString())])
+    )
+
     // Create sprint
     const sprint = new Sprint({
       name,
@@ -455,7 +464,7 @@ export async function POST(request: NextRequest) {
       goal: goal || '',
       capacity: capacity || 0,
       velocity: 0,
-      teamMembers: Array.isArray(teamMembers) ? teamMembers : []
+      teamMembers: sprintTeamMembers
     })
 
     await sprint.save()
@@ -466,10 +475,11 @@ export async function POST(request: NextRequest) {
       .populate('createdBy', 'firstName lastName email')
       .populate('teamMembers', 'firstName lastName email')
 
-    // Send email notifications to team members (asynchronously)
-    if (teamMembers && teamMembers.length > 0) {
+    // Send email notifications to invited team members (asynchronously), excluding the creator
+    const invitedMemberIds = requestedTeamMembers.filter(id => id.toString() !== userId.toString())
+    if (invitedMemberIds.length > 0) {
       const User = (await import('@/models/User')).User
-      const teamMemberUsers = await User.find({ _id: { $in: teamMembers } }).select('firstName lastName email')
+      const teamMemberUsers = await User.find({ _id: { $in: invitedMemberIds } }).select('firstName lastName email')
 
       if (teamMemberUsers.length > 0) {
         // Send emails in background - don't await
@@ -499,7 +509,7 @@ export async function POST(request: NextRequest) {
         startDate,
         endDate,
         goal: goal || undefined,
-        teamMemberCount: teamMembers?.length || 0
+        teamMemberCount: sprintTeamMembers.length
       }
     }).catch(err => console.error('Failed to log sprint creation activity:', err))
 
