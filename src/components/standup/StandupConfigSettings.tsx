@@ -202,7 +202,7 @@ export function StandupConfigSettings({
         <div className="mt-4">
           <Field
             label="Meeting URL"
-            hint="Shown as a Join Meeting button on the run screen and on each member's My Stand-up"
+            hint="Shown as a Join Meeting button on the run screen and on each member's Standups page"
             type="url"
             value={settings.meetingUrl ?? ''}
             onChange={(value) => update('meetingUrl', value)}

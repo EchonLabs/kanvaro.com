@@ -124,7 +124,7 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
   // sidebar's own label is both correct and consistent. Passed as a prop,
   // not via `useBreadcrumb()` — see the run screen page for why that hook
   // silently no-ops when called from a page component.
-  const breadcrumbItems = [{ label: 'My Stand-up' }]
+  const breadcrumbItems = [{ label: 'Standups' }]
 
   // The auth check runs asynchronously (`useAuth`'s `checkAuth`); until it
   // settles, `user` is indistinguishable from "genuinely no session" — both

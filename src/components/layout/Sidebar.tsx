@@ -142,7 +142,7 @@ const navigationItems = [
   },
   {
     id: 'standup',
-    label: 'Standup',
+    label: 'Sprint Management',
     icon: Rocket,
     path: '/sprints',
     children: [
@@ -165,7 +165,7 @@ const navigationItems = [
         // resolves per-user server-side and shows an explanatory empty state
         // when there is nothing to show, so no client-side gate is needed.
         id: 'standup-my',
-        label: 'My Stand-up',
+        label: 'Standups',
         icon: Zap,
         path: '/my/standup'
       }

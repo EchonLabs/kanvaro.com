@@ -697,7 +697,7 @@ export const standupStrings = {
    * because this screen's whole layout — not just a row — is read-only.
    */
   my: {
-    title: () => 'My Stand-up',
+    title: () => 'Standups',
     noStandup: () => 'You have no stand-up open right now.',
     /**
      * Shown under `noStandup`. A blank screen with one sentence gave no way

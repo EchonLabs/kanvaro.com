@@ -126,7 +126,7 @@ const navigationItems = [
   },
   {
     id: 'standup',
-    label: 'Standup',
+    label: 'Sprint Management',
     icon: Rocket,
     path: '/sprints',
     children: [
@@ -143,7 +143,7 @@ const navigationItems = [
         // this on it would hide it from every plain team member, the exact
         // audience this screen is for.
         id: 'standup-my',
-        label: 'My Stand-up',
+        label: 'Standups',
         icon: Zap,
         path: '/my/standup'
       }

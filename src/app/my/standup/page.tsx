@@ -45,14 +45,14 @@ export default async function MyStandupPage() {
     // cross-project read on which sprints need attention.
     if (OVERSIGHT_ROLES.includes(authResult.user.role)) {
       return (
-        <MainLayout breadcrumbItems={[{ label: 'My Stand-up' }]}>
+        <MainLayout breadcrumbItems={[{ label: 'Standups' }]}>
           <StandupOversightScreen />
         </MainLayout>
       )
     }
 
     return (
-      <MainLayout breadcrumbItems={[{ label: 'My Stand-up' }]}>
+      <MainLayout breadcrumbItems={[{ label: 'Standups' }]}>
         <div className="flex flex-col items-center justify-center gap-1 px-8 py-20 text-center">
           <div className="mb-4 rounded-2xl bg-[var(--apple-quaternary-fill)] p-4 text-[var(--apple-tertiary-label)]">
             <CalendarOff className="h-6 w-6" strokeWidth={1.75} />
