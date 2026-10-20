@@ -588,6 +588,37 @@ describe('PokerModal — reveal layout (votes grid, median stat, quick-pick esti
     expect(screen.getByTestId('poker-stat-max')).toHaveTextContent('5')
   })
 
+  it('keeps Revote and Set estimate for the facilitator only, and greys out the estimate picker for everyone else', async () => {
+    global.fetch = fetchMockRevealed(false) as any
+
+    renderModal({ isFacilitator: false })
+
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
+
+    expect(screen.queryByRole('button', { name: 'Revote' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Set estimate/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Waiting for the facilitator to set the estimate.')).toBeInTheDocument()
+
+    // Visible so the room can follow the decision, but inert.
+    expect(screen.getByTestId('poker-final-estimate')).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByLabelText('Final estimate')).toBeDisabled()
+    for (const chip of within(screen.getByRole('group', { name: 'Quick-pick estimate' })).getAllByRole('button')) {
+      expect(chip).toBeDisabled()
+    }
+  })
+
+  it('lets the facilitator use the same estimate picker', async () => {
+    global.fetch = fetchMockRevealed(true) as any
+
+    renderModal({ isFacilitator: true })
+
+    await waitFor(() => expect(screen.getByText('The table has spoken')).toBeInTheDocument())
+
+    expect(screen.getByRole('button', { name: 'Revote' })).toBeEnabled()
+    expect(screen.getByTestId('poker-final-estimate')).toHaveAttribute('aria-disabled', 'false')
+    expect(screen.getByLabelText('Final estimate')).toBeEnabled()
+  })
+
   it('renders each revealed vote as its own tile naming the voter and their card', async () => {
     global.fetch = fetchMockRevealed(false) as any
 
