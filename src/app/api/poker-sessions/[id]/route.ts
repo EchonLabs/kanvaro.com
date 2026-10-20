@@ -23,7 +23,7 @@ export const dynamic = 'force-dynamic'
 
 export const GET = withPokerPermission(
   { permission: Permission.SPRINT_VIEW },
-  async (_request, { pokerSession }) => {
+  async (_request, { pokerSession, userId }) => {
     // A facilitator who opted out of voting (PLN-11) never casts a vote of
     // their own, so the vote() response — the only other place progress is
     // computed — never reaches them. Without this, their "Reveal" control
@@ -31,6 +31,10 @@ export const GET = withPokerPermission(
     let progress:
       | { round: number; voted: number; expected: number; votedVoterIds: string[] }
       | undefined
+    // The viewer's own card for the round in progress, so a modal reopened
+    // after an accidental close shows what they already picked. Only ever the
+    // caller's own vote — other voters' cards still wait for reveal (PLN-11).
+    let myVote: { taskId: string; round: number; card: string } | undefined
     const currentEntry = pokerSession.currentTask
       ? pokerSession.queue.find(
           (item: any) => item.task?.toString() === pokerSession.currentTask.toString()
@@ -44,8 +48,13 @@ export const GET = withPokerPermission(
         task: currentEntry.task,
         round
       })
-        .select('voter')
+        .select('voter card')
         .lean()
+
+      const own = (votes as any[]).find((vote) => vote.voter.toString() === userId)
+      if (own) {
+        myVote = { taskId: currentEntry.task.toString(), round, card: own.card }
+      }
 
       const result = voteProgress(
         (votes as any[]).map((vote) => ({ voterId: vote.voter.toString(), card: '' })),
@@ -137,6 +146,7 @@ export const GET = withPokerPermission(
         participants: participantIds,
         participantProfiles,
         progress,
+        myVote,
         queue: (pokerSession.queue ?? []).map((entry: any) => {
           const task = taskById.get(entry.task?.toString())
           return {

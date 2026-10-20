@@ -11,6 +11,7 @@
 import { PokerSession, PokerVote } from '@/models/PokerSession'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { StandupError } from '@/lib/standup/errors'
+import { broadcastPokerChange } from '@/lib/poker-broadcaster'
 import { assertValidVote, cardValue, voteProgress } from '@/lib/standup/poker'
 import { ok, readJson, withPokerPermission } from '@/lib/standup/route-helpers'
 
@@ -90,6 +91,8 @@ export const POST = withPokerPermission(
       (votes as any[]).map((vote) => ({ voterId: vote.voter.toString(), card: '' })),
       (pokerSession.participants ?? []).map((participant: any) => participant.toString())
     )
+
+    broadcastPokerChange(pokerSession._id.toString(), { reason: 'vote', taskId, round })
 
     return ok({
       round,

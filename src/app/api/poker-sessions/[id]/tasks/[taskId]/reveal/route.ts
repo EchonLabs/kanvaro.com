@@ -11,6 +11,7 @@ import { User } from '@/models/User'
 import { PokerSession, PokerVote } from '@/models/PokerSession'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { StandupError } from '@/lib/standup/errors'
+import { broadcastPokerChange } from '@/lib/poker-broadcaster'
 import { revealVotes } from '@/lib/standup/poker'
 import { ok, withPokerPermission } from '@/lib/standup/route-helpers'
 
@@ -53,6 +54,8 @@ export const POST = withPokerPermission(
     entry.revealedAt = new Date()
     entry.voteSpread = result.spread ?? undefined
     await pokerSession.save()
+
+    broadcastPokerChange(pokerSession._id.toString(), { reason: 'reveal', taskId, round })
 
     // Names only when identities are not hidden — resolving them regardless and
     // letting the client drop them would defeat the setting.

@@ -13,6 +13,8 @@ import mongoose from 'mongoose'
 import { PokerSession, PokerVote } from '@/models/PokerSession'
 import { Task } from '@/models/Task'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { broadcastUserEvent } from '@/lib/notification-broadcaster'
+import { broadcastPokerChange, closePokerSession } from '@/lib/poker-broadcaster'
 import { recordAudit } from '@/lib/standup/audit'
 import { StandupError } from '@/lib/standup/errors'
 import { deriveEstimateMinutes } from '@/lib/standup/estimates'
@@ -53,6 +55,12 @@ export const POST = withPokerPermission(
       entry.status = 'voting'
       entry.revealedAt = undefined
       await pokerSession.save()
+
+      broadcastPokerChange(pokerSession._id.toString(), {
+        reason: 'revote',
+        taskId,
+        round: entry.roundCount
+      })
 
       return ok({ round: entry.roundCount, status: 'voting' })
     }
@@ -142,6 +150,20 @@ export const POST = withPokerPermission(
       },
       context: { voteSpread: result.voteSpread, roundCount: round }
     })
+
+    const sessionId = pokerSession._id.toString()
+    broadcastPokerChange(sessionId, { reason: 'estimated', taskId, round })
+
+    if (pokerSession.status === 'completed') {
+      // Planning is over: end the session streams and take the invite popup /
+      // Join button away from everyone who was sent them.
+      closePokerSession(sessionId)
+      broadcastUserEvent(
+        (pokerSession.participants ?? []).map((participant: any) => participant.toString()),
+        'poker_closed',
+        { sessionId, sprintId: pokerSession.sprint?.toString() }
+      )
+    }
 
     return ok({
       taskId,

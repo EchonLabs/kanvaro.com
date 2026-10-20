@@ -8,6 +8,7 @@ import { PokerSession } from '@/models/PokerSession'
 import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 import { SprintPlanningSession } from '@/models/SprintPlanningSession'
 import { Task } from '@/models/Task'
+import { broadcastUserEvent } from '@/lib/notification-broadcaster'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { StandupError } from '@/lib/standup/errors'
 import { type EstimateUnit } from '@/lib/standup/estimates'
@@ -119,6 +120,22 @@ export const POST = withSprintPermission(
       currentTask: (tasks as any[])[0]._id,
       createdBy: userId
     })
+
+    // Tell the people the PM picked that a round is open. Live delivery only;
+    // anyone offline finds it via GET /api/poker-sessions/open-for-me. Best
+    // effort — the session already exists whether or not this lands.
+    broadcastUserEvent(
+      ((session as any).participants ?? [])
+        .map((participant: any) => participant.toString())
+        .filter((participantId: string) => participantId !== userId),
+      'poker_invite',
+      {
+        sessionId: (session as any)._id.toString(),
+        sprintId,
+        sprintName: sprint.name,
+        facilitatorId: userId
+      }
+    )
 
     return ok({ session, cards: deckCards(deckType) }, { status: 201 })
   }
