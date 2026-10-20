@@ -794,9 +794,11 @@ export async function PUT(
       updateData.position = maxPosition ? maxPosition.position + 1 : 0
     }
 
-    // When changing status to 'backlog', remove task from any sprint and move to backlog
+    // When changing status to 'backlog', remove task from any sprint, unarchive, and move to backlog
     if (updateData.status === 'backlog') {
       updateData.sprint = null
+      updateData.archived = false
+      updateData.completedAt = null
       if (currentTask.sprint) {
         const oldSprintId = (typeof currentTask.sprint === 'object' && currentTask.sprint !== null && '_id' in currentTask.sprint)
           ? currentTask.sprint._id

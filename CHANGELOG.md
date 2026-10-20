@@ -1,3 +1,10 @@
+## [1.46.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.2...v1.46.3) (2026-10-20)
+
+
+### Bug Fixes
+
+* unarchive and reset completedAt when moving task to backlog ([d222389](https://github.com/EchonLabs/kanvaro.com/commit/d222389293c60ae36414b4d9bd42982aa5ea6c2a))
+
 ## [1.46.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.1...v1.46.2) (2026-10-09)
 
 
