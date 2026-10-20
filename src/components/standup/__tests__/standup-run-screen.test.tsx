@@ -1436,13 +1436,11 @@ describe('Panel 5 — the pool assignment (Task 8 fix)', () => {
         allocations: []
       }
     ],
-    pool: { unassigned: [poolTask], assignedNotPlanned: [] },
+    pool: { unassigned: [], assignedNotPlanned: [{ ...poolTask, assigneeIds: ['kasun'] }] },
     poolTotal: 1
   })
 
   // The pool opens on "Assigned but not planned"; the task under test is unassigned.
-  // Switched outside any `act`, so the tab change has rendered by the lookup.
-  const openUnassigned = () => fireEvent.click(screen.getByRole('tab', { name: /^Unassigned/ }))
   const picker = () => screen.getByLabelText('Assign Export CSV to')
 
   it('confirms a successful assignment with a toast (ALO-16)', async () => {
@@ -1451,7 +1449,6 @@ describe('Panel 5 — the pool assignment (Task 8 fix)', () => {
     // this test drove would be unmounted before the toast is asserted.
     api.refresh = jest.fn().mockResolvedValue(data(withPool()))
     renderScreen(withPool(), api)
-    openUnassigned()
 
     await act(async () => {
       fireEvent.change(picker(), { target: { value: 'kasun' } })
@@ -1478,7 +1475,6 @@ describe('Panel 5 — the pool assignment (Task 8 fix)', () => {
     )
     api.refresh = jest.fn().mockResolvedValue(data(withPool()))
     renderScreen(withPool(), api)
-    openUnassigned()
 
     await act(async () => {
       fireEvent.change(picker(), { target: { value: 'kasun' } })

@@ -68,15 +68,30 @@ function task(id: string, overrides: Partial<PoolTask> = {}): PoolTask {
   }
 }
 
-const unassigned = [
-  task('KAN-301', { title: 'Export CSV', remainingEstimateMinutes: m(300), priority: 'high' }),
-  task('KAN-302', { title: 'Audit log', remainingEstimateMinutes: m(480), type: 'bug' }),
-  task('KAN-310', { title: 'Health check', remainingEstimateMinutes: m(60), priority: 'low' })
-]
-
+// Every task in the pool is owned: the run screen shows only the
+// assigned-but-not-planned pile (there is no Unassigned view).
 const assignedNotPlanned = [
-  task('KAN-255', { title: 'Rate limiter', assigneeIds: ['amal'] }),
-  task('KAN-260', { title: 'SSO callback', assigneeIds: ['ravi'] })
+  task('KAN-301', {
+    title: 'Export CSV',
+    remainingEstimateMinutes: m(300),
+    priority: 'high',
+    assigneeIds: ['amal'],
+    assigneeNames: ['Amal Perera']
+  }),
+  task('KAN-302', {
+    title: 'Audit log',
+    remainingEstimateMinutes: m(480),
+    type: 'bug',
+    assigneeIds: ['ravi'],
+    assigneeNames: ['Ravi Silva']
+  }),
+  task('KAN-310', {
+    title: 'Health check',
+    remainingEstimateMinutes: m(60),
+    priority: 'low',
+    assigneeIds: ['amal'],
+    assigneeNames: ['Amal Perera']
+  })
 ]
 
 function capacity(overrides: Partial<CapacityBreakdown> = {}): CapacityBreakdown {
@@ -126,37 +141,20 @@ const members: BoardMemberView[] = [
   }
 ]
 
-/**
- * The pool opens on "Assigned but not planned". Most suites here are about the
- * unassigned work, so they are moved to that tab; pass `opening: true` to
- * stay on whatever the panel opens on.
- */
-const renderPool = (
-  props: Partial<Parameters<typeof UnassignedPool>[0]> = {},
-  { opening = false }: { opening?: boolean } = {}
-) => {
+const renderPool = (props: Partial<Parameters<typeof UnassignedPool>[0]> = {}) => {
   const onAssign = jest.fn()
   render(
     <UnassignedPool
-      unassigned={unassigned}
+      unassigned={[]}
       assignedNotPlanned={assignedNotPlanned}
       members={members}
-      totalCount={unassigned.length + assignedNotPlanned.length}
+      totalCount={assignedNotPlanned.length}
       onAssign={onAssign}
       {...props}
     />
   )
-  if (!opening) fireEvent.click(screen.getByRole('tab', { name: /^Unassigned/ }))
   return onAssign
 }
-
-/**
- * Matches a tab by its exact label.
- *
- * A `RegExp` would be wrong here: the labels contain their counts in
- * parentheses (ALO-14), and `(3)` is a capture group, not a literal.
- */
-const tab = (name: string | RegExp) => screen.getByRole('tab', { name })
 
 const cards = () => screen.getAllByTestId('task-card')
 
@@ -173,70 +171,53 @@ beforeEach(() => {
 })
 
 describe('UnassignedPool', () => {
-  describe('ALO-14 — two tabs, counts in the labels', () => {
-    it('labels both tabs with their counts', () => {
+  describe('ALO-14 — one list, no Unassigned view', () => {
+    it('has no tabs, and no Unassigned control', () => {
       renderPool()
 
-      expect(tab(standupStrings.pool.tabUnassigned({ count: 3 }))).toBeInTheDocument()
+      expect(screen.queryByRole('tab')).not.toBeInTheDocument()
       expect(
-        tab(standupStrings.pool.tabAssignedNotPlanned({ count: 2 }))
+        screen.queryByText(standupStrings.pool.tabUnassigned({ count: 0 }))
+      ).not.toBeInTheDocument()
+    })
+
+    it('titles the list with the count of assigned-but-not-planned tasks', () => {
+      renderPool()
+
+      expect(
+        screen.getByText(standupStrings.pool.tabAssignedNotPlanned({ count: 3 }))
       ).toBeInTheDocument()
     })
 
-    it('opens on Assigned but not planned, even while there is unassigned work', () => {
-      renderPool({}, { opening: true })
+    it('lists only the assigned-but-not-planned tasks, even if the server sent unassigned ones', () => {
+      renderPool({ unassigned: [task('KAN-999', { title: 'Orphan task' })] })
 
-      expect(tab(/^Assigned but not planned/)).toHaveAttribute('aria-selected', 'true')
-      expect(screen.getByText('Rate limiter')).toBeInTheDocument()
-      expect(screen.queryByText('Export CSV')).not.toBeInTheDocument()
+      expect(screen.queryByText('Orphan task')).not.toBeInTheDocument()
+      expect(screen.getByText('Export CSV')).toBeInTheDocument()
     })
 
-    it('switches to the second tab', () => {
+    it('hands a task over with no assignee, so it can be dropped on its own owner', () => {
+      // These tasks *are* assigned — they have no allocation on this stand-up,
+      // which is what the right-hand side is about. Carrying the assignee
+      // through would make the most common drop a no-op.
       renderPool()
 
-      fireEvent.click(tab(/^Assigned but not planned/))
-
-      expect(screen.getByText('Rate limiter')).toBeInTheDocument()
-      expect(screen.queryByText('Export CSV')).not.toBeInTheDocument()
-    })
-
-    it('moves between tabs with the arrow keys (NFR-A2)', () => {
-      renderPool({}, { opening: true })
-
-      const first = tab(/^Assigned but not planned/)
-      first.focus()
-      fireEvent.keyDown(first, { key: 'ArrowLeft' })
-
-      expect(tab(/^Unassigned/)).toHaveAttribute('aria-selected', 'true')
-    })
-
-    it('hands an assigned-but-not-planned task over with no assignee, so it can be dropped on its own owner', () => {
-      // The tab's tasks *are* assigned — they have no allocation on this
-      // stand-up, which is what the right-hand side is about. Carrying the
-      // assignee through would make the most common drop on this tab a no-op.
-      renderPool()
-
-      fireEvent.click(tab(/^Assigned but not planned/))
-
-      expect(screen.getByLabelText('Assign Rate limiter to')).toHaveValue('')
+      expect(screen.getByLabelText('Assign Export CSV to')).toHaveValue('')
     })
   })
 
   describe('assignee on the card', () => {
     it("names each task's current assignee, so the PM knows who to give it to for the day", () => {
-      renderPool({
-        assignedNotPlanned: [
-          task('KAN-255', { title: 'Rate limiter', assigneeIds: ['amal'], assigneeNames: ['Amal Perera'] })
-        ]
-      })
+      renderPool()
 
-      fireEvent.click(tab(/^Assigned but not planned/))
-
-      expect(within(cards()[0]).getByTestId('task-assignee')).toHaveTextContent('Amal Perera')
+      const card = cards().find((el) => el.textContent?.includes('Export CSV'))!
+      expect(within(card).getByTestId('task-assignee')).toHaveTextContent('Amal Perera')
     })
 
-    it('shows no assignee line on a task nobody owns', () => {
-      renderPool()
+    it('shows no assignee line when the name is not known', () => {
+      renderPool({
+        assignedNotPlanned: [task('KAN-255', { title: 'Rate limiter', assigneeIds: ['amal'] })]
+      })
 
       expect(within(cards()[0]).queryByTestId('task-assignee')).not.toBeInTheDocument()
     })
@@ -298,59 +279,16 @@ describe('UnassignedPool', () => {
   })
 
   describe('empty states', () => {
-    it('distinguishes an empty tab from a filtered-empty one', () => {
-      // These mean opposite things — "there is no such work" versus "your
-      // filters hid it" — and only one of them has an action.
-      renderPool({ unassigned: [] })
-
-      // Selected explicitly: with nothing unassigned the pool opens on the
-      // other tab (see the default-tab test below), and this case is about the
-      // copy an empty tab shows once you are looking at it.
-      fireEvent.click(
-        screen.getByRole('tab', { name: standupStrings.pool.tabUnassigned({ count: 0 }) })
-      )
-
-      expect(screen.getByText(standupStrings.pool.emptyUnassigned())).toBeInTheDocument()
-      expect(
-        screen.queryByRole('button', { name: standupStrings.pool.clearFilters() })
-      ).not.toBeInTheDocument()
-    })
-
-    it('uses the other tab’s copy when it is the one that is empty', () => {
+    it('says so when planning gave every task a day already', () => {
+      // "There is no such work" — no filters are involved, so no action offered.
       renderPool({ assignedNotPlanned: [] })
-
-      fireEvent.click(
-        screen.getByRole('tab', {
-          name: standupStrings.pool.tabAssignedNotPlanned({ count: 0 })
-        })
-      )
 
       expect(
         screen.getByText(standupStrings.pool.emptyAssignedNotPlanned())
       ).toBeInTheDocument()
-    })
-
-    it('opens on the assigned tab when planning already gave every task an owner', () => {
-      // PC-8 makes an empty unassigned tab the normal day-one state, and
-      // opening on an empty tab reads as a broken panel rather than as
-      // "planning did its job".
-      renderPool({ unassigned: [] }, { opening: true })
-
       expect(
-        screen.getByRole('tab', {
-          name: standupStrings.pool.tabAssignedNotPlanned({ count: assignedNotPlanned.length })
-        })
-      ).toHaveAttribute('aria-selected', 'true')
-    })
-
-    it('does not switch to the unassigned tab just because it has work', () => {
-      renderPool({}, { opening: true })
-
-      expect(
-        screen.getByRole('tab', {
-          name: standupStrings.pool.tabAssignedNotPlanned({ count: assignedNotPlanned.length })
-        })
-      ).toHaveAttribute('aria-selected', 'true')
+        screen.queryByRole('button', { name: standupStrings.pool.clearFilters() })
+      ).not.toBeInTheDocument()
     })
 
     it('offers to clear the filters when they are what emptied the list', () => {
@@ -469,7 +407,7 @@ describe('UnassignedPool', () => {
       renderPool({ totalCount: 55 })
 
       expect(
-        screen.getByText(standupStrings.pool.showingCount({ shown: 5, total: 55 }))
+        screen.getByText(standupStrings.pool.showingCount({ shown: 3, total: 55 }))
       ).toBeInTheDocument()
     })
 
@@ -482,7 +420,7 @@ describe('UnassignedPool', () => {
     })
 
     it('hides the control when the whole pool is already shown', () => {
-      renderPool({ totalCount: 5, onShowMore: jest.fn() })
+      renderPool({ totalCount: 3, onShowMore: jest.fn() })
 
       expect(
         screen.queryByRole('button', { name: standupStrings.pool.showMore() })

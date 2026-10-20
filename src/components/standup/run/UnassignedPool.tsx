@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 
 import type { PoolTask } from '@/lib/standup/allocation'
 import { standupStrings } from '@/lib/standup/strings'
@@ -80,8 +80,6 @@ export interface UnassignedPoolProps {
   className?: string
 }
 
-type TabId = 'unassigned' | 'assigned_not_planned'
-
 export function UnassignedPool({
   unassigned,
   assignedNotPlanned,
@@ -97,17 +95,11 @@ export function UnassignedPool({
   locale,
   className
 }: UnassignedPoolProps) {
-  // Assignment happens during sprint planning now (PC-8), so the work worth
-  // looking at is the assigned-but-not-yet-planned pile. It is always the
-  // opening tab, even when the Unassigned tab has tasks: its count in the tab
-  // label is what points the PM there.
-  const [tab, setTab] = useState<TabId>('assigned_not_planned')
-  const tabRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
-    unassigned: null,
-    assigned_not_planned: null
-  })
-
-  const source = tab === 'unassigned' ? unassigned : assignedNotPlanned
+  // Assignment happens during sprint planning now (PC-8), so the only pile
+  // worth showing is the assigned-but-not-yet-planned one. There is no
+  // Unassigned view: the planning gate already refuses a sprint with unowned
+  // tasks.
+  const source = assignedNotPlanned
 
   const tasks = useMemo(
     // `assigneeId: null` deliberately — see the docblock. Nothing in the pool
@@ -121,41 +113,12 @@ export function UnassignedPool({
 
   const shown = unassigned.length + assignedNotPlanned.length
 
-  const onTabKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-    event.preventDefault()
-    const next: TabId = tab === 'unassigned' ? 'assigned_not_planned' : 'unassigned'
-    setTab(next)
-    tabRefs.current[next]?.focus()
-  }
-
   return (
     <section className={cn('flex flex-col gap-3', className)} aria-label="Task pool">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div role="tablist" aria-label="Task pool tabs" className="flex gap-1.5">
-          <PoolTab
-            id="unassigned"
-            selected={tab === 'unassigned'}
-            label={standupStrings.pool.tabUnassigned({ count: unassigned.length })}
-            onSelect={setTab}
-            onKeyDown={onTabKeyDown}
-            register={(node) => {
-              tabRefs.current.unassigned = node
-            }}
-          />
-          <PoolTab
-            id="assigned_not_planned"
-            selected={tab === 'assigned_not_planned'}
-            label={standupStrings.pool.tabAssignedNotPlanned({
-              count: assignedNotPlanned.length
-            })}
-            onSelect={setTab}
-            onKeyDown={onTabKeyDown}
-            register={(node) => {
-              tabRefs.current.assigned_not_planned = node
-            }}
-          />
-        </div>
+        <p className="apple-type-subheadline font-semibold text-[var(--plan-text)]">
+          {standupStrings.pool.tabAssignedNotPlanned({ count: assignedNotPlanned.length })}
+        </p>
 
         {/* D-K — the pool paginates rather than loading an unbounded sprint.
             Distinct from the split screen's own "showing N of M", which
@@ -198,11 +161,7 @@ export function UnassignedPool({
         members={memberViews}
         busy={readOnly}
         locale={locale}
-        emptyPoolMessage={
-          tab === 'unassigned'
-            ? standupStrings.pool.emptyUnassigned()
-            : standupStrings.pool.emptyAssignedNotPlanned()
-        }
+        emptyPoolMessage={standupStrings.pool.emptyAssignedNotPlanned()}
         renderMemberAlways={renderMemberAlways}
         renderMemberExpanded={renderMemberExpanded}
         renderMemberTaskRow={renderMemberTaskRow}
@@ -218,42 +177,5 @@ export function UnassignedPool({
         }}
       />
     </section>
-  )
-}
-
-function PoolTab({
-  id,
-  selected,
-  label,
-  onSelect,
-  onKeyDown,
-  register
-}: {
-  id: TabId
-  selected: boolean
-  label: string
-  onSelect: (id: TabId) => void
-  onKeyDown: (event: React.KeyboardEvent) => void
-  register: (node: HTMLButtonElement | null) => void
-}) {
-  return (
-    <button
-      ref={register}
-      type="button"
-      role="tab"
-      aria-selected={selected}
-      // Roving tabindex: one stop for the tablist, arrows move within it.
-      tabIndex={selected ? 0 : -1}
-      onClick={() => onSelect(id)}
-      onKeyDown={onKeyDown}
-      className={cn(
-        'apple-transition apple-type-caption rounded-[var(--apple-radius-sm)] px-2.5 py-1 font-semibold',
-        selected
-          ? 'bg-[var(--plan-info-bg)] text-[var(--plan-accent-ink)]'
-          : 'text-[var(--plan-muted)] hover:bg-[var(--plan-surface)] hover:text-[var(--plan-text)]'
-      )}
-    >
-      {label}
-    </button>
   )
 }
