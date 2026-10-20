@@ -126,7 +126,15 @@ const members: BoardMemberView[] = [
   }
 ]
 
-const renderPool = (props: Partial<Parameters<typeof UnassignedPool>[0]> = {}) => {
+/**
+ * The pool opens on "Assigned but not planned". Most suites here are about the
+ * unassigned work, so they are moved to that tab; pass `opening: true` to
+ * stay on whatever the panel opens on.
+ */
+const renderPool = (
+  props: Partial<Parameters<typeof UnassignedPool>[0]> = {},
+  { opening = false }: { opening?: boolean } = {}
+) => {
   const onAssign = jest.fn()
   render(
     <UnassignedPool
@@ -138,6 +146,7 @@ const renderPool = (props: Partial<Parameters<typeof UnassignedPool>[0]> = {}) =
       {...props}
     />
   )
+  if (!opening) fireEvent.click(screen.getByRole('tab', { name: /^Unassigned/ }))
   return onAssign
 }
 
@@ -174,12 +183,12 @@ describe('UnassignedPool', () => {
       ).toBeInTheDocument()
     })
 
-    it('opens on Unassigned, because that is the work with nobody looking after it', () => {
-      renderPool()
+    it('opens on Assigned but not planned, even while there is unassigned work', () => {
+      renderPool({}, { opening: true })
 
-      expect(tab(/^Unassigned/)).toHaveAttribute('aria-selected', 'true')
-      expect(screen.getByText('Export CSV')).toBeInTheDocument()
-      expect(screen.queryByText('Rate limiter')).not.toBeInTheDocument()
+      expect(tab(/^Assigned but not planned/)).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByText('Rate limiter')).toBeInTheDocument()
+      expect(screen.queryByText('Export CSV')).not.toBeInTheDocument()
     })
 
     it('switches to the second tab', () => {
@@ -192,13 +201,13 @@ describe('UnassignedPool', () => {
     })
 
     it('moves between tabs with the arrow keys (NFR-A2)', () => {
-      renderPool()
+      renderPool({}, { opening: true })
 
-      const first = tab(/^Unassigned/)
+      const first = tab(/^Assigned but not planned/)
       first.focus()
-      fireEvent.keyDown(first, { key: 'ArrowRight' })
+      fireEvent.keyDown(first, { key: 'ArrowLeft' })
 
-      expect(tab(/^Assigned but not planned/)).toHaveAttribute('aria-selected', 'true')
+      expect(tab(/^Unassigned/)).toHaveAttribute('aria-selected', 'true')
     })
 
     it('hands an assigned-but-not-planned task over with no assignee, so it can be dropped on its own owner', () => {
@@ -210,6 +219,26 @@ describe('UnassignedPool', () => {
       fireEvent.click(tab(/^Assigned but not planned/))
 
       expect(screen.getByLabelText('Assign Rate limiter to')).toHaveValue('')
+    })
+  })
+
+  describe('assignee on the card', () => {
+    it("names each task's current assignee, so the PM knows who to give it to for the day", () => {
+      renderPool({
+        assignedNotPlanned: [
+          task('KAN-255', { title: 'Rate limiter', assigneeIds: ['amal'], assigneeNames: ['Amal Perera'] })
+        ]
+      })
+
+      fireEvent.click(tab(/^Assigned but not planned/))
+
+      expect(within(cards()[0]).getByTestId('task-assignee')).toHaveTextContent('Amal Perera')
+    })
+
+    it('shows no assignee line on a task nobody owns', () => {
+      renderPool()
+
+      expect(within(cards()[0]).queryByTestId('task-assignee')).not.toBeInTheDocument()
     })
   })
 
@@ -305,7 +334,7 @@ describe('UnassignedPool', () => {
       // PC-8 makes an empty unassigned tab the normal day-one state, and
       // opening on an empty tab reads as a broken panel rather than as
       // "planning did its job".
-      renderPool({ unassigned: [] })
+      renderPool({ unassigned: [] }, { opening: true })
 
       expect(
         screen.getByRole('tab', {
@@ -314,12 +343,12 @@ describe('UnassignedPool', () => {
       ).toHaveAttribute('aria-selected', 'true')
     })
 
-    it('still opens on the unassigned tab when there is unassigned work', () => {
-      renderPool()
+    it('does not switch to the unassigned tab just because it has work', () => {
+      renderPool({}, { opening: true })
 
       expect(
         screen.getByRole('tab', {
-          name: standupStrings.pool.tabUnassigned({ count: unassigned.length })
+          name: standupStrings.pool.tabAssignedNotPlanned({ count: assignedNotPlanned.length })
         })
       ).toHaveAttribute('aria-selected', 'true')
     })

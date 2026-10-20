@@ -591,7 +591,7 @@ describe('the shapes (§15.8.10)', () => {
     expect(screen.queryByTestId('day-one-progress')).not.toBeInTheDocument()
   })
 
-  it('renders Panel 5 as the top panel on day one, per spec §15.8.10', () => {
+  it('keeps Attendance above Panel 5 on day one too', () => {
     renderScreen({ shape: 'day_one' })
 
     const panelFive = screen.getByRole('heading', { name: standupStrings.run.panel5() })
@@ -601,9 +601,9 @@ describe('the shapes (§15.8.10)', () => {
 
     // compareDocumentPosition returns a bitmask; DOCUMENT_POSITION_FOLLOWING
     // (4) means the *other* node comes after this one in document order — so
-    // asserting it here proves Panel 5 precedes Attendance in the DOM.
+    // asserting it here proves Attendance precedes Panel 5 in the DOM.
     expect(
-      panelFive.compareDocumentPosition(attendanceHeading) &
+      attendanceHeading.compareDocumentPosition(panelFive) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
   })
@@ -1440,6 +1440,9 @@ describe('Panel 5 — the pool assignment (Task 8 fix)', () => {
     poolTotal: 1
   })
 
+  // The pool opens on "Assigned but not planned"; the task under test is unassigned.
+  // Switched outside any `act`, so the tab change has rendered by the lookup.
+  const openUnassigned = () => fireEvent.click(screen.getByRole('tab', { name: /^Unassigned/ }))
   const picker = () => screen.getByLabelText('Assign Export CSV to')
 
   it('confirms a successful assignment with a toast (ALO-16)', async () => {
@@ -1448,6 +1451,7 @@ describe('Panel 5 — the pool assignment (Task 8 fix)', () => {
     // this test drove would be unmounted before the toast is asserted.
     api.refresh = jest.fn().mockResolvedValue(data(withPool()))
     renderScreen(withPool(), api)
+    openUnassigned()
 
     await act(async () => {
       fireEvent.change(picker(), { target: { value: 'kasun' } })
@@ -1474,6 +1478,7 @@ describe('Panel 5 — the pool assignment (Task 8 fix)', () => {
     )
     api.refresh = jest.fn().mockResolvedValue(data(withPool()))
     renderScreen(withPool(), api)
+    openUnassigned()
 
     await act(async () => {
       fireEvent.change(picker(), { target: { value: 'kasun' } })
