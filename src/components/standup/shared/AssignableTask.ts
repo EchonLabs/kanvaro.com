@@ -38,6 +38,12 @@ export interface AssignableTaskView {
   /** Stand-in: `PoolTask.labels` where available; omitted for planning-context tasks. */
   skills?: string[]
   assigneeId?: string | null
+  /**
+   * Who the task belongs to, for display only. Separate from `assigneeId`,
+   * which drives drop semantics: the run pool blanks that on purpose (see
+   * `UnassignedPool`) but the PM still needs to see the owner on the card.
+   */
+  assigneeName?: string
 }
 
 export interface AssignableMemberView {
@@ -100,7 +106,8 @@ export function fromPoolTask(t: PoolTask): AssignableTaskView {
     estimateMinutes: t.remainingEstimateMinutes,
     type: t.type,
     skills: t.labels.length > 0 ? t.labels : undefined,
-    assigneeId: t.assigneeIds[0] ?? null
+    assigneeId: t.assigneeIds[0] ?? null,
+    ...(t.assigneeNames?.length ? { assigneeName: t.assigneeNames.join(', ') } : {})
   }
 }
 

@@ -194,8 +194,19 @@ export function TaskCard({
         ) : undefined
       }
       footer={
-        task.priority || task.estimateMinutes !== undefined || task.skills?.length ? (
+        task.priority ||
+        task.estimateMinutes !== undefined ||
+        task.skills?.length ||
+        task.assigneeName ? (
           <>
+            {task.assigneeName && (
+              <span
+                data-testid="task-assignee"
+                className="apple-type-caption max-w-full truncate text-[var(--plan-muted)]"
+              >
+                {task.assigneeName}
+              </span>
+            )}
             {task.priority && (
               <span
                 data-testid="task-priority"

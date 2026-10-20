@@ -97,13 +97,11 @@ export function UnassignedPool({
   locale,
   className
 }: UnassignedPoolProps) {
-  // Assignment happens during sprint planning now (PC-8), so the unassigned
-  // tab should normally be empty on day one and the work worth looking at is
-  // the assigned-but-not-yet-planned pile. Opening on an empty tab reads as a
-  // broken panel.
-  const [tab, setTab] = useState<TabId>(
-    unassigned.length > 0 ? 'unassigned' : 'assigned_not_planned'
-  )
+  // Assignment happens during sprint planning now (PC-8), so the work worth
+  // looking at is the assigned-but-not-yet-planned pile. It is always the
+  // opening tab, even when the Unassigned tab has tasks: its count in the tab
+  // label is what points the PM there.
+  const [tab, setTab] = useState<TabId>('assigned_not_planned')
   const tabRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
     unassigned: null,
     assigned_not_planned: null

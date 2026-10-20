@@ -1999,8 +1999,6 @@ export function StandupRunScreen({
         </PlanBanner>
       )}
 
-      {isDayOne && panelFive}
-
       <AttendancePanel
         members={board.members}
         prompt={prompt}
@@ -2011,7 +2009,7 @@ export function StandupRunScreen({
         locale={locale}
       />
 
-      {!isDayOne && panelFive}
+      {panelFive}
 
       {/* Panels 2, 3 and 4 explain yesterday, so day one — which has no
           yesterday — shows none of them (§15.8.10). */}

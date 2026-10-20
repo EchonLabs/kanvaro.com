@@ -155,6 +155,8 @@ export interface PoolTask {
   /** Backlog rank. `position` on the Task document. */
   position: number
   assigneeIds: string[]
+  /** Display names for `assigneeIds`, same order. Absent where a caller has none. */
+  assigneeNames?: string[]
 }
 
 /** The subset of an allocation the partition needs. */

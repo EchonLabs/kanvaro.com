@@ -573,6 +573,23 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
     })
   }
 
+  // The pool shows who owns each task, and an owner is not necessarily on this
+  // stand-up's team, so `nameById` alone would leave them blank.
+  const assigneeNameById = new Map(nameById)
+  const unnamed = new Set<string>()
+  for (const task of tasks) {
+    for (const entry of task.assignedTo ?? []) {
+      const id = String(entry.user ?? entry)
+      if (!assigneeNameById.has(id)) unnamed.add(id)
+    }
+  }
+  if (unnamed.size > 0) {
+    const extra = (await User.find({ _id: { $in: Array.from(unnamed) } })
+      .select('firstName lastName email')
+      .lean()) as any[]
+    for (const person of extra) assigneeNameById.set(String(person._id), displayName(person))
+  }
+
   const members: BoardMember[] = context.memberIds.map((memberId) => {
     const rows = byMember.get(memberId) ?? []
     const recorded = attendanceByMember.get(memberId)
@@ -599,7 +616,7 @@ export async function loadAllocationBoard(standupId: string): Promise<Allocation
   const doneStatuses = context.settings?.doneStatuses ?? ['done', 'cancelled', 'released']
 
   const pool = partitionPool(
-    tasks.map(toPoolTask),
+    tasks.map((task) => toPoolTask(task, assigneeNameById)),
     allocations.map((row) => ({
       taskId: String(row.task),
       memberId: String(row.member),
@@ -863,7 +880,8 @@ function displayName(person: any): string {
   return full || person.email || String(person._id)
 }
 
-function toPoolTask(task: any): PoolTask {
+function toPoolTask(task: any, nameById: ReadonlyMap<string, string>): PoolTask {
+  const assigneeIds = (task.assignedTo ?? []).map((entry: any) => String(entry.user ?? entry))
   return {
     taskId: String(task._id),
     key: task.displayId,
@@ -875,7 +893,8 @@ function toPoolTask(task: any): PoolTask {
     epicId: task.epic ? String(task.epic) : undefined,
     remainingEstimateMinutes: minutes(task.remainingEstimateMinutes ?? 0),
     position: task.position ?? 0,
-    assigneeIds: (task.assignedTo ?? []).map((entry: any) => String(entry.user ?? entry))
+    assigneeIds,
+    assigneeNames: assigneeIds.map((id: string) => nameById.get(id) ?? '').filter(Boolean)
   }
 }
 
