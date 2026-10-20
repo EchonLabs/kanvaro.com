@@ -11,6 +11,7 @@ import { ContentLoader } from '@/components/ui/ContentLoader'
 import { DateTimeProvider } from '@/components/providers/DateTimeProvider'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useTimeTrackingNotifications } from '@/hooks/useTimeTrackingNotifications'
+import { PokerInvitePopup } from '@/components/standup/PokerInvitePopup'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -132,6 +133,7 @@ export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
             </div>
           </main>
         </div>
+        <PokerInvitePopup />
       </div>
       </BreadcrumbProvider>
     </DateTimeProvider>

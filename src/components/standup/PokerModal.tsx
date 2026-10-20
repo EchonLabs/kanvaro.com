@@ -26,6 +26,7 @@ import {
   PokerTaskNav,
   pokerPanelClass
 } from '@/components/standup/poker/ui'
+import { usePokerSessionStream } from '@/hooks/usePokerSessionStream'
 import { useNotify } from '@/lib/notify'
 import {
   abstentionOf,
@@ -38,8 +39,14 @@ import {
 } from '@/lib/standup/poker'
 import { cn } from '@/lib/utils'
 
-/** How often an open modal re-reads the session. */
+/** How often an open modal re-reads the session when the live stream is down. */
 const POLL_INTERVAL_MS = 4000
+
+/**
+ * While the stream is connected it signals every change, so this slower read is
+ * only a safety net for a signal that never arrived.
+ */
+const SAFETY_POLL_INTERVAL_MS = 30000
 
 const DECK_LABELS: Record<DeckType, string> = {
   fibonacci: 'Fibonacci',
@@ -305,8 +312,17 @@ export function PokerModal({
   // The facilitator advances the queue, but only their own finalize response
   // carries `nextTaskId`. Everyone else learns about the move by re-reading the
   // session — without this a voter sits on a task that has already been
-  // estimated and every card they click is refused. Polling rather than a live
-  // channel is deliberate: plan v3 descopes presence (RUN-24) and keeps polling.
+  // estimated and every card they click is refused. Everyone learns by
+  // re-reading the session: the live stream (SSE) says *when*, and the 4s poll
+  // below is the fallback whenever that stream is not connected. The stream
+  // carries no state — `sync` stays the single place state is derived.
+  const syncRef = useRef<(() => void) | null>(null)
+  const { isConnected: streamConnected } = usePokerSessionStream({
+    enabled: open && !sessionClosed,
+    sessionId,
+    onSignal: () => syncRef.current?.()
+  })
+
   useEffect(() => {
     if (!open) return
 
@@ -406,6 +422,15 @@ export function PokerModal({
         // A facilitator who opted out of voting (PLN-11) never calls vote()
         // themselves, so they need the poll to learn how many have voted —
         // without it their "Reveal" control never appears at all.
+        // Resuming after the modal was closed: restore the card this viewer
+        // already cast. Only fills an empty pick, so it never overrides what
+        // they have just chosen on this screen, and a revote (new round, no
+        // vote yet) yields no `myVote` so the pick stays cleared.
+        if (session.myVote && String(session.myVote.taskId) === taskId) {
+          const cast = cards.find((card) => String(card) === String(session.myVote.card))
+          if (cast !== undefined) setSelected((current) => (current === null ? cast : current))
+        }
+
         if (session.progress) {
           const { voted, expected, round, votedVoterIds: castBy } = session.progress
 
@@ -440,17 +465,22 @@ export function PokerModal({
       }
     }
 
+    syncRef.current = sync
     sync()
-    const interval = setInterval(sync, POLL_INTERVAL_MS)
+    const interval = setInterval(
+      sync,
+      streamConnected ? SAFETY_POLL_INTERVAL_MS : POLL_INTERVAL_MS
+    )
     return () => {
       cancelled = true
       clearInterval(interval)
+      if (syncRef.current === sync) syncRef.current = null
     }
     // `taskId` is included (Important 3) so the reveal-state fetch always
     // targets the task actually on screen, including after
     // `resolveVisibleTask`'s fallback branch changes it out from under a
-    // stale `currentTaskId` prop.
-  }, [open, sessionId, taskId])
+    // stale `currentTaskId` prop. `streamConnected` only changes the cadence.
+  }, [open, sessionId, taskId, streamConnected])
 
   // One rule decides what is on screen, for the facilitator and voters alike.
   useEffect(() => {
@@ -1252,69 +1282,76 @@ function RevealScreen({
           </span>
         </div>
 
-        {isFacilitator && (
-          <div className="flex flex-col gap-2">
-            <span className="apple-type-footnote font-semibold text-[var(--plan-text)]">
-              Final estimate
-            </span>
-            {numericCards.length > 0 && (
-              <div
-                className="grid grid-cols-4 gap-2"
-                role="group"
-                aria-label="Quick-pick estimate"
-              >
-                {numericCards.map((card) => {
-                  const isActive = finalValue === String(card)
-                  return (
-                    <button
-                      key={card}
-                      type="button"
-                      aria-pressed={isActive}
-                      onClick={() => onPickFinal(String(card))}
-                      className={cn(
-                        'apple-transition apple-type-callout flex h-[38px] items-center justify-center rounded-[var(--apple-radius-sm)] border font-bold tabular-nums',
-                        isActive
-                          ? 'border-[var(--plan-accent)] bg-[var(--plan-info-bg)] text-[var(--plan-accent)]'
-                          : 'border-[var(--plan-border)] bg-[var(--plan-surface)] text-[var(--plan-muted)] hover:text-[var(--plan-text)]'
-                      )}
-                    >
-                      {card}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            {/* The design's conversion row, with its left half made editable:
-                the deck covers the usual answers, but E16 lets a facilitator
-                set a value the room never voted, and that has to stay
-                reachable without a second control fighting the chips for
-                space. */}
-            <div className="flex items-center justify-between gap-3 py-1">
-              <span className="flex min-w-0 items-center gap-2">
-                <input
-                  id="poker-final"
-                  aria-label="Final estimate"
-                  type="number"
-                  min="0.25"
-                  step="0.25"
-                  value={finalValue}
-                  onChange={(event) => onPickFinal(event.target.value)}
-                  placeholder="—"
-                  className="apple-type-callout h-[34px] w-[72px] rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-2 text-center font-bold tabular-nums text-[var(--plan-text)] placeholder:font-normal placeholder:text-[var(--plan-muted)] focus:border-[var(--plan-accent)] focus:outline-none"
-                />
-                <span className="apple-type-footnote truncate text-[var(--plan-muted)]">{unit}</span>
-              </span>
-              {conversion && (
-                <span
-                  data-testid="poker-final-conversion"
-                  className="apple-type-subheadline shrink-0 font-semibold tabular-nums text-[var(--plan-text)]"
-                >
-                  {conversion}
-                </span>
-              )}
+        {/* Everyone sees the final-estimate picker so the room can follow the
+            decision, but only the facilitator can use it: for the rest it is
+            greyed out and inert. */}
+        <div
+          data-testid="poker-final-estimate"
+          aria-disabled={!isFacilitator}
+          className={cn('flex flex-col gap-2', !isFacilitator && 'opacity-50')}
+        >
+          <span className="apple-type-footnote font-semibold text-[var(--plan-text)]">
+            Final estimate
+          </span>
+          {numericCards.length > 0 && (
+            <div
+              className="grid grid-cols-4 gap-2"
+              role="group"
+              aria-label="Quick-pick estimate"
+            >
+              {numericCards.map((card) => {
+                const isActive = finalValue === String(card)
+                return (
+                  <button
+                    key={card}
+                    type="button"
+                    aria-pressed={isActive}
+                    disabled={!isFacilitator}
+                    onClick={() => onPickFinal(String(card))}
+                    className={cn(
+                      'apple-transition apple-type-callout flex h-[38px] items-center justify-center rounded-[var(--apple-radius-sm)] border font-bold tabular-nums disabled:cursor-not-allowed',
+                      isActive
+                        ? 'border-[var(--plan-accent)] bg-[var(--plan-info-bg)] text-[var(--plan-accent)]'
+                        : 'border-[var(--plan-border)] bg-[var(--plan-surface)] text-[var(--plan-muted)] hover:text-[var(--plan-text)]'
+                    )}
+                  >
+                    {card}
+                  </button>
+                )
+              })}
             </div>
+          )}
+          {/* The design's conversion row, with its left half made editable:
+              the deck covers the usual answers, but E16 lets a facilitator
+              set a value the room never voted, and that has to stay
+              reachable without a second control fighting the chips for
+              space. */}
+          <div className="flex items-center justify-between gap-3 py-1">
+            <span className="flex min-w-0 items-center gap-2">
+              <input
+                id="poker-final"
+                aria-label="Final estimate"
+                type="number"
+                min="0.25"
+                step="0.25"
+                value={finalValue}
+                disabled={!isFacilitator}
+                onChange={(event) => onPickFinal(event.target.value)}
+                placeholder="—"
+                className="apple-type-callout disabled:cursor-not-allowed h-[34px] w-[72px] rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-2 text-center font-bold tabular-nums text-[var(--plan-text)] placeholder:font-normal placeholder:text-[var(--plan-muted)] focus:border-[var(--plan-accent)] focus:outline-none"
+              />
+              <span className="apple-type-footnote truncate text-[var(--plan-muted)]">{unit}</span>
+            </span>
+            {conversion && (
+              <span
+                data-testid="poker-final-conversion"
+                className="apple-type-subheadline shrink-0 font-semibold tabular-nums text-[var(--plan-text)]"
+              >
+                {conversion}
+              </span>
+            )}
           </div>
-        )}
+        </div>
       </aside>
     </div>
   )

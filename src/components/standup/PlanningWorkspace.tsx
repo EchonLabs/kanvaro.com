@@ -41,6 +41,7 @@ import { Checkbox } from '@/components/ui/Checkbox'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useNotify } from '@/lib/notify'
+import { subscribePokerInviteEvents } from '@/lib/poker-invite-bus'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { deckCards, type DeckType } from '@/lib/standup/poker'
@@ -408,6 +409,18 @@ export function PlanningWorkspace({
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [refresh])
+
+  // A voter already on this screen when the round opens (or ends) learns of it
+  // over the shared notification stream, instead of only on the next load or
+  // refocus. The event is only a prompt to re-read; `refresh` stays the source
+  // of truth.
+  useEffect(
+    () =>
+      subscribePokerInviteEvents((event) => {
+        if (!event.data.sprintId || event.data.sprintId === sprintId) refresh()
+      }),
+    [sprintId, refresh]
+  )
 
   // Scope and members load unconditionally, not only once a session is open:
   // a voter arriving to join a round has no session in view but still needs
@@ -1097,14 +1110,25 @@ export function PlanningWorkspace({
       {poker && (
         <PokerModal
           open
-          onOpenChange={(next) => !next && setPoker(null)}
+          // Closing never ends the round — it is saved server side. Re-read
+          // so the "Join planning poker" button reflects it and resumes the
+          // same task, round and reveal if the close was accidental.
+          onOpenChange={(next) => {
+            if (next) return
+            setPoker(null)
+            refresh()
+          }}
           sessionId={poker.session._id}
           cards={poker.cards}
           queue={poker.queue}
           currentTaskId={poker.session.currentTask}
           // Reveal and finalise are SPRINT_UPDATE server side. Hardcoding this
           // to true showed a voter buttons the API would answer with 403.
-          isFacilitator={canFacilitate}
+          // Permission alone is not enough: any PM or admin has SPRINT_UPDATE,
+          // but the server only lets the person who opened this round reveal,
+          // revote and finalize. Showing those controls to anyone else
+          // offered buttons that could only answer 403.
+          isFacilitator={canFacilitate && String(poker.session.facilitator) === user?.id}
           // A viewer who isn't on the participant list (including a
           // facilitator who deliberately opted out — PLN-11) gets a
           // read-only version of the round instead of the card grid.
