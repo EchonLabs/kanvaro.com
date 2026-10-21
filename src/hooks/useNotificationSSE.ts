@@ -2,10 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { INotification } from '@/models/Notification'
+import {
+  publishNotificationStreamConnected,
+  publishPokerInviteEvent
+} from '@/lib/poker-invite-bus'
 
 interface SSEMessage {
-  type: 'connected' | 'heartbeat' | 'notification'
-  data?: INotification
+  type: 'connected' | 'heartbeat' | 'notification' | 'poker_invite' | 'poker_closed'
+  data?: any
   timestamp?: number
   userId?: string
 }
@@ -79,6 +83,7 @@ export function useNotificationSSE(
       })
 
       eventSource.onopen = () => {
+        publishNotificationStreamConnected(true)
         setIsConnected(true)
         setConnectionAttempts(0)
         onConnectionChangeRef.current?.(true)
@@ -103,6 +108,15 @@ export function useNotificationSSE(
               }
               break
 
+            // Planning poker invites ride this same connection (one stream per
+            // tab); the popup and planning screen listen on the bus.
+            case 'poker_invite':
+            case 'poker_closed':
+              if (message.data) {
+                publishPokerInviteEvent({ type: message.type, data: message.data })
+              }
+              break
+
             default:
               console.warn('Unknown SSE message type:', message.type)
           }
@@ -112,6 +126,7 @@ export function useNotificationSSE(
       }
 
       eventSource.onerror = () => {
+        publishNotificationStreamConnected(false)
         setIsConnected(false)
         onConnectionChangeRef.current?.(false)
         eventSource.close()
@@ -157,6 +172,7 @@ export function useNotificationSSE(
         eventSourceRef.current.close()
         eventSourceRef.current = null
       }
+      publishNotificationStreamConnected(false)
     }
   }, [enabled, connect])
 

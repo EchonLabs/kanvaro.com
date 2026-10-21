@@ -2,7 +2,7 @@ import { Permission, Role, ProjectRole, PermissionScope, getPermissionScope } fr
 import { User } from '@/models/User';
 import { Project } from '@/models/Project';
 import { CustomRole } from '@/models/CustomRole';
-import mongoose from 'mongoose';
+import { isProjectTeamMember } from './project-team-membership';
 
 export interface UserPermissions {
   globalPermissions: Permission[];
@@ -40,7 +40,11 @@ export class PermissionService {
     // Find all projects where user is a team member
     const projects = await Project.find({
       $or: [
-        { teamMembers: user._id },
+        // `teamMembers` is an array of subdocuments ({ memberId, hourlyRate }),
+        // so the member id lives one level down. Matching the array itself never
+        // hit, which meant a project the user is ONLY a team member of was never
+        // loaded here and they ended up with no project permissions at all.
+        { 'teamMembers.memberId': user._id },
         { createdBy: user._id },
         { client: user._id },
         { 'projectRoles.user': user._id }
@@ -231,9 +235,16 @@ export class PermissionService {
     }
 
     // Check if user is a team member
-    const isTeamMember = project.teamMembers.some(
-      (memberId: mongoose.Types.ObjectId) => memberId.toString() === user._id.toString()
-    );
+    // `teamMembers` holds subdocuments ({ memberId, hourlyRate }), not bare
+    // ObjectIds. Comparing the subdocument itself never matched, so every team
+    // member fell through to PROJECT_VIEWER and lost their project-scoped
+    // stand-up permissions.
+    //
+    // `isProjectTeamMember` is the only place that knows the shape, so this
+    // keeps working if the Project.find above ever starts populating
+    // `teamMembers.memberId` - an inline comparison would quietly drop every
+    // member back to PROJECT_VIEWER the day that happens.
+    const isTeamMember = isProjectTeamMember(project, user._id);
 
     if (isTeamMember) {
       // Default to project member, but could be enhanced with specific project roles

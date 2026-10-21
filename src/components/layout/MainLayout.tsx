@@ -11,6 +11,7 @@ import { ContentLoader } from '@/components/ui/ContentLoader'
 import { DateTimeProvider } from '@/components/providers/DateTimeProvider'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useTimeTrackingNotifications } from '@/hooks/useTimeTrackingNotifications'
+import { PokerInvitePopup } from '@/components/standup/PokerInvitePopup'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -37,6 +38,20 @@ export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  // This shell's only intended scroll region is `<main>` below — see the
+  // `.app-shell-locked` rule in globals.css for why the document itself
+  // needs to be prevented from scrolling too (a stray `#hash` anchor jump
+  // could otherwise nudge `window` and leave the whole app looking
+  // permanently shifted up). Scoped to this component's own mount lifetime
+  // since docs/landing pages don't use MainLayout and need normal
+  // document-level scrolling.
+  useEffect(() => {
+    document.documentElement.classList.add('app-shell-locked')
+    return () => {
+      document.documentElement.classList.remove('app-shell-locked')
+    }
   }, [])
 
   if (!mounted) {
@@ -118,6 +133,7 @@ export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
             </div>
           </main>
         </div>
+        <PokerInvitePopup />
       </div>
       </BreadcrumbProvider>
     </DateTimeProvider>

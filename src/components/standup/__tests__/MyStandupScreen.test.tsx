@@ -1,0 +1,364 @@
+/**
+ * @jest-environment jsdom
+ */
+import { render, screen, within, fireEvent } from '@testing-library/react'
+import { MyStandupScreen } from '../my/MyStandupScreen'
+import type { CapacityBreakdown } from '@/lib/standup/capacity'
+import { minutes } from '@/lib/standup/minutes'
+import { standupStrings } from '@/lib/standup/strings'
+
+const mockPush = jest.fn()
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush })
+}))
+
+// `mock`-prefixed so Jest's hoisting exception lets this factory reference it.
+const mockHasPermission = jest.fn().mockReturnValue(false)
+jest.mock('@/lib/permissions/permission-context', () => ({
+  usePermissions: () => ({ hasPermission: mockHasPermission })
+}))
+
+/**
+ * Builds a complete `CapacityBreakdown` fixture. `MyStandupMember.capacity`
+ * keeps the full type (not narrowed) because Task 15's read-only leave
+ * display reads `member.capacity.adjustments` — matching how
+ * `RunScreenMember.capacity: CapacityBreakdown` already works in
+ * `StandupRunScreen.tsx`. Mirrors the `capacity()` helper in
+ * `standup-run-screen.test.tsx`.
+ */
+function capacity(overrides: Partial<CapacityBreakdown> = {}): CapacityBreakdown {
+  return {
+    memberId: 'u1',
+    date: '2026-09-05',
+    nominalMinutes: minutes(480),
+    adjustments: [],
+    adjustedMinutes: minutes(480),
+    outstandingDebtMinutes: minutes(0),
+    overrunPolicy: 'absorb',
+    effectiveMinutes: minutes(480),
+    allocatedMinutes: minutes(120),
+    gapMinutes: minutes(360),
+    status: 'under',
+    isUnavailable: false,
+    strandedMinutes: minutes(0),
+    ...overrides
+  }
+}
+
+const member = {
+  memberId: 'u1',
+  name: 'Amal',
+  attendance: 'present' as const,
+  capacity: capacity(),
+  allocations: [
+    {
+      allocationId: 'a1',
+      taskId: 't1',
+      taskKey: 'KAN-1',
+      title: 'Fix the thing',
+      plannedMinutes: minutes(120),
+      remainingEstimateMinutes: minutes(180),
+      source: 'assigned_in_standup' as const,
+      isBlocked: false,
+      excludedFromCapacity: false,
+      pairedDeliberately: false
+    }
+  ]
+}
+
+/**
+ * No `removeAllocation` mock: `MyStandupApi` no longer declares one. ALO-22's
+ * member surface is additions only, this screen renders no control that could
+ * call it, and the DELETE route stays PM-only.
+ */
+function setup(overrides: Partial<React.ComponentProps<typeof MyStandupScreen>> = {}) {
+  const api = {
+    addAllocation: jest.fn().mockResolvedValue({ standupVersion: 2 }),
+    changeHours: jest.fn().mockResolvedValue({ standupVersion: 2 })
+  }
+  render(
+    <MyStandupScreen
+      standupId="s1"
+      standupVersion={1}
+      status="Ready"
+      date="2026-09-05"
+      member={member}
+      poolTasks={[]}
+      allowSelfSelect
+      api={api as any}
+      {...overrides}
+    />
+  )
+  return api
+}
+
+describe('MyStandupScreen', () => {
+  it('shows the member’s own allocations', () => {
+    setup()
+    expect(screen.getByText('KAN-1')).toBeInTheDocument()
+  })
+
+  it('allows editing while the stand-up is Ready', () => {
+    setup()
+    expect(screen.getByLabelText(/hours for Fix the thing/i)).not.toBeDisabled()
+  })
+
+  it('locks editing once the stand-up is In_Progress (RUN-26)', () => {
+    setup({ status: 'In_Progress' })
+    expect(screen.getByLabelText(/hours for Fix the thing/i)).toBeDisabled()
+    expect(screen.getByText(/read-only/i)).toBeInTheDocument()
+    expect(screen.getByText(/the stand-up has started/i)).toBeInTheDocument()
+  })
+
+  /**
+   * This route is reachable for every stand-up status — the "other
+   * stand-ups today" banner links straight to `Scheduled` ones — so the
+   * read-only banner must not claim the stand-up "has started" when it has
+   * not. Each status that locks editing gets its own accurate wording.
+   */
+  it('never claims the stand-up "has started" for a status where it has not', () => {
+    setup({ status: 'Scheduled' })
+    expect(screen.queryByText(/has started/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/hasn't started yet/i)).toBeInTheDocument()
+  })
+
+  it('describes a completed stand-up as complete, not as having "started"', () => {
+    setup({ status: 'Completed' })
+    expect(screen.queryByText(/has started/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/this stand-up is complete/i)).toBeInTheDocument()
+  })
+
+  it('calls addAllocation with selfSelect: true when self-selecting a pool task', () => {
+    const api = setup({
+      poolTasks: [{ taskId: 't2', key: 'KAN-2', title: 'Pool task', remainingEstimateMinutes: minutes(60) }]
+    })
+    fireEvent.click(screen.getByRole('button', { name: /add kan-2/i }))
+    expect(api.addAllocation).toHaveBeenCalledWith(
+      expect.objectContaining({ taskId: 't2', memberId: 'u1', selfSelect: true })
+    )
+  })
+
+  /**
+   * Task 14/E31. The backend route/service now admit a self-select write
+   * against a `Completed` stand-up, but that fix is unreachable by a real
+   * user unless the one button that triggers it is actually enabled in that
+   * state — this is the direct UI-level proof that it is, distinct from the
+   * hours-editing lock (RUN-26) which correctly stays put.
+   */
+  describe('self-select after completion (E31)', () => {
+    const poolTasks = [
+      { taskId: 't2', key: 'KAN-2', title: 'Pool task', remainingEstimateMinutes: minutes(60) }
+    ]
+
+    it('leaves the self-select button enabled once the stand-up is Completed, when allowed', () => {
+      setup({ status: 'Completed', allowSelfSelect: true, poolTasks })
+      expect(screen.getByRole('button', { name: /add kan-2/i })).not.toBeDisabled()
+    })
+
+    it('still locks existing rows’ hours on Completed even though self-select stays open', () => {
+      setup({ status: 'Completed', allowSelfSelect: true, poolTasks })
+      expect(screen.getByLabelText(/hours for Fix the thing/i)).toBeDisabled()
+    })
+
+    it('disables the self-select button on Completed when the project has it turned off', () => {
+      setup({ status: 'Completed', allowSelfSelect: false, poolTasks: [] })
+      // allowSelfSelect off also hides the whole pool section (existing
+      // behaviour, unchanged) — nothing to self-select onto in the first
+      // place, which is itself proof the control cannot be triggered.
+      expect(screen.queryByRole('button', { name: /add kan-2/i })).not.toBeInTheDocument()
+    })
+
+    it('disables the self-select button on a status that is neither Ready nor Completed', () => {
+      setup({ status: 'In_Progress', allowSelfSelect: true, poolTasks })
+      expect(screen.getByRole('button', { name: /add kan-2/i })).toBeDisabled()
+    })
+  })
+
+  /**
+   * The redesign moved NFR-20's dual-timezone display into `NextStandupStrip`
+   * (design §4.2). Its fallback is the stand-up's `status` word, not the raw
+   * `date` string the old inline header used to render — `date` itself is no
+   * longer rendered anywhere on this screen (superseded by the next-stand-up
+   * strip and the Yesterday/Today sections, which each carry their own dates
+   * in context), so this assertion now targets the real fallback.
+   */
+  it('shows the stand-up state as a badge, and no times when none are known (NFR-20)', () => {
+    setup()
+    expect(screen.getByText(standupStrings.schedule.status.Ready)).toBeInTheDocument()
+    expect(screen.queryByText(/^local:/i)).not.toBeInTheDocument()
+  })
+
+  it('renders the dual-timezone string once all three fields are present (NFR-20)', () => {
+    setup({
+      scheduledStartAt: '2026-09-05T09:00:00Z',
+      viewerTimeZone: 'America/New_York',
+      projectTimeZone: 'Asia/Colombo'
+    })
+    expect(screen.getByText(/^local: 05:00/i)).toBeInTheDocument()
+    expect(screen.getByText(/^project .+: 02:30/i)).toBeInTheDocument()
+  })
+
+  it('shows a read-only leave line from the capacity breakdown, never an edit control', () => {
+    setup({
+      member: {
+        ...member,
+        capacity: {
+          ...member.capacity,
+          adjustments: [{ type: 'leave', label: 'Approved leave', minutes: minutes(240) }]
+        }
+      }
+    })
+    expect(screen.getByText(/Approved leave/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit leave/i })).not.toBeInTheDocument()
+  })
+
+  /**
+   * Every refusal here is a server decision the screen cannot predict —
+   * `allowSelfSelect` off, a stale version, the stand-up having moved on. With
+   * no `catch` each was a silent no-op plus an unhandled rejection: the member
+   * is told nothing and believes the change stuck.
+   */
+  describe('when the server refuses', () => {
+    it('says so when an hours edit is rejected', async () => {
+      const api = setup()
+      api.changeHours.mockRejectedValue(new Error('refused'))
+
+      const input = screen.getByLabelText(/hours for Fix the thing/i)
+      fireEvent.change(input, { target: { value: '3' } })
+      fireEvent.blur(input)
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        standupStrings.my.editRejected()
+      )
+    })
+
+    it('says so when self-selecting a task is rejected (e.g. self-select turned off)', async () => {
+      const api = setup({
+        poolTasks: [
+          { taskId: 't2', key: 'KAN-2', title: 'Pool task', remainingEstimateMinutes: minutes(60) }
+        ]
+      })
+      api.addAllocation.mockRejectedValue(new Error('refused'))
+
+      fireEvent.click(screen.getByRole('button', { name: /add kan-2/i }))
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        standupStrings.my.addRejected()
+      )
+    })
+
+    it('names a version clash as a server edit conflict and says how to recover (RUN-23)', async () => {
+      const api = setup()
+      api.changeHours.mockRejectedValue(Object.assign(new Error('stale'), { code: 'STALE_STANDUP' }))
+
+      const input = screen.getByLabelText(/hours for Fix the thing/i)
+      fireEvent.change(input, { target: { value: '3' } })
+      fireEvent.blur(input)
+
+      const notice = await screen.findByRole('status')
+      expect(notice).toHaveTextContent(standupStrings.my.conflictTitle())
+      expect(notice).toHaveTextContent(standupStrings.my.conflictDetail())
+    })
+
+    it('shows nothing until something actually fails', () => {
+      setup()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+  })
+
+  /**
+   * A composition-level check, not a duplicate of `ProjectSwitcher.test.tsx`:
+   * that file proves the switcher itself behaves correctly given candidates;
+   * this proves `MyStandupScreen` actually wires `standupsToday` through to it,
+   * so a member on two projects' sprint teams can reach both stand-ups.
+   */
+  it('renders the project switcher when more than one stand-up is passed through', () => {
+    setup({
+      projectId: 'p1',
+      projectName: 'Project Alpha',
+      standupsToday: [
+        {
+          standupId: 's1',
+          status: 'Ready',
+          scheduledStartAt: '2026-09-05T09:00:00.000Z',
+          projectId: 'p1',
+          projectName: 'Project Alpha',
+          sprintId: 'sp1',
+          sprintName: 'Sprint 3'
+        },
+        {
+          standupId: 's2',
+          status: 'Ready',
+          scheduledStartAt: '2026-09-05T09:30:00.000Z',
+          projectId: 'p2',
+          projectName: 'Project Beta',
+          sprintId: 'sp2',
+          sprintName: 'Sprint 7'
+        }
+      ]
+    })
+    expect(screen.getByRole('button', { name: /switch project/i })).toBeInTheDocument()
+  })
+
+  describe('the "open full stand-up" button', () => {
+    afterEach(() => {
+      mockHasPermission.mockReturnValue(false)
+      mockPush.mockClear()
+    })
+
+    it('is absent for a viewer without SPRINT_UPDATE on the project', () => {
+      setup({ projectId: 'p1', sprintId: 'sp1' })
+      expect(screen.queryByRole('button', { name: /open full stand-up/i })).not.toBeInTheDocument()
+    })
+
+    it('is absent when no project could be resolved, even for a PM', () => {
+      mockHasPermission.mockReturnValue(true)
+      setup({ projectId: undefined, sprintId: 'sp1' })
+      expect(screen.queryByRole('button', { name: /open full stand-up/i })).not.toBeInTheDocument()
+    })
+
+    it('is absent when no sprint could be resolved, even for a PM', () => {
+      mockHasPermission.mockReturnValue(true)
+      setup({ projectId: 'p1', sprintId: undefined })
+      expect(screen.queryByRole('button', { name: /open full stand-up/i })).not.toBeInTheDocument()
+    })
+
+    /**
+     * Matches the "Stand-ups" button on the sprint page
+     * (`src/app/sprints/[id]/page.tsx`), which also goes to
+     * `/projects/:id/standups` — so the two surfaces land in the same place
+     * rather than one going to the schedule hub and the other straight to a
+     * single day's meeting. `sprintId` still gates whether the button
+     * appears at all (see `canViewSchedule`); it is not part of the URL.
+     */
+    it('navigates to the project’s stand-up schedule hub for a PM', () => {
+      mockHasPermission.mockReturnValue(true)
+      setup({ projectId: 'p1', sprintId: 'sp1' })
+
+      fireEvent.click(screen.getByRole('button', { name: /open full stand-up/i }))
+      expect(mockPush).toHaveBeenCalledWith('/projects/p1/standups')
+    })
+  })
+
+  describe('the project-name subtitle (a member on more than one project needs to tell them apart)', () => {
+    it('shows the project name as plain text in the breadcrumb, not a control', () => {
+      setup({ projectName: 'Acme Redesign' })
+      const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i })
+      expect(within(breadcrumb).getByText('Acme Redesign')).toBeInTheDocument()
+      // Plain text, not the filter button — switching projects is that
+      // button's job now, not the breadcrumb's.
+      expect(
+        within(breadcrumb).queryByRole('button', { name: /switch project/i })
+      ).not.toBeInTheDocument()
+    })
+
+    it('also shows the project name on the filter button in the action row', () => {
+      setup({ projectId: 'p1', projectName: 'Acme Redesign' })
+      // Single open stand-up (the default fixture), so the filter button
+      // renders as the non-interactive chip, not a dropdown — see
+      // ProjectSwitcher.test.tsx for that control's own behaviour.
+      const matches = screen.getAllByText('Acme Redesign')
+      expect(matches).toHaveLength(2)
+    })
+  })
+})

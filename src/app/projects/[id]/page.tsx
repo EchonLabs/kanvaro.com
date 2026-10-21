@@ -54,7 +54,6 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import TaskList from '@/components/tasks/TaskList'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
-import CalendarView from '@/components/tasks/CalendarView'
 import BacklogView from '@/components/tasks/BacklogView'
 import TestSuiteTree from '@/components/test-management/TestSuiteTree'
 import TestCaseList from '@/components/test-management/TestCaseList'
@@ -70,6 +69,7 @@ import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { Permission } from '@/lib/permissions'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { PermissionGate } from '@/lib/permissions/permission-components'
+import { StandupSettingsPanel } from '@/components/standup/StandupSettingsPanel'
 
 interface Project {
   _id: string
@@ -275,6 +275,7 @@ export default function ProjectDetailPage() {
   const canUpdateProject = hasPermission(Permission.PROJECT_UPDATE)
   const canCreateTask = hasPermission(Permission.TASK_CREATE)
   const canManageTests = hasPermission(Permission.TEST_MANAGE)
+  const canViewStandups = hasPermission(Permission.STANDUP_VIEW, projectId)
 
   // Financial action gating: only Admin, Super Admin, HR, and PM can manage income/expenses.
   // We check userRole directly because the hasPermission hook returns true while loading,
@@ -293,7 +294,7 @@ export default function ProjectDetailPage() {
     { id: 'budget', label: 'Budget', order: 4 },
     { id: 'tasks', label: 'Tasks', order: 5 },
     { id: 'kanban', label: 'Kanban', order: 6 },
-    { id: 'calendar', label: 'Calendar', order: 7 },
+    ...(canViewStandups ? [{ id: 'standups', label: 'Standups', order: 7 }] : []),
     { id: 'backlog', label: 'Backlog', order: 8 },
     ...(canManageTests ? [{ id: 'testing', label: 'Testing' }] : []),
     { id: 'reports', label: 'Reports' },
@@ -1932,12 +1933,29 @@ export default function ProjectDetailPage() {
               />
             </TabsContent>
 
-            <TabsContent value="calendar" className="space-y-8">
-              <CalendarView
-                projectId={projectId}
-                onCreateTask={() => setShowCreateTaskModal(true)}
-              />
-            </TabsContent>
+            {canViewStandups && (
+              <TabsContent value="standups" className="space-y-8">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Stand-ups</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Working days, stand-up rules, and each member&rsquo;s real daily capacity.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => router.push(`/projects/${projectId}/standups`)}
+                    className="shrink-0 rounded-full"
+                  >
+                    Scheduled Stand-ups
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+
+                {/* Configuration is gated on STANDUP_CONFIGURE inside the panel,
+                    so an attendee sees the header and the schedule link only. */}
+                <StandupSettingsPanel projectId={projectId} />
+              </TabsContent>
+            )}
 
             <TabsContent value="backlog" className="space-y-8">
               <BacklogView

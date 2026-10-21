@@ -337,6 +337,13 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority') || '';
     const type = searchParams.get('type') || '';
     const project = searchParams.get('project') || '';
+    // Tasks in no sprint at all — what a sprint-planning backlog picker means
+    // by "backlog". Without it the picker offers tasks already committed to
+    // another sprint.
+    const noSprint = searchParams.get('noSprint') === 'true';
+    // Tasks already committed to a specific sprint — the Planning Workspace's
+    // "sprint scope" pane. Symmetric to noSprint above.
+    const sprint = searchParams.get('sprint') || '';
     const story = searchParams.get('story') || '';
     const assignedTo = searchParams.get('assignedTo') || '';
     const createdBy = searchParams.get('createdBy') || '';
@@ -458,6 +465,10 @@ export async function GET(request: NextRequest) {
     if (type) filters.type = type;
     if (project) filters.project = project;
     if (story) filters.story = story;
+    // `null` matches both an explicit null and a missing field in Mongo, which
+    // is what an unassigned task looks like either way.
+    if (noSprint) filters.sprint = null;
+    if (sprint) filters.sprint = sprint;
     if (category) filters.category = category
 
     console.log('[Tasks GET] Building date filters');

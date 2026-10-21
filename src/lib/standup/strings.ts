@@ -1,0 +1,1811 @@
+/**
+ * User-facing string catalogue for the stand-up module (spec NFR-19).
+ *
+ * NFR-19 requires every user-facing string to be externalised for translation,
+ * **including the generated variance explanations**. Kanvaro has no i18n runtime
+ * today, and adding one is an application-wide decision rather than this
+ * module's to make — so this file does the part that is genuinely expensive to
+ * retrofit: it gets the strings out of the components and gives every
+ * interpolation a named parameter.
+ *
+ * Why that ordering matters. Swapping a lookup function for `next-intl` or
+ * `react-i18next` later is mechanical. Unpicking sentences that were assembled
+ * inline with template literals and string concatenation is not — especially the
+ * variance explanations, where word order changes between languages and a
+ * concatenated sentence simply cannot be translated.
+ *
+ * Rules for adding to this file:
+ *   - One entry per complete sentence. Never concatenate two entries to build
+ *     one sentence; languages do not agree on word order.
+ *   - Interpolate through named parameters, never positional.
+ *   - Keep pluralisation inside the entry, so a language with different plural
+ *     rules can override the whole form.
+ */
+import { formatMinutesAsHours, type Minutes } from './minutes'
+
+/** Formatting context a string may need. Supplied by the caller's locale. */
+export interface StringContext {
+  locale?: string
+}
+
+const plural = (count: number, singular: string, pluralForm: string) =>
+  count === 1 ? singular : pluralForm
+
+export const standupStrings = {
+  calendar: {
+    title: () => 'Working Calendar',
+    subtitle: () => 'Decides which dates get a stand-up. Everything else depends on this.',
+
+    inheritedNotice: () =>
+      'This project inherits the organisation working week. Saving creates a project-specific calendar you can then adjust.',
+
+    atLeastOneWorkingDay: () => 'At least one working day must be selected',
+
+    timezoneHint: () => 'Decides which calendar date a stand-up belongs to.',
+
+    noHolidaySets: () =>
+      'No holiday calendars exist yet. An organisation admin can create one and import a gazette.',
+
+    noOverrides: () =>
+      'No overrides. Add one to close a working day, or to work a day the holiday calendar marks as a holiday.',
+
+    recurringWarning: () =>
+      'Only use this for fixed dates. Lunar holidays such as Poya days move every year and must come from a holiday calendar instead.',
+
+    /**
+     * Coverage gap warning. Holiday sets are perpetual and topped up each year,
+     * so running past the loaded range must announce itself.
+     */
+    coverageExhausted: ({ coveredTo }: { coveredTo: string }) =>
+      `Holiday data only runs to ${coveredTo}. Dates after that are treated as working days. Import the next gazette to cover them.`,
+
+    // --- N10, the consolidated calendar-change notification (CAL-15) --------
+    // CAL-15 requires one notification summarising everything that changed, so
+    // the count fragments below are assembled into a single sentence rather
+    // than sent as separate messages.
+
+    changeNotificationTitle: () => 'Your stand-up schedule changed',
+
+    changeNotification: ({ change, summary }: { change: string; summary: string }) =>
+      `${change} ${summary}`,
+
+    countCreated: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'stand-up', 'stand-ups')} will be created.`,
+
+    countSkipped: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'stand-up', 'stand-ups')} will be skipped.`,
+
+    countWarned: ({ count }: { count: number }) =>
+      `${count} in-progress ${plural(count, 'stand-up needs', 'stand-ups need')} your attention.`,
+
+    countBlocked: ({ count }: { count: number }) =>
+      `${count} completed ${plural(count, 'stand-up was', 'stand-ups were')} left unchanged.`,
+
+    coverageEmpty: () => 'No holidays have been loaded for the subscribed calendars yet.',
+
+    saved: () => 'Working calendar saved',
+    saveFailed: () => 'Could not save the calendar',
+    loadFailed: () => 'Could not load the calendar'
+  },
+
+  /**
+   * Planning gate messages (spec §8.3).
+   *
+   * The PC/PA wording is quoted from the spec's own failure-message column —
+   * it is deliberately blunt ("You are planning to fail unless you cut scope"),
+   * and softening it would remove the point of the check.
+   */
+  planning: {
+    pc1: () => 'Write a sprint goal before completing planning.',
+    pc2: () => 'This sprint has no tasks.',
+    pc3: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task has', 'tasks have')} no estimate. Estimate them or remove them from the sprint.`,
+    pc4: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task has', 'tasks have')} no description of what done means.`,
+    pc5: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task is', 'tasks are')} missing type or priority.`,
+    pc6: () => 'Add team members to this sprint.',
+    pc7NoWorkingDays: () => 'This sprint contains no working days.',
+    pc7BadRange: () => 'The sprint start date must be on or before its end date.',
+
+    pc8: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task has', 'tasks have')} no assignee. Assign every task before running planning poker.`,
+    pc8Multi: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task is', 'tasks are')} assigned to more than one person. Each task needs a single owner.`,
+    pc8OffTeam: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task is', 'tasks are')} assigned to somebody who is not on this sprint's team.`,
+    pc9: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task has', 'tasks have')} not been through planning poker. Run a round over ${plural(count, 'it', 'them')} before completing planning.`,
+
+    pa1: ({ overBy }: { overBy: string }) =>
+      `Scope is ${overBy} over capacity. You are planning to fail unless you cut scope.`,
+    pa2: ({ percent }: { percent: number }) =>
+      `Scope is only ${percent} percent of capacity. The team will run out of work.`,
+    pa3: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task is', 'tasks are')} larger than a single day. Consider splitting them.`,
+    pa4: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task was', 'tasks were')} estimated without a team vote.`,
+    pa5: ({ name, assigned, capacity }: { name: string; assigned: string; capacity: string }) =>
+      `${name} is pre-assigned ${assigned} against ${capacity} of capacity.`,
+    pa6: ({ name }: { name: string }) =>
+      `${name} has nothing assigned in this sprint.`,
+
+    /**
+     * Reasons the planning screen's step gates are open or shut (UI-6).
+     *
+     * A blocked control states its reason on screen permanently rather than
+     * only in a tooltip: a disabled button gets no pointer events, so a
+     * tooltip on one is a reason nobody can read.
+     */
+    stepNoSession: () => 'Start a planning session first.',
+    stepScopeEmpty: () => 'Add at least one task to the sprint before assigning it.',
+    pokerReady: () => 'Every task has an assignee. Ready to estimate.',
+    pokerNothingToEstimate: () => 'Every task has already been through planning poker.',
+    completeReady: () => 'Every check passed. Completing takes this sprint to Planned.',
+    completeNeedsAcknowledgement: ({ count }: { count: number }) =>
+      count === 1
+        ? 'Acknowledge or fix the remaining advisory before completing.'
+        : `Acknowledge or fix the ${count} remaining advisories before completing.`,
+    startBlockedNotPlanned: () =>
+      'This sprint cannot start until planning is complete. Open Plan Sprint and finish the checklist.',
+    startUseStartSprint: () => 'Use Start Sprint to start a sprint.',
+    reopenUnstartsSprint: () =>
+      'Reopening planning returns this sprint to Planning, and it cannot be started until planning completes again.',
+
+    /** PLN-19's carve-out, refused under every circumstance. */
+    waiverCannotCoverEstimates: () =>
+      'A waiver cannot allow an unestimated task to be allocated. Estimate it first.',
+
+    gateNotPassed: () =>
+      'This sprint has not completed planning, so its stand-ups cannot run.'
+  },
+
+  impact: {
+    none: () => 'This change does not affect any stand-ups.',
+
+    willCreate: ({ date }: { date: string }) =>
+      `A stand-up will be created for ${date}, and later day numbers will shift.`,
+
+    willSkip: ({ date }: { date: string }) =>
+      `The stand-up on ${date} will be skipped as a holiday.`,
+
+    /** Kept as one sentence rather than appended to `willSkip`. */
+    willSkipWithCarryForward: ({ date, count }: { date: string; count: number }) =>
+      `The stand-up on ${date} will be skipped as a holiday. Its ${count} carry-forward ${plural(
+        count,
+        'item',
+        'items'
+      )} will move to the next working day.`,
+
+    missedBecomesHoliday: ({ date }: { date: string }) =>
+      `The missed stand-up on ${date} will be reclassified as a holiday and will no longer count as missed.`,
+
+    inProgressUntouched: ({ date }: { date: string }) =>
+      `The stand-up on ${date} is in progress and will not be changed. Its facilitator will be warned that the date is now non-working.`,
+
+    /** CAL-16 — completed stand-ups are never modified. */
+    completedBlocked: ({ date }: { date: string }) =>
+      `The stand-up on ${date} is already completed and cannot be changed. A calendar anomaly note will be recorded against it and the sprint.`,
+
+    alreadySkipped: ({ date }: { date: string }) => `${date} is already skipped.`,
+    alreadyCancelled: ({ date }: { date: string }) => `${date} is already cancelled.`,
+
+    noStandupExists: ({ date }: { date: string }) =>
+      `${date} will no longer be a working day. No stand-up exists for it.`,
+
+    alreadyHasStandup: ({ date, status }: { date: string; status: string }) =>
+      `${date} already has a ${status} stand-up.`
+  },
+
+  holidayImport: {
+    /** CAL-10 — nothing is written when any row fails. */
+    rejected: ({ rows }: { rows: number[] }) =>
+      `Nothing was imported. ${rows.length} ${plural(
+        rows.length,
+        'row',
+        'rows'
+      )} failed validation (${plural(rows.length, 'row', 'rows')} ${rows.join(', ')}).`,
+
+    imported: ({ count, from, to }: { count: number; from: string; to: string }) =>
+      `Imported ${count} ${plural(count, 'holiday', 'holidays')} covering ${from} to ${to}.`,
+
+    headerMismatch: ({ expected, actual }: { expected: string; actual: string }) =>
+      `The header row must be exactly "${expected}", received "${actual}".`
+  },
+
+  capacity: {
+    title: () => 'Capacity and Members',
+    subtitle: () =>
+      'The hours the stand-up board will hold you to every day. Set real availability, not aspiration.',
+
+    datedChangeNotice: () =>
+      'Stand-ups before this date keep the capacity that applied then, so past variance stays accurate.',
+
+    noMembers: () => 'This project has no team members yet.',
+    noMembersHint: () => 'Add people on the Team tab, then set their daily capacity here.',
+
+    /** NFR-A4 — hour values are announced with their unit. */
+    announceCapacity: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `capacity ${formatMinutesAsHours(minutes, { locale, withUnit: false })} hours`,
+
+    projectStandard: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `Project standard day is ${formatMinutesAsHours(minutes, { locale })}. Members marked "Default" inherit it.`,
+
+    /** Named adjustment reasons shown on the capacity breakdown. */
+    adjustment: {
+      partialDay: () => 'Half day',
+      leave: () => 'Approved leave',
+      absentPlanned: () => 'Absent (planned)',
+      absentUnplanned: () => 'Absent (unplanned)',
+      partialAttendance: () => 'Working a partial day'
+    },
+
+    /**
+     * DN-6 — the breakdown must say when ceremonies were *not* deducted.
+     * Otherwise a full eight-hour day on a day holding a two-hour review looks
+     * like a bug rather than a setting.
+     */
+    ceremoniesNotDeducted: () =>
+      'Ceremonies not deducted. Meetings do not reduce capacity on this project.',
+
+    /**
+     * RUN-7 — hours still sitting on somebody who is not there. States the
+     * amount rather than the task count, because the amount is what the rest of
+     * the board is measured in and what has to be placed somewhere else today.
+     */
+    strandedAllocations: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} is still allocated to this member, who has no capacity today. Reassign it or carry it forward.`,
+
+    strandedAllocationsAction: () => 'Reassign these hours'
+  },
+
+  allocationStatus: {
+    /**
+     * NFR-A1 — the capacity meter's state must carry a text label as well as a
+     * colour, so colour is never the only carrier of meaning.
+     */
+    full: () => 'FULL',
+    under: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `GAP ${formatMinutesAsHours(minutes, { locale })}`,
+    over: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `OVER ${formatMinutesAsHours(minutes, { locale })}`,
+    zero: () => 'Nothing planned',
+    unavailable: () => 'Unavailable'
+  },
+
+  /**
+   * The shared allocation primitives (Phase 7, Task 9).
+   *
+   * Every one of these has an accessible-name job as well as a visible one.
+   * NFR-A1 to NFR-A4 require the board to be operable and legible without
+   * colour and without a mouse, and an unlabelled stepper or an unnamed drop
+   * zone fails that whether or not it looks right.
+   */
+  allocation: {
+    /** The meter's accessible name. The visible label is `allocationStatus`. */
+    meterLabel: ({
+      name,
+      allocated,
+      capacity,
+      locale
+    }: {
+      name: string
+      allocated: Minutes
+      capacity: Minutes
+      locale?: string
+    }) =>
+      `${name}: ${formatMinutesAsHours(allocated, { locale })} of ${formatMinutesAsHours(capacity, { locale })} planned.`,
+
+    /** The two meter segments, so the split is audible as well as visible. */
+    meterCarriedSegment: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} carried from previous days`,
+    meterNewSegment: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} planned today`,
+    meterOverSegment: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} beyond capacity`,
+
+    stepperLabel: ({ task }: { task: string }) => `Planned hours for ${task}`,
+    stepperIncrease: () => 'Add fifteen minutes',
+    stepperDecrease: () => 'Remove fifteen minutes',
+    /** ALO-7's split helper, shown under a partial allocation. */
+    stepperSplit: ({
+      planned,
+      remaining,
+      carries,
+      locale
+    }: {
+      planned: Minutes
+      remaining: Minutes
+      carries: Minutes
+      locale?: string
+    }) =>
+      `${formatMinutesAsHours(planned, { locale })} of ${formatMinutesAsHours(remaining, { locale })} remaining, ${formatMinutesAsHours(carries, { locale })} will carry to tomorrow.`,
+
+    /** ALO-8. Advisory only — nothing may block on it. */
+    largerThanOneDay: () =>
+      'This task is larger than one day. Consider splitting it into subtasks so progress is visible daily.',
+
+    /**
+     * The keyboard equivalent of the drop zone (§15.8.7 "Quick add").
+     *
+     * Not a convenience. Drag-and-drop has no keyboard path of its own, so this
+     * combobox *is* how a keyboard user allocates work, and it ships alongside
+     * the drop zone rather than after it.
+     */
+    quickAddLabel: ({ name }: { name: string }) => `Add a task to ${name}'s day`,
+    quickAddPlaceholder: () => 'Search sprint tasks…',
+    quickAddEmpty: () => 'No matching task in this sprint.',
+    quickAddHint: () => 'Type to search, then press Enter to allocate.',
+
+    /** ALO-17's fit indicator, against the selected member's remaining gap. */
+    fitsExact: () => 'Fits exactly',
+    fitsUnder: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `Leaves ${formatMinutesAsHours(minutes, { locale })}`,
+    fitsOver: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} over`,
+
+    removeRow: ({ task }: { task: string }) => `Remove ${task} from this day`,
+    dropZone: ({ name }: { name: string }) => `Drop a task here to add it to ${name}'s day`,
+
+    /** The member drawer's accessible name and its close control. */
+    drawerLabel: ({ name }: { name: string }) => `${name}'s day`,
+    drawerClose: () => 'Close',
+
+    /** Opens the capacity breakdown. Named per member so the board's buttons differ. */
+    breakdownTrigger: ({ name }: { name: string }) => `Show capacity breakdown for ${name}`,
+    capacityToday: () => 'Capacity today',
+    viewBreakdown: () => 'View breakdown',
+    /** After the hours stepper: "3.0h left on task". */
+    leftOnTask: () => 'left on task',
+    blockedTag: () => 'Blocked',
+    removeTitle: () => 'Remove from today',
+    breakdownNominal: () => 'Full day',
+    breakdownEffective: () => 'Available today',
+    breakdownNoAdjustments: () => 'Nothing is reducing this day.',
+
+    /** §15.8.7 — shown only when there is debt, so its presence is the signal. */
+    debtBadge: ({ minutes, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(minutes, { locale })} estimate debt`,
+
+    /**
+     * The per-row source chip (§15.8.7). Carried work is the one that changes
+     * how a PM reads the row — it is a commitment already made, not a choice
+     * being made now — so the words stay distinct rather than collapsing into
+     * a generic "added".
+     */
+    source: {
+      pre_assigned: () => 'Pre-assigned',
+      assigned_in_standup: () => 'New',
+      carried_forward: () => 'Carried',
+      auto_prefilled: () => 'Auto',
+      self_selected: () => 'Self-selected'
+    },
+
+    memberCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 member' : `${count} members`,
+    capacityBoardTitle: () => "Today's capacity",
+    /** ALO-16's drop zone, shown in place of an empty allocation list. */
+    dropHint: () => 'Drag a task here, or use quick add below.'
+  },
+
+  /** The unassigned pool (§15.8.7, ALO-13 … ALO-17). */
+  pool: {
+    title: () => "Today's pool",
+
+    /** ALO-14's two tabs. Counts are in the label, per the spec's table. */
+    tabUnassigned: ({ count }: { count: number }) => `Unassigned (${count})`,
+    tabAssignedNotPlanned: ({ count }: { count: number }) =>
+      `Assigned but not planned today (${count})`,
+
+    searchLabel: () => 'Search the pool',
+    searchPlaceholder: () => 'Search by key, title or label…',
+    filterType: () => 'Type',
+    filterPriority: () => 'Priority',
+    sortLabel: () => 'Sort',
+    sortPriority: () => 'Priority',
+    sortEstimateAsc: () => 'Smallest first',
+    sortEstimateDesc: () => 'Largest first',
+    sortBacklogRank: () => 'Backlog rank',
+
+    /** Distinguished from a filtered-empty list: the two mean opposite things. */
+    emptyUnassigned: () => 'Every sprint task has an owner.',
+    emptyAssignedNotPlanned: () => "Everybody's assigned work is planned for today.",
+    emptyFiltered: () => 'No task matches these filters.',
+    clearFilters: () => 'Clear filters',
+
+    /** D-K — the pool paginates rather than loading an unbounded sprint. */
+    showingCount: ({ shown, total }: { shown: number; total: number }) =>
+      `Showing ${shown} of ${total}`,
+    showMore: () => 'Show more',
+
+    /** The selected member the "fits" indicator measures against (ALO-17). */
+    fitsAgainst: ({ name }: { name: string }) => `Fits shown against ${name}'s remaining gap`,
+    selectMemberFirst: () => 'Select a member to see which tasks close their day.',
+    addToMember: ({ task, name }: { task: string; name: string }) =>
+      `Add ${task} to ${name}'s day`
+  },
+
+  /** The stand-up run screen (§15.8). */
+  run: {
+    dayOf: ({ day, total }: { day: number; total: number }) => `Day ${day} of ${total}`,
+    facilitator: ({ name }: { name: string }) => `Facilitator: ${name}`,
+    presentOf: ({ present, total }: { present: number; total: number }) =>
+      `Present ${present} of ${total}`,
+    joinCall: () => 'Join call',
+    refresh: () => 'Refresh',
+    /** The Refresh button used to give no sign it had done anything. */
+    refreshed: () => 'Refreshed',
+    refreshFailed: () => "Couldn't refresh. Check your connection.",
+    complete: () => 'Complete stand-up',
+    viewSummary: () => 'View summary',
+
+    /** The "Daily Standup Page Redesign" summary bar. */
+    summaryEyebrow: () => 'Daily Stand-up',
+    summaryAttendance: () => 'Attendance:',
+    summaryAttendanceValue: ({ present, total }: { present: number; total: number }) =>
+      `${present}/${total} Present`,
+    summaryPlan: () => 'Plan Status:',
+    summaryPlanValue: ({ percent }: { percent: number }) => `${percent}% Allocated`,
+    allocationSubtitle: () =>
+      "The open backlog beside each team member's bandwidth for today. Drag a task onto a member, or use a card's picker.",
+    allocationBacklogTitle: () => 'Unassigned Backlog',
+    allocationBoardTitle: () => 'Active Assignments & Capacity',
+    reviewTitle: () => "Yesterday's Review & Variance Log",
+    noticeLead: () => 'Update:',
+    lockedLead: () => 'Read-only:',
+
+    /** RUN-2/3, AC-5 (Task 1). The button that starts a `Ready` stand-up. */
+    start: () => 'Start stand-up',
+    startSuccess: () => 'Stand-up started.',
+    startPlanningGateFailed: () =>
+      'This sprint has not completed planning, so this stand-up cannot start.',
+    startFailed: () => 'That could not be started.',
+    /**
+     * The refusal banner. `startFailed` alone threw away the server's reason —
+     * "available at 09:00", "Tuesday's stand-up is still running", the
+     * planning items left open — which is the one thing the PM needed.
+     */
+    startBlockedTitle: () => "This stand-up can't start yet",
+    startBlockedPlanningItems: () => 'Still open in sprint planning:',
+    startBlockedSprintState: ({ state }: { state: string }) =>
+      `The sprint is ${state.replace(/_/g, ' ').toLowerCase()}. Stand-ups only run while the sprint is in progress.`,
+    startOpenPlanning: () => 'Open sprint planning',
+
+    /**
+     * E49. The only path a `Missed` stand-up has back to `Completed` — before
+     * this existed, a `Missed` day had no action anywhere in the UI at all,
+     * despite `POST /backfill` being fully built and tested.
+     */
+    backfill: () => 'Backfill stand-up',
+    backfillTitle: () => 'Backfill this stand-up',
+    backfillDescription: () =>
+      "This day was missed. Backfilling completes it using today's board as recorded, so it counts toward the sprint's history.",
+    /**
+     * SCH-14's "full run payload". A missed day has no attendance recorded by
+     * definition, and CC-7 is hard and non-overridable, so the dialog has to
+     * collect the room before it can complete anything. `partial` is
+     * deliberately absent from the options: reconstructing partial-day minutes
+     * after the fact is guesswork.
+     */
+    backfillAttendanceLegend: () => 'Who attended?',
+    backfillAttendanceUnrecorded: () => 'Not recorded',
+    backfillAttendanceFor: (name: string) => `Backfill attendance for ${name}`,
+    /**
+     * Ruling 21. A missed day had nothing allocated, so CC-1 — hard but
+     * overridable — can never pass retroactively. Rather than exempting
+     * backfill from the check, the dialog shows what is failing and takes the
+     * facilitator's attestation, which the service turns into a real,
+     * audited override. The copy says "attest", not "ignore", because that is
+     * what the recorded override means.
+     */
+    backfillChecksLegend: () => 'What this day cannot satisfy',
+    backfillChecksDescription: () =>
+      'A past day cannot be replanned, so these will not pass. Say what happened and they are recorded as overridden, under your name.',
+    backfillJustificationLabel: () => 'Why these could not be met',
+    backfillJustificationHint: () =>
+      'At least 20 characters, and specific enough to explain the day.',
+    /**
+     * A non-overridable failing check cannot be attested away by anybody, so
+     * the dialog says so rather than offering a tick that cannot work. CC-7 is
+     * excluded from this list by the caller — the attendance selects above are
+     * what resolve it.
+     */
+    backfillBlockedByChecks: () =>
+      'These must be fixed before this day can be backfilled; no attestation can clear them:',
+    backfillMarkAllPresent: () => 'Mark everyone present',
+    /** An attendance row that is already on record, shown locked. */
+    backfillRecorded: () => 'Recorded',
+    /** CC-6: the facilitator's word that the members agreed, in the member's absence. */
+    backfillMembersAgreed: () => 'The affected members agreed to this overtime.',
+    backfillConfirmNeeded: () => 'Confirm the members agreed to continue.',
+    backfillAttendanceRemaining: ({ count }: { count: number }) =>
+      `Record attendance for ${count} more ${plural(count, 'member', 'members')} to continue.`,
+    backfillJustificationNeeded: () =>
+      'Explain why the checks above could not be met to continue.',
+    backfillFixFirst: () => 'Fix the items above to continue.',
+    backfillReady: () => 'Ready to backfill.',
+    /** CC-3 can't be attested away (Ruling 21) — but it can be answered, here. */
+    backfillGoFix: () => 'Fix',
+    backfillNotesLabel: () => 'Notes (optional)',
+    backfillCancel: () => 'Cancel',
+    backfillConfirm: () => 'Backfill',
+    backfillSuccess: () => 'Stand-up backfilled.',
+    backfillFailed: () => 'That could not be backfilled.',
+
+    /**
+     * E57/§15.8.2. Advisory-only elapsed-time indicator — never disables or
+     * gates anything, just tells the room how it's tracking against the
+     * configured duration.
+     */
+    elapsedTime: ({ elapsed, duration }: { elapsed: string; duration: number }) =>
+      `Elapsed ${elapsed} of ${duration}:00`,
+
+    /** The §15.8.1 jump bar. One entry per panel, all seven, always. */
+    panel1: () => 'Attendance',
+    panel2: () => 'Yesterday',
+    panel3: () => 'Variance',
+    panel4: () => 'Carry forward',
+    panel5: () => "Today's Capacity Allocation & Board",
+    panel6: () => 'Open Blockers',
+    panel7: () => 'Complete',
+
+    /** §15.8.11's inserted panel — final day only. */
+    sprintCloseTitle: () => 'Sprint close readiness',
+    sprintCloseDispositionFor: ({ key }: { key: string }) => `Disposition for ${key}`,
+    sprintCloseOutcomeWillFinish: () => 'Will finish',
+    sprintCloseOutcomeAtRisk: () => 'At risk',
+    sprintCloseOutcomeCannotFinish: () => 'Cannot finish',
+    sprintCloseNoDisposition: () => 'Choose one…',
+    sprintCloseDispositionFinishToday: () => 'Finish today',
+    sprintCloseDispositionDescope: () => 'Descope',
+    sprintCloseDispositionMoveToNextSprint: () => 'Move to next sprint',
+    sprintCloseDispositionSplitAndMoveRemainder: () => 'Split and move remainder',
+    sprintCloseCarryForwardTitle: () => 'Open carry-forward items',
+    sprintCloseCarryForwardHint: () =>
+      'Resolve these from the carry forward panel above before completing.',
+
+    /**
+     * A panel this release cannot fill yet.
+     *
+     * Rendered rather than hidden, naming the phase that will build it, for the
+     * same reason `not_evaluated` completion checks are rendered: a screen that
+     * silently omits three of its seven steps looks finished, and the PM has no
+     * way to tell a missing panel from an empty one.
+     */
+    panelPending: ({ phase }: { phase: string }) =>
+      `Not built yet — arrives in ${phase}.`,
+
+    /**
+     * ALO-16's confirmation. Raised by the run screen once the server has
+     * agreed, for both the drop and the keyboard paths — the drop animation
+     * alone cannot say whether the allocation actually stuck.
+     */
+    allocationAdded: ({ task, name }: { task: string; name: string }) =>
+      `${task} added to ${name}`,
+
+    /** RUN-25's rollback toast. */
+    editRejected: () => 'Change not saved. Board restored.',
+    editRejectedToast: () => 'Change not saved',
+    /** RUN-23 lost the race. */
+    staleReload: () => 'Someone else changed this stand-up. Reloaded.',
+    /** RUN-26. */
+    lockedForMembers: () =>
+      'The stand-up has started, so your own row is now read-only.',
+
+    /**
+     * The red counters beside each panel heading (`PlanCount` in `planning/ui.tsx`).
+     * Text-only labels: the number itself is rendered visually and hidden from
+     * assistive tech, so these carry the whole meaning for a screen reader and
+     * must name *what* is being counted, not just repeat the digit.
+     */
+    attendanceIssueCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 member needs attention' : `${count} members need attention`,
+    yesterdayIssueCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 row needs a note or a revision' : `${count} rows need a note or a revision`,
+    varianceIssueCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 row needs a revision or a reason' : `${count} rows need a revision or a reason`,
+    failingCheckCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 check is failing' : `${count} checks are failing`,
+    sprintCloseIssueCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 task still open' : `${count} tasks still open`,
+
+    /** Panel 1. */
+    attendanceTitle: () => 'Attendance',
+    attendanceFor: ({ name }: { name: string }) => `Attendance for ${name}`,
+    partialHoursFor: ({ name }: { name: string }) => `Hours available for ${name}`,
+    absenceReasonFor: ({ name }: { name: string }) => `Absence reason for ${name}`,
+    statePresent: () => 'Present',
+    stateAbsentPlanned: () => 'Absent (planned)',
+    stateAbsentUnplanned: () => 'Absent (unplanned)',
+    statePartial: () => 'Partial day',
+    attendanceFullCapacity: ({ hours }: { hours: string }) =>
+      `Full capacity available (${hours})`,
+    attendancePartialCapacity: ({ hours }: { hours: string }) =>
+      `Partial day (${hours} capacity)`,
+    attendanceOut: () => 'Out today, no capacity',
+    attendanceReassignRequired: () => 'Reassignment Required',
+
+    /** RUN-7's prompt, and its bulk action. */
+    reassignPrompt: ({ name, count }: { name: string; count: number }) =>
+      count === 1
+        ? `Reassign ${name}'s 1 open task?`
+        : `Reassign ${name}'s ${count} open tasks?`,
+    reassignTo: () => 'Reassign to',
+    reassignConfirm: () => 'Reassign',
+    reassignDismiss: () => 'Leave for now',
+
+    /** Panel 7. */
+    completionTitle: () => 'Validation & Completion',
+    checkNotEvaluated: ({ phase }: { phase: string }) => `Not checked yet (${phase})`,
+    completeBlockedBy: ({ message }: { message: string }) =>
+      `Cannot complete: ${message}`,
+    completeReady: () => 'All checks passed.',
+    jumpToFailure: () => 'Fix',
+    checksUnavailable: () =>
+      "This stand-up's checklist could not be loaded, so Complete is disabled until it can be — completing blind would risk skipping a real failure.",
+    everythingChecksOut: () => 'Nothing needs attention.',
+    showPassedChecks: ({ count }: { count: number }) =>
+      count === 1 ? 'Show 1 more check' : `Show ${count} more checks`,
+    hidePassedChecks: () => 'Hide',
+
+    /**
+     * Task 22 — Panel 7's Override action, wiring §15.12's modal to a
+     * failing, overridable check instead of leaving OVR-1..7 unreachable
+     * from the run screen.
+     */
+    override: () => 'Override',
+    overrideSuccess: () => 'Override recorded.',
+    overrideFailed: () => 'That override could not be recorded.',
+    /** Between Fix and Override, so Fix reads as the usual answer and Override as the exception. */
+    overrideHint: () => 'or',
+    /** A failing check an issued override has lifted. */
+    overridden: () => 'Overridden',
+    overrideUnavailable: () => "This check can't be overridden from here.",
+
+    /** Task 17 — `POST /complete`'s outcomes. */
+    completeSuccess: () => 'Stand-up completed.',
+    completeAlreadyDone: () => 'This stand-up has already been completed.',
+    completeChecksFailed: () => 'Resolve the failing checks to complete.',
+    completeFailed: () => 'That could not be completed.',
+    /** R2's blocking banner: a previous attempt did not finish. */
+    completionInterruptedBanner: () =>
+      'A previous attempt to complete this stand-up did not finish. Resume it to continue.',
+    completionInterruptedResume: () => 'Resume completion',
+
+    /** Day one (§15.8.10, ALO-20/21). */
+    dayOneProgress: ({
+      assigned,
+      totalTasks,
+      placed,
+      capacity
+    }: {
+      assigned: number
+      totalTasks: number
+      placed: string
+      capacity: string
+    }) =>
+      `${assigned} of ${totalTasks} tasks assigned, ${placed} of ${capacity} placed.`,
+    dayOneUnassignedWarning: ({ count }: { count: number }) =>
+      count === 1
+        ? '1 task is still unassigned. It will appear in tomorrow’s pool.'
+        : `${count} tasks are still unassigned. They will appear in tomorrow’s pool.`
+  },
+
+  /**
+   * `/my/standup` (UI-12), the mobile-first single-member slice of the run
+   * screen. RUN-26's lock banner is distinct from `run.lockedForMembers`
+   * because this screen's whole layout — not just a row — is read-only.
+   */
+  my: {
+    title: () => 'Standups',
+    noStandup: () => 'You have no stand-up open right now.',
+    /**
+     * Shown under `noStandup`. A blank screen with one sentence gave no way
+     * to tell "nothing scheduled today" apart from "something is broken" —
+     * this names the most common cause (the sprint covering today has not
+     * finished planning, so generation never ran) and gives a next step.
+     */
+    noStandupHint: () =>
+      'Your current sprint may still be in planning — stand-ups are only scheduled once planning is complete. Check with your PM, or view your projects.',
+    noStandupProjectsLink: () => 'View your projects',
+    /**
+     * This route is reachable for every stand-up status — including
+     * `Scheduled`, which the "other stand-ups today" banner links to
+     * directly — so a single "has started" sentence used to be shown even
+     * when it plainly had not. Each status gets its own accurate lead
+     * clause; only `In_Progress` keeps the original "has started" wording,
+     * because that is the one status it is actually true for.
+     */
+    readOnlyBanner: ({ status }: { status: string }) => {
+      const tail = "Yesterday's records and capacity allocation are read-only."
+      switch (status) {
+        case 'In_Progress':
+          return `The stand-up has started. ${tail}`
+        case 'Completed':
+          return `This stand-up is complete. ${tail}`
+        case 'Reopened':
+          return `This stand-up has been reopened by your PM. ${tail}`
+        case 'Missed':
+          return `This stand-up was missed. ${tail}`
+        case 'Skipped_Holiday':
+          return `This date was not a working day, so no stand-up ran. ${tail}`
+        case 'Cancelled':
+          return `This stand-up was cancelled. ${tail}`
+        case 'Scheduled':
+        default:
+          return "This stand-up hasn't started yet. Yesterday's records and capacity allocation will open once it does."
+      }
+    },
+    hoursFor: ({ title }: { title: string }) => `Hours for ${title}`,
+    addTask: ({ key }: { key: string }) => `Add ${key}`,
+    selfSelectHint: () => 'Adding this notifies your PM.',
+    /**
+     * This screen applies nothing optimistically, so — unlike
+     * `run.editRejected` — there is no board to put back; the wording says
+     * only that the change did not save.
+     */
+    editRejected: () => 'That change could not be saved.',
+    addRejected: () => 'That task could not be added to your day.',
+    /** A read-tolerant section (Yesterday, My position, Blockers) shown when its own fetch failed — the rest of the screen still renders. */
+    sectionLoadFailed: () => 'Could not load this section.',
+    /** The header's project switcher — a member on more than one project's
+     *  sprint team has more than one stand-up open at once, and the project is
+     *  what selects between them. Replaced the old collapsed "also today"
+     *  banner, which made the others findable but not obvious. */
+    switchProject: () => 'Switch project',
+    switchProjectHint: ({ count }: { count: number }) =>
+      `${count} stand-ups open for you`,
+    dayOf: ({ day, total }: { day: number; total: number }) => `Day ${day} of ${total}`,
+    /** Deliberately not `run.joinCall`'s "Join call": this is a full button on
+     *  the member's screen rather than a strip link, and "Join Meeting" names
+     *  the thing the project's Meeting URL setting configures. */
+    joinMeeting: () => 'Join Meeting',
+    breadcrumbRoot: () => 'Dashboard',
+    localTime: ({ time }: { time: string }) => `Local: ${time}`,
+    projectTime: ({ zone, time }: { zone: string; time: string }) => `Project ${zone}: ${time}`,
+    duration: ({ minutes }: { minutes: number }) => `${minutes} mins`,
+    /** Bold lead-ins for the save-refused banner: a version clash (RUN-23) reads differently from any other refusal. */
+    conflictTitle: () => 'Server edit conflict:',
+    refusedTitle: () => 'Not saved:',
+    conflictDetail: () => 'Someone else updated this stand-up. Reload to see the latest.',
+
+    journeyEyebrow: () => 'Guided journey',
+    journeyTitle: () => 'Complete each area in order before the stand-up starts.',
+    journeyBody: () =>
+      'Start with yesterday, confirm today, review carry-forward items, and finish with blockers. Every section is designed to keep the next action unmistakable.',
+    stateCompleted: () => 'Completed',
+    stateInProgress: () => 'In Progress',
+    stateLocked: () => 'Locked',
+    stateEditing: () => 'Editing',
+    stateReview: () => 'Review',
+    stateOptional: () => 'Optional',
+    stateAllClear: () => 'All clear',
+    stateOverdue: () => 'Overdue',
+    stateNothingToReview: () => 'Nothing to review',
+
+    yesterdayStepTitle: () => 'Review yesterday',
+    yesterdayStepSubtitle: () => 'Confirm logged hours and close out the previous day.',
+    yesterdayDone: () => 'Done:',
+    yesterdayLogged: () => 'Logged Total:',
+    loggedHours: ({ hours }: { hours: string }) => `${hours} hrs`,
+    yesterdayLockedNote: () =>
+      'Yesterday is read-only because the stand-up has started. Use this view to confirm the previous day before moving into today.',
+    yesterdayEditableNote: () =>
+      'Correct any status or logged hours now, so the stand-up does not have to spend time on it.',
+    columnTask: () => 'Task Details',
+    columnPlannedVsLogged: () => 'Planned vs Logged',
+    columnLogged: () => 'Logged Hours',
+    columnStatus: () => 'Status',
+    varianceAmount: ({ hours }: { hours: string }) => `${hours} variance`,
+    perfectMatch: () => 'Perfect match',
+    carryBadge: ({ count }: { count: number }) => `Carry x${count}`,
+    taskStatus: {
+      todo: 'To Do',
+      in_progress: 'In Progress',
+      blocked: 'Blocked',
+      done: 'Completed'
+    } as Record<string, string>,
+
+    todayStepTitle: () => 'Confirm today',
+    todayStepSubtitle: () => "Review capacity, today's plan, and the next available task.",
+    capacityAllocated: () => 'Allocated',
+    capacityState: {
+      full: 'Optimized State (Full)',
+      under: 'Under Capacity',
+      over: 'Over Capacity',
+      zero: 'Nothing Planned',
+      unavailable: 'Unavailable'
+    } as Record<string, string>,
+    plannedVsCapacity: ({ planned, capacity }: { planned: string; capacity: string }) =>
+      `Planned: ${planned} / Capacity: ${capacity}`,
+    nominalCapacity: ({ hours }: { hours: string }) => `Nominal: ${hours}`,
+    adjustmentLine: ({ label, hours }: { label: string; hours: string }) => `${label}: −${hours}`,
+    todayPlanTitle: () => "Today's Plan",
+    tasksPlanned: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? 'task' : 'tasks'} planned`,
+    gapAvailable: ({ hours }: { hours: string }) => `${hours} surplus available`,
+    overCapacity: ({ hours }: { hours: string }) => `${hours} over capacity`,
+    fullyPlanned: () => 'fully planned',
+    allocatedLabel: () => 'Allocated:',
+    spareCapacity: ({ hours }: { hours: string }) =>
+      `You have ${standupStrings.my.spareCapacityPhrase({ hours })} today. You can select one small task to pull.`,
+    spareCapacityPhrase: ({ hours }: { hours: string }) => `${hours} spare capacity`,
+    pullTask: () => 'Pull task',
+    overLimit: () => 'Over Limit',
+    estimated: ({ hours }: { hours: string }) => `Estimated: ${hours}`,
+    priority: ({ priority }: { priority: string }) => `Priority: ${priority}`,
+
+    positionStepSubtitle: () =>
+      'Acknowledge the oldest and most escalated items before the stand-up.',
+    positionEyebrow: () => 'Read-only carry forward (sorted oldest & most escalated)',
+    ageBand: {
+      normal: 'Stable Age',
+      note_required: 'Note Required',
+      escalated: 'Escalated Priority',
+      chronic: 'Chronic'
+    } as Record<string, string>,
+    ageBadge: ({ count }: { count: number }) =>
+      `Age: ${count} ${count === 1 ? 'stand-up' : 'stand-ups'}`,
+    originallyPlanned: ({ date }: { date: string }) => `Originally planned ${date}.`,
+
+    blockersStepTitle: () => 'Raise blockers',
+    blockersStepSubtitle: () => 'Capture anything blocking your progress before the stand-up starts.',
+    activeRoadblocks: () => 'Active roadblocks',
+    raiseRoadblock: () => 'Raise New Roadblock',
+    roadblockPlaceholder: () => "Describe what's keeping you from completing your work today...",
+    markUrgent: () => 'Mark as Urgent',
+    fileRoadblock: () => 'File Roadblock',
+    ownedBy: ({ owner }: { owner: string }) => `Owned by: ${owner}`,
+    noOwnerYet: () => 'No owner yet',
+    targetDate: ({ date }: { date: string }) => `Target ${date}`,
+    capacityFull: ({ hours, taskCount }: { hours: string; taskCount: number }) =>
+      `You're planned to ${hours} today across ${taskCount} ${taskCount === 1 ? 'task' : 'tasks'}.`,
+    capacityUnder: ({ hours }: { hours: string }) => `You have ${hours} unplanned today.`,
+    capacityOver: ({ hours }: { hours: string }) => `You're planned ${hours} beyond your capacity today.`,
+    capacityZero: () => 'Nothing is planned for you today yet.',
+    capacityUnavailable: () => "You're down as unavailable today — nothing is planned.",
+    debtSentence: ({ hours }: { hours: string }) =>
+      `You are ${hours} over estimate on this sprint's completed and in-flight work.`,
+    surplusSentence: ({ hours }: { hours: string }) =>
+      `You're ${hours} ahead of estimate on this sprint's work.`,
+    strandedSentence: ({ hours }: { hours: string }) =>
+      `${hours} is still assigned to you for a day you're not available.`,
+    yesterdayEmpty: () => "Nothing to review yet — your previous stand-up hasn't closed.",
+    statusFor: ({ key }: { key: string }) => `Status for ${key}`,
+    todayEmpty: () => 'Nothing planned for you yet — your PM assigns work at the stand-up.',
+    /**
+     * Deliberately status-agnostic — this row-level card is shown whatever
+     * the stand-up's status is (Scheduled, Completed, Missed, …), and "the
+     * stand-up has started" is false for most of those. Kept true in every
+     * case instead of threading `status` through for a sentence this short.
+     */
+    lockedReason: () => 'Editing is locked for this stand-up.',
+    sourceCarried: () => 'carried',
+    sourcePreAssigned: () => 'pre-assigned',
+    sourceAssignedInStandup: () => 'assigned',
+    sourceSelfSelected: () => 'self-selected',
+    sourceAutoPrefilled: () => 'auto',
+    positionHeader: () => 'My position',
+    positionEmpty: () => 'Nothing blocked. Nothing carried.',
+    pmOwesNote: () => 'Your PM owes a note on this today.',
+    blockersEmpty: () => 'No open blockers.',
+    /** Links a PM straight to this stand-up's own run screen — not the project's whole schedule hub, which they would then have to search. */
+    openFullStandup: () => 'Open full stand-up'
+  },
+
+  config: {
+    title: () => 'Stand-up Configuration',
+    subtitle: () => 'When the stand-up runs, and the rules it holds the team to.',
+
+    /**
+     * The overrun policy explanations. Full sentences because a PM choosing
+     * between these is choosing whether tomorrow's plan is aspirational or
+     * honest, which is not inferable from the label alone.
+     */
+    absorbTitle: () => 'Absorb',
+    absorbSummary: () => 'Capacity stays at full tomorrow.',
+    absorbDetail: () =>
+      'When someone goes over estimate, their day tomorrow is still eight hours and the overrun shows as estimate debt they are expected to make up. Choose this if your culture is that the estimate is the commitment.',
+
+    reduceTitle: () => 'Reduce',
+    reduceSummary: () => "Tomorrow's capacity drops by the overrun.",
+    reduceDetail: () =>
+      'Burn two hours over and the board will only let you plan six hours of new work. Choose this if you want the plan to reflect reality rather than intention.',
+
+    policyChangeScope: () =>
+      'Changing this only affects stand-ups that have not been completed.',
+
+    /** DN-6 — the ceremonies opt-out. */
+    ceremoniesTitle: () => 'Ceremonies reduce capacity',
+    ceremoniesHint: () =>
+      'A sprint review, retro or demo removes its own length from the day of everyone attending it. Off means meetings are treated as outside the working day.',
+
+    /**
+     * DN-4 — an event with nobody on it deducts from nobody. Named as a
+     * question about the event rather than a system error, because it is a
+     * data problem the PM fixes on the Sprint Events screen.
+     */
+    unattendedCeremonies: ({ count }: { count: number }) =>
+      count === 1
+        ? '1 upcoming event has no attendees, so it reduces nobody’s capacity.'
+        : `${count} upcoming events have no attendees, so they reduce nobody’s capacity.`,
+    unattendedCeremoniesHint: () =>
+      'Add attendees on the Sprint Events screen and the time will start coming out of their day.',
+
+    saved: () => 'Stand-up settings saved',
+    saveFailed: () => 'Could not save stand-up settings'
+  },
+
+  /**
+   * Plain-language variance explanations (spec §15.8.5).
+   *
+   * §15.8.5 states this copy "is a requirement, not decoration" — it is the
+   * sentence that makes a PM understand *why* two hours are missing rather than
+   * just seeing a number. Phase 5 fills these in as the outcome classifier is
+   * built; the namespace exists now so that copy is written into the catalogue
+   * from its first commit rather than inlined into a component and retrofitted.
+   */
+  variance: {
+    /**
+     * One entry per outcome, each a complete sentence.
+     *
+     * Never assembled from fragments: §12.2's twelve outcomes read differently
+     * in different languages, and a sentence concatenated from "Planned", a
+     * number and "not started" cannot be translated at all. The two the
+     * worked example fixes (§12.3) are reproduced here word for word — the
+     * tests assert them character by character, because a paraphrase there is
+     * a spec deviation, not a style choice.
+     */
+    deliveredUnder: ({
+      planned,
+      logged,
+      under,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      under: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, done with ${formatMinutesAsHours(under, { locale })} to spare. ` +
+      'That time is credited back against estimate debt.',
+
+    deliveredOnEstimate: ({
+      planned,
+      logged,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, done on estimate.`,
+
+    deliveredOver: ({
+      planned,
+      logged,
+      over,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      over: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, over by ${formatMinutesAsHours(over, { locale })}. Done, but the estimate was short.`,
+
+    openUnderConsumed: ({
+      planned,
+      logged,
+      under,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      under: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, so ${formatMinutesAsHours(under, { locale })} of planned time went elsewhere. ` +
+      'Still in progress and carrying forward.',
+
+    openFullyConsumed: ({
+      planned,
+      logged,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, all of it spent. Still in progress and carrying forward.`,
+
+    /** §12.3's KAN-214 sentence, verbatim. */
+    openOverConsumed: ({
+      planned,
+      logged,
+      over,
+      totalOnTask,
+      estimate,
+      taskOver,
+      locale
+    }: {
+      planned: Minutes
+      logged: Minutes
+      over: Minutes
+      totalOnTask: Minutes
+      estimate: Minutes
+      taskOver: Minutes
+      locale?: string
+    }) =>
+      `Planned ${formatMinutesAsHours(planned, { locale })}, logged ${formatMinutesAsHours(
+        logged,
+        { locale }
+      )}, over by ${formatMinutesAsHours(over, { locale })}. Still in progress. ` +
+      `Total on task ${formatMinutesAsHours(totalOnTask, {
+        locale
+      })} against a ${formatMinutesAsHours(estimate, { locale })} estimate, task is ` +
+      `${formatMinutesAsHours(taskOver, { locale })} over estimate. ` +
+      'Revised remaining estimate required.',
+
+    /** §12.3's KAN-231 sentence, verbatim. */
+    notStarted: ({ planned, locale }: { planned: Minutes; locale?: string }) =>
+      `Planned ${formatMinutesAsHours(planned, {
+        locale
+      })}, logged 0.0h, not started. ${formatMinutesAsHours(planned, {
+        locale
+      })} of planned work did not happen. Reason required.`,
+
+    blocked: ({ planned, locale }: { planned: Minutes; locale?: string }) =>
+      `Blocked. The ${formatMinutesAsHours(planned, {
+        locale
+      })} planned here is not counted as an overrun — the blocker owns this row.`,
+
+    descoped: () =>
+      'Removed from the sprint. Logged time is kept for reporting, and the carry-forward item closes.',
+
+    reassigned: ({ logged, locale }: { logged: Minutes; locale?: string }) =>
+      `Reassigned after the day was planned. The ${formatMinutesAsHours(logged, {
+        locale
+      })} logged stays with the person who worked it, and the remaining estimate moves with the task.`,
+
+    ownerAbsent: () =>
+      'The owner was away, so nothing here counts as an overrun and no estimate debt accrues.',
+
+    noTimeLoggedButProgressed: () =>
+      'Status moved but no time was logged. Enter the actual hours — nothing accrues until they exist.',
+
+    /**
+     * §12.3's absorb-policy banner. Says what the debt *means* for today's
+     * plan, because a number alone tells a PM nothing they can act on.
+     */
+    debtBanner: ({ minutes: value, locale }: { minutes: Minutes; locale?: string }) =>
+      `Carrying ${formatMinutesAsHours(value, {
+        locale
+      })} of estimate debt. Today’s plan assumes estimates hold. If they do not, this debt grows.`,
+
+    /** AC-16's sentence for the reduce policy, verbatim. */
+    capacityReduced: ({
+      nominal,
+      effective,
+      debt,
+      locale
+    }: {
+      nominal: Minutes
+      effective: Minutes
+      debt: Minutes
+      locale?: string
+    }) =>
+      `Capacity ${formatMinutesAsHours(nominal, { locale })} reduced to ${formatMinutesAsHours(
+        effective,
+        { locale }
+      )} by ${formatMinutesAsHours(debt, { locale })} of estimate debt.`,
+
+    /**
+     * VAR-6 / E42. A negative balance is surplus and gets its own word.
+     * "-2.0h of debt" would tell somebody they owe negative work.
+     */
+    surplus: ({ minutes: value, locale }: { minutes: Minutes; locale?: string }) =>
+      `Ahead of estimate by ${formatMinutesAsHours(value, { locale })}.`,
+
+    /**
+     * VAR-10 / NFR-14. Factual, never punitive: it states a number about the
+     * work, not a judgement about the person.
+     */
+    memberFacingDebt: ({ minutes: value, locale }: { minutes: Minutes; locale?: string }) =>
+      `You are ${formatMinutesAsHours(value, { locale, withUnit: false })} hours over estimate ` +
+      'on this sprint’s completed and in-flight work.',
+
+    chronicSpill: ({ chainLength }: { chainLength: number }) =>
+      `Spilled across ${chainLength} ${plural(chainLength, 'stand-up', 'stand-ups')}.`,
+
+    /** E43 — debt now larger than a whole day. */
+    notRecoverable: () =>
+      'Estimate debt now exceeds a full day. This plan is not recoverable without descoping or writing debt off.',
+
+    /** VAR-13's roll-up strip labels. */
+    rollUpPlanned: () => 'Planned yesterday',
+    rollUpLogged: () => 'Logged yesterday',
+    rollUpDayVariance: () => 'Net day variance',
+    rollUpDebt: () => 'Estimate debt',
+    rollUpNeedingRevision: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'task needs', 'tasks need')} a revised estimate`,
+
+    /** VAR-12's words. Colour is never the only signal (NFR-A2). */
+    labelOver: () => 'over',
+    labelUnder: () => 'under',
+    labelOnEstimate: () => 'on estimate',
+    labelNotStarted: () => 'not started',
+    /** Blueprint's row badge — an outcome that cannot close without a revision. */
+    revisionRequiredBadge: () => 'Revision required',
+    reasonRequiredBadge: () => 'Reason required',
+
+    /** §15.11, the revision modal. */
+    reviseTitle: () => 'Revise remaining estimate',
+    reviseHoursLabel: () => 'How many hours are left?',
+    reviseOriginalUnchanged: () => 'This will not change the original estimate.',
+    reviseProjectedTotal: ({
+      name,
+      total,
+      locale
+    }: {
+      name: string
+      total: Minutes
+      locale?: string
+    }) =>
+      `${name}’s new total on this task would be ${formatMinutesAsHours(total, { locale })}.`,
+    reviseDetailRequired: ({ minLength }: { minLength: number }) =>
+      `Say a little more — at least ${minLength} characters.`,
+    reasonRequired: ({ minLength }: { minLength: number }) =>
+      `Give a reason of at least ${minLength} characters for the planned time that did not happen.`,
+
+    /**
+     * The panel's "answer these first" queue. The rows that block completion
+     * (CC-3) used to sit in one list with every other row, marked only by a red
+     * pill, so the PM had to read every row to find the two that mattered.
+     */
+    needsAnswerTitle: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'row needs', 'rows need')} an answer before you can complete`,
+    needsAnswerHelp: () =>
+      'Work that ran over needs a new estimate of the time left. Planned work that never started needs a reason.',
+    allAnswered: () => 'Every row from yesterday is explained.',
+    /** The one question each flagged row is asking, in the PM's words. */
+    revisionQuestion: ({ name }: { name: string }) =>
+      `How much time does ${name} still need on this?`,
+    reasonQuestion: ({ name }: { name: string }) =>
+      `Why didn\u2019t ${name}\u2019s planned time on this happen?`,
+    answeredRevision: ({ minutes: value, locale }: { minutes: Minutes; locale?: string }) =>
+      `Revised: ${formatMinutesAsHours(value, { locale })} left`,
+    answeredReason: () => 'Reason given',
+    giveReason: () => 'Give a reason',
+    showExplained: ({ count }: { count: number }) =>
+      `Show ${count} other ${plural(count, 'row', 'rows')}`,
+    hideExplained: () => 'Hide other rows',
+    debtByMember: () => 'Estimate debt by member',
+
+    /** AC-18's dialog. The floor mirrors `MIN_NOT_STARTED_REASON_LENGTH`. */
+    notStartedTitle: () => 'Why didn\u2019t this happen?',
+    notStartedLabel: () => 'Reason',
+    notStartedPlaceholder: () => 'e.g. Pulled onto a production incident all afternoon.',
+    notStartedHint: ({ minLength, remaining }: { minLength: number; remaining: number }) =>
+      remaining > 0
+        ? `At least ${minLength} characters \u2014 ${remaining} more to go.`
+        : 'Looks good.',
+
+    /** Dialog-level failures, shown inside the dialog the PM is looking at. */
+    saveFailed: () => 'That could not be saved. Try again.'
+  },
+
+  /**
+   * Panel 2, the yesterday review (§15.8.4, RUN-9..RUN-13).
+   *
+   * The bucket headings are the panel's structure, so all four are returned
+   * even when three are empty: a PM who sees three headings cannot tell
+   * "nothing is blocked" from "the blocked bucket did not render".
+   */
+  yesterday: {
+    title: () => 'Yesterday',
+    /** Trails the signed hours on the row's badge: "+0.5h variance". */
+    varianceBadge: () => 'variance',
+    bucketCompleted: () => 'Completed since last stand-up',
+    bucketInProgress: () => 'In progress',
+    bucketNotStarted: () => 'Not started',
+    bucketBlocked: () => 'Blocked',
+    bucketCount: ({ label, count }: { label: string; count: number }) => `${label} (${count})`,
+    noPreviousStandup: () =>
+      'This is the first stand-up of the sprint, so there is no previous day to review.',
+    emptyBucket: () => 'Nothing here.',
+    /** E39 — time logged against a task nobody planned for this member. */
+    unplannedBadge: () => 'Unplanned',
+    unplannedHint: () =>
+      'Time was logged against this task yesterday, but it was not on the plan.',
+    markAllConfirmed: () => 'Mark all confirmed',
+    /** I1 — tasks added to yesterday's plan after that stand-up already completed. */
+    addedAfterCompletion: () => "Added after yesterday's stand-up completed",
+    ageBadge: ({ standups }: { standups: number }) =>
+      `Open across ${standups} ${plural(standups, 'stand-up', 'stand-ups')}`,
+    previousStatus: () => 'Was',
+    currentStatus: () => 'Now',
+    /** RUN-11 — a status the PM changed for somebody else. */
+    changedOnBehalfOf: ({ name }: { name: string }) => `Changed by the facilitator for ${name}`,
+    /** RUN-10 — the one-line note action. */
+    saveNote: () => 'Add note',
+    noteSaved: () => 'Saved',
+    /** The row's actions, as buttons rather than link-styled text. */
+    goToTask: () => 'Go to Task',
+    /** Visible label; the button's accessible name keeps the full "Revise remaining estimate". */
+    reviseShort: () => 'Revise estimate',
+    /** Before the previous status, shown only when the status moved. */
+    was: () => 'was',
+    editRow: () => 'Hours & note',
+    loggedLabel: () => 'Logged (h)',
+    notePlaceholder: () => 'Add a note for the team',
+    onPlan: () => 'on plan'
+  },
+
+  /**
+   * The estimate-debt ledger drawer and the write-off dialog (VAR-5, VAR-8).
+   *
+   * The entry types are labelled in plain language rather than by their stored
+   * names: "accrual" is a bookkeeping word, and the drawer is read by the
+   * person the number is about.
+   */
+  debt: {
+    title: () => 'Estimate debt',
+    ledgerTitle: () => 'Estimate debt ledger',
+    empty: () => 'Nothing has been recorded on this sprint yet.',
+    outstanding: ({ minutes: value, locale }: { minutes: Minutes; locale?: string }) =>
+      `${formatMinutesAsHours(value, { locale })} outstanding`,
+    entryType: {
+      accrual: () => 'Went over estimate',
+      credit: () => 'Came in under estimate',
+      settlement: () => 'Worked off against capacity',
+      writeoff: () => 'Written off',
+      carry_in: () => 'Carried in from the previous sprint'
+    },
+    writeOff: () => 'Write off debt',
+    writeOffConfirm: () => 'Confirm write-off',
+    writeOffReasonLabel: () => 'Why is this debt being written off?',
+    writeOffReasonTooShort: ({ minLength }: { minLength: number }) =>
+      `A write-off needs a justification of at least ${minLength} characters.`,
+    writeOffTooLarge: ({ outstanding, locale }: { outstanding: Minutes; locale?: string }) =>
+      `Only ${formatMinutesAsHours(outstanding, { locale })} is outstanding, so no more than that can be written off.`,
+    writeOffNotPermitted: () => 'Only a project manager can write estimate debt off.',
+    /** NFR-13: the API answers with the team total only, never a member's rows. */
+    noAccess: () => "You don't have access to individual members' estimate debt.",
+    loadFailed: () => "That member's estimate debt could not be loaded.",
+    writeOffFailed: () => 'That write-off could not be saved.',
+    writeOffHoursLabel: () => 'Hours to write off',
+    close: () => 'Close',
+    /** VAR-9's confirmation, shown at the new sprint's planning completion. */
+    carryInConfirm: ({ count }: { count: number }) =>
+      `${count} ${plural(count, 'person carries', 'people carry')} estimate debt into this sprint.`
+  },
+
+  /**
+   * The Schedule hub (spec §15.6, UI-8, UI-9).
+   *
+   * The status labels are deliberately plain-language rather than the internal
+   * state names: "Skipped — public holiday" tells a PM what happened;
+   * "Skipped_Holiday" tells them what the database calls it.
+   */
+  schedule: {
+    title: () => 'Stand-up schedule',
+    empty: () =>
+      'No stand-ups have been generated for this sprint yet. They are created when the planning session completes.',
+    today: () => 'Today',
+    sprintDays: () => 'This sprint',
+    dayLabel: ({ number, total }: { number: number; total: number }) =>
+      `Day ${number} of ${total}`,
+    dayOne: () => 'Day one — assignment',
+    finalDay: () => 'Final day — sprint close',
+    frozenDayNumber: ({ number }: { number: number }) => `Ran as day ${number}`,
+    backfilled: () => 'Back-filled',
+    calendarAnomaly: () =>
+      'The calendar changed after this stand-up ran. Its record was left untouched.',
+    loading: () => 'Loading the schedule…',
+    sprintsLoadFailed: () => "Could not load this project's sprints.",
+    scheduleLoadFailed: () => 'Could not load the stand-up schedule.',
+    resume: () => 'Resume',
+    regenerate: {
+      button: () => 'Regenerate schedule',
+      title: () => 'Regenerate stand-up schedule',
+      description: () =>
+        'Reconcile this sprint’s stand-up days against the project’s latest working calendar and sprint dates. Completed stand-ups are preserved; future and unstarted days are updated.',
+      confirm: () => 'Reconcile schedule',
+      cancel: () => 'Cancel',
+      reconciling: () => 'Reconciling…',
+      success: () => 'Schedule successfully updated.',
+      failed: () => 'Could not regenerate the schedule.'
+    },
+    health: {
+      title: () => 'Sprint Health & Cadence',
+      cadenceTitle: () => 'Sprint Runway',
+      cadenceSub: ({ completed, total, percent }: { completed: number; total: number; percent: number }) =>
+        `${completed} of ${total} days completed (${percent}%)`,
+      scopeTitle: () => 'Scope vs Capacity',
+      onTrack: () => 'On track',
+      overCapacity: ({ overage }: { overage: string }) => `Over by ${overage}`,
+      scopeDetail: ({ capacity, scope }: { capacity: string; scope: string }) =>
+        `${scope} remaining scope vs ${capacity} capacity`,
+      debtTitle: () => 'Estimate Debt',
+      debtClear: () => 'Zero estimate debt',
+      debtActive: ({ debt, members }: { debt: string; members: number }) =>
+        `${debt} across ${members} ${members === 1 ? 'member' : 'members'}`,
+      debtDetail: () => 'Accumulated overrun on completed tasks',
+      cfwTitle: () => 'Carry-Forwards & Overrides',
+      cfwClear: () => 'No open carry-forwards',
+      cfwActive: ({ count, oldest }: { count: number; oldest: number }) =>
+        `${count} ${count === 1 ? 'item' : 'items'} (oldest ${oldest} ${oldest === 1 ? 'day' : 'days'})`,
+      overridesCount: ({ count }: { count: number }) =>
+        `${count} ${count === 1 ? 'override' : 'overrides'} issued`
+    },
+    metrics: {
+      allocation: ({ percent }: { percent: number }) => `${percent}% allocated`,
+      duration: ({ minutes }: { minutes: number }) => `${minutes}m`,
+      attendance: ({ present, total }: { present: number; total: number }) => `${present}/${total} present`,
+      overrides: ({ count }: { count: number }) =>
+        count === 1 ? '1 override' : `${count} overrides`,
+      carryForward: ({ count }: { count: number }) =>
+        count === 1 ? '1 carry-fwd' : `${count} carry-fwds`,
+      joinCall: () => 'Join call',
+      startStandup: () => 'Start stand-up',
+      viewSummary: () => 'View summary',
+      unallocated: () => 'Unallocated',
+      scheduled: () => 'Planned'
+    },
+    status: {
+      Scheduled: 'Scheduled',
+      Ready: 'Ready to start',
+      In_Progress: 'In progress',
+      Completed: 'Completed',
+      Reopened: 'Reopened',
+      Missed: 'Missed',
+      Skipped_Holiday: 'Skipped — not a working day',
+      Cancelled: 'Cancelled'
+    } as Record<string, string>
+  },
+
+  /**
+   * Scheduler notifications (spec §9.5 — N1, N2, N8).
+   *
+   * Each says what the reader has to *do*. "Stand-up is ready" tells a
+   * facilitator nothing they cannot see; "your 09:00 stand-up opens in fifteen
+   * minutes" tells them whether to stop what they are doing.
+   */
+  notifications: {
+    readyTitle: () => 'Your stand-up is ready to start',
+    readyMessage: ({ localTime, minutesUntil }: { localTime: string; minutesUntil: number }) =>
+      `The ${localTime} stand-up opens in ${minutesUntil} ${plural(
+        minutesUntil,
+        'minute',
+        'minutes'
+      )}. Its numbers are prepared.`,
+
+    reminderTitle: () => 'Update your tasks before stand-up',
+    reminderMessage: ({ localTime }: { localTime: string }) =>
+      `Stand-up is at ${localTime}. Update your task statuses and log your time before it starts.`,
+
+    missedTitle: () => 'Yesterday`s stand-up was missed',
+    missedMessage: ({ date }: { date: string }) =>
+      `The stand-up for ${date} was never started. Its work has been carried into the next one, and you can still back-fill it.`,
+
+    missedTwiceTitle: () => 'Two stand-ups missed in a row',
+    missedTwiceMessage: ({ count }: { count: number }) =>
+      `${count} stand-ups have now been missed consecutively on this sprint.`,
+
+    missedThriceTitle: () => 'Three stand-ups missed in a row',
+    missedThriceMessage: ({ count }: { count: number }) =>
+      `${count} consecutive stand-ups have been missed. This sprint's plan is no longer being tracked daily.`,
+
+    /** CFW-3, N9. */
+    carryForwardEscalatedTitle: () => 'A carry-forward item is escalated',
+    carryForwardEscalatedMessage: ({ label, age }: { label: string; age: number }) =>
+      `${label} has been open for ${age} stand-ups without closing.`,
+    carryForwardChronicTitle: () => 'A carry-forward item is now chronic',
+    carryForwardChronicMessage: ({ label, age }: { label: string; age: number }) =>
+      `${label} has been open for ${age} stand-ups. It needs a documented decision: continue, descope, or split.`,
+
+    /** N4 — UI-10/UI-11: each member's own commitment summary, on completion. */
+    personalCommitmentTitle: () => 'Your stand-up summary is ready',
+    personalCommitmentMessage: () =>
+      'Today’s stand-up is complete. Your personal commitment summary is ready to review.',
+
+    /** N5 — the facilitator/admin/stakeholder digest, on completion. */
+    completedTitle: () => 'Stand-up completed',
+    completedMessage: () => 'Today’s stand-up is complete. The summary is ready to review.',
+
+    /** N6 — a member who received no allocation for the day. */
+    notAllocatedTitle: () => 'You were not allocated any work today',
+    notAllocatedMessage: () =>
+      'Today’s stand-up completed without allocating you any work. If that is unexpected, check with your facilitator.',
+
+    /** N7 — an override was issued during the stand-up (spec AC-11). */
+    overrideIssuedTitle: () => 'An override was issued',
+    overrideIssuedMessage: ({ type }: { type: string }) =>
+      `An override of type "${type}" was issued for today's stand-up.`,
+
+    /** N11 — RUN-11: a status change made on behalf of another member. */
+    statusChangedOnBehalfTitle: () => 'Your task status was updated on your behalf',
+    statusChangedOnBehalfMessage: ({ taskKey }: { taskKey: string }) =>
+      taskKey
+        ? `${taskKey} was updated on your behalf during today's stand-up.`
+        : 'One of your tasks was updated on your behalf during today’s stand-up.',
+
+    /** N13 — Task 14/E31: a member self-selected work after completion. */
+    selfSelectedAfterCompletionTitle: () => 'Extra work was self-selected after completion',
+    selfSelectedAfterCompletionMessage: () =>
+      'A team member added a task to their own day after the stand-up was already completed. It will appear on tomorrow’s review.'
+  },
+
+  /**
+   * Lifecycle refusals (spec §10.1, RUN-2..RUN-5, E51, E52).
+   *
+   * These are refusals a PM reads mid-meeting, so each one says what to do
+   * next — the time the stand-up opens, or which stand-up is holding the lock —
+   * rather than only that the action was rejected.
+   */
+  lifecycle: {
+    notStartableYet: ({ localTime, localDate }: { localTime: string; localDate: string }) =>
+      `This stand-up becomes available at ${localTime} on ${localDate}.`,
+    notStartableFromStatus: ({ status }: { status: string }) =>
+      `A stand-up in ${status} cannot be started.`,
+    anotherInProgress: ({ date }: { date: string }) =>
+      `The stand-up for ${date} is still in progress. Complete or cancel it first.`,
+    invalidTransition: ({ from, to }: { from: string; to: string }) =>
+      `A stand-up cannot move from ${from} to ${to}.`,
+    reopenReasonTooShort: ({ minLength }: { minLength: number }) =>
+      `Give a reason of at least ${minLength} characters for reopening this stand-up.`,
+    reopenWindowExpired: ({ hours }: { hours: number }) =>
+      `The ${hours}-hour reopen window has passed. Only an organisation admin can reopen this stand-up now.`,
+    reopenSprintCompleted: () =>
+      'This sprint is completed, so its stand-ups can no longer be reopened.'
+  },
+
+  /**
+   * Notices for capabilities release one deliberately ships without (plan §3).
+   *
+   * Each entry leads with the **effect on the reader**, not the cause: a PM
+   * needs to know stand-ups are not being promoted, not that a heartbeat is
+   * missing. The cause belongs in the linked documentation.
+   */
+  degradation: {
+    schedulerStaleNever:
+      'Stand-ups are not being promoted automatically. No background run has been recorded yet.',
+    schedulerStale: ({ minutes }: { minutes: number }) =>
+      `Stand-ups are not being promoted automatically. The last background run was ${minutes} ${plural(
+        minutes,
+        'minute',
+        'minutes'
+      )} ago.`,
+    schedulerStaleAction: 'How to fix this',
+    cronRoutesUnauthenticated:
+      'Background job URLs can be triggered by anyone who knows the address. Set CRON_SECRET to require a token.',
+    cronRoutesUnauthenticatedAction: 'How to set CRON_SECRET',
+    holidayCoverageGap: ({ setName, coveredTo }: { setName: string; coveredTo: string }) =>
+      `${setName} has no dates loaded after ${coveredTo}. Stand-ups generated after ` +
+      'that date may fall on public holidays.',
+    holidayCoverageNone: ({ setName }: { setName: string }) =>
+      `${setName} has no holidays loaded at all. Every date is being treated as a working day.`,
+    holidayCoverageAction: 'Import holidays',
+    crossProjectLoadUnavailable:
+      'Capacity shown here does not account for what this person is allocated on other projects today.',
+    leaveDataManual:
+      'This project has no connected leave calendar — capacity assumes nobody is on leave unless a PM enters it manually.',
+    timeLoggingManual:
+      'This project has no logged time yet — variance is being tracked from hours the PM enters manually.'
+  },
+
+  /**
+   * Panel 4 — the carry-forward register (spec §13, CFW-1..11).
+   *
+   * "The register is the module's memory" (§13.1), so its copy leans on that:
+   * every label says what is still owed and for how long, never just a status
+   * word.
+   */
+  carryForward: {
+    title: () => 'Carry Forward Register',
+    ownedBy: ({ name }: { name: string }) => `Owned by ${name}`,
+    empty: () => 'Nothing carried forward. A clean board.',
+
+    itemTypeLabel: (type: string) => {
+      switch (type) {
+        case 'unfinished_task':
+          return 'Unfinished task'
+        case 'unrevised_estimate':
+          return 'Estimate needs revising'
+        case 'open_blocker':
+          return 'Open blocker'
+        case 'owner_absent':
+          return 'Owner absent'
+        case 'unassigned_task':
+          return 'Unassigned task'
+        case 'missed_standup_rollup':
+          return 'Rolled from a missed stand-up'
+        case 'override_followup':
+          return 'Override follow-up'
+        case 'not_started_commitment':
+          return 'Not started'
+        case 'cross_sprint':
+          return 'Carried from last sprint'
+        default:
+          return 'Carried forward'
+      }
+    },
+
+    ageBadge: ({ age }: { age: number }) =>
+      age === 1 ? '1 stand-up' : `${age} stand-ups`,
+    escalatedBadge: () => 'Escalated',
+    chronicBadge: () => 'Chronic',
+
+    /** CFW-11's summary strip. */
+    summaryOpen: ({ count }: { count: number }) => `${count} open`,
+    summaryNeedingNote: ({ count }: { count: number }) => `${count} need a note today`,
+    summaryEscalated: ({ count }: { count: number }) => `${count} escalated`,
+    summaryResolved: ({ count }: { count: number }) => `${count} resolved`,
+    /**
+     * The red counter beside the panel heading. Counts the two bands that
+     * actually need a PM today — a note owed, or an escalation — rather than
+     * every open item, since a normal-age item sitting in the register is not
+     * something anybody has to act on in this stand-up.
+     */
+    issueCount: ({ count }: { count: number }) =>
+      count === 1
+        ? '1 item needs a note or is escalated'
+        : `${count} items need a note or are escalated`,
+
+    /** CFW-4's mandatory note, and its two rejections. */
+    noteRequired: () =>
+      'This item has been open long enough that a note is mandatory before completion (CC-4).',
+    notePlaceholder: () => "What's the update today?",
+    /** The short pill an owed note shows; `noteRequired` is its tooltip. */
+    noteDue: () => 'Note due today',
+    allTypes: () => 'All types',
+    allAges: () => 'All ages',
+    noteTooShort: ({ minLength }: { minLength: number }) =>
+      `Add at least ${minLength} characters.`,
+    noteUnchanged: () => 'Add today’s update, not yesterday’s.',
+    addNote: () => 'Add note',
+    noteHistory: () => 'Note history',
+
+    /** CFW-7's inline resolve. */
+    resolve: () => 'Resolve',
+    resolveDone: () => 'Done',
+    resolveReassigned: () => 'Reassigned',
+    resolveDescoped: () => 'Descoped',
+    resolveAcknowledged: () => 'Acknowledged',
+    resolveOther: () => 'Other',
+    resolveCommentPlaceholder: () => 'Optional comment',
+
+    /** CFW-10's filters. */
+    filterType: () => 'Type',
+    filterOwner: () => 'Owner',
+    filterAgeBand: () => 'Age',
+    filterStatus: () => 'Status'
+  },
+
+  /**
+   * The override modal (§15.12, OVR-1..7).
+   *
+   * §14.2's checks are refusals by default — this is the one screen where a
+   * PM can push past one, so every string here leans toward accountability:
+   * the modal names who is doing this and why, and the attribution notice is
+   * never optional copy.
+   */
+  override: {
+    title: ({ type }: { type: string }) => {
+      switch (type) {
+        case 'over_allocation':
+          return 'Override: allocate beyond capacity'
+        case 'skip_reestimate':
+          return 'Override: defer the re-estimate'
+        case 'duplicate_allocation':
+          return 'Override: allow duplicate allocation'
+        case 'under_allocation':
+        default:
+          return 'Override: allocate below capacity'
+      }
+    },
+
+    gapLine: ({
+      name,
+      gapMinutes,
+      allocatedMinutes,
+      effectiveMinutes
+    }: {
+      name: string
+      gapMinutes: number
+      allocatedMinutes: number
+      effectiveMinutes: number
+    }) =>
+      `${name}: ${Math.round(allocatedMinutes / 60)}h of ${Math.round(effectiveMinutes / 60)}h planned, ${Math.round(Math.abs(gapMinutes) / 60)}h gap.`,
+
+    reasonLabel: ({ code }: { code: string }) => {
+      switch (code) {
+        case 'no_work_available':
+          return 'No work available'
+        case 'blocked_capacity':
+          return 'Blocked on something outside their control'
+        case 'skills_mismatch':
+          return 'No task matching their skills'
+        case 'awaiting_dependency':
+          return 'Waiting on a dependency'
+        case 'training_or_ceremony':
+          return 'Training or ceremony'
+        case 'support_rota':
+          return 'On support rota'
+        case 'part_day_unrecorded':
+          return 'Part day, not recorded as attendance'
+        case 'onboarding':
+          return 'Onboarding'
+        case 'deliberate_buffer':
+          return 'Deliberate buffer'
+        case 'member_agreed_overtime':
+          return 'Member agreed to overtime'
+        case 'estimates_conservative':
+          return 'Estimates were conservative'
+        case 'catching_up_debt':
+          return 'Catching up on estimate debt'
+        case 'critical_deadline':
+          return 'Critical deadline'
+        case 'task_will_split':
+          return 'Task will be split tomorrow'
+        case 'owner_unavailable':
+          return 'The person who knows is not here today'
+        case 'needs_investigation':
+          return 'Needs investigation before it can be estimated'
+        case 'will_split_task':
+          return 'The task will be split instead'
+        case 'deliberate_pairing':
+          return 'Deliberate pairing'
+        case 'handover_in_progress':
+          return 'Handover between two people'
+        case 'review_or_qa':
+          return 'One person builds, the other reviews or tests'
+        case 'other':
+        default:
+          return 'Other'
+      }
+    },
+
+    /**
+     * What the override actually does, before the PM commits to it. The modal
+     * used to open on a title and a form, leaving "what am I agreeing to?"
+     * to guesswork.
+     */
+    explanation: ({ type }: { type: string }) => {
+      switch (type) {
+        case 'over_allocation':
+          return 'Lets this stand-up complete with these members planned beyond their capacity today.'
+        case 'skip_reestimate':
+          return 'Lets this stand-up complete without a new estimate on these tasks. They are added to the carry-forward register to be re-estimated tomorrow \u2014 a task can only be deferred once.'
+        case 'duplicate_allocation':
+          return 'Lets this stand-up complete with the same task planned for more than one person today.'
+        case 'under_allocation':
+        default:
+          return 'Lets this stand-up complete with these members planned below their capacity today.'
+      }
+    },
+    usualFix: ({ type }: { type: string }) => {
+      switch (type) {
+        case 'over_allocation':
+          return 'Usually it is better to move or shorten work on the board.'
+        case 'skip_reestimate':
+          return 'Usually it is better to revise the estimate in the variance log.'
+        case 'duplicate_allocation':
+          return 'Usually it is better to remove one of the two allocations.'
+        case 'under_allocation':
+        default:
+          return 'Usually it is better to give them more work from the backlog.'
+      }
+    },
+    affectedMembers: () => 'Affected members',
+    affectedTasks: () => 'Affected tasks',
+    justificationLabel: () => 'Why is this being overridden?',
+    justificationPlaceholder: () => 'Explain what actually happened. This is recorded on the audit trail.',
+
+    /**
+     * OVR-5. Mirrors `validateJustification`'s two failure codes
+     * (`override.ts`) with the copy actually shown to the person overriding —
+     * the validation *decision* stays in `override.ts`, but the sentence the
+     * reader sees belongs in this catalogue like every other user-facing
+     * string in the module.
+     */
+    validationError: ({ code, minLength }: { code: 'TOO_SHORT' | 'LOW_VALUE'; minLength: number }) => {
+      switch (code) {
+        case 'TOO_SHORT':
+          return `A justification needs at least ${minLength} characters.`
+        case 'LOW_VALUE':
+        default:
+          return 'That justification does not explain anything. Say what actually happened.'
+      }
+    },
+
+    /** OVR-6 — required only for `over_allocation`. */
+    acknowledgement: () => 'The member has agreed to this overtime.',
+
+    /** SEC-3 — the override, who issued it and why, is never anonymous. */
+    attributionNotice: () =>
+      'This override is recorded against your name and is visible on the audit trail.',
+
+    cancel: () => 'Cancel',
+    submit: () => 'Override'
+  },
+
+  /**
+   * Panel 6 — blockers (§13, RUN-14..18).
+   */
+  blocker: {
+    raise: () => 'Raise a blocker',
+    resolve: () => 'Resolve',
+    empty: () => 'No blockers right now.',
+    general: () => 'General',
+    blockedTask: ({ task }: { task: string }) => `Blocked: ${task}`,
+    owner: ({ name }: { name: string }) => `Owner: ${name}`,
+    target: ({ date }: { date: string }) => `Target: ${date}`,
+    severity: ({ severity }: { severity: string }) => `${severity} severity`,
+    overdue: () => 'Overdue',
+    openCount: ({ count }: { count: number }) =>
+      count === 1 ? '1 open blocker' : `${count} open blockers`,
+    raiseFailed: () => 'That blocker could not be raised.',
+    resolveFailed: () => 'That blocker could not be resolved.'
+  },
+
+  /**
+   * The read-only summary screen (§15.13, UI-10/UI-11).
+   */
+  summary: {
+    title: () => 'Stand-up summary',
+    loading: () => 'Loading the summary…',
+    notAvailable: () =>
+      'This stand-up has no summary yet. Summaries are generated when a stand-up completes.',
+    loadFailed: () => 'Could not load this summary.',
+
+    dayOf: ({ day, total }: { day: number; total: number }) => `Day ${day} of ${total}`,
+    facilitator: ({ name }: { name: string }) => `Facilitator: ${name}`,
+    duration: ({ minutes }: { minutes: number }) => `${minutes} minutes`,
+
+    sectionAttendance: () => 'Attendance',
+    sectionCompletedYesterday: () => 'Completed yesterday',
+    sectionVariance: () => 'Variance',
+    sectionDebtMovements: () => 'Estimate debt movements',
+    sectionCommitments: () => "Today's commitments",
+    sectionBlockersRaised: () => 'Blockers raised',
+    sectionBlockersResolved: () => 'Blockers resolved',
+    sectionCarryForward: () => 'Carry forward',
+    sectionOverrides: () => 'Overrides issued',
+    sectionNotes: () => 'PM notes',
+
+    emptyAttendance: () => 'Nothing recorded.',
+    emptyCompletedYesterday: () => 'Nothing completed.',
+    emptyVariance: () => 'Nothing recorded.',
+    emptyDebtMovements: () => 'Nothing recorded.',
+    emptyCommitments: () => 'Nothing planned.',
+    emptyBlockersRaised: () => 'None.',
+    emptyBlockersResolved: () => 'None.',
+    emptyCarryForward: () => 'Nothing carried forward.',
+    emptyOverrides: () => 'None.',
+
+    /** UI-10's two export actions. */
+    copyAsText: () => 'Copy as text',
+    copied: () => 'Copied to clipboard',
+    copyFailed: () => 'Could not copy the summary.',
+    printOrSave: () => 'Print / Save as PDF'
+  }
+} as const
+
+export type StandupStrings = typeof standupStrings

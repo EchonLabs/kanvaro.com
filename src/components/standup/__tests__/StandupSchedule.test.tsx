@@ -1,0 +1,293 @@
+/**
+ * @jest-environment jsdom
+ */
+/**
+ * The Schedule hub list (spec §15.6, UI-8, UI-9).
+ *
+ * Two behaviours here are requirements rather than styling choices, and both
+ * are the kind that quietly regress into a filter:
+ *
+ * UI-8 — today's row is pinned and dominant. A PM opening this screen at 08:55
+ * should not have to find the row.
+ * UI-9 — skipped days stay visible *with their reason*. Hiding them makes a
+ * sprint that lost a day to a holiday indistinguishable from a shorter sprint.
+ */
+import { render, screen, within } from '@testing-library/react'
+
+import { StandupSchedule } from '@/components/standup/StandupSchedule'
+import type { ScheduleDay, SprintSchedule } from '@/lib/standup/schedule'
+
+const day = (over: Partial<ScheduleDay> = {}): ScheduleDay => ({
+  standupId: `standup-${over.date ?? '2026-08-10'}`,
+  date: '2026-08-10',
+  status: 'Scheduled',
+  shape: 'mid_sprint',
+  sprintDayNumber: 1,
+  totalSprintDays: 5,
+  scheduledStartAt: '2026-08-10T03:30:00.000Z',
+  durationMinutes: 15,
+  facilitatorId: 'user-1',
+  facilitatorName: 'Priya Fernando',
+  expectedAttendeeIds: ['member-1'],
+  wasBackfilled: false,
+  hasCalendarAnomaly: false,
+  ...over
+})
+
+const schedule = (over: Partial<SprintSchedule> = {}): SprintSchedule => ({
+  sprintId: 'sprint-1',
+  sprintName: 'Sprint 14',
+  projectId: 'project-1',
+  timezone: 'Asia/Colombo',
+  today: '2026-08-11',
+  dateRange: { from: '2026-08-10', to: '2026-08-14' },
+  totalSprintDays: 5,
+  days: [
+    day({ date: '2026-08-10', sprintDayNumber: 1, shape: 'day_one', status: 'Completed' }),
+    day({ date: '2026-08-11', sprintDayNumber: 2, status: 'Ready' }),
+    day({
+      date: '2026-08-12',
+      sprintDayNumber: 3,
+      status: 'Skipped_Holiday',
+      skippedReason: 'Nikini Full Moon Poya Day'
+    }),
+    day({ date: '2026-08-13', sprintDayNumber: 4 }),
+    day({ date: '2026-08-14', sprintDayNumber: 5, shape: 'final_day' })
+  ],
+  health: {
+    estimateDebt: { outstandingMinutes: 0 as any, affectedMembersCount: 0 },
+    carryForward: { openCount: 0, oldestAgeInStandups: 0, chronicCount: 0 },
+    overrides: { totalCount: 0 },
+    capacityBalance: {
+      remainingEstimateMinutes: 0 as any,
+      remainingCapacityMinutes: 0 as any,
+      overageMinutes: 0 as any,
+      exceedsCapacity: false
+    },
+    progress: { completedDays: 1, missedDays: 0, totalWorkingDays: 4, percentComplete: 25 }
+  },
+  ...over
+})
+
+describe('StandupSchedule', () => {
+  it('lists every day of the sprint', () => {
+    render(<StandupSchedule schedule={schedule()} />)
+
+    // Today is lifted out of the list into its own row (UI-8), so the count
+    // spans both testids.
+    expect(screen.getAllByTestId(/^schedule-(day|today)$/)).toHaveLength(5)
+  })
+
+  it('UI-8: marks today`s row as the pinned one', () => {
+    render(<StandupSchedule schedule={schedule()} />)
+
+    const today = screen.getByTestId('schedule-today')
+    expect(within(today).getByText(/11 Aug/i)).toBeInTheDocument()
+    expect(today).toHaveAttribute('data-today', 'true')
+  })
+
+  it('UI-8: pins nothing when today falls outside the sprint', () => {
+    render(<StandupSchedule schedule={schedule({ today: '2026-09-01' })} />)
+
+    expect(screen.queryByTestId('schedule-today')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('schedule-day')).toHaveLength(5)
+  })
+
+  it('UI-9: shows a skipped day and its reason rather than hiding it', () => {
+    render(<StandupSchedule schedule={schedule()} />)
+
+    expect(screen.getByText('Nikini Full Moon Poya Day')).toBeInTheDocument()
+  })
+
+  it('UI-9: a skipped day is not a link — there is nothing to open', () => {
+    render(<StandupSchedule schedule={schedule()} />)
+
+    const links = screen.getAllByRole('link')
+    expect(links.map((link) => link.getAttribute('href'))).not.toContain(
+      '/standups/standup-2026-08-12'
+    )
+  })
+
+  it('names day one and the final day', () => {
+    render(<StandupSchedule schedule={schedule()} />)
+
+    expect(screen.getByText(/day one/i)).toBeInTheDocument()
+    expect(screen.getByText(/final day/i)).toBeInTheDocument()
+  })
+
+  it('shows the frozen day number on a completed stand-up whose schedule moved (CAL-14)', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          days: [day({ date: '2026-08-10', sprintDayNumber: 1, displayedDayNumber: 3, status: 'Completed' })]
+        })}
+      />
+    )
+
+    expect(screen.getByText(/ran as day 3/i)).toBeInTheDocument()
+  })
+
+  it('says so plainly when a sprint has no schedule yet', () => {
+    render(<StandupSchedule schedule={schedule({ days: [], totalSprintDays: 0 })} />)
+
+    expect(screen.getByText(/no stand-ups have been generated/i)).toBeInTheDocument()
+  })
+
+  it('shows the facilitator’s name, not their id', () => {
+    render(<StandupSchedule schedule={schedule()} />)
+
+    expect(screen.getAllByText('Priya Fernando').length).toBeGreaterThan(0)
+  })
+
+  it('links each openable day to the real nested run-screen route, not a bare /standups/:id', () => {
+    const testSchedule = {
+      sprintId: 'sprint-1',
+      sprintName: 'Sprint 1',
+      projectId: 'project-1',
+      timezone: 'UTC',
+      today: '2026-08-05',
+      dateRange: { from: '2026-08-01', to: '2026-08-14' },
+      totalSprintDays: 8,
+      days: [
+        {
+          standupId: 'standup-1',
+          date: '2026-08-01',
+          status: 'Ready',
+          shape: 'day_one',
+          sprintDayNumber: 1,
+          totalSprintDays: 8,
+          scheduledStartAt: '2026-08-01T09:15:00.000Z',
+          durationMinutes: 15,
+          facilitatorId: 'pm-1',
+          expectedAttendeeIds: [],
+          wasBackfilled: false
+        }
+      ]
+    }
+
+    render(<StandupSchedule schedule={testSchedule as any} />)
+
+    const link = screen.getByRole('link')
+    expect(link).toHaveAttribute(
+      'href',
+      '/projects/project-1/sprints/sprint-1/standups/standup-1'
+    )
+  })
+
+  /**
+   * §3.3 of the schedule redesign: a completed day is a record to read, not a
+   * meeting to run — it links straight to its summary, matching
+   * `TodayStandupHero`'s own branch for a completed *today*.
+   */
+  it('links a completed, non-today day to its summary rather than the run screen', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [day({ date: '2026-08-10', sprintDayNumber: 1, status: 'Completed' })]
+        })}
+      />
+    )
+
+    const link = screen.getByRole('link')
+    expect(link).toHaveAttribute(
+      'href',
+      '/projects/project-1/sprints/sprint-1/standups/standup-2026-08-10/summary'
+    )
+  })
+
+  it('UI-8: shows "Start stand-up" on today’s row when Ready', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [day({ date: '2026-08-11', status: 'Ready' })]
+        })}
+      />
+    )
+
+    const today = screen.getByTestId('schedule-today')
+    expect(within(today).getByText('Start stand-up')).toBeInTheDocument()
+  })
+
+  it('UI-8: shows "Resume" on today’s row when in progress', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [day({ date: '2026-08-11', status: 'In_Progress' })]
+        })}
+      />
+    )
+
+    const today = screen.getByTestId('schedule-today')
+    expect(within(today).getByText('Resume')).toBeInTheDocument()
+  })
+
+  it('UI-8: shows "View summary" on today’s row when completed', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [day({ date: '2026-08-11', status: 'Completed' })]
+        })}
+      />
+    )
+
+    const today = screen.getByTestId('schedule-today')
+    expect(within(today).getByText('View summary')).toBeInTheDocument()
+  })
+
+  it('shows no action label on a non-today row', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [
+            day({ date: '2026-08-11', status: 'Ready' }),
+            day({ date: '2026-08-12', status: 'Ready' })
+          ]
+        })}
+      />
+    )
+
+    const notToday = screen.getByTestId('schedule-day')
+    expect(within(notToday).queryByText('Start stand-up')).not.toBeInTheDocument()
+  })
+
+  it('spec §15.7: renders operational metrics (allocation %, overrides, duration)', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({
+          today: '2026-08-11',
+          days: [
+            day({
+              date: '2026-08-10',
+              status: 'Completed',
+              allocationPercentage: 100,
+              overridesCount: 1,
+              carryForwardCount: 2,
+              actualDurationMinutes: 14,
+              attendance: { present: 7, total: 8 }
+            }),
+            day({
+              date: '2026-08-11',
+              status: 'Ready',
+              allocationPercentage: 94
+            })
+          ]
+        })}
+      />
+    )
+
+    // Completed day operational metrics
+    expect(screen.getByText('100% allocated')).toBeInTheDocument()
+    expect(screen.getByText('1 override')).toBeInTheDocument()
+    expect(screen.getByText('2 carry-fwds')).toBeInTheDocument()
+    expect(screen.getByText('14m')).toBeInTheDocument()
+    expect(screen.getByText('7/8 present')).toBeInTheDocument()
+
+    // Today's row metrics
+    expect(screen.getByText('94% allocated')).toBeInTheDocument()
+  })
+})

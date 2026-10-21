@@ -57,7 +57,7 @@ export function MarkdownRenderer({ doc, className = '' }: MarkdownRendererProps)
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className={`flex items-center justify-center p-8 ${className}`}>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         <span className="ml-2 text-gray-600">Loading content...</span>
       </div>
@@ -66,7 +66,7 @@ export function MarkdownRenderer({ doc, className = '' }: MarkdownRendererProps)
 
   if (error) {
     return (
-      <div className="p-8 bg-red-50 border border-red-200 rounded-lg">
+      <div className={`p-8 bg-red-50 border border-red-200 rounded-lg ${className}`}>
         <h3 className="text-red-800 font-semibold mb-2">Rendering Error</h3>
         <p className="text-red-600">{error}</p>
       </div>

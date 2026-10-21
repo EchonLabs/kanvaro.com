@@ -331,6 +331,19 @@ export default function EditTaskPage() {
 
   const router = useRouter()
   const params = useParams()
+
+  // Where the editor was opened from, when that was not the task list — the
+  // sprint planning checklist sends `returnTo` so Back, Cancel and Save lead
+  // there. Same-origin paths only, so the parameter cannot redirect off-site.
+  const returnTo = () => {
+    const value = new URLSearchParams(window.location.search).get('returnTo')
+    return value && value.startsWith('/') && !value.startsWith('//') ? value : null
+  }
+  const goBack = () => {
+    const target = returnTo()
+    if (target) router.push(target)
+    else router.back()
+  }
   const taskId = params.id as string
   const { setItems } = useBreadcrumb()
 
@@ -865,7 +878,7 @@ export default function EditTaskPage() {
         setOriginalAssignedTo(updatedAssignees)
         notifySuccess({ title: 'Task Updated', message: 'Task updated successfully' })
         setTimeout(() => {
-          router.push('/tasks')
+          router.push(returnTo() ?? '/tasks')
         }, 1200)
       } else {
         notifyError({ title: 'Failed to Save Task', message: data.error || 'Failed to save task' })
@@ -945,7 +958,7 @@ export default function EditTaskPage() {
     return (
       <MainLayout>
         <div className="max-w-3xl mx-auto">
-          <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+          <Button variant="ghost" onClick={goBack} className="mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
         </div>
@@ -956,7 +969,7 @@ export default function EditTaskPage() {
   return (
     <MainLayout>
       <div className="w-full max-w-5xl mx-auto space-y-4">
-        <Button variant="ghost" onClick={() => router.back()} className="text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]">
+        <Button variant="ghost" onClick={goBack} className="text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)]">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
@@ -1538,7 +1551,7 @@ export default function EditTaskPage() {
             />
 
             <div className="flex justify-end space-x-2 pt-2">
-              <Button variant="outline" onClick={() => router.push('/tasks')}>Cancel</Button>
+              <Button variant="outline" onClick={() => router.push(returnTo() ?? '/tasks')}>Cancel</Button>
               <Button onClick={handleSave} disabled={saving || !isDirty || !isValid}>
                 {saving ? (
                   <>
