@@ -380,7 +380,7 @@ export default function SprintDetailPage() {
 
       const tasks = data.data?.tasks || []
       return tasks
-        .filter((task: any) => !['done', 'completed'].includes(task.status))
+        .filter((task: any) => !['done', 'completed'].includes(task.status) && !task.movedToSprint && !task.movedToBacklog)
         .map((task: any) => ({
           _id: task._id,
           title: task.title,

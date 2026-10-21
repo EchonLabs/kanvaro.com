@@ -117,6 +117,7 @@ export function ReopenSprintTasksModal({
         archived: false,
         status: destination === 'backlog' ? 'backlog' : targetStatus,
         sprint: destination === 'sprint' ? targetSprintId : null,
+        completedAt: null,
         ...(destination === 'backlog' ? { movedFromSprint: sprint._id } : {})
       }
 
@@ -174,7 +175,7 @@ export function ReopenSprintTasksModal({
         </div>
       }
     >
-      <div className="space-y-3 py-1 max-h-[70vh] overflow-y-auto pr-1">
+      <div className="space-y-3 py-1 pr-1">
         {/* Destination & Status */}
         <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border bg-muted/20 text-xs">
           <div className="space-y-1.5">
@@ -196,8 +197,14 @@ export function ReopenSprintTasksModal({
             {destination === 'sprint' && (
               <Select value={targetSprintId} onValueChange={setTargetSprintId}>
                 <SelectTrigger className="h-8 text-xs mt-1.5"><SelectValue placeholder="Choose target sprint…" /></SelectTrigger>
-                <SelectContent className="z-[10050]">
-                  {otherSprints.map(s => <SelectItem key={s._id} value={s._id}>{s.name} ({s.status})</SelectItem>)}
+                <SelectContent className="z-[10050] max-h-60 overflow-y-auto">
+                  {otherSprints.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-muted-foreground text-center">
+                      No active or planning sprints found
+                    </div>
+                  ) : (
+                    otherSprints.map(s => <SelectItem key={s._id} value={s._id}>{s.name} ({s.status})</SelectItem>)
+                  )}
                 </SelectContent>
               </Select>
             )}
@@ -208,7 +215,7 @@ export function ReopenSprintTasksModal({
             {destination === 'sprint' ? (
               <Select value={targetStatus} onValueChange={setTargetStatus}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
-                <SelectContent className="z-[10050]">
+                <SelectContent className="z-[10050] max-h-60 overflow-y-auto">
                   {projectStatusOptions
                     .filter(opt => opt.value !== 'backlog')
                     .map(opt => (
