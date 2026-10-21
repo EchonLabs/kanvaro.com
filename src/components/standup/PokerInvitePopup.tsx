@@ -8,14 +8,15 @@
  * or whose stream is down, is recovered from `GET /api/poker-sessions/open-for-me`
  * on load, on tab refocus, and on a 30s poll while the stream is disconnected.
  *
- * It goes away when the user goes to that sprint's planning page themselves, when
- * the round ends, or when they dismiss it. The existing Toast is bottom-centre
- * and cannot carry a link, so this is its own component.
+ * One card at a time, and each round is announced once: after the user goes to
+ * the planning page, dismisses it, or the round ends, it never comes back —
+ * across reloads and other tabs too. The existing Toast is bottom-centre and
+ * cannot carry a link, so this is its own component.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowRight, Spade, X } from 'lucide-react'
+import { ArrowRight, X } from 'lucide-react'
 
 import {
   isNotificationStreamConnected,
@@ -32,22 +33,31 @@ interface OpenInvite {
 
 const FALLBACK_POLL_MS = 30000
 const DISMISSED_KEY = 'kanvaro:poker-invite-dismissed'
+/** Old round ids are pruned so the stored list cannot grow without bound. */
+const DISMISSED_LIMIT = 50
 
-function readDismissed(): Set<string> {
+function readDismissed(): string[] {
   try {
-    const raw = window.sessionStorage.getItem(DISMISSED_KEY)
-    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+    const raw = window.localStorage.getItem(DISMISSED_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
   } catch {
-    return new Set()
+    return []
   }
 }
 
-function writeDismissed(ids: Set<string>) {
+function rememberDismissed(sessionId: string): string[] {
+  // Merged with what is already stored, so a dismissal made in another tab is
+  // not overwritten by this tab's older copy.
+  const ids = readDismissed().filter((id) => id !== sessionId)
+  ids.push(sessionId)
+  const next = ids.slice(-DISMISSED_LIMIT)
   try {
-    window.sessionStorage.setItem(DISMISSED_KEY, JSON.stringify(Array.from(ids)))
+    window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(next))
   } catch {
-    // Storage can be unavailable; the popup then simply may reappear on reload.
+    // Storage can be unavailable; the popup then only stays gone for this page load.
   }
+  return next
 }
 
 export function PokerInvitePopup() {
@@ -57,9 +67,19 @@ export function PokerInvitePopup() {
   const [streamConnected, setStreamConnected] = useState(false)
 
   useEffect(() => {
-    setDismissed(readDismissed())
+    setDismissed(new Set(readDismissed()))
     setStreamConnected(isNotificationStreamConnected())
-    return subscribeNotificationStreamConnected(setStreamConnected)
+
+    // Dismissing in one tab clears the popup in every other open tab.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === DISMISSED_KEY) setDismissed(new Set(readDismissed()))
+    }
+    window.addEventListener('storage', onStorage)
+    const unsubscribe = subscribeNotificationStreamConnected(setStreamConnected)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      unsubscribe()
+    }
   }, [])
 
   const load = useCallback(async () => {
@@ -112,12 +132,7 @@ export function PokerInvitePopup() {
   )
 
   const dismiss = useCallback((sessionId: string) => {
-    setDismissed((current) => {
-      const next = new Set(current)
-      next.add(sessionId)
-      writeDismissed(next)
-      return next
-    })
+    setDismissed(new Set(rememberDismissed(sessionId)))
   }, [])
 
   // Going to the planning page is the acknowledgement: dismiss for good, so the
@@ -131,19 +146,18 @@ export function PokerInvitePopup() {
     }
   }, [pathname, invites, dismissed, dismiss])
 
-  const visible = useMemo(
-    () => invites.filter((invite) => !dismissed.has(invite.sessionId)),
+  // One notification is enough: the newest round the user has not yet dealt with.
+  const current = useMemo(
+    () => invites.find((invite) => !dismissed.has(invite.sessionId)) ?? null,
     [invites, dismissed]
   )
 
-  if (visible.length === 0) return null
+  if (!current) return null
 
   return (
     // Sits below the 56px (h-14) header and its buttons rather than over them.
-    <div className="pointer-events-none fixed right-4 top-20 z-[9999] flex w-full max-w-[360px] flex-col gap-3 px-4 sm:px-0">
-      {visible.map((invite) => (
-        <InviteCard key={invite.sessionId} invite={invite} onDismiss={dismiss} />
-      ))}
+    <div className="pointer-events-none fixed right-4 top-20 z-[9999] w-full max-w-[340px] px-4 sm:px-0">
+      <InviteCard key={current.sessionId} invite={current} onDismiss={dismiss} />
     </div>
   )
 }
@@ -155,7 +169,7 @@ function InviteCard({
   invite: OpenInvite
   onDismiss: (sessionId: string) => void
 }) {
-  // Slides in from the right on mount.
+  // Fades and settles in on mount.
   const [shown, setShown] = useState(false)
   useEffect(() => {
     const frame = requestAnimationFrame(() => setShown(true))
@@ -165,55 +179,43 @@ function InviteCard({
   return (
     <div
       role="alert"
-      className={`apple-glass pointer-events-auto relative overflow-hidden rounded-[var(--apple-radius-xl)] border border-[var(--apple-separator)] shadow-[0_12px_36px_rgba(0,0,0,0.16)] transition-all duration-300 ease-out dark:shadow-[0_12px_36px_rgba(0,0,0,0.5)] ${
-        shown ? 'translate-x-0 opacity-100' : 'translate-x-6 opacity-0'
+      className={`apple-glass pointer-events-auto rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] px-4 py-3.5 shadow-[0_8px_28px_rgba(0,0,0,0.12)] transition-all duration-300 ease-out dark:shadow-[0_8px_28px_rgba(0,0,0,0.45)] ${
+        shown ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
       }`}
     >
-      {/* Accent edge, in the app's blue-to-cyan project gradient. */}
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{ background: 'linear-gradient(180deg,#007AFF 0%,#5AC8FA 100%)' }}
-      />
-
-      <div className="flex items-start gap-3.5 py-4 pl-5 pr-4">
-        <span
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[var(--apple-radius-md)] text-white"
-          style={{
-            background: 'linear-gradient(135deg,#007AFF 0%,#5AC8FA 100%)',
-            boxShadow: '0 4px 12px rgba(0,122,255,0.30)'
-          }}
-        >
-          <Spade className="h-5 w-5" />
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <p className="apple-section-label text-[var(--apple-system-blue)]">Planning poker</p>
-          <p className="apple-type-callout mt-0.5 font-semibold text-[var(--apple-label)]">
-            {invite.sprintName ?? 'A sprint'} is being estimated
-          </p>
-          <p className="apple-type-footnote mt-0.5 break-words text-[var(--apple-secondary-label)]">
-            {invite.projectName ? `${invite.projectName} · ` : ''}You&apos;ve been asked to vote.
-          </p>
-
-          <Link
-            href={`/sprints/${invite.sprintId}/planning`}
-            className="apple-transition apple-type-footnote mt-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--apple-system-blue)] px-3.5 py-1.5 font-semibold text-white hover:opacity-90"
-          >
-            Go to planning
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-
+      <div className="flex items-start justify-between gap-3">
+        {/* Importance is carried by a small pulsing dot and the label, not by colour fills. */}
+        <p className="apple-section-label flex items-center gap-2 text-[var(--apple-label)]">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--apple-system-red)] opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--apple-system-red)]" />
+          </span>
+          Your vote is needed
+        </p>
         <button
           type="button"
           onClick={() => onDismiss(invite.sessionId)}
           aria-label="Dismiss"
-          className="apple-transition flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--apple-tertiary-fill)] text-[var(--apple-secondary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-[var(--apple-label)]"
+          className="apple-transition -mr-1 -mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[var(--apple-tertiary-label)] hover:bg-[var(--apple-quaternary-fill)] hover:text-[var(--apple-label)]"
         >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
+
+      <p className="apple-type-callout mt-1.5 font-semibold text-[var(--apple-label)]">
+        {invite.sprintName ?? 'A sprint'} is being estimated
+      </p>
+      <p className="apple-type-footnote mt-0.5 break-words text-[var(--apple-secondary-label)]">
+        {invite.projectName ? `${invite.projectName} · ` : ''}Planning poker has started.
+      </p>
+
+      <Link
+        href={`/sprints/${invite.sprintId}/planning`}
+        className="apple-transition apple-type-footnote mt-3 inline-flex items-center gap-1.5 font-semibold text-[var(--apple-label)] hover:opacity-70"
+      >
+        Go to planning
+        <ArrowRight className="h-3.5 w-3.5" />
+      </Link>
     </div>
   )
 }

@@ -32,7 +32,7 @@ describe('PokerInvitePopup', () => {
 
   beforeEach(() => {
     mockPathname = '/dashboard'
-    window.sessionStorage.clear()
+    window.localStorage.clear()
     publishNotificationStreamConnected(true)
   })
 
@@ -80,12 +80,45 @@ describe('PokerInvitePopup', () => {
     // Visiting the page is recorded as the acknowledgement once the invite is
     // known; wait for that rather than for the fetch merely being issued.
     await waitFor(() =>
-      expect(window.sessionStorage.getItem('kanvaro:poker-invite-dismissed')).toContain('s1')
+      expect(window.localStorage.getItem('kanvaro:poker-invite-dismissed')).toContain('s1')
     )
     expect(screen.queryByText('Sprint 7 is being estimated')).not.toBeInTheDocument()
 
     mockPathname = '/dashboard'
     rerender(<PokerInvitePopup />)
+    expect(screen.queryByText('Sprint 7 is being estimated')).not.toBeInTheDocument()
+  })
+
+  it('shows only one notification even when several rounds are open', async () => {
+    mockOpenForMe([
+      open,
+      { sessionId: 's2', sprintId: 'sp2', sprintName: 'Sprint 8', projectName: 'Other' }
+    ])
+    render(<PokerInvitePopup />)
+
+    expect(await screen.findByText('Sprint 7 is being estimated')).toBeInTheDocument()
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.queryByText('Sprint 8 is being estimated')).not.toBeInTheDocument()
+  })
+
+  it('does not come back after being dismissed, even on a reload or a refocus', async () => {
+    mockOpenForMe([open])
+    const first = render(<PokerInvitePopup />)
+
+    const dismiss = await screen.findByRole('button', { name: 'Dismiss' })
+    act(() => dismiss.click())
+    expect(screen.queryByText('Sprint 7 is being estimated')).not.toBeInTheDocument()
+    first.unmount()
+
+    // A fresh mount (page reload / new tab) still sees the round as open on the
+    // server, but remembers it was already dealt with.
+    render(<PokerInvitePopup />)
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('Sprint 7 is being estimated')).not.toBeInTheDocument()
+
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
     expect(screen.queryByText('Sprint 7 is being estimated')).not.toBeInTheDocument()
   })
 
