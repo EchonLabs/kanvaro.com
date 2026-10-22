@@ -813,9 +813,16 @@ export async function PUT(
       }
     }
 
+    // When adding/moving an archived task to a sprint, unarchive and reset it to 'todo'
     // When adding task to sprint, only change status to 'todo' if currently 'backlog'
     if (Object.prototype.hasOwnProperty.call(updateData, 'sprint') && updateData.sprint) {
-      if (Object.prototype.hasOwnProperty.call(updateData, 'status')) {
+      if (currentTask.archived) {
+        updateData.archived = false
+        updateData.completedAt = null
+        if (!updateData.status || currentTask.status === 'done' || currentTask.status === 'completed') {
+          updateData.status = updateData.status || 'todo'
+        }
+      } else if (Object.prototype.hasOwnProperty.call(updateData, 'status')) {
         // Only apply status change if current status is 'backlog'
         if (currentTask.status !== 'backlog' && updateData.status === 'todo') {
           delete updateData.status // Don't change status if not backlog
