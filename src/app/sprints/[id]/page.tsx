@@ -3355,8 +3355,8 @@ export default function SprintDetailPage() {
                                       </td>
 
                                       {/* Task Title */}
-                                      <td className="py-3 px-3">
-                                        <div className="flex items-center gap-2 flex-wrap">
+                                      <td className="py-3 px-3 max-w-[340px] xl:max-w-[460px]">
+                                        <div className="flex items-center gap-2 min-w-0">
                                           {task.subtasks && task.subtasks.length > 0 && (
                                             <button
                                               type="button"
@@ -3379,7 +3379,7 @@ export default function SprintDetailPage() {
                                           )}
                                           <span
                                             onClick={() => handleOpenEditTask(task)}
-                                            className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer line-clamp-1"
+                                            className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer truncate min-w-0"
                                             title={task.title}
                                           >
                                             {task.title || 'Untitled Task'}
@@ -3387,7 +3387,7 @@ export default function SprintDetailPage() {
 
                                           {task.movedToSprint && (
                                             <span
-                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800/60 shrink-0"
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800/60 shrink-0 whitespace-nowrap"
                                               title={`Moved to ${task.movedToSprint.name}`}
                                             >
                                               <span>Moved to {task.movedToSprint.name}</span>
