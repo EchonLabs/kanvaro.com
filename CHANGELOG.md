@@ -1,3 +1,16 @@
+# [1.47.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.3...v1.47.0) (2026-10-23)
+
+
+### Bug Fixes
+
+* prevent moved sprint badge wrapping on long task titles ([b8dbba4](https://github.com/EchonLabs/kanvaro.com/commit/b8dbba484c3bd2ea3e98af9dda9d22a87515c043))
+* unarchive tasks when assigning to sprint and restore items on sprint reopen ([db0b16e](https://github.com/EchonLabs/kanvaro.com/commit/db0b16edb68941772c3b1933a322e96d60742bf2))
+
+
+### Features
+
+* add bulk task ID paste tool and moved task indicators ([e1ace1e](https://github.com/EchonLabs/kanvaro.com/commit/e1ace1e12db0c9ce343543dd611355ba0388b5d4))
+
 ## [1.46.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.46.2...v1.46.3) (2026-10-20)
 
 
