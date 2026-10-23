@@ -36,8 +36,10 @@ import {
   Zap,
   ChevronDown,
   ChevronRight,
-  CheckSquare
+  CheckSquare,
+  RotateCcw
 } from 'lucide-react'
+import { ReopenSprintTasksModal } from '@/components/sprints/ReopenSprintTasksModal'
 
 interface Sprint {
   _id: string
@@ -202,6 +204,7 @@ export default function SprintDetailPage() {
   const [startingSprint, setStartingSprint] = useState(false)
   const [completingSprint, setCompletingSprint] = useState(false)
   const [completeModalOpen, setCompleteModalOpen] = useState(false)
+  const [reopenModalOpen, setReopenModalOpen] = useState(false)
   const [completionMode, setCompletionMode] = useState<'existing' | 'new'>('existing')
   const [availableSprints, setAvailableSprints] = useState<SprintOption[]>([])
   const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
@@ -377,7 +380,7 @@ export default function SprintDetailPage() {
 
       const tasks = data.data?.tasks || []
       return tasks
-        .filter((task: any) => !['done', 'completed'].includes(task.status))
+        .filter((task: any) => !['done', 'completed'].includes(task.status) && !task.movedToSprint && !task.movedToBacklog)
         .map((task: any) => ({
           _id: task._id,
           title: task.title,
@@ -952,6 +955,20 @@ export default function SprintDetailPage() {
               )}
 
               <div className="flex items-center gap-2">
+                {canEditSprint && sprint.status === 'completed' && (
+                  <button
+                    onClick={async () => {
+                      if (availableSprints.length === 0) {
+                        await loadAvailableSprints(sprintId, sprint?.project?._id)
+                      }
+                      setReopenModalOpen(true)
+                    }}
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[var(--apple-label)] text-[13px] font-medium px-4 h-9 hover:bg-[var(--apple-tertiary-fill)] apple-transition disabled:opacity-40"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reopen & Move Tasks
+                  </button>
+                )}
                 {canEditSprint && (
                   <button
                     onClick={() => router.push(`/sprints/${sprintId}/edit`)}
@@ -1761,6 +1778,20 @@ export default function SprintDetailPage() {
             )}
           </div>
         </ResponsiveDialog>
+
+        {sprint && sprint.status === 'completed' && (
+          <ReopenSprintTasksModal
+            open={reopenModalOpen}
+            onOpenChange={setReopenModalOpen}
+            sprint={sprint}
+            tasks={sprintTasks}
+            availableSprints={availableSprints}
+            projectStatusOptions={projectStatusOptions}
+            onSuccess={async () => {
+              await fetchSprint({ silent: true })
+            }}
+          />
+        )}
     </MainLayout>
   )
 }
