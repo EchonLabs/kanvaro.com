@@ -3,7 +3,7 @@ import connectDB from '@/lib/db-config'
 import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
 import { Project } from '@/models/Project'
-import '@/models/Story'
+import { Story } from '@/models/Story'
 import '@/models/Epic'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
@@ -321,6 +321,31 @@ export async function PUT(
       updatePayload.teamMembers = Array.isArray(updateData.teamMembers)
         ? updateData.teamMembers
         : []
+    }
+
+    // When changing a completed sprint back to any other status (active, planning, etc.),
+    // unarchive all tasks and stories associated with this sprint and reset actualEndDate
+    if (existingSprint.status === 'completed' && updateData.status && updateData.status !== 'completed') {
+      if (!Object.prototype.hasOwnProperty.call(updatePayload, 'actualEndDate')) {
+        updatePayload.actualEndDate = null
+      }
+
+      await Promise.all([
+        Task.updateMany(
+          {
+            $or: [
+              { sprint: sprintId },
+              { _id: { $in: existingSprint.tasks || [] } }
+            ],
+            archived: true
+          },
+          { archived: false }
+        ),
+        Story.updateMany(
+          { sprint: sprintId, archived: true },
+          { archived: false }
+        )
+      ])
     }
 
     const sprint = await Sprint.findByIdAndUpdate(
