@@ -213,21 +213,22 @@ export function MyStandupScreen({
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 apple-type-subheadline">
-            <Link
-              href="/dashboard"
-              className="font-medium uppercase text-[var(--my-subtle)] hover:text-[var(--my-muted)]"
-            >
-              {standupStrings.my.breadcrumbRoot()}
-            </Link>
-            {/* Plain text, not a control — switching projects lives on the
-                filter button in the action row below, so there is exactly
+            {/* The project name replaces the old generic "Dashboard" root, and
+                the sprint follows as plain text. Switching projects lives on
+                the filter button in the action row below, so there is exactly
                 one place on screen that changes what you are looking at. */}
-            {projectName ? (
+            <Link
+              href={projectName && projectId ? `/projects/${projectId}` : '/dashboard'}
+              className="truncate font-medium uppercase text-[var(--my-subtle)] hover:text-[var(--my-muted)]"
+            >
+              {projectName || standupStrings.my.breadcrumbRoot()}
+            </Link>
+            {projectName && sprintName ? (
               <>
                 <span aria-hidden className="text-[var(--my-subtle)]">
                   /
                 </span>
-                <span className="truncate font-medium text-[var(--my-blue)]">{projectName}</span>
+                <span className="truncate font-medium text-[var(--my-blue)]">{sprintName}</span>
               </>
             ) : null}
           </nav>

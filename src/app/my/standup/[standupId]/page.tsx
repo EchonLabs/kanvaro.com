@@ -127,11 +127,11 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
   // loaded, the project and sprint are appended so the crumb says where the
   // viewer is, not just which section.
   const breadcrumbItems = [
+    { label: 'Standups' },
     ...(data?.projectName ? [{ label: data.projectName, href: `/projects/${data.projectId}` }] : []),
     ...(data?.sprintName
       ? [{ label: data.sprintName, href: `/projects/${data.projectId}/sprints/${data.sprintId}` }]
-      : []),
-    { label: 'Standups' }
+      : [])
   ]
 
   // The auth check runs asynchronously (`useAuth`'s `checkAuth`); until it
