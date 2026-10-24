@@ -169,6 +169,8 @@ export default function CreateTaskPage() {
   const [attachmentError, setAttachmentError] = useState('')
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
+  // Where to land after a successful create (e.g. the sprint view that sent us here).
+  const returnToRef = useRef<string | null>(null)
 
   // Word limit validation state
   const [titleWordLimitMessage, setTitleWordLimitMessage] = useState('')
@@ -417,7 +419,7 @@ export default function CreateTaskPage() {
 
       if (data.success) {
         notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
-        router.push('/backlog')
+        router.push(returnToRef.current ?? '/backlog')
         setAttachments([])
       } else {
         notifyError({ title: 'Failed to Create Task', message: data.error || 'Failed to create task' })
@@ -633,6 +635,13 @@ export default function CreateTaskPage() {
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       fetchProjects()
+      // Read from window rather than useSearchParams, which would need a Suspense boundary.
+      const query = new URLSearchParams(window.location.search)
+      const returnTo = query.get('returnTo')
+      // Same-origin paths only, so the param can't be used as an open redirect.
+      returnToRef.current = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null
+      const presetProject = query.get('project')
+      if (presetProject) handleChange('project', presetProject)
       // Set currentUser from AuthContext
       if (user) {
         const mapped = mapUserResponse(user)

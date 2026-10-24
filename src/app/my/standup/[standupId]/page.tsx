@@ -123,8 +123,16 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
   // "My" linked to `/my`, a route that doesn't exist. One crumb matching the
   // sidebar's own label is both correct and consistent. Passed as a prop,
   // not via `useBreadcrumb()` — see the run screen page for why that hook
-  // silently no-ops when called from a page component.
-  const breadcrumbItems = [{ label: 'Standups' }]
+  // silently no-ops when called from a page component. Once the board has
+  // loaded, the project and sprint are appended so the crumb says where the
+  // viewer is, not just which section.
+  const breadcrumbItems = [
+    ...(data?.projectName ? [{ label: data.projectName, href: `/projects/${data.projectId}` }] : []),
+    ...(data?.sprintName
+      ? [{ label: data.sprintName, href: `/projects/${data.projectId}/sprints/${data.sprintId}` }]
+      : []),
+    { label: 'Standups' }
+  ]
 
   // The auth check runs asynchronously (`useAuth`'s `checkAuth`); until it
   // settles, `user` is indistinguishable from "genuinely no session" — both

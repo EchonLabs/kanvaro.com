@@ -2500,37 +2500,31 @@ export default function SprintDetailPage() {
                 </button>
               )}
 
-              {/* Create New Task Button */}
+              {/* Create Task Button (opens the create task page, which returns here) */}
               {canCreateTask && (
-                <button
-                  type="button"
-                  onClick={() => setShowCreateTaskModal(true)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/60 text-gray-700 dark:text-gray-200 text-[13px] font-medium px-4 h-9 shadow-sm transition-all cursor-pointer"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Create New Task</span>
-                </button>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const params = new URLSearchParams({ returnTo: `/sprints/${sprintId}` })
+                          if (sprint?.project?._id) params.set('project', sprint.project._id)
+                          router.push(`/tasks/create-new-task?${params.toString()}`)
+                        }}
+                        className="h-9 w-9 rounded-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/60 text-gray-600 dark:text-gray-300 flex items-center justify-center shadow-sm transition-all cursor-pointer"
+                        title="Create Task"
+                        aria-label="Create Task"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs font-medium">
+                      Create Task
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
-
-              {/* Add Task Button (Redirects to Backlog) */}
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => router.push(sprint?.project?._id ? `/backlog?project=${sprint.project._id}` : '/backlog')}
-                      className="h-9 w-9 rounded-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/60 text-gray-600 dark:text-gray-300 flex items-center justify-center shadow-sm transition-all cursor-pointer"
-                      title="Add Task"
-                      aria-label="Add Task"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs font-medium">
-                    Add Task
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
 
               {/* Edit Icon Button */}
               {canEditSprint && (
