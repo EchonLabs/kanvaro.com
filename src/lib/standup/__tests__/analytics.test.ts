@@ -4,6 +4,7 @@ import {
   computeAccuracy,
   computeDayHealth,
   computeDebtTrend,
+  debtChange,
   computeDiscipline,
   spillChains
 } from '@/lib/standup/analytics'
@@ -61,8 +62,8 @@ describe('computeDebtTrend', () => {
   it('accumulates the ledger up to each date', () => {
     const trend = computeDebtTrend(
       [
-        { entryType: 'accrual', minutes: 120, standupDate: '2026-10-02' },
-        { entryType: 'settlement', minutes: 30, standupDate: '2026-10-03' }
+        { memberId: 'a', entryType: 'accrual', minutes: 120, standupDate: '2026-10-02' },
+        { memberId: 'a', entryType: 'settlement', minutes: 30, standupDate: '2026-10-03' }
       ],
       ['2026-10-01', '2026-10-02', '2026-10-03']
     )
@@ -73,7 +74,7 @@ describe('computeDebtTrend', () => {
 
   it('sorts unsorted dates and never goes negative', () => {
     const trend = computeDebtTrend(
-      [{ entryType: 'credit', minutes: 60, standupDate: '2026-10-01' }],
+      [{ memberId: 'a', entryType: 'credit', minutes: 60, standupDate: '2026-10-01' }],
       ['2026-10-02', '2026-10-01']
     )
 
@@ -81,6 +82,40 @@ describe('computeDebtTrend', () => {
       { date: '2026-10-01', outstandingMinutes: 0 },
       { date: '2026-10-02', outstandingMinutes: 0 }
     ])
+  })
+})
+
+describe('computeDebtTrend per member', () => {
+  it("floors each member at zero so one member's surplus never hides another's debt", () => {
+    const trend = computeDebtTrend(
+      [
+        { memberId: 'a', entryType: 'accrual', minutes: 90, standupDate: '2026-10-01' },
+        { memberId: 'b', entryType: 'credit', minutes: 60, standupDate: '2026-10-01' }
+      ],
+      ['2026-10-01']
+    )
+
+    expect(trend).toEqual([{ date: '2026-10-01', outstandingMinutes: 90 }])
+  })
+})
+
+describe('debtChange', () => {
+  const trend = [
+    { date: '2026-10-01', outstandingMinutes: 60 },
+    { date: '2026-10-05', outstandingMinutes: 120 },
+    { date: '2026-10-09', outstandingMinutes: 150 }
+  ]
+
+  it('compares the latest point with the last point at least seven days earlier', () => {
+    expect(debtChange(trend)).toBe(90)
+  })
+
+  it('compares with zero when the sprint is younger than seven days', () => {
+    expect(debtChange(trend.slice(1))).toBe(150)
+  })
+
+  it('is zero for an empty trend', () => {
+    expect(debtChange([])).toBe(0)
   })
 })
 

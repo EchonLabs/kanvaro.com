@@ -16,7 +16,7 @@ import type { LedgerEntryType } from '@/models/EstimateDebtLedger'
 
 import { CHRONIC_AGE_THRESHOLD } from './carry-forward'
 import { computeDebtPosition, estimationAccuracy } from './debt'
-import { minutes } from './minutes'
+import { minutes, type Minutes } from './minutes'
 
 export type AnalyticsView = 'full' | 'aggregate'
 
@@ -74,18 +74,51 @@ export interface DebtTrendPoint {
   outstandingMinutes: number
 }
 
-/** The sprint's total outstanding debt as it stood at the end of each date. */
+/**
+ * The sprint's total outstanding debt as it stood at the end of each date.
+ *
+ * Summed per member, each floored at zero, the same way the oversight rollup
+ * sums `MemberSprintDebtSummary` — a team-level balance would let one
+ * member's surplus (E42, never negative debt) cancel another member's debt.
+ */
 export function computeDebtTrend(
-  entries: { entryType: LedgerEntryType; minutes: number; standupDate: string }[],
+  entries: { memberId: string; entryType: LedgerEntryType; minutes: number; standupDate: string }[],
   dates: string[]
 ): DebtTrendPoint[] {
   return [...dates].sort().map((date) => {
-    const upToDate = entries
-      .filter((entry) => entry.standupDate <= date)
-      .map((entry) => ({ entryType: entry.entryType, minutes: minutes(entry.minutes) }))
+    const byMember = new Map<string, { entryType: LedgerEntryType; minutes: Minutes }[]>()
+    for (const entry of entries) {
+      if (entry.standupDate > date) continue
+      const list = byMember.get(entry.memberId) ?? []
+      list.push({ entryType: entry.entryType, minutes: minutes(entry.minutes) })
+      byMember.set(entry.memberId, list)
+    }
 
-    return { date, outstandingMinutes: computeDebtPosition(upToDate).outstandingMinutes }
+    let outstandingMinutes = 0
+    byMember.forEach((memberEntries) => {
+      outstandingMinutes += computeDebtPosition(memberEntries).outstandingMinutes
+    })
+
+    return { date, outstandingMinutes }
   })
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * How far debt moved over the last `days` calendar days: the latest point
+ * against the last point on or before `days` earlier, or against zero when
+ * the sprint is younger than that.
+ */
+export function debtChange(trend: DebtTrendPoint[], days = 7): number {
+  if (trend.length === 0) return 0
+  const latest = trend[trend.length - 1]
+  const cutoff = new Date(new Date(`${latest.date}T00:00:00Z`).getTime() - days * DAY_MS)
+    .toISOString()
+    .slice(0, 10)
+  const earlier = trend.filter((point) => point.date <= cutoff)
+  const baseline = earlier.length > 0 ? earlier[earlier.length - 1].outstandingMinutes : 0
+  return latest.outstandingMinutes - baseline
 }
 
 export interface AccuracyRow {
