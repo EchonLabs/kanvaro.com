@@ -38,6 +38,7 @@ import Link from 'next/link'
 import { ArrowUpRight, ChevronDown } from 'lucide-react'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
 type CadenceState = 'ran' | 'missed' | 'ahead' | 'off'
@@ -692,6 +693,15 @@ function SprintRow({ row }: { row: SprintOversightRow }) {
               </Link>
             </h3>
             <p className={cn('text-[11px]', SEVERITY_TEXT[severity])}>{verdictOf(row)}</p>
+            {/* §15.15's per-sprint report, in the Sprint Management module —
+                the board says where to look, the analytics page says why. */}
+            <Link
+              href={`/sprints/${row.sprintId}/analytics`}
+              className="inline-flex items-center gap-[5px] self-start rounded-[4px] text-[11px] font-semibold text-[var(--ovs-blue)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ovs-blue)]"
+            >
+              {standupStrings.analytics.oversightLink()}
+              <ArrowUpRight aria-hidden className="h-[11px] w-[11px] shrink-0" strokeWidth={2} />
+            </Link>
           </div>
 
           <CadenceRibbon

@@ -165,6 +165,19 @@ describe('StandupOversightScreen', () => {
     )
   })
 
+  it('links each sprint row to that sprint\'s stand-up analytics', async () => {
+    mockFetch(mockPayload())
+    render(<StandupOversightScreen />)
+
+    const board = await screen.findByRole('region', { name: /active sprints/i })
+    const flagged = within(board).getByText('Sprint 2').closest('li')!
+
+    expect(within(flagged).getByRole('link', { name: 'Analytics' })).toHaveAttribute(
+      'href',
+      '/sprints/s1/analytics'
+    )
+  })
+
   it('describes a sprint cadence ribbon for anyone not reading the colours', async () => {
     mockFetch(mockPayload())
     render(<StandupOversightScreen />)
