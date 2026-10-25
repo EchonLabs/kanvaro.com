@@ -41,8 +41,8 @@ export function OverrideLogCard({ payload, link }: { payload: AnalyticsPayload; 
         <RowsTable
           caption={s.sectionOverrides()}
           columns={[
-            { key: 'date', label: s.columnDate() },
-            { key: 'type', label: s.columnType() },
+            { key: 'date', label: s.columnDate(), nowrap: true },
+            { key: 'type', label: s.columnType(), nowrap: true },
             { key: 'member', label: s.columnMember() },
             { key: 'reason', label: s.columnReason() },
             { key: 'justification', label: s.columnJustification() }

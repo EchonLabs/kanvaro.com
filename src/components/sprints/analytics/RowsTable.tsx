@@ -10,6 +10,8 @@ export interface RowsColumn {
   key: string
   label: string
   align?: 'left' | 'right'
+  /** Keep this column's cells on one line (dates, pills); the table scrolls sideways instead of wrapping them. */
+  nowrap?: boolean
 }
 
 /**
@@ -55,7 +57,8 @@ export function RowsTable({
                   key={column.key}
                   className={cn(
                     'px-2 py-2 align-top text-[var(--plan-text)]',
-                    column.align === 'right' ? 'whitespace-nowrap text-right' : 'text-left'
+                    column.align === 'right' ? 'text-right' : 'text-left',
+                    (column.align === 'right' || column.nowrap) && 'whitespace-nowrap'
                   )}
                 >
                   {row.cells[column.key]}

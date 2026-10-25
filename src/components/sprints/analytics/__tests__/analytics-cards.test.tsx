@@ -111,6 +111,13 @@ describe('the full view', () => {
     expect(dayLinks[0]).toHaveAttribute('href', '/projects/project-1/sprints/sprint-1/standups/s1/summary')
   })
 
+  it('keeps the date of each override on one line', () => {
+    render(<OverrideLogCard payload={full()} link={link} />)
+
+    const dateCell = screen.getAllByRole('link')[0].closest('td')
+    expect(dateCell?.className).toContain('whitespace-nowrap')
+  })
+
   it('names the chronically under-allocated member', () => {
     render(<ChronicUnderAllocationCard payload={full()} link={link} />)
 
