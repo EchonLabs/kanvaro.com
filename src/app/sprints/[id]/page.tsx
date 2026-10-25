@@ -66,7 +66,9 @@ import {
   Check,
   Link2,
   X,
-  CornerDownRight
+  CornerDownRight,
+  RotateCcw,
+  FileText
 } from 'lucide-react'
 
 interface Sprint {
@@ -118,6 +120,7 @@ interface Sprint {
     _id: string
     title: string
     displayId?: string
+    taskNumber?: number
     status: string
     storyPoints: number
     estimatedHours: number
@@ -299,6 +302,8 @@ export default function SprintDetailPage() {
   const [startingSprint, setStartingSprint] = useState(false)
   const [completingSprint, setCompletingSprint] = useState(false)
   const [completeModalOpen, setCompleteModalOpen] = useState(false)
+  const [pasteModalOpen, setPasteModalOpen] = useState(false)
+  const [pastedKeysText, setPastedKeysText] = useState('')
   const [completionMode, setCompletionMode] = useState<'existing' | 'new'>('existing')
   const [availableSprints, setAvailableSprints] = useState<SprintOption[]>([])
   const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
@@ -452,11 +457,28 @@ export default function SprintDetailPage() {
   const filteredSprintTasks = useMemo(() => {
     return sprintTasks.filter(task => {
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase()
-        const matchesTitle = task.title?.toLowerCase().includes(q)
-        const matchesDisplayId = task.displayId?.toLowerCase().includes(q)
-        const matchesModule = (task.module || task.story?.title || task.epic?.title)?.toLowerCase().includes(q)
-        if (!matchesTitle && !matchesDisplayId && !matchesModule) {
+        const raw = searchQuery.trim().toLowerCase()
+        const tokens = raw.includes(',') || raw.includes(';') || raw.includes('\n')
+          ? raw.split(/[\s,;\n]+/).map(t => t.trim()).filter(Boolean)
+          : [raw]
+
+        const matches = tokens.some(tok => {
+          const cleanTok = tok.replace(/^#/, '')
+          const matchesTitle = task.title?.toLowerCase().includes(tok) || (cleanTok && task.title?.toLowerCase().includes(cleanTok))
+          const disp = task.displayId ? String(task.displayId).toLowerCase() : ''
+          const dispClean = disp.replace(/^#/, '')
+          const matchesDisplayId =
+            disp.includes(tok) ||
+            (cleanTok && disp.includes(cleanTok)) ||
+            (cleanTok && dispClean === cleanTok) ||
+            dispClean === tok
+          const matchesId = task._id?.toLowerCase() === tok || task._id?.toLowerCase() === cleanTok
+          const matchesTaskNum = (task as any).taskNumber !== undefined && (String((task as any).taskNumber).toLowerCase() === cleanTok || String((task as any).taskNumber).toLowerCase() === tok)
+          const matchesModule = (task.module || task.story?.title || task.epic?.title)?.toLowerCase().includes(tok)
+          return matchesTitle || matchesDisplayId || matchesId || matchesTaskNum || matchesModule
+        })
+
+        if (!matches) {
           return false
         }
       }
@@ -1300,19 +1322,40 @@ export default function SprintDetailPage() {
     try {
       setBulkActionLoading(true)
       const selectedIds = Array.from(tableSelectedTasks)
+      const isBacklog = !targetSprintId
 
-      await Promise.all(
-        selectedIds.map(taskId =>
-          fetch(`/api/tasks/${taskId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sprint: targetSprintId || null,
-              ...(targetSprintId ? {} : { movedToBacklog: true, status: 'backlog' })
-            })
-          })
-        )
-      )
+      const updates = {
+        archived: false,
+        status: isBacklog ? 'backlog' : 'todo',
+        sprint: isBacklog ? null : targetSprintId,
+        completedAt: null,
+        ...(isBacklog ? { movedFromSprint: sprintId } : {})
+      }
+
+      const response = await fetch('/api/tasks/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          taskIds: selectedIds,
+          updates
+        })
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to move tasks')
+      }
+
+      if (targetSprintId) {
+        const sRes = await fetch(`/api/sprints/${targetSprintId}`)
+        const sData = await sRes.json().catch(() => ({}))
+        const existing = (sData.data?.tasks || []).map((t: any) => typeof t === 'string' ? t : t._id)
+        await fetch(`/api/sprints/${targetSprintId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tasks: Array.from(new Set([...existing, ...selectedIds])) })
+        }).catch(err => console.warn('Sprint sync:', err))
+      }
 
       notifySuccess({
         title: targetSprintId ? `Moved ${selectedIds.length} tasks to sprint` : `Moved ${selectedIds.length} tasks to backlog`
@@ -1327,6 +1370,61 @@ export default function SprintDetailPage() {
     } finally {
       setBulkActionLoading(false)
     }
+  }
+
+  // Handle Multi-ID Paste Selection
+  const handleApplyPastedKeys = () => {
+    const rawTokens = pastedKeysText
+      .split(/[\s,;\n\r\t]+/)
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean)
+
+    if (!rawTokens.length) return
+
+    const cleanTokens = new Set<string>()
+    rawTokens.forEach(t => {
+      cleanTokens.add(t)
+      cleanTokens.add(t.replace(/^#/, ''))
+      if (t.includes('-')) {
+        cleanTokens.add(t.split('-').pop() || '')
+      }
+    })
+
+    let count = 0
+    setTableSelectedTasks(prev => {
+      const next = new Set(prev)
+      sprintTasks.forEach(task => {
+        const idLower = task._id ? task._id.toLowerCase() : ''
+        const disp = task.displayId ? String(task.displayId).trim().toLowerCase() : ''
+        const dispClean = disp.replace(/^#/, '')
+        const num = (task as any).taskNumber !== undefined ? String((task as any).taskNumber).toLowerCase() : ''
+
+        const matches =
+          (idLower && cleanTokens.has(idLower)) ||
+          (disp && (cleanTokens.has(disp) || cleanTokens.has(dispClean) || cleanTokens.has(`#${dispClean}`))) ||
+          (num && (cleanTokens.has(num) || cleanTokens.has(`#${num}`)))
+
+        if (matches) {
+          next.add(task._id)
+          count++
+        }
+      })
+      return next
+    })
+
+    if (count > 0) {
+      notifySuccess({
+        title: 'Tasks Selected',
+        message: `Selected ${count} matching tasks.`
+      })
+    } else {
+      notifyError({
+        title: 'No Matching Tasks Found',
+        message: 'Could not find any tasks matching the pasted IDs (e.g. 2.5, 2.6, #2.5).'
+      })
+    }
+    setPasteModalOpen(false)
+    setPastedKeysText('')
   }
 
   // Bulk Export to CSV
@@ -1665,7 +1763,7 @@ export default function SprintDetailPage() {
 
       const tasks = data.data?.tasks || []
       return tasks
-        .filter((task: any) => !['done', 'completed'].includes(task.status))
+        .filter((task: any) => !['done', 'completed'].includes(task.status) && !task.movedToSprint)
         .map((task: any) => ({
           _id: task._id,
           title: task.title,
@@ -1679,7 +1777,7 @@ export default function SprintDetailPage() {
   }
 
   const incompleteTasksList = useMemo(
-    () => sprintTasks.filter(task => !['done', 'completed'].includes(task.status)),
+    () => sprintTasks.filter(task => !['done', 'completed'].includes(task.status) && !task.movedToSprint),
     [sprintTasks]
   )
 
@@ -2816,6 +2914,17 @@ export default function SprintDetailPage() {
                   )}
                 </div>
 
+                {/* Multi-ID Paste Tool Button */}
+                <button
+                  type="button"
+                  onClick={() => setPasteModalOpen(true)}
+                  className="h-10 px-4 rounded-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs sm:text-[13px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-gray-800/80 inline-flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
+                  title="Paste task keys or IDs to select them"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>Paste IDs</span>
+                </button>
+
                 {/* Filter Pills */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* Status Filter */}
@@ -3327,8 +3436,8 @@ export default function SprintDetailPage() {
                                       </td>
 
                                       {/* Task Title */}
-                                      <td className="py-3 px-3">
-                                        <div className="flex items-center gap-1.5">
+                                      <td className="py-3 px-3 max-w-[340px] xl:max-w-[460px]">
+                                        <div className="flex items-center gap-2 min-w-0">
                                           {task.subtasks && task.subtasks.length > 0 && (
                                             <button
                                               type="button"
@@ -3351,11 +3460,20 @@ export default function SprintDetailPage() {
                                           )}
                                           <span
                                             onClick={() => handleOpenEditTask(task)}
-                                            className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer line-clamp-1"
+                                            className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer truncate min-w-0"
                                             title={task.title}
                                           >
                                             {task.title || 'Untitled Task'}
                                           </span>
+
+                                          {task.movedToSprint && (
+                                            <span
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800/60 shrink-0 whitespace-nowrap"
+                                              title={`Moved to ${task.movedToSprint.name}`}
+                                            >
+                                              <span>Moved to {task.movedToSprint.name}</span>
+                                            </span>
+                                          )}
                                         </div>
                                       </td>
 
@@ -4166,13 +4284,8 @@ export default function SprintDetailPage() {
                                     })()}
                                   </p>
                                   {task.movedToSprint && (
-                                    <p className="text-[12px] font-medium text-orange-600 dark:text-orange-400 mt-1">
-                                      Moved to: {task.movedToSprint.name}
-                                    </p>
-                                  )}
-                                  {task.movedToBacklog && (
-                                    <p className="text-[12px] font-medium text-orange-600 dark:text-orange-400 mt-1">
-                                      Moved to backlog
+                                    <p className="inline-flex items-center gap-1 text-[12px] font-medium text-orange-600 dark:text-orange-400 mt-1">
+                                      <span>Moved to: {task.movedToSprint.name}</span>
                                     </p>
                                   )}
                                 </div>
@@ -4192,11 +4305,6 @@ export default function SprintDetailPage() {
                                     Spillover
                                   </span>
                                 )}
-                                {task.movedToBacklog && (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20 text-[12px] font-medium text-orange-700 dark:text-orange-400">
-                                    Backlog
-                                  </span>
-                                )}
                               </div>
 
                               <div className="flex items-center gap-2">
@@ -4205,7 +4313,7 @@ export default function SprintDetailPage() {
                                 </span>
                               </div>
 
-                              {!task.movedToSprint && !task.movedToBacklog && (
+                              {!task.movedToSprint && (
                                 <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
                                   <Label className="text-[12px] text-gray-600 dark:text-gray-400">Status</Label>
                                   <Select
@@ -4321,6 +4429,13 @@ export default function SprintDetailPage() {
                           </button>
                         </div>
                       </div>
+
+                      {/* Moved Pointer Notice */}
+                      {editingTask.movedToSprint && (
+                        <div className="flex items-center gap-1.5 p-2.5 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200/80 dark:border-orange-800/50 text-orange-800 dark:text-orange-300 text-xs font-medium">
+                          <span>Moved to {editingTask.movedToSprint.name}</span>
+                        </div>
+                      )}
 
                       {/* Form Fields */}
                       <div className="space-y-4 text-xs">
@@ -5298,6 +5413,40 @@ export default function SprintDetailPage() {
                 </div>
               )}
             </div>
+          </div>
+        </ResponsiveDialog>
+
+        {/* Paste IDs Multi-Select Dialog */}
+        <ResponsiveDialog
+          open={pasteModalOpen}
+          onOpenChange={(open) => {
+            setPasteModalOpen(open)
+            if (!open) setPastedKeysText('')
+          }}
+          title="Select Tasks by IDs or Keys"
+          description="Paste task keys or IDs to select matching tasks in this sprint."
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button variant="outline" onClick={() => setPasteModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleApplyPastedKeys} disabled={!pastedKeysText.trim()}>
+                Select Tasks
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 py-1">
+            <textarea
+              value={pastedKeysText}
+              onChange={(e) => setPastedKeysText(e.target.value)}
+              placeholder="Paste keys or IDs separated by commas, spaces, or lines:&#10;KAN-101, KAN-102&#10;KAN-103"
+              rows={6}
+              className="w-full text-xs font-mono p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Tip: Matching tasks will be selected in the table, allowing you to use the floating bar to move them in bulk.
+            </p>
           </div>
         </ResponsiveDialog>
     </MainLayout>
