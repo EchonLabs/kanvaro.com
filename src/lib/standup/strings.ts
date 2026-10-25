@@ -1935,7 +1935,25 @@ export const standupStrings = {
       }
     },
 
-    oversightLink: () => 'Analytics'
+    oversightLink: () => 'Analytics',
+
+    /** The sidebar's way in: choose which sprint's report to open. */
+    navLabel: () => 'Analytics',
+    pickerSubtitle: () => 'Choose a sprint to see how its stand-ups went.',
+    pickerLoading: () => 'Loading sprints…',
+    pickerLoadFailed: () => 'Could not load your sprints.',
+    pickerEmpty: () => 'No sprint has stand-ups yet. Stand-ups exist once a sprint’s planning is complete.',
+    pickerAllSprints: () => 'All sprints',
+    pickerGroup: ({ status }: { status: string }) => {
+      switch (status) {
+        case 'active':
+          return 'Active'
+        case 'planned':
+          return 'Planned'
+        default:
+          return 'Completed'
+      }
+    }
   }
 } as const
 
