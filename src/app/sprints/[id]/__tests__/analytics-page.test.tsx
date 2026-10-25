@@ -88,6 +88,20 @@ describe('SprintAnalyticsPage', () => {
     ])
   })
 
+  it('stretches the allocation health and debt trend cards to one height', async () => {
+    ;(global.fetch as jest.Mock).mockReturnValue(
+      respond(200, { success: true, data: buildAnalyticsPayload(populatedInputs(), 'aggregate') })
+    )
+
+    render(<SprintAnalyticsPage />)
+    await screen.findByRole('heading', { name: s.title() })
+
+    const row = screen.getByRole('heading', { name: s.sectionDebtTrend() }).closest('[data-testid="analytics-health-row"]')
+    expect(row).not.toBeNull()
+    expect(row?.className).toContain('items-stretch')
+    expect(row?.className).not.toContain('items-start')
+  })
+
   it('adds no padding of its own, since MainLayout already pads the content', async () => {
     ;(global.fetch as jest.Mock).mockReturnValue(
       respond(200, { success: true, data: buildAnalyticsPayload(emptyInputs(), 'aggregate') })

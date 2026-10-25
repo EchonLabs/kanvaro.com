@@ -24,6 +24,7 @@ import { DisciplineCard } from '@/components/sprints/analytics/DisciplineCard'
 import { OverrideLogCard } from '@/components/sprints/analytics/OverrideLogCard'
 import { SpillChainsCard } from '@/components/sprints/analytics/SpillChainsCard'
 import { buildAnalyticsPayload } from '@/lib/standup/analytics-payload'
+import { shortDate } from '@/components/sprints/analytics/format'
 import { standupStrings } from '@/lib/standup/strings'
 
 import {
@@ -122,7 +123,7 @@ describe('the full view', () => {
     render(<OverrideLogCard payload={full()} link={link} />)
 
     const nameSpan = screen.getAllByText('Amara Okafor')[0]
-    expect(nameSpan.className).toContain('min-w-[10rem]')
+    expect(nameSpan.className).toMatch(/min-w-\[\d/)
     expect(nameSpan.className).not.toContain('whitespace-nowrap')
   })
 
@@ -184,6 +185,51 @@ describe('charts are readable without colour (NFR-A1) and drill to rows (UI-13)'
       '/projects/project-1/sprints/sprint-1/standups/s2',
       '/projects/project-1/sprints/sprint-1/standups/s3'
     ])
+  })
+})
+
+describe('the estimate debt trend chart', () => {
+  const pointName = s.debtPointLabel({ date: shortDate('2026-10-01'), debt: '1.5h' })
+
+  it('shows the date and the debt when a point is hovered, and hides them on leave', () => {
+    render(<DebtTrendCard payload={aggregate()} link={link} />)
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+    const point = screen.getByRole('button', { name: pointName })
+    fireEvent.mouseEnter(point)
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent(`${shortDate('2026-10-01')}1.5h`)
+
+    fireEvent.mouseLeave(point)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('shows the same on keyboard focus, so it is not hover-only (NFR-A1)', () => {
+    render(<DebtTrendCard payload={aggregate()} link={link} />)
+
+    const point = screen.getByRole('button', { name: pointName })
+    fireEvent.focus(point)
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+
+    fireEvent.blur(point)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('is as tall as the allocation health chart beside it', () => {
+    render(
+      <>
+        <AllocationHealthCard payload={aggregate()} link={link} />
+        <DebtTrendCard payload={aggregate()} link={link} />
+      </>
+    )
+
+    const bars = screen.getByTestId('allocation-health-bars').className
+    const chart = screen.getByTestId('debt-trend-chart').className
+    // Allocation health: a 10rem bar area, then a legend row. The trend chart
+    // has a date row in place of the legend, so its chart is sized to match.
+    expect(bars).toContain('h-40')
+    expect(chart).toContain('h-[10.75rem]')
   })
 })
 

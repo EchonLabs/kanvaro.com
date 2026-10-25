@@ -145,7 +145,10 @@ function Report({ payload, sprintId }: { payload: AnalyticsPayload; sprintId: st
       <AnalyticsHero payload={payload} />
       <AnalyticsStatGrid headline={payload.headline} />
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      {/* Stretched, not top-aligned like the rows below: these two are the
+          page's pair of charts, and cards of different heights side by side
+          read as a layout fault. */}
+      <div data-testid="analytics-health-row" className="grid items-stretch gap-4 lg:grid-cols-2">
         <AllocationHealthCard payload={payload} link={link} />
         <DebtTrendCard payload={payload} link={link} />
       </div>
