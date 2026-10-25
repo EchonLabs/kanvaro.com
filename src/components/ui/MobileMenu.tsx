@@ -146,6 +146,13 @@ const navigationItems = [
         label: 'Standups',
         icon: Zap,
         path: '/my/standup'
+      },
+      {
+        // No `permission` gate: see the matching comment in Sidebar.tsx.
+        id: 'standup-analytics',
+        label: 'Analytics',
+        icon: BarChart,
+        path: '/sprints/analytics'
       }
     ]
   },

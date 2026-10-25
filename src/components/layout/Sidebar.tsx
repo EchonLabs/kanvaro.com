@@ -168,6 +168,16 @@ const navigationItems = [
         label: 'Standups',
         icon: Zap,
         path: '/my/standup'
+      },
+      {
+        // No `permission` gate, like "Standups" above: `standup:view_analytics`
+        // is mostly granted per project, so an org-wide check would hide the
+        // item from the people the team view is for. It lands on a picker of
+        // the caller's own sprints; the report enforces access itself.
+        id: 'standup-analytics',
+        label: 'Analytics',
+        icon: BarChart,
+        path: '/sprints/analytics'
       }
     ]
   },
