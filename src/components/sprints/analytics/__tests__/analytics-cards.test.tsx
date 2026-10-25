@@ -118,6 +118,14 @@ describe('the full view', () => {
     expect(dateCell?.className).toContain('whitespace-nowrap')
   })
 
+  it('gives the member column room for a name on one line, wrapping only a very long one', () => {
+    render(<OverrideLogCard payload={full()} link={link} />)
+
+    const nameSpan = screen.getAllByText('Amara Okafor')[0]
+    expect(nameSpan.className).toContain('min-w-[10rem]')
+    expect(nameSpan.className).not.toContain('whitespace-nowrap')
+  })
+
   it('names the chronically under-allocated member', () => {
     render(<ChronicUnderAllocationCard payload={full()} link={link} />)
 

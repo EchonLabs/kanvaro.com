@@ -58,7 +58,9 @@ export function OverrideLogCard({ payload, link }: { payload: AnalyticsPayload; 
                   </Link>
                 ),
                 type: <span className={planPillClass('warning')}>{s.overrideType({ type: row.type })}</span>,
-                member: row.memberNames.join(', ') || '—',
+                // Room for an ordinary name on one line; a very long one (or several
+                // members) wraps to a second row rather than stretching the table.
+                member: <span className="block min-w-[8rem]">{row.memberNames.join(', ') || '—'}</span>,
                 reason: standupStrings.override.reasonLabel({ code: row.reasonCode }),
                 justification: <span className="block min-w-[14rem]">{row.justification}</span>
               }
