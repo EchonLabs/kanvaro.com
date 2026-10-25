@@ -88,6 +88,17 @@ describe('SprintAnalyticsPage', () => {
     ])
   })
 
+  it('adds no padding of its own, since MainLayout already pads the content', async () => {
+    ;(global.fetch as jest.Mock).mockReturnValue(
+      respond(200, { success: true, data: buildAnalyticsPayload(emptyInputs(), 'aggregate') })
+    )
+
+    render(<SprintAnalyticsPage />)
+    await screen.findByRole('heading', { name: s.title() })
+
+    expect(screen.getByTestId('analytics-page').className).not.toMatch(/(^|\s)(md:|sm:|lg:)?p[xytblr]?-\d/)
+  })
+
   it('says plainly when the caller may not see the analytics', async () => {
     ;(global.fetch as jest.Mock).mockReturnValue(respond(403, { error: { code: 'FORBIDDEN' } }))
 

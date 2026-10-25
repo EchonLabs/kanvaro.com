@@ -105,7 +105,9 @@ export default function SprintAnalyticsPage() {
 
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
-      <div className="flex flex-col gap-6 p-4 md:p-8">
+      {/* No padding of its own: MainLayout's <main> already pads the content, and
+          a second layer here doubled it. */}
+      <div data-testid="analytics-page" className="flex flex-col gap-6">
         {state.kind === 'loading' && <LoadingSkeleton />}
 
         {(state.kind === 'forbidden' || state.kind === 'not-found') && (

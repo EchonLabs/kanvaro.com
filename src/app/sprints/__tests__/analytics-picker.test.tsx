@@ -78,6 +78,15 @@ describe('SprintAnalyticsPickerPage', () => {
     expect(within(active).getByText('Kanvaro Web')).toBeInTheDocument()
   })
 
+  it('adds no padding of its own, since MainLayout already pads the content', async () => {
+    ;(global.fetch as jest.Mock).mockReturnValue(respond(200, { success: true, data: [] }))
+
+    render(<SprintAnalyticsPickerPage />)
+    await screen.findByText(s.pickerEmpty())
+
+    expect(screen.getByTestId('analytics-picker-page').className).not.toMatch(/(^|\s)(md:|sm:|lg:)?p[xytblr]?-\d/)
+  })
+
   it('has the Sprints trail like the page it leads to', async () => {
     ;(global.fetch as jest.Mock).mockReturnValue(respond(200, { success: true, data: [] }))
 

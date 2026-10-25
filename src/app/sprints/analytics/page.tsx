@@ -78,7 +78,8 @@ export default function SprintAnalyticsPickerPage() {
 
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
-      <div className="flex flex-col gap-6 p-4 md:p-8">
+      {/* No padding of its own: MainLayout's <main> already pads the content. */}
+      <div data-testid="analytics-picker-page" className="flex flex-col gap-6">
         <div className={cn(planCardClass, 'flex flex-col gap-1.5 p-5 sm:p-7')}>
           <h1 className="apple-type-title1 font-bold text-[var(--plan-text)]">{s.title()}</h1>
           <p className="apple-type-subheadline text-[var(--plan-muted)]">{s.pickerSubtitle()}</p>
