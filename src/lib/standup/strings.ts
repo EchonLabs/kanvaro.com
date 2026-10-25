@@ -1805,6 +1805,137 @@ export const standupStrings = {
     copied: () => 'Copied to clipboard',
     copyFailed: () => 'Could not copy the summary.',
     printOrSave: () => 'Print / Save as PDF'
+  },
+
+  /**
+   * The sprint's Stand-up Analytics report (§15.15, UI-13), in the Sprint
+   * Management module at `/sprints/[id]/analytics`. Two audiences read the
+   * same page: the full view (`standup:view_debt`) and the team view, whose
+   * notes say plainly what is withheld rather than leaving a silent gap.
+   */
+  analytics: {
+    title: () => 'Stand-up analytics',
+    breadcrumb: () => 'Analytics',
+    loading: () => 'Loading the analytics…',
+    loadFailed: () => 'Could not load the analytics for this sprint.',
+    forbidden: () => 'You do not have permission to view analytics for this sprint.',
+    notFound: () => 'That sprint no longer exists.',
+    retry: () => 'Retry',
+    backToSprint: () => 'Back to sprint',
+    fullView: () => 'Full view',
+    teamView: () => 'Team view',
+    teamViewNote: () => 'Individual figures are visible to the PM and admins only.',
+    sprintDates: ({ start, end }: { start: string; end: string }) => `${start} to ${end}`,
+
+    statOnTime: () => 'Ran on time',
+    statOpenDebt: () => 'Open estimate debt',
+    statOverrides: () => 'Overrides issued',
+    statChronic: () => 'Chronic carry-forward',
+    onTimeDetail: ({ missed }: { missed: number }) => (missed === 1 ? '1 missed' : `${missed} missed`),
+    debtChangeDetail: ({ change }: { change: string }) => `${change} in the last 7 days`,
+
+    sectionAllocationHealth: () => 'Allocation health',
+    sectionDebtTrend: () => 'Estimate debt trend',
+    sectionAccuracy: () => 'Estimation accuracy',
+    sectionAgeing: () => 'Carry-forward ageing',
+    sectionOverrides: () => 'Override log',
+    sectionChronic: () => 'Chronic under-allocation',
+    sectionDiscipline: () => 'Stand-up discipline',
+    sectionSpillChains: () => 'Spill chains',
+
+    emptyAllocationHealth: () => 'No stand-up has run yet, so there is no allocation to show.',
+    emptyDebtTrend: () => 'No stand-up has happened yet.',
+    emptyAccuracy: () => 'No task has been completed yet.',
+    emptyAgeing: () => 'Nothing is carried over. Clean slate.',
+    emptyOverrides: () => 'No overrides have been issued in this sprint.',
+    emptyChronic: () => 'Nobody has been under-allocated three or more times.',
+    emptyDiscipline: () => 'This sprint has no stand-ups yet.',
+    emptySpillChains: () => 'No task has been carried across stand-ups.',
+
+    legendFull: () => 'Allocated within capacity',
+    legendUnder: () => 'Unallocated capacity',
+    legendOver: () => 'Over capacity',
+    dayLabel: ({ day }: { day: number }) => `Day ${day}`,
+    dayHealthLabel: ({ day, full, under, over }: { day: number; full: string; under: string; over: string }) =>
+      `Day ${day}: ${full} allocated within capacity, ${under} unallocated, ${over} over capacity`,
+    debtPointLabel: ({ date, debt }: { date: string; debt: string }) => `${date}: ${debt} outstanding`,
+
+    showRows: () => 'Show rows',
+    hideRows: () => 'Hide rows',
+
+    columnDay: () => 'Day',
+    columnDate: () => 'Date',
+    columnCapacity: () => 'Capacity',
+    columnWithin: () => 'Within',
+    columnUnder: () => 'Under',
+    columnOver: () => 'Over',
+    columnDebt: () => 'Outstanding',
+    columnScope: () => 'Scope',
+    columnMember: () => 'Member',
+    columnTasks: () => 'Tasks',
+    columnEstimated: () => 'Estimated',
+    columnLogged: () => 'Logged',
+    columnAccuracy: () => 'Accuracy',
+    columnTask: () => 'Task',
+    columnAge: () => 'Age',
+    columnStatus: () => 'Status',
+    columnOwner: () => 'Owner',
+    columnType: () => 'Type',
+    columnReason: () => 'Reason',
+    columnJustification: () => 'Justification',
+    columnCount: () => 'Count',
+    columnOverrides: () => 'Under-allocation overrides',
+    columnChain: () => 'Carried for',
+    columnDuration: () => 'Duration',
+    team: () => 'Team',
+
+    ageBucket: ({ label }: { label: string }) => `Age ${label}`,
+    ageBucketLabel: ({ label, count, chronic }: { label: string; count: number; chronic: boolean }) =>
+      `Age ${label} stand-ups: ${count} ${count === 1 ? 'item' : 'items'}${chronic ? ', chronic' : ''}`,
+    chronicBand: ({ count }: { count: number }) => `${count} chronic`,
+    ageInStandups: ({ age }: { age: number }) => (age === 1 ? '1 stand-up' : `${age} stand-ups`),
+    chainLength: ({ length }: { length: number }) => `${length} stand-ups`,
+    loggedAgainst: ({ logged, estimate }: { logged: string; estimate: string }) => `${logged} logged of ${estimate}`,
+    chronicMemberCount: ({ count }: { count: number }) =>
+      count === 1
+        ? '1 member has been under-allocated three or more times.'
+        : `${count} members have been under-allocated three or more times.`,
+
+    disciplineOnTime: () => 'On-time completion',
+    disciplineMissed: () => 'Missed stand-ups',
+    disciplineMedian: () => 'Median duration',
+    minutesValue: ({ minutes }: { minutes: number }) => `${Math.round(minutes)} min`,
+    backfilled: () => 'Backfilled',
+
+    overrideType: ({ type }: { type: string }) => {
+      switch (type) {
+        case 'under_allocation':
+          return 'Under-allocation'
+        case 'over_allocation':
+          return 'Over-allocation'
+        case 'skip_reestimate':
+          return 'Deferred re-estimate'
+        case 'duplicate_allocation':
+          return 'Duplicate allocation'
+        case 'complete_with_absent_facilitator_role':
+          return 'Completed without a facilitator'
+        default:
+          return type.replace(/_/g, ' ')
+      }
+    },
+
+    standupStatus: ({ status }: { status: string }) => {
+      switch (status) {
+        case 'In_Progress':
+          return 'In progress'
+        case 'Skipped_Holiday':
+          return 'Skipped (holiday)'
+        default:
+          return status
+      }
+    },
+
+    oversightLink: () => 'Analytics'
   }
 } as const
 
