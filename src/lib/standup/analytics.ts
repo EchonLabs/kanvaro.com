@@ -137,7 +137,7 @@ export function computeAccuracy(rows: AccuracyInput[]): {
 
   return {
     team: accuracyRow(rows),
-    members: [...byMember].map(([memberId, memberRows]) => ({ memberId, ...accuracyRow(memberRows) }))
+    members: Array.from(byMember).map(([memberId, memberRows]) => ({ memberId, ...accuracyRow(memberRows) }))
   }
 }
 
@@ -184,7 +184,7 @@ export function chronicUnderAllocation(
     }
   }
 
-  return [...counts]
+  return Array.from(counts)
     .filter(([, count]) => count >= threshold)
     .map(([memberId, count]) => ({ memberId, count }))
     .sort((a, b) => b.count - a.count)
@@ -255,7 +255,7 @@ export function spillChains(
     chains.set(key, chain)
   }
 
-  return [...chains.values()]
+  return Array.from(chains.values())
     .filter((chain) => chain.standups.size >= 2)
     .map((chain) => {
       const totals = taskTotals.get(chain.taskId)
