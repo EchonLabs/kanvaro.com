@@ -14,12 +14,13 @@
  * would hide the item from the people the team view is for. The list is the
  * caller's own sprints, and the report enforces access itself.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, BarChart3 } from 'lucide-react'
 
 import { MainLayout } from '@/components/layout/MainLayout'
 import { planButtonClass, planCardClass, planEmptyClass, planPillClass } from '@/components/standup/planning/ui'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
@@ -44,8 +45,13 @@ const STATUS_TONE = { active: 'success', planned: 'accent', completed: 'neutral'
 
 const breadcrumbItems = [{ label: 'Sprints', href: '/sprints' }, { label: s.breadcrumb() }]
 
+const ALL_PROJECTS = '__all__'
+
 const projectNameOf = (sprint: PickerSprint) =>
   typeof sprint.project === 'object' && sprint.project ? (sprint.project.name ?? '') : ''
+
+const projectIdOf = (sprint: PickerSprint) =>
+  typeof sprint.project === 'object' && sprint.project ? (sprint.project._id ?? '') : (sprint.project ?? '')
 
 function dateRange(sprint: PickerSprint): string | null {
   if (!sprint.startDate || !sprint.endDate) return null
@@ -74,7 +80,25 @@ export default function SprintAnalyticsPickerPage() {
     void load()
   }, [load])
 
-  const sprints = state.kind === 'loaded' ? state.sprints : []
+  const [projectId, setProjectId] = useState(ALL_PROJECTS)
+
+  const allSprints = state.kind === 'loaded' ? state.sprints : []
+
+  // Projects come from the sprints the caller can already see, so the filter
+  // never offers a project with nothing to open.
+  const projects = useMemo(() => {
+    const byId = new Map<string, string>()
+    for (const sprint of allSprints) {
+      const id = projectIdOf(sprint)
+      if (id) byId.set(id, projectNameOf(sprint) || id)
+    }
+    return Array.from(byId.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [allSprints])
+
+  const sprints =
+    projectId === ALL_PROJECTS ? allSprints : allSprints.filter((sprint) => projectIdOf(sprint) === projectId)
 
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
@@ -84,6 +108,22 @@ export default function SprintAnalyticsPickerPage() {
           <h1 className="apple-type-title1 font-bold text-[var(--plan-text)]">{s.title()}</h1>
           <p className="apple-type-subheadline text-[var(--plan-muted)]">{s.pickerSubtitle()}</p>
         </div>
+
+        {projects.length > 1 && (
+          <Select value={projectId} onValueChange={setProjectId}>
+            <SelectTrigger aria-label="Project" className="w-56 text-[13px]">
+              <SelectValue placeholder="All projects" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {state.kind === 'loading' && (
           <p role="status" className="apple-type-subheadline text-[var(--plan-muted)]">

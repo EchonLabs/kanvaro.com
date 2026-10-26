@@ -11,6 +11,7 @@
  * no answer without saying complete through when.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { AlertTriangle, CalendarDays } from 'lucide-react'
 
 import { MainLayout } from '@/components/layout/MainLayout'
@@ -65,7 +66,9 @@ export default function ProjectStandupSchedulePage({
   params: { id: string }
 }) {
   const projectId = params.id
+  const router = useRouter()
 
+  const [projects, setProjects] = useState<SprintOption[]>([])
   const [sprints, setSprints] = useState<SprintOption[]>([])
   const [sprintId, setSprintId] = useState<string | null>(null)
   const [schedule, setSchedule] = useState<SprintSchedule | null>(null)
@@ -87,6 +90,35 @@ export default function ProjectStandupSchedulePage({
 
   useEffect(() => {
     let cancelled = false
+
+    const loadProjects = async () => {
+      try {
+        const response = await fetch('/api/projects?limit=1000&page=1')
+        const payload = await response.json()
+        const rows: SprintOption[] = (Array.isArray(payload?.data) ? payload.data : []).map(
+          (project: any) => ({ id: project._id ?? project.id, name: project.name })
+        )
+        if (!cancelled) setProjects(rows)
+      } catch {
+        // The filter is a convenience; the page still works for the current project.
+      }
+    }
+
+    loadProjects()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    // A different project's sprints are a different list: drop the old
+    // selection so the first sprint of the new project is picked.
+    setSprints([])
+    setSprintId(null)
+    setSchedule(null)
+    setLoading(true)
 
     const loadSprints = async () => {
       try {
@@ -150,9 +182,6 @@ export default function ProjectStandupSchedulePage({
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
       <div className="space-y-6 p-4 md:p-6">
-        {/* §3 rule 1: the banner is the first thing on every stand-up screen. */}
-        <DegradationBanner degradations={degradations} />
-
         {/* ── Page Header ─────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -174,6 +203,29 @@ export default function ProjectStandupSchedulePage({
           <div className="flex items-center gap-2.5">
             {sprintId ? (
               <RegenerateScheduleModal sprintId={sprintId} onReconciled={loadSchedule} />
+            ) : null}
+
+            {projects.length > 1 ? (
+              <Select
+                value={projectId}
+                onValueChange={(value) => {
+                  if (value !== projectId) router.push(`/projects/${value}/standups`)
+                }}
+              >
+                <SelectTrigger
+                  aria-label="Project"
+                  className="w-44 text-[13px] rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)]"
+                >
+                  <SelectValue placeholder="Choose project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ) : null}
 
             {sprints.length > 1 ? (
@@ -221,6 +273,10 @@ export default function ProjectStandupSchedulePage({
             {standupStrings.schedule.empty()}
           </p>
         )}
+
+        {/* Configuration notices sit below the schedule here so the day list
+            is what opens the page; the banner still renders on every load. */}
+        <DegradationBanner degradations={degradations} />
       </div>
     </MainLayout>
   )
