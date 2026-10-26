@@ -101,17 +101,17 @@ export async function GET(
     const sprintTaskIds = sprint.tasks || []
     
 
-    // Before the sprint starts, tasks are committed to it by planning without
-    // their status changing, so a `backlog` status is normal there and must not
-    // be read as "moved back to the backlog". Only a started sprint is cleaned.
-    const hasStarted = ['active', 'completed', 'cancelled'].includes(sprint.status)
-
-    // Clean up any tasks in sprint.tasks that are now in backlog or have no sprint
+    // A task's status says nothing about whether it left the sprint. Planning
+    // commits tasks without touching status, and starting a sprint leaves it
+    // alone too so work carried over from the previous sprint keeps its status,
+    // which means a freshly planned task is still `backlog` when the sprint goes
+    // active. Moving a task back to the backlog clears `sprint` itself (the task
+    // PUT handler does it), so `sprint` is the only signal to clean up on.
+    // Clean up any tasks in sprint.tasks that no longer point at a sprint
     const backlogTasksInSprint = await Task.find({
       _id: { $in: sprintTaskIds },
       organization: organizationId,
       $or: [
-        ...(hasStarted ? [{ status: 'backlog' }] : []),
         { sprint: null },
         { sprint: { $exists: false } }
       ]
@@ -135,8 +135,7 @@ export async function GET(
 
     const taskDocs = await Task.find({
       _id: { $in: validSprintTaskIds },
-      organization: organizationId,
-      ...(hasStarted ? { status: { $ne: 'backlog' } } : {})
+      organization: organizationId
     })
       .sort({ createdAt: -1, _id: -1 })
       .select('title displayId status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint movedFromSprint story epic module startDate dueDate createdAt')
