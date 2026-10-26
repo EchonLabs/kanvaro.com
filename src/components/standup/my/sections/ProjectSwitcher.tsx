@@ -22,8 +22,6 @@ export interface ProjectSwitcherProps {
   currentStandupId: string
   currentProjectId?: string
   currentProjectName?: string
-  /** Shown alongside the project name so the viewer can tell which sprint
-   *  each option is for without opening it first. */
   currentSprintName?: string
   /** Every open stand-up the viewer is expected at, the current one included. */
   candidates: readonly StandupCandidate[]
@@ -75,31 +73,39 @@ export function ProjectSwitcher({
 }: ProjectSwitcherProps) {
   const router = useRouter()
 
-  // The current stand-up is normally in `candidates` already — same query, same
-  // statuses — but not once it leaves them (Completed, Reopened, Missed). Union
-  // it in so the trigger never shows a project the viewer is not on.
-  const options = candidates.some((candidate) => candidate.standupId === currentStandupId)
-    ? candidates
-    : [
-        ...(currentProjectId && currentProjectName
-          ? [
-              {
-                standupId: currentStandupId,
-                status: '',
-                scheduledStartAt: '',
-                projectId: currentProjectId,
-                projectName: currentProjectName,
-                sprintId: '',
-                sprintName: currentSprintName ?? ''
-              } satisfies StandupCandidate
-            ]
-          : []),
-        ...candidates
-      ]
+  // A plain project filter over today's stand-ups: one entry per project, no
+  // sprint detail, and nothing from another day. The current stand-up is always
+  // kept (it may have left `candidates` by completing, or be on another day)
+  // so the trigger never shows a project the viewer is not on.
+  const today = new Date().toDateString()
+  const isToday = (iso: string) => iso !== '' && new Date(iso).toDateString() === today
+
+  const current: StandupCandidate | undefined =
+    candidates.find((candidate) => candidate.standupId === currentStandupId) ??
+    (currentProjectId && currentProjectName
+      ? {
+          standupId: currentStandupId,
+          status: '',
+          scheduledStartAt: '',
+          projectId: currentProjectId,
+          projectName: currentProjectName,
+          sprintId: '',
+          sprintName: currentSprintName ?? ''
+        }
+      : undefined)
+
+  const options: StandupCandidate[] = []
+  const seenProjects = new Set<string>()
+  for (const candidate of [...(current ? [current] : []), ...candidates]) {
+    if (seenProjects.has(candidate.projectId)) continue
+    if (candidate.standupId !== currentStandupId && !isToday(candidate.scheduledStartAt)) continue
+    seenProjects.add(candidate.projectId)
+    options.push(candidate)
+  }
+  options.sort((a, b) => a.projectName.localeCompare(b.projectName))
 
   const selected = options.find((option) => option.standupId === currentStandupId)
   const label = selected?.projectName || currentProjectName
-  const sprintLabel = selected?.sprintName || currentSprintName
 
   if (!label) return null
 
@@ -111,11 +117,6 @@ export function ProjectSwitcher({
           <span className="truncate apple-type-footnote font-semibold leading-tight">
             {label}
           </span>
-          {sprintLabel ? (
-            <span className="truncate apple-type-caption leading-tight text-[var(--apple-secondary-label)]">
-              {sprintLabel}
-            </span>
-          ) : null}
         </span>
       </span>
     )
@@ -132,11 +133,6 @@ export function ProjectSwitcher({
           <ListFilter className="h-4 w-4 shrink-0 opacity-70" strokeWidth={2} aria-hidden />
           <span className="flex min-w-0 flex-col items-start truncate text-left">
             <span className="truncate apple-type-footnote leading-tight">{label}</span>
-            {sprintLabel ? (
-              <span className="truncate apple-type-caption font-normal leading-tight text-[var(--apple-secondary-label)]">
-                {sprintLabel}
-              </span>
-            ) : null}
           </span>
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-70" strokeWidth={2} aria-hidden />
         </Button>
@@ -169,11 +165,6 @@ export function ProjectSwitcher({
                 <span className="truncate apple-type-subheadline font-medium">
                   {option.projectName}
                 </span>
-                {option.sprintName ? (
-                  <span className="truncate apple-type-footnote text-[var(--apple-secondary-label)]">
-                    {option.sprintName}
-                  </span>
-                ) : null}
               </span>
               {option.scheduledStartAt ? (
                 <span className="font-apple-mono shrink-0 tabular-nums apple-type-caption text-[var(--apple-secondary-label)]">

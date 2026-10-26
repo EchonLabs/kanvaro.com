@@ -280,7 +280,7 @@ describe('MyStandupScreen', () => {
         {
           standupId: 's1',
           status: 'Ready',
-          scheduledStartAt: '2026-09-05T09:00:00.000Z',
+          scheduledStartAt: new Date().toISOString(),
           projectId: 'p1',
           projectName: 'Project Alpha',
           sprintId: 'sp1',
@@ -289,7 +289,7 @@ describe('MyStandupScreen', () => {
         {
           standupId: 's2',
           status: 'Ready',
-          scheduledStartAt: '2026-09-05T09:30:00.000Z',
+          scheduledStartAt: new Date().toISOString(),
           projectId: 'p2',
           projectName: 'Project Beta',
           sprintId: 'sp2',

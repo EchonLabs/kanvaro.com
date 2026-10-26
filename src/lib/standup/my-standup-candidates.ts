@@ -56,7 +56,14 @@ export async function findOpenStandupCandidates(input: {
     .lean()) as any[]
   const sprintNameById = new Map(sprints.map((sprint) => [String(sprint._id), sprint.name]))
 
-  const byPriorityThenTime = [...rows].sort((a, b) => {
+  // A stand-up outlives a deleted project. Nobody can open it — the project
+  // permission check has nothing to resolve against and answers 403 — and an
+  // In_Progress one outranks every live stand-up in PRIORITY, so the
+  // redirector would land every attendee on that dead end every day. (A
+  // missing sprint is tolerated: the project still resolves.)
+  const live = rows.filter((row) => projectNameById.has(String(row.project)))
+
+  const byPriorityThenTime = [...live].sort((a, b) => {
     const priorityDiff = PRIORITY.indexOf(a.status) - PRIORITY.indexOf(b.status)
     if (priorityDiff !== 0) return priorityDiff
     return new Date(a.scheduledStartAt).getTime() - new Date(b.scheduledStartAt).getTime()

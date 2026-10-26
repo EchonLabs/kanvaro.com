@@ -14,7 +14,7 @@ function candidate(overrides: Partial<StandupCandidate> = {}): StandupCandidate 
   return {
     standupId: 's1',
     status: 'Ready',
-    scheduledStartAt: '2026-09-05T09:00:00.000Z',
+    scheduledStartAt: new Date().toISOString(),
     projectId: 'p1',
     projectName: 'Project Alpha',
     sprintId: 'sp1',
@@ -126,7 +126,7 @@ describe('ProjectSwitcher', () => {
     expect(screen.getAllByRole('menuitem')).toHaveLength(2)
   })
 
-  it('shows the current sprint name beside the project on the trigger', () => {
+  it('is a project filter only: no sprint name on the trigger or in the menu', () => {
     render(
       <ProjectSwitcher
         currentStandupId="s1"
@@ -135,46 +135,34 @@ describe('ProjectSwitcher', () => {
         candidates={[candidate(), beta]}
       />
     )
-    expect(screen.getByRole('button', { name: /switch project/i })).toHaveTextContent('Sprint 3')
+    expect(screen.getByRole('button', { name: /switch project/i })).not.toHaveTextContent('Sprint')
+    open()
+    screen.getAllByRole('menuitem').forEach((item) => expect(item).not.toHaveTextContent('Sprint'))
   })
 
-  it('shows each option’s own sprint name in the menu', () => {
+  it('lists one entry per project', () => {
     render(
       <ProjectSwitcher
         currentStandupId="s1"
         currentProjectId="p1"
         currentProjectName="Project Alpha"
-        candidates={[candidate(), beta]}
+        candidates={[candidate(), candidate({ standupId: 's3', sprintId: 'sp3' }), beta]}
       />
     )
     open()
-    const items = screen.getAllByRole('menuitem')
-    expect(items[0]).toHaveTextContent('Sprint 3')
-    expect(items[1]).toHaveTextContent('Sprint 7')
+    expect(screen.getAllByRole('menuitem')).toHaveLength(2)
   })
 
-  it('falls back to the union-in fallback’s currentSprintName when the dropped stand-up has no candidate row to supply one', () => {
-    render(
-      <ProjectSwitcher
-        currentStandupId="s9"
-        currentProjectId="p1"
-        currentProjectName="Project Alpha"
-        currentSprintName="Sprint 9"
-        candidates={[beta]}
-      />
-    )
-    expect(screen.getByRole('button', { name: /switch project/i })).toHaveTextContent('Sprint 9')
-  })
-
-  it('renders the sprint name in the single-option plain-text path too', () => {
+  it('leaves out other projects’ stand-ups that are not today', () => {
+    const tomorrow = new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString()
     render(
       <ProjectSwitcher
         currentStandupId="s1"
         currentProjectId="p1"
         currentProjectName="Project Alpha"
-        candidates={[candidate()]}
+        candidates={[candidate(), { ...beta, scheduledStartAt: tomorrow }]}
       />
     )
-    expect(screen.getByText('Sprint 3')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /switch project/i })).not.toBeInTheDocument()
   })
 })
