@@ -6,6 +6,7 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { LIVE_SPRINT_STATES } from '@/lib/standup/sprint-states'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         console.log('Sprint reference is invalid, trying to find correct sprint for project')
         const correctSprint = await Sprint.findOne({
           project: rawEvent.project,
-          status: { $in: ['planning', 'active'] } // Look for active/planning sprints
+          status: { $in: LIVE_SPRINT_STATES } // Look for active/planning sprints
         }).sort({ createdAt: -1 }) // Get the most recent one
 
         if (correctSprint) {

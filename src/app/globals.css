@@ -75,12 +75,26 @@
 
   /* Apple HIG section header label */
   .apple-section-label {
-    font-size: 11px;
+    font-size: var(--apple-font-caption);
     font-weight: 600;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--apple-tertiary-label);
   }
+
+  /* Apple HIG text styles — size, leading and tracking from the type-scale
+     tokens. Weight is deliberately left out: emphasis is `font-semibold` /
+     `font-bold` on the element, so a style never fights a weight class over
+     which utility wins. */
+  .apple-type-title1      { font-size: var(--apple-font-title1);      line-height: 1.2;  letter-spacing: -0.02em; }
+  .apple-type-title2      { font-size: var(--apple-font-title2);      line-height: 1.25; letter-spacing: -0.015em; }
+  .apple-type-title3      { font-size: var(--apple-font-title3);      line-height: 1.25; letter-spacing: -0.01em; }
+  .apple-type-headline    { font-size: var(--apple-font-headline);    line-height: 1.3;  letter-spacing: -0.01em; }
+  .apple-type-body        { font-size: var(--apple-font-body);        line-height: 1.4; }
+  .apple-type-callout     { font-size: var(--apple-font-callout);     line-height: 1.4; }
+  .apple-type-subheadline { font-size: var(--apple-font-subheadline); line-height: 1.4; }
+  .apple-type-footnote    { font-size: var(--apple-font-footnote);    line-height: 1.35; }
+  .apple-type-caption     { font-size: var(--apple-font-caption);     line-height: 1.3;  letter-spacing: 0.01em; }
 
   /* Apple HIG spring-like easing transition */
   .apple-transition {
@@ -180,6 +194,35 @@
 .card-fade-in-delay-3 { animation-delay: 120ms; }
 .card-fade-in-delay-4 { animation-delay: 160ms; }
 
+/* Check-pop — a completion check's icon flipping pass/fail/warn. Applied to
+   an element keyed on `${checkId}-${status}` (CompletionPanel.tsx), so React
+   remounts the icon on every status change and this plays fresh each time. */
+@keyframes check-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.check-pop {
+  animation: check-pop 0.32s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+
+/* Poker card select — the confirm-pop played on a successful vote.
+   Applied to the Confirm button in PokerModal.tsx (not the carousel card
+   itself — the carousel only ever reports a candidate, it never votes). */
+@keyframes poker-card-select {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(0, 122, 255, 0.55); }
+  40%  { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(0, 122, 255, 0); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(0, 122, 255, 0); }
+}
+.poker-card-select {
+  animation: poker-card-select 0.45s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+
+/* Poker carousel — snap-settle after a drag/wheel rotation ends. */
+.poker-card-snap {
+  transition: transform 0.45s cubic-bezier(0.34, 1.45, 0.64, 1), opacity 0.3s ease;
+}
+
 /* Transitions.dev — Number pop-in */
 :root {
   --digit-dur: 500ms;
@@ -270,6 +313,31 @@
     position: relative;
   }
 
+  /*
+   * MainLayout's app shell (`Sidebar`/`Header` + `<main class="overflow-auto">`
+   * inside an `h-screen` flex container) is the ONLY scroll region those pages
+   * ever intend to use — the document itself is not meant to scroll there.
+   * But `html`/`body` above are shared with the docs and landing pages, which
+   * use plain `min-h-screen` document-flow scrolling instead, so this can't be
+   * a global `overflow-y: hidden` — it has to be scoped to app-shell pages
+   * only. `MainLayout` toggles this class on `<html>` for exactly its own
+   * mount lifetime (see `MainLayout.tsx`).
+   *
+   * Without it: a `#hash` anchor jump (the completion checklist's "Fix"
+   * links, the summary page's KPI strip, the run screen's jump shortcuts)
+   * walks every scrollable ancestor to bring its target into view, including
+   * `window` if it's technically scrollable by even a few pixels — and once
+   * the window scrolls, nothing resets it, so the whole app appears to "jump
+   * up and get stuck" until a manual reload. Locking the document's own
+   * scroll to zero on these pages forces all of that scrolling into `<main>`,
+   * where it belongs.
+   */
+  html.app-shell-locked,
+  html.app-shell-locked body {
+    overflow-y: hidden;
+    height: 100%;
+  }
+
   /* Prevent horizontal scrolling on all containers */
   body > * {
     max-width: 100%;
@@ -326,6 +394,36 @@
     --apple-system-cyan: #32ADE6;
     --apple-system-teal: #30B0C7;
 
+    /* ============================================================
+       Chart palette (stand-up oversight dashboard)
+
+       Separate from the --apple-system-* tokens on purpose: those are UI
+       chrome colours chosen for fills and text, and several of them do not
+       clear 3:1 against a white card as a chart mark (system green measures
+       2.22:1, system orange 2.20:1). These are the same hue families
+       re-stepped until they pass, so a bar is never a colour a reader
+       cannot see.
+
+       Validated against #FFFFFF (light) and #1C1C1E (dark) cards:
+         · discipline trio (good / neutral / critical) — all >= 3:1, worst
+           adjacent CVD dE 8.7, normal-vision dE 16.7, in both modes. The
+           neutral sits *between* good and critical in the stack so the
+           green/red pair never touches.
+         · age ramp — single hue, monotone lightness, every adjacent step
+           >= 0.06 L apart, light end clear of the surface. The ramp flips
+           anchor in dark mode so "older" is always the more prominent step.
+       ============================================================ */
+    --viz-good: #2D9F4A;       /* stand-ups completed        4 3.40:1 on white */
+    --viz-neutral: #8E8E93;    /* not yet run / midpoint     4 3.26:1 */
+    --viz-critical: #FF3B30;   /* missed / over capacity     4 3.55:1 */
+    --viz-accent: #007AFF;     /* single-series magnitude    4 4.02:1 */
+    --viz-age-1: #FF9500;      /* carry-forward age 1-2  (normal)        */
+    --viz-age-2: #D98200;      /* age 3-4  (note required, CFW-3)        */
+    --viz-age-3: #A66300;      /* age 5-7  (escalated)                   */
+    --viz-age-4: #734400;      /* age 8+   (chronic, E63)                */
+    --viz-surface: #FFFFFF;    /* the gap colour between touching marks  */
+    --viz-grid: #E5E5EA;       /* hairline, one step off the surface     */
+
     /* Background hierarchy */
     --apple-system-background: #FFFFFF;
     --apple-secondary-system-background: #F2F2F7;
@@ -356,6 +454,19 @@
     --apple-radius-lg: 16px;
     --apple-radius-xl: 20px;
     --apple-radius-pill: 999px;
+
+    /* Type scale — Apple HIG text styles at the app's desktop sizes. Read
+       through the `.apple-type-*` utilities below rather than `text-[Npx]`,
+       so a surface's type follows this one scale instead of its own. */
+    --apple-font-title1: 28px;
+    --apple-font-title2: 22px;
+    --apple-font-title3: 20px;
+    --apple-font-headline: 17px;
+    --apple-font-body: 15px;
+    --apple-font-callout: 14px;
+    --apple-font-subheadline: 13px;
+    --apple-font-footnote: 12px;
+    --apple-font-caption: 11px;
 
     /* Premium cobalt-azure — charts, card accents, button bg, progress bars, avatars */
     --apple-chart-from: #3D8EFF;
@@ -402,6 +513,20 @@
     --apple-system-gray: #8E8E93;
     --apple-system-cyan: #64D2FF;
     --apple-system-teal: #40C8E0;
+
+    /* Chart palette — dark steps, selected for the #1C1C1E card and
+       validated against it, not an automatic flip of the light values.
+       The age ramp reverses so the chronic band stays the brightest step. */
+    --viz-good: #2D9F4A;       /* 5.00:1 on #1C1C1E */
+    --viz-neutral: #8E8E93;    /* 5.22:1 */
+    --viz-critical: #FF453A;   /* 4.99:1 */
+    --viz-accent: #0A84FF;     /* 4.66:1 */
+    --viz-age-1: #8F5600;      /* normal        (dimmest) */
+    --viz-age-2: #B36B00;      /* note required */
+    --viz-age-3: #D98200;      /* escalated     */
+    --viz-age-4: #FF9500;      /* chronic       (brightest) */
+    --viz-surface: #1C1C1E;
+    --viz-grid: #2C2C2E;
 
     /* Background hierarchy — dark */
     --apple-system-background: #000000;
@@ -658,6 +783,11 @@
   --apple-card-gradient:  #FF7A00;
   --primary: 29 100% 50%;
   --ring:    29 100% 50%;
+  --plan-accent-ink: #BD5A00;            /* 4.54:1 on #FFFFFF */
+}
+
+.dark[data-theme="orange"] {
+  --plan-accent-ink: #FF7A00;            /* 6.51:1 on #1C1C1E */
 }
 
 [data-theme="purple"] {
@@ -669,8 +799,21 @@
   --apple-card-gradient:  #9B5FE8;
   --primary: 270 72% 63%;
   --ring:    270 72% 63%;
+  --plan-accent-ink: #8854CC;            /* 5.02:1 on #FFFFFF */
 }
 
+.dark[data-theme="purple"] {
+  --plan-accent-ink: #A067E9;            /* 4.55:1 on #1C1C1E */
+}
+
+/* Red is stepped much harder than the 4.5:1 floor on purpose. At the floor
+   the ink lands on #E3282B, which is 1.18:1 against --plan-danger #D70015 —
+   a failing check and a link would render the same colour. Colour cannot fix
+   this fully (both must be red and both must clear 4.5:1 on one surface,
+   which traps them in a narrow band); this takes the ~1.7:1 that is
+   available and leaves danger the brighter of the two, so errors shout
+   louder than links. The real guarantee is that no danger state relies on
+   colour alone. */
 [data-theme="red"] {
   --apple-chart-from:     #FF2D30;
   --apple-chart-to:       #FF2D30;
@@ -680,6 +823,11 @@
   --apple-card-gradient:  #FF2D30;
   --primary: 357 100% 59%;
   --ring:    357 100% 59%;
+  --plan-accent-ink: #8E1018;            /* 9.39:1 on #FFFFFF; 1.74:1 vs --plan-danger */
+}
+
+.dark[data-theme="red"] {
+  --plan-accent-ink: #FF8085;            /* 7.03:1 on #1C1C1E; 1.41:1 vs --plan-danger */
 }
 
 /* Task description formatting */
@@ -756,4 +904,225 @@
 .rich-text-editor ul li::marker,
 .rich-text-editor ol li::marker {
   color: hsl(var(--foreground));
+}
+
+/* Sprint planning surface.
+
+   Derived from the app's Apple HIG tokens, as the stand-up run screen
+   now is, rather than the Figma "Dark sprint planning" hexes it started
+   from — those were a parallel design system that made planning look like a
+   different product to the sprint page it is reached from.
+
+   Surfaces are the shadcn `--card`/`--background` pair the rest of the app's
+   cards sit on; the accent is the theme accent the app's buttons use. The
+   status inks are stepped, for the same reason and to the same values as the
+   run screen's: Apple's vivid systemGreen/Orange cannot carry 11-13px text on
+   white (2.2:1), so light mode uses the darker step and dark mode, where every
+   system colour already clears AA on #1C1C1E, uses the system colour. Tints
+   are mixed from the vivid colour at 12%, matching the app's badge tints. */
+:root {
+  --plan-surface: hsl(var(--card));
+  --plan-raised: var(--apple-quaternary-fill);
+  --plan-border: var(--apple-separator);
+  --plan-track: var(--apple-tertiary-fill);
+  --plan-text: var(--apple-label);
+  --plan-muted: var(--apple-secondary-label);
+  --plan-accent: var(--apple-card-gradient);
+  /* Accent as *text*. The themeable accent fails AA as ink in all four
+     themes (blue 3.23:1, orange 2.61:1, purple 4.04:1, red 3.70:1 on white),
+     so each theme carries a stepped ink beside the fill — the same technique
+     the --viz-* chart palette uses, for the same reason. Overridden in each
+     [data-theme] block; blue is the default and lives here. */
+  --plan-accent-ink: #0A6CFF;            /* 4.56:1 on #FFFFFF */
+  --plan-secondary: #48484E;             /* 9.08:1 — the step between text and muted */
+  --plan-disabled: var(--apple-tertiary-label);
+  /* The one vivid fill the module needs: the issue-count pill and the
+     Backfill / Resume buttons carry white text on red. Accent fills use
+     --plan-accent directly, which is already solid and should follow the
+     user's theme. */
+  --plan-danger-solid: var(--apple-system-red);
+  --plan-danger: #D70015;
+  --plan-warning: #A66300;
+  --plan-success: #22843A;
+  --plan-idle: var(--apple-system-gray);
+  --plan-violet: var(--apple-system-purple);
+  --plan-danger-bg: color-mix(in srgb, var(--apple-system-red) 12%, transparent);
+  --plan-warning-bg: color-mix(in srgb, var(--apple-system-orange) 12%, transparent);
+  --plan-info-bg: color-mix(in srgb, var(--apple-card-gradient) 12%, transparent);
+  --plan-success-bg: color-mix(in srgb, var(--apple-system-green) 12%, transparent);
+  --plan-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+}
+
+.dark {
+  --plan-danger: var(--apple-system-red);
+  --plan-warning: var(--apple-system-orange);
+  --plan-success: var(--apple-system-green);
+  --plan-accent-ink: #3D8EFF;            /* 5.28:1 on #1C1C1E */
+  --plan-secondary: #D1D1D6;             /* 11.18:1 on #1C1C1E */
+  --plan-shadow: none;
+}
+
+/* Native selects on the stand-up and planning surfaces.
+
+   The app declares no `color-scheme`, so the browser drew every opened option
+   list in its light theme even in dark mode, and the options inherited their
+   select's ink — a green or orange status colour on a default white list. The
+   scheme follows the app's theme here, and the options get the card surface
+   and the label ink explicitly so the list reads the same in both. */
+.plan-select {
+  color-scheme: light;
+}
+
+.dark .plan-select {
+  color-scheme: dark;
+}
+
+.plan-select option {
+  background-color: hsl(var(--card));
+  color: var(--plan-text);
+}
+
+.plan-select option:disabled {
+  color: var(--plan-muted);
+}
+
+/* A fixed-height task list on the planning screen: the scope panes and the
+   assignment lanes. Same reasoning as the stand-up run screen's lists — the
+   global hairline scrollbar gives no signal that a clipped list has more
+   below — so these get a visible track. Opt-in by class. */
+.plan-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--apple-fill) var(--plan-track);
+}
+
+.plan-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.plan-scroll::-webkit-scrollbar-track {
+  background: var(--plan-track);
+  border-radius: var(--apple-radius-pill);
+}
+
+.plan-scroll::-webkit-scrollbar-thumb {
+  background: var(--apple-fill);
+  border-radius: var(--apple-radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.plan-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--apple-secondary-fill);
+  background-clip: padding-box;
+}
+
+/* A printed page has no scrollbars: a capped scroll box must print in full
+   rather than clipped to whatever height the screen chose. Scoped to the
+   summary, which is the surface anyone prints. */
+@media print {
+  .standup-summary .plan-scroll {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+/* My Stand-up surface.
+
+   Derived from the app's Apple HIG tokens, exactly as sprint planning
+   `--plan-*` is, rather than the Figma "My
+   Stand-up page redesign" hexes it started from — those were a Tailwind
+   slate/blue-600 ramp, and slate's blue cast plus a `#2563EB` accent made this
+   screen read as a different, bluer product than the sprint planning screen a
+   member reaches it from.
+
+   Surfaces are the shadcn `--background`/`--card` pair the rest of the app's
+   cards sit on; the accent is `--apple-card-gradient`, the themeable accent the
+   app's own buttons and links use, so this screen follows an accent-theme
+   switch instead of staying blue. The status inks are stepped for the same
+   reason and to the same values as the planning and run screens': Apple's vivid
+   systemGreen/Orange cannot carry 11-13px text on white (2.2:1), so light mode
+   uses the darker step and dark mode, where every system colour already clears
+   AA on #1C1C1E, uses the system colour. Tints are mixed from the vivid colour
+   at 12%, matching the app's badge tints. */
+:root {
+  --my-surface: hsl(var(--card));
+  --my-raised: var(--apple-quaternary-fill);
+  --my-inset: var(--apple-tertiary-fill);
+  --my-border: var(--apple-separator);
+  --my-text: var(--apple-label);
+  --my-muted: var(--apple-secondary-label);
+  --my-subtle: var(--apple-tertiary-label);
+  --my-blue: var(--apple-card-gradient);
+  --my-green: #22843A;
+  --my-amber: #A66300;
+  --my-red: #D70015;
+  --my-violet: var(--apple-system-purple);
+  --my-blue-tint: color-mix(in srgb, var(--apple-card-gradient) 12%, transparent);
+  --my-green-tint: color-mix(in srgb, var(--apple-system-green) 12%, transparent);
+  --my-amber-tint: color-mix(in srgb, var(--apple-system-orange) 12%, transparent);
+  --my-red-tint: color-mix(in srgb, var(--apple-system-red) 12%, transparent);
+  --my-violet-tint: color-mix(in srgb, var(--apple-system-purple) 12%, transparent);
+}
+
+.dark {
+  --my-green: var(--apple-system-green);
+  --my-amber: var(--apple-system-orange);
+  --my-red: var(--apple-system-red);
+}
+
+/* No `font-family` override: this surface inherits the app's global Nunito
+   Sans like every other screen. `.my-mono` stays as a class name — some twenty
+   call sites use it for tabular figures — but is now the same declaration as
+   the global `.font-apple-mono`, so a figure here matches one on the sprint
+   page rather than switching to JetBrains Mono. */
+.my-standup .my-mono {
+  font-family: 'Nunito Sans', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stand-up oversight surface (org admin) — the dark values are the Figma
+   "Admin Standup Insights Dashboard" palette verbatim; the light values are
+   its daylight counterpart. */
+:root {
+  --ovs-canvas: #F5F6F8;
+  --ovs-surface: #FFFFFF;
+  --ovs-raised: #F2F4F7;
+  --ovs-inset: #ECEFF3;
+  --ovs-track: #E3E7ED;
+  --ovs-border: #DCE1E8;
+  --ovs-text: #12151A;
+  --ovs-muted: #5B6472;
+  --ovs-subtle: #7A8391;
+  --ovs-blue: #2F7DE1;
+  --ovs-green: #1F9D5C;
+  --ovs-amber: #B7791F;
+  --ovs-red: #D93F45;
+  --ovs-violet: #7C5CE0;
+  --ovs-amber-tint: #FBF0DC;
+  --ovs-shadow: 0 10px 30px rgba(16, 24, 40, 0.06);
+}
+
+.dark {
+  --ovs-canvas: #090A0D;
+  --ovs-surface: #13161C;
+  --ovs-raised: #181C23;
+  --ovs-inset: #101319;
+  --ovs-track: #20242C;
+  --ovs-border: #272C35;
+  --ovs-text: #F4F6F8;
+  --ovs-muted: #9AA3AF;
+  --ovs-subtle: #66707E;
+  --ovs-blue: #4D9CFF;
+  --ovs-green: #38C878;
+  --ovs-amber: #F4B449;
+  --ovs-red: #FF5D62;
+  --ovs-violet: #A78BFA;
+  --ovs-amber-tint: #362B18;
+  --ovs-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.standup-oversight {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }

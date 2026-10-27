@@ -13,7 +13,7 @@ const userConnections = new Map<string, Set<ReadableStreamDefaultController>>()
 const encoder = new TextEncoder()
 
 interface NotificationMessage {
-  type: 'connected' | 'heartbeat' | 'notification' | 'task_update'
+  type: 'connected' | 'heartbeat' | 'notification' | 'task_update' | 'poker_invite' | 'poker_closed'
   data?: any
   timestamp: number
   userId?: string
@@ -102,6 +102,44 @@ export function broadcastToUsers(userIds: string[], notification: any): number {
       successCount++
     }
   }
+  return successCount
+}
+
+/**
+ * Push a non-notification event (planning poker invite / close) to every
+ * connected tab of the given users. Nothing is persisted: users who are offline
+ * pick the state up from `GET /api/poker-sessions/open-for-me` when they load.
+ * Best effort — never throws, so it cannot break the write that triggered it.
+ */
+export function broadcastUserEvent(
+  userIds: string[],
+  type: 'poker_invite' | 'poker_closed',
+  data: any
+): number {
+  let successCount = 0
+
+  for (const userId of userIds) {
+    try {
+      const connections = userConnections.get(userId)
+      if (!connections || connections.size === 0) continue
+
+      const message: NotificationMessage = { type, data, timestamp: Date.now() }
+      const dead: ReadableStreamDefaultController[] = []
+      let sent = false
+
+      connections.forEach((controller) => {
+        if (sendToController(controller, message)) sent = true
+        else dead.push(controller)
+      })
+
+      dead.forEach((controller) => connections.delete(controller))
+      if (connections.size === 0) userConnections.delete(userId)
+      if (sent) successCount++
+    } catch {
+      // Best effort
+    }
+  }
+
   return successCount
 }
 

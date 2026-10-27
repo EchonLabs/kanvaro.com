@@ -34,7 +34,11 @@ export async function GET(request: NextRequest) {
     const parsedLimit = parseInt(searchParams.get('limit') || '10')
     const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
     const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10
-    const PAGE_SIZE = Math.min(limit, 500)
+    // `all=true` is what a picker sends when it needs every option rather than a
+    // page. Without it a project with more than ten epics silently hides the
+    // rest, and the task cannot be filed against them at all.
+    const wantsAll = searchParams.get('all') === 'true'
+    const PAGE_SIZE = wantsAll ? 500 : Math.min(limit, 500)
 
     let accessibleProjectIds: string[] = []
 

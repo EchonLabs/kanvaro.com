@@ -22,11 +22,13 @@ import {
   X,
   Trash2,
   Paperclip,
+  Info,
   Settings2
 } from 'lucide-react'
 import { AttachmentList } from '@/components/ui/AttachmentList'
 import { countWords, TASK_TITLE_MAX_WORDS, truncateToMaxWords } from '@/lib/text/word-limit'
 import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
+import { computeIsFormValid } from './isFormValid'
 
 interface Project {
   _id: string
@@ -167,6 +169,8 @@ export default function CreateTaskPage() {
   const [attachmentError, setAttachmentError] = useState('')
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
+  // Where to land after a successful create (e.g. the sprint view that sent us here).
+  const returnToRef = useRef<string | null>(null)
 
   // Word limit validation state
   const [titleWordLimitMessage, setTitleWordLimitMessage] = useState('')
@@ -322,12 +326,6 @@ export default function CreateTaskPage() {
         return
       }
 
-      if (assignedTo.length === 0) {
-        notifyError({ title: 'Assignment Required', message: 'Please assign this task to at least one user' })
-        setLoading(false)
-        return
-      }
-
       const titleTrimmed = formData.title.trim()
       if (countWords(titleTrimmed) > TASK_TITLE_MAX_WORDS) {
         notifyError({ title: 'Validation Error', message: `Task title must be ${TASK_TITLE_MAX_WORDS} words or fewer.` })
@@ -421,7 +419,7 @@ export default function CreateTaskPage() {
 
       if (data.success) {
         notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
-        router.push('/backlog')
+        router.push(returnToRef.current ?? '/backlog')
         setAttachments([])
       } else {
         notifyError({ title: 'Failed to Create Task', message: data.error || 'Failed to create task' })
@@ -611,16 +609,14 @@ export default function CreateTaskPage() {
 
   // Required field validation (only fields marked with *)
   const isFormValid = useMemo(() => {
-    return (
-      !!formData.title.trim() &&
-      !!formData.project &&
-      !!formData.dueDate &&
-      !!formData.category &&
-      assignedTo.length > 0 &&
-      !subtasks.some(st => !(st.title && st.title.trim().length > 0)) &&
-      !subtasks.some(st => (st.subtasks || []).some(n => !(n.title && n.title.trim().length > 0)))
-    )
-  }, [formData.title, formData.project, formData.dueDate, formData.category, assignedTo.length, subtasks])
+    return computeIsFormValid({
+      title: formData.title,
+      project: formData.project,
+      dueDate: formData.dueDate,
+      category: formData.category,
+      subtasks
+    })
+  }, [formData.title, formData.project, formData.dueDate, formData.category, subtasks])
 
   const attachmentListItems = useMemo(
     () =>
@@ -639,6 +635,13 @@ export default function CreateTaskPage() {
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       fetchProjects()
+      // Read from window rather than useSearchParams, which would need a Suspense boundary.
+      const query = new URLSearchParams(window.location.search)
+      const returnTo = query.get('returnTo')
+      // Same-origin paths only, so the param can't be used as an open redirect.
+      returnToRef.current = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null
+      const presetProject = query.get('project')
+      if (presetProject) handleChange('project', presetProject)
       // Set currentUser from AuthContext
       if (user) {
         const mapped = mapUserResponse(user)
@@ -875,10 +878,12 @@ export default function CreateTaskPage() {
                 {formData.project && (
                   <div className="grid gap-6 md:grid-cols-2 items-start">
                     <div>
-                      <div className="mb-1 flex items-center h-7">
-                        <label className="text-sm font-medium text-foreground">Assigned To *</label>
-                      </div>
-                      <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Assigned To</label>
+                      <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[var(--apple-tertiary-label)]">
+                        <Info className="h-3 w-3 shrink-0" />
+                        Optional — tasks are assigned during sprint planning.
+                      </p>
+                      <div className="space-y-2 mt-1">
                         <Select
                           value=""
                           onValueChange={(value) => {
