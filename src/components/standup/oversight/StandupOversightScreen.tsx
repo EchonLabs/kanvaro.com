@@ -364,7 +364,7 @@ export function StandupOversightScreen() {
       <div aria-hidden className="fixed inset-0 -z-10 bg-[var(--ovs-canvas)]" />
 
       {error ? (
-        <p role="alert" className="text-[13px] text-[var(--ovs-red)]">
+        <p role="alert" className="text-[14px] text-[var(--ovs-red)]">
           {error}
         </p>
       ) : !data || !view ? (
@@ -377,7 +377,7 @@ export function StandupOversightScreen() {
                 <h1 className="text-[26px] font-bold leading-tight text-[var(--ovs-text)] sm:text-[30px]">
                   Stand-up oversight
                 </h1>
-                <p className="text-[13px] text-[var(--ovs-muted)]">
+                <p className="text-[14px] text-[var(--ovs-muted)]">
                   Organization health across active delivery cycles
                 </p>
               </div>
@@ -386,7 +386,7 @@ export function StandupOversightScreen() {
                 <Select value={projectId} onValueChange={setProjectId}>
                   <SelectTrigger
                     aria-label="Project"
-                    className="h-auto w-auto gap-[18px] rounded-[8px] border-[var(--ovs-border)] bg-[var(--ovs-raised)] px-[14px] py-[9px] text-[12px] font-semibold text-[var(--ovs-text)] [&>svg:last-child]:hidden"
+                    className="h-auto w-auto gap-[18px] rounded-[8px] border-[var(--ovs-border)] bg-[var(--ovs-raised)] px-[14px] py-[9px] text-[13px] font-semibold text-[var(--ovs-text)] [&>svg:last-child]:hidden"
                   >
                     <SelectValue placeholder="All projects" />
                     <ChevronDown aria-hidden className="h-3 w-3 shrink-0 text-[var(--ovs-muted)]" strokeWidth={2} />
@@ -468,7 +468,7 @@ function Verdict({ view }: { view: OversightView }) {
             </span>
           </h2>
 
-          <p className="max-w-[46ch] text-[13px] text-[var(--ovs-muted)]">
+          <p className="max-w-[46ch] text-[14px] text-[var(--ovs-muted)]">
             {worst ? (
               <>
                 Open{' '}
@@ -516,7 +516,7 @@ function Tally({
   const zero = value === 0
   return (
     <div className="flex min-w-0 flex-col-reverse gap-[5px] rounded-[12px] bg-[var(--ovs-raised)] p-[14px]">
-      <dt className="text-[11px] text-[var(--ovs-muted)]">{label}</dt>
+      <dt className="text-[12px] text-[var(--ovs-muted)]">{label}</dt>
       <dd className={cn('text-[22px] font-bold leading-none tabular-nums', zero ? 'text-[var(--ovs-subtle)]' : tone)}>
         {format ? format(value) : value}
       </dd>
@@ -559,12 +559,12 @@ function OrgCadenceChart({ days }: { days: Array<{ date: string; ran: number; mi
     <figure className="m-0 flex w-full shrink-0 flex-col gap-[14px] lg:w-[390px] lg:pl-2">
       <figcaption className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-[3px]">
-          <span className="text-[13px] font-semibold text-[var(--ovs-text)]">{days.length}-working-day cadence</span>
-          <span className="text-[10px] text-[var(--ovs-subtle)]">
+          <span className="text-[14px] font-semibold text-[var(--ovs-text)]">{days.length}-working-day cadence</span>
+          <span className="text-[12px] text-[var(--ovs-subtle)]">
             {missed > 0 ? `Stand-up completion · ${missed} missed` : 'Organization-wide stand-up completion'}
           </span>
         </div>
-        <span className={cn('text-[13px] font-semibold tabular-nums', completionTone)}>
+        <span className={cn('text-[14px] font-semibold tabular-nums', completionTone)}>
           {completion === null ? '–' : `${completion}%`}
         </span>
       </figcaption>
@@ -587,7 +587,7 @@ function OrgCadenceChart({ days }: { days: Array<{ date: string; ran: number; mi
                 className={cn('w-full rounded-b-[2px] rounded-t-[4px]', DAY_BAR_CLASS[state])}
                 style={{ height: Math.max(8, Math.round((total / peak) * DAY_BAR_MAX)) }}
               />
-              <span className="text-[8px] leading-none text-[var(--ovs-subtle)]">{index + 1}</span>
+              <span className="text-[11px] leading-none text-[var(--ovs-subtle)]">{index + 1}</span>
             </div>
           )
         })}
@@ -604,13 +604,13 @@ function Board({ sprints }: { sprints: SprintOversightRow[] }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h2 className="text-[20px] font-bold text-[var(--ovs-text)]">Active sprints</h2>
-          <p className="text-[11px] text-[var(--ovs-subtle)]">Worst first · daily operating view</p>
+          <p className="text-[12px] text-[var(--ovs-subtle)]">Worst first · daily operating view</p>
         </div>
         <ul aria-label="Legend" className="flex items-center gap-3">
           {(['ran', 'missed', 'ahead'] as const).map((state) => (
             <li key={state} className="flex items-center gap-[5px]">
               <span aria-hidden className={cn('h-1.5 w-1.5 rounded-[3px]', DAY_BAR_CLASS[state])} />
-              <span className="text-[9px] text-[var(--ovs-subtle)]">{LEGEND_WORD[state]}</span>
+              <span className="text-[11px] text-[var(--ovs-subtle)]">{LEGEND_WORD[state]}</span>
             </li>
           ))}
         </ul>
@@ -649,7 +649,7 @@ const CADENCE_WORD: Record<CadenceState, string> = {
  */
 function CadenceRibbon({ days, label }: { days: CadenceDay[]; label: string }) {
   if (days.length === 0) {
-    return <p className="text-[11px] text-[var(--ovs-subtle)]">No stand-ups scheduled yet</p>
+    return <p className="text-center text-[12px] text-[var(--ovs-subtle)]">No stand-ups scheduled yet</p>
   }
 
   return (
@@ -685,19 +685,19 @@ function SprintRow({ row }: { row: SprintOversightRow }) {
                 <span className="truncate text-[16px] font-bold text-[var(--ovs-blue)] group-hover:underline">
                   {row.sprintName}
                 </span>
-                <span aria-hidden className="text-[12px] text-[var(--ovs-subtle)]">
+                <span aria-hidden className="text-[13px] text-[var(--ovs-subtle)]">
                   /
                 </span>
-                <span className="truncate text-[13px] font-semibold text-[var(--ovs-text)]">{row.projectName}</span>
+                <span className="truncate text-[14px] font-semibold text-[var(--ovs-text)]">{row.projectName}</span>
                 <ArrowUpRight aria-hidden className="h-[11px] w-[11px] shrink-0 text-[var(--ovs-blue)]" strokeWidth={2} />
               </Link>
             </h3>
-            <p className={cn('text-[11px]', SEVERITY_TEXT[severity])}>{verdictOf(row)}</p>
+            <p className={cn('text-[12px]', SEVERITY_TEXT[severity])}>{verdictOf(row)}</p>
             {/* §15.15's per-sprint report, in the Sprint Management module —
                 the board says where to look, the analytics page says why. */}
             <Link
               href={`/sprints/${row.sprintId}/analytics`}
-              className="inline-flex items-center gap-[5px] self-start rounded-[4px] text-[11px] font-semibold text-[var(--ovs-blue)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ovs-blue)]"
+              className="inline-flex items-center gap-[5px] self-start rounded-[4px] text-[12px] font-semibold text-[var(--ovs-blue)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ovs-blue)]"
             >
               {standupStrings.analytics.oversightLink()}
               <ArrowUpRight aria-hidden className="h-[11px] w-[11px] shrink-0" strokeWidth={2} />
@@ -729,7 +729,7 @@ function SprintRow({ row }: { row: SprintOversightRow }) {
   )
 }
 
-const METRIC_LABEL = 'text-[9px] font-bold uppercase tracking-[0.04em] text-[var(--ovs-subtle)]'
+const METRIC_LABEL = 'text-[11px] font-bold uppercase tracking-[0.04em] text-[var(--ovs-subtle)]'
 
 /**
  * CC-11 / N12: remaining estimate against remaining capacity, both written
@@ -750,7 +750,7 @@ function CapacityBalance({ row }: { row: SprintOversightRow }) {
     <div className="col-span-2 flex min-w-0 flex-col gap-[7px] md:w-[185px] md:shrink-0">
       <dt className={METRIC_LABEL}>Capacity balance</dt>
       <dd className="flex flex-col gap-[7px]">
-        <span className="flex items-start justify-between gap-2 text-[12px]">
+        <span className="flex items-start justify-between gap-2 text-[13px]">
           <span className="text-[var(--ovs-text)]">Estimate {hoursLabel(estimate)}</span>
           <span className="text-[var(--ovs-muted)]">
             <span className="sr-only">of capacity </span>
@@ -807,9 +807,9 @@ function BlockerDisclosure({ blockers }: { blockers: BlockerRow[] }) {
 
   if (blockers.length === 0) {
     return (
-      <div className="flex items-start justify-between rounded-[8px] bg-[var(--ovs-inset)] px-3 py-2.5">
-        <p className="text-[11px] font-semibold text-[var(--ovs-text)]">Open blockers · 0</p>
-        <p className="text-[10px] text-[var(--ovs-subtle)]">None open</p>
+      <div className="flex flex-col items-center gap-0.5 rounded-[8px] bg-[var(--ovs-inset)] px-3 py-2.5 text-center">
+        <p className="text-[12px] font-semibold text-[var(--ovs-text)]">Open blockers · 0</p>
+        <p className="text-[12px] text-[var(--ovs-subtle)]">None open</p>
       </div>
     )
   }
@@ -822,14 +822,14 @@ function BlockerDisclosure({ blockers }: { blockers: BlockerRow[] }) {
         onClick={() => setOpen((current) => !current)}
         className="flex w-full items-start justify-between gap-3 rounded-[4px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ovs-blue)]"
       >
-        <span className="text-[11px] font-semibold text-[var(--ovs-text)]">Open blockers · {blockers.length}</span>
-        <span className="text-[10px] text-[var(--ovs-subtle)]">{open ? 'Expanded' : 'Collapsed'} ⌄</span>
+        <span className="text-[12px] font-semibold text-[var(--ovs-text)]">Open blockers · {blockers.length}</span>
+        <span className="text-[12px] text-[var(--ovs-subtle)]">{open ? 'Expanded' : 'Collapsed'} ⌄</span>
       </button>
 
       {open && (
         <ul className="grid gap-x-5 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
           {blockers.map((blocker) => (
-            <li key={blocker.blockerId} className="flex min-w-0 items-baseline gap-[7px] text-[10px] text-[var(--ovs-muted)]">
+            <li key={blocker.blockerId} className="flex min-w-0 items-baseline gap-[7px] text-[12px] text-[var(--ovs-muted)]">
               <span
                 aria-hidden
                 className={cn(
@@ -876,7 +876,7 @@ function Panel({
     <section className="flex min-h-[250px] flex-col gap-[18px] rounded-[16px] bg-[var(--ovs-surface)] p-5">
       <div className="flex flex-col gap-1">
         <h2 className="text-[16px] font-bold text-[var(--ovs-text)]">{title}</h2>
-        <p className="text-[10px] text-[var(--ovs-subtle)]">{caption}</p>
+        <p className="text-[12px] text-[var(--ovs-subtle)]">{caption}</p>
       </div>
       {children}
     </section>
@@ -902,13 +902,13 @@ function AgeingPanel({ bands }: { bands: Array<{ key: keyof AgeBands; label: str
         <ul className="flex flex-col gap-3">
           {bands.map((band) => (
             <li key={band.key} className="flex items-center gap-3">
-              <span className="w-[82px] shrink-0 text-[10px] text-[var(--ovs-muted)]">{band.label}</span>
+              <span className="w-[104px] shrink-0text-[12px] text-[var(--ovs-muted)]">{band.label}</span>
               <span aria-hidden className="h-[9px] min-w-0 flex-1 overflow-hidden rounded-[5px] bg-[var(--ovs-track)]">
                 <span className={cn('block h-full rounded-[5px]', band.bar)} style={{ width: barWidth(band.count, max) }} />
               </span>
               <span
                 className={cn(
-                  'w-[18px] shrink-0 text-right text-[10px] font-semibold tabular-nums',
+                  'w-[18px] shrink-0 text-right text-[12px] font-semibold tabular-nums',
                   band.count === 0 ? 'text-[var(--ovs-subtle)]' : 'text-[var(--ovs-text)]'
                 )}
               >
@@ -943,7 +943,7 @@ function OverridesPanel({
         <ul className="flex flex-col gap-[11px]">
           {reasons.map((reason, index) => (
             <li key={reason.reasonCode} className="flex flex-col gap-[5px]">
-              <span className="flex items-start justify-between gap-3 text-[10px]">
+              <span className="flex items-start justify-between gap-3 text-[12px]">
                 <span className="text-[var(--ovs-muted)]">{reason.label}</span>
                 <span className="font-semibold tabular-nums text-[var(--ovs-text)]">{reason.count}</span>
               </span>
@@ -965,7 +965,11 @@ function OverridesPanel({
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="flex min-h-[96px] items-center text-[13px] text-[var(--ovs-subtle)]">{text}</p>
+  return (
+    <p className="flex min-h-[96px] flex-1 items-center justify-center px-4 text-center text-[14px] text-[var(--ovs-subtle)]">
+      {text}
+    </p>
+  )
 }
 
 /* --------------------------------------------------------------- waivers */
@@ -991,11 +995,11 @@ function WaiverPanel({ waivers, onRevoke }: { waivers: WaiverRow[]; onRevoke: (s
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h2 className="text-[16px] font-bold text-[var(--ovs-text)]">Planning waivers in force</h2>
-          <p className="text-[10px] text-[var(--ovs-subtle)]">
+          <p className="text-[12px] text-[var(--ovs-subtle)]">
             {plural(active, 'active exception', 'active exceptions')} requiring periodic review
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-[var(--ovs-amber-tint)] px-[9px] py-[5px] text-[10px] font-semibold text-[var(--ovs-amber)]">
+        <span className="shrink-0 rounded-full bg-[var(--ovs-amber-tint)] px-[9px] py-[5px] text-[12px] font-semibold text-[var(--ovs-amber)]">
           {active} active
         </span>
       </div>
@@ -1029,25 +1033,25 @@ function WaiverRowItem({
     <li className="flex flex-col gap-2 rounded-[12px] bg-[var(--ovs-raised)] p-[14px]">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-[18px]">
         <div className="flex min-w-0 flex-col gap-[3px] md:w-[145px] md:shrink-0">
-          <p className="truncate text-[12px] font-bold text-[var(--ovs-blue)]">
+          <p className="truncate text-[13px] font-bold text-[var(--ovs-blue)]">
             {waiver.sprintName} / {waiver.projectName}
           </p>
-          <p className="text-[9px] text-[var(--ovs-subtle)]">Planning gate waived</p>
+          <p className="text-[11px] text-[var(--ovs-subtle)]">Planning gate waived</p>
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
           <p className={METRIC_LABEL}>Justification</p>
-          <p className="text-[10px] text-[var(--ovs-muted)]">{waiver.justification}</p>
+          <p className="text-[12px] text-[var(--ovs-muted)]">{waiver.justification}</p>
         </div>
 
         <div className="flex min-w-0 flex-col gap-[3px] md:w-[180px] md:shrink-0">
           <p className={METRIC_LABEL}>Waived checks</p>
-          <p className="text-[10px] text-[var(--ovs-text)]">{waiver.waivedCheckIds.join(' · ')}</p>
+          <p className="text-[12px] text-[var(--ovs-text)]">{waiver.waivedCheckIds.join(' · ')}</p>
         </div>
 
         <div className="flex min-w-0 flex-col gap-[3px] md:w-[95px] md:shrink-0">
           <p className={METRIC_LABEL}>Expires</p>
-          <p className={cn('text-[10px]', waiver.expired ? 'text-[var(--ovs-red)]' : 'text-[var(--ovs-amber)]')}>
+          <p className={cn('text-[12px]', waiver.expired ? 'text-[var(--ovs-red)]' : 'text-[var(--ovs-amber)]')}>
             {waiver.expired ? 'Expired' : formatExpiry(waiver.expiresAt)}
           </p>
         </div>
@@ -1068,7 +1072,7 @@ function WaiverRowItem({
                   setRevoking(false)
                 }
               }}
-              className="rounded-[8px] bg-[var(--ovs-red)] px-3 py-[7px] text-[10px] font-semibold text-white disabled:opacity-50"
+              className="rounded-[8px] bg-[var(--ovs-red)] px-3 py-[7px] text-[12px] font-semibold text-white disabled:opacity-50"
             >
               Confirm
             </button>
@@ -1079,7 +1083,7 @@ function WaiverRowItem({
                 setConfirming(false)
                 setRevokeError(null)
               }}
-              className="rounded-[8px] border border-[var(--ovs-border)] px-3 py-[7px] text-[10px] font-semibold text-[var(--ovs-muted)] disabled:opacity-50"
+              className="rounded-[8px] border border-[var(--ovs-border)] px-3 py-[7px] text-[12px] font-semibold text-[var(--ovs-muted)] disabled:opacity-50"
             >
               Cancel
             </button>
@@ -1088,14 +1092,14 @@ function WaiverRowItem({
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            className="shrink-0 self-start rounded-[8px] border border-[var(--ovs-red)] px-3 py-[7px] text-[10px] font-semibold text-[var(--ovs-red)] transition-colors hover:bg-[var(--ovs-red)] hover:text-white md:self-auto"
+            className="shrink-0 self-start rounded-[8px] border border-[var(--ovs-red)] px-3 py-[7px] text-[12px] font-semibold text-[var(--ovs-red)] transition-colors hover:bg-[var(--ovs-red)] hover:text-white md:self-auto"
           >
             Revoke
           </button>
         )}
       </div>
 
-      {revokeError && <p className="text-[10px] text-[var(--ovs-red)]">{revokeError}</p>}
+      {revokeError && <p className="text-[12px] text-[var(--ovs-red)]">{revokeError}</p>}
     </li>
   )
 }
