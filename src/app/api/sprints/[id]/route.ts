@@ -7,7 +7,16 @@ import { Story } from '@/models/Story'
 import '@/models/Epic'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { isoOfStoredDate } from '@/lib/standup/calendar-dates'
+import { toErrorResponse } from '@/lib/standup/errors'
+import {
+  assertScheduleChangeAllowed,
+  reconcileSprintSchedule,
+  type ReconcileTrigger
+} from '@/lib/standup/reconcile'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { assertTransition, type SprintState } from '@/lib/standup/sprint-states'
+import { standupStrings } from '@/lib/standup/strings'
 import { logActivity } from '@/lib/activity-logger'
 
 export async function GET(
@@ -51,8 +60,8 @@ export async function GET(
 
     const sprint = await Sprint.findOne({ _id: sprintId })
       .populate('project', 'name settings')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email avatar')
+      .populate('teamMembers', 'firstName lastName email avatar')
 
     if (!sprint) {
       return NextResponse.json(
@@ -92,12 +101,17 @@ export async function GET(
     const sprintTaskIds = sprint.tasks || []
     
 
-    // Clean up any tasks in sprint.tasks that are now in backlog or have no sprint
+    // A task's status says nothing about whether it left the sprint. Planning
+    // commits tasks without touching status, and starting a sprint leaves it
+    // alone too so work carried over from the previous sprint keeps its status,
+    // which means a freshly planned task is still `backlog` when the sprint goes
+    // active. Moving a task back to the backlog clears `sprint` itself (the task
+    // PUT handler does it), so `sprint` is the only signal to clean up on.
+    // Clean up any tasks in sprint.tasks that no longer point at a sprint
     const backlogTasksInSprint = await Task.find({
       _id: { $in: sprintTaskIds },
       organization: organizationId,
       $or: [
-        { status: 'backlog' },
         { sprint: null },
         { sprint: { $exists: false } }
       ]
@@ -121,8 +135,7 @@ export async function GET(
 
     const taskDocs = await Task.find({
       _id: { $in: validSprintTaskIds },
-      organization: organizationId,
-      status: { $ne: 'backlog' }
+      organization: organizationId
     })
       .sort({ createdAt: -1, _id: -1 })
       .select('title displayId status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint movedFromSprint story epic module startDate dueDate createdAt')
@@ -323,6 +336,71 @@ export async function PUT(
         : []
     }
 
+    // --- SCH-6: the schedule follows the sprint ------------------------------
+    // Moving a sprint's dates changes which days have stand-ups, and cancelling
+    // it cancels them. The check runs *before* the write: SCH-7 refuses a move
+    // that would strand a completed or in-progress stand-up, and a refusal that
+    // had already moved the dates would leave exactly the state the rule exists
+    // to prevent.
+    const previousFrom = isoOfStoredDate(existingSprint.startDate)
+    const previousTo = isoOfStoredDate(existingSprint.endDate)
+    const nextFrom = updateData.startDate
+      ? isoOfStoredDate(new Date(updateData.startDate))
+      : previousFrom
+    const nextTo = updateData.endDate
+      ? isoOfStoredDate(new Date(updateData.endDate))
+      : previousTo
+
+    const datesMoved = nextFrom !== previousFrom || nextTo !== previousTo
+    const beingCancelled =
+      updateData.status === 'cancelled' && existingSprint.status !== 'cancelled'
+
+    if (datesMoved) {
+      try {
+        await assertScheduleChangeAllowed(sprintId, { from: nextFrom, to: nextTo })
+      } catch (error) {
+        const { status, body } = toErrorResponse(error)
+        return NextResponse.json(body, { status })
+      }
+    }
+
+    // A generic PUT used to write `status` straight through, which made this
+    // route a way around every gate the sprint lifecycle has: the start
+    // endpoint's planned-only rule, its task-count check, and `actualStartDate`
+    // being stamped at all. Two guards close it.
+    if (updateData.status && updateData.status !== existingSprint.status) {
+      // `planned -> active` is a legal transition, so `assertTransition` alone
+      // would still let an edit form start a sprint by the back door.
+      if (updateData.status === 'active') {
+        return NextResponse.json(
+          { error: standupStrings.planning.startUseStartSprint() },
+          { status: 400 }
+        )
+      }
+
+      try {
+        assertTransition(
+          existingSprint.status as SprintState,
+          updateData.status as SprintState
+        )
+      } catch (error) {
+        const { status, body } = toErrorResponse(error)
+        return NextResponse.json(body, { status })
+      }
+    }
+
+    const reconcileTrigger: ReconcileTrigger | null = beingCancelled
+      ? 'sprint_cancelled'
+      : nextFrom < previousFrom
+        ? 'sprint_start_earlier'
+        : nextFrom > previousFrom
+          ? 'sprint_start_later'
+          : nextTo > previousTo
+            ? 'sprint_end_later'
+            : nextTo < previousTo
+              ? 'sprint_end_earlier'
+              : null
+
     // When changing a completed sprint back to any other status (active, planning, etc.),
     // unarchive all tasks and stories associated with this sprint and reset actualEndDate
     if (existingSprint.status === 'completed' && updateData.status && updateData.status !== 'completed') {
@@ -354,14 +432,25 @@ export async function PUT(
       { new: true }
     )
       .populate('project', 'name')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email avatar')
+      .populate('teamMembers', 'firstName lastName email avatar')
 
     if (!sprint) {
       return NextResponse.json(
         { error: 'Sprint not found or unauthorized' },
         { status: 404 }
       )
+    }
+
+    if (reconcileTrigger) {
+      // The schedule is repaired even if this throws — `generation-audit` finds
+      // the drift within a tick — so a reconcile failure must not fail the
+      // sprint update the user actually asked for.
+      try {
+        await reconcileSprintSchedule(sprintId, reconcileTrigger, { actorId: String(userId) })
+      } catch (error) {
+        console.error('[standup] reconcile after sprint update failed:', error)
+      }
     }
 
     // Log activity: sprint updated (non-blocking)

@@ -8,6 +8,21 @@ import mongoose from 'mongoose';
 jest.mock('@/models/User');
 jest.mock('@/models/Project');
 
+function mockUserFindById(user: unknown) {
+  ;(User.findById as jest.Mock).mockReturnValue({
+    populate: jest.fn().mockResolvedValue(user)
+  })
+}
+
+// getAccessibleProjects chains `.select('_id')` onto Project.find, while
+// getUserPermissions awaits it directly. Mock both shapes.
+function mockProjectFindChainable(projects: unknown[]) {
+  ;(Project.find as jest.Mock).mockReturnValue({
+    select: jest.fn().mockResolvedValue(projects),
+    then: (resolve: (v: unknown) => unknown) => Promise.resolve(projects).then(resolve)
+  })
+}
+
 describe('Permission System', () => {
   const mockUser = {
     _id: 'user123',
@@ -19,7 +34,9 @@ describe('Permission System', () => {
     _id: 'project123',
     organization: 'org123',
     createdBy: 'user123',
-    teamMembers: ['user123', 'user456'],
+    // Real schema shape: teamMembers is an array of subdocuments
+    // ({ memberId, hourlyRate }), not a flat array of ids.
+    teamMembers: [{ memberId: 'user123' }, { memberId: 'user456' }],
     client: 'user789',
     projectRoles: [
       {
@@ -38,7 +55,7 @@ describe('Permission System', () => {
   describe('PermissionService', () => {
     describe('hasPermission', () => {
       it('should return true for admin users with global permissions', async () => {
-        (User.findById as jest.Mock).mockResolvedValue(mockUser);
+        mockUserFindById(mockUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const hasPermission = await PermissionService.hasPermission(
@@ -51,7 +68,7 @@ describe('Permission System', () => {
 
       it('should return false for users without required permissions', async () => {
         const teamMemberUser = { ...mockUser, role: Role.TEAM_MEMBER };
-        (User.findById as jest.Mock).mockResolvedValue(teamMemberUser);
+        mockUserFindById(teamMemberUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const hasPermission = await PermissionService.hasPermission(
@@ -63,7 +80,7 @@ describe('Permission System', () => {
       });
 
       it('should return true for project-scoped permissions when user has access', async () => {
-        (User.findById as jest.Mock).mockResolvedValue(mockUser);
+        mockUserFindById(mockUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const hasPermission = await PermissionService.hasPermission(
@@ -77,7 +94,7 @@ describe('Permission System', () => {
 
       it('should return false for project-scoped permissions when user lacks access', async () => {
         const teamMemberUser = { ...mockUser, role: Role.TEAM_MEMBER };
-        (User.findById as jest.Mock).mockResolvedValue(teamMemberUser);
+        mockUserFindById(teamMemberUser);
         (Project.find as jest.Mock).mockResolvedValue([]);
 
         const hasPermission = await PermissionService.hasPermission(
@@ -92,7 +109,7 @@ describe('Permission System', () => {
 
     describe('canAccessProject', () => {
       it('should return true for admin users', async () => {
-        (User.findById as jest.Mock).mockResolvedValue(mockUser);
+        mockUserFindById(mockUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const canAccess = await PermissionService.canAccessProject(
@@ -105,7 +122,7 @@ describe('Permission System', () => {
 
       it('should return true for project team members', async () => {
         const teamMemberUser = { ...mockUser, role: Role.TEAM_MEMBER };
-        (User.findById as jest.Mock).mockResolvedValue(teamMemberUser);
+        mockUserFindById(teamMemberUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const canAccess = await PermissionService.canAccessProject(
@@ -118,7 +135,7 @@ describe('Permission System', () => {
 
       it('should return false for users without project access', async () => {
         const teamMemberUser = { ...mockUser, role: Role.TEAM_MEMBER };
-        (User.findById as jest.Mock).mockResolvedValue(teamMemberUser);
+        mockUserFindById(teamMemberUser);
         (Project.find as jest.Mock).mockResolvedValue([]);
 
         const canAccess = await PermissionService.canAccessProject(
@@ -132,14 +149,18 @@ describe('Permission System', () => {
 
     describe('getAccessibleProjects', () => {
       it('should return all projects for admin users', async () => {
+        // Project.createdBy is `required: true` (models/Project.ts), and
+        // getUserPermissions' $or query only ever returns projects the user
+        // touches, so getUserProjectRole dereferences createdBy/teamMembers
+        // unguarded. Stubs must therefore carry them.
         const allProjects = [
-          { _id: 'project1' },
-          { _id: 'project2' },
-          { _id: 'project3' }
+          { _id: 'project1', createdBy: 'user123', teamMembers: [] },
+          { _id: 'project2', createdBy: 'user456', teamMembers: [] },
+          { _id: 'project3', createdBy: 'user456', teamMembers: [] }
         ];
 
-        (User.findById as jest.Mock).mockResolvedValue(mockUser);
-        (Project.find as jest.Mock).mockResolvedValue(allProjects);
+        mockUserFindById(mockUser);
+        mockProjectFindChainable(allProjects);
 
         const accessibleProjects = await PermissionService.getAccessibleProjects('user123');
 
@@ -148,7 +169,7 @@ describe('Permission System', () => {
 
       it('should return only assigned projects for non-admin users', async () => {
         const teamMemberUser = { ...mockUser, role: Role.TEAM_MEMBER };
-        (User.findById as jest.Mock).mockResolvedValue(teamMemberUser);
+        mockUserFindById(teamMemberUser);
         (Project.find as jest.Mock).mockResolvedValue([mockProject]);
 
         const accessibleProjects = await PermissionService.getAccessibleProjects('user123');
@@ -165,6 +186,11 @@ describe('Permission System', () => {
       expect(getPermissionScope(Permission.USER_DELETE)).toBe('global');
       expect(getPermissionScope(Permission.ORGANIZATION_UPDATE)).toBe('global');
       expect(getPermissionScope(Permission.PROJECT_VIEW_ALL)).toBe('global');
+      // Inviting is organisation-wide, not per project: permission-definitions
+      // lists TEAM_INVITE (and USER_INVITE) under globalPermissions with that
+      // exact rationale. GLOBAL is the stricter scope - a project-role grant
+      // cannot satisfy it (permission-service.ts, PermissionScope.GLOBAL).
+      expect(getPermissionScope(Permission.TEAM_INVITE)).toBe('global');
     });
 
     it('should correctly identify project permissions', () => {
@@ -172,7 +198,11 @@ describe('Permission System', () => {
       
       expect(getPermissionScope(Permission.PROJECT_UPDATE)).toBe('project');
       expect(getPermissionScope(Permission.TASK_CREATE)).toBe('project');
-      expect(getPermissionScope(Permission.TEAM_INVITE)).toBe('project');
+      // SETTINGS_VIEW is NOT an `own` permission. OWN scope short-circuits to
+      // `true` for every caller (permission-service.ts), which would void the
+      // fact that only Role.ADMIN and Role.HUMAN_RESOURCE are granted
+      // SETTINGS_VIEW - Role.TEAM_MEMBER deliberately is not.
+      expect(getPermissionScope(Permission.SETTINGS_VIEW)).toBe('project');
     });
 
     it('should correctly identify own permissions', () => {
@@ -180,7 +210,7 @@ describe('Permission System', () => {
       
       expect(getPermissionScope(Permission.USER_READ)).toBe('own');
       expect(getPermissionScope(Permission.TIME_TRACKING_CREATE)).toBe('own');
-      expect(getPermissionScope(Permission.SETTINGS_VIEW)).toBe('own');
+      expect(getPermissionScope(Permission.USER_UPDATE)).toBe('own');
     });
   });
 
@@ -200,7 +230,13 @@ describe('Permission System', () => {
       const { ROLE_PERMISSIONS } = require('../permission-definitions');
       const teamMemberPermissions = ROLE_PERMISSIONS[Role.TEAM_MEMBER];
 
-      expect(teamMemberPermissions).toContain(Permission.TASK_CREATE);
+      // TASK_CREATE is withheld org-wide ON PURPOSE and granted per project
+      // instead: see the [Role.TEAM_MEMBER] block comment in
+      // permission-definitions.ts - a grant in ROLE_PERMISSIONS is
+      // organisation-wide, so listing a PROJECT-scoped permission there would
+      // let every team member in the org act on every project. The capability
+      // lives on PROJECT_ROLE_PERMISSIONS[PROJECT_MEMBER] (asserted below).
+      expect(teamMemberPermissions).not.toContain(Permission.TASK_CREATE);
       expect(teamMemberPermissions).toContain(Permission.TIME_TRACKING_CREATE);
       expect(teamMemberPermissions).not.toContain(Permission.USER_DELETE);
       expect(teamMemberPermissions).not.toContain(Permission.PROJECT_DELETE);
@@ -247,5 +283,236 @@ describe('Permission System', () => {
       expect(projectViewerPermissions).not.toContain(Permission.TASK_CREATE);
       expect(projectViewerPermissions).not.toContain(Permission.PROJECT_UPDATE);
     });
+  });
+});
+
+// Pinning tests for project-role resolution. `getUserProjectRole` is private,
+// so these drive it through the public `getUserPermissions` and read the
+// resolved role back out of the returned `projectRoles` map. They exist because
+// the teamMembers fix WIDENS a permission boundary: they fix in place every
+// outcome that must NOT change when team members stop falling through to
+// PROJECT_VIEWER.
+describe('Project role resolution', () => {
+  const USER = new mongoose.Types.ObjectId();
+  const OTHER = new mongoose.Types.ObjectId();
+
+  // Mirrors the real schema: `teamMembers` is an array of subdocuments
+  // ({ memberId, hourlyRate }) and `createdBy` is required.
+  const projectWith = (overrides: Record<string, unknown>) => ({
+    _id: new mongoose.Types.ObjectId(),
+    organization: 'org123',
+    createdBy: OTHER,
+    teamMembers: [] as unknown[],
+    projectRoles: [] as unknown[],
+    ...overrides
+  });
+
+  const resolve = async (project: { _id: mongoose.Types.ObjectId }) => {
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    (Project.find as jest.Mock).mockResolvedValue([project]);
+
+    const permissions = await PermissionService.getUserPermissions(USER.toString());
+    return permissions.projectRoles.get(project._id.toString());
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('still prefers an explicit projectRoles entry over any fallback', async () => {
+    const project = projectWith({
+      projectRoles: [{ user: USER, role: ProjectRole.PROJECT_MANAGER }],
+      teamMembers: [{ memberId: USER }]
+    });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_MANAGER);
+  });
+
+  it('still resolves the project creator to project manager', async () => {
+    const project = projectWith({ createdBy: USER, teamMembers: [{ memberId: USER }] });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_MANAGER);
+  });
+
+  it('still resolves the client', async () => {
+    const project = projectWith({ client: USER });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_CLIENT);
+  });
+
+  // The one precedence this change could silently invert: the client check at
+  // getUserProjectRole runs BEFORE the team-member check, so a client who is
+  // also listed in teamMembers must keep resolving to PROJECT_CLIENT rather
+  // than being promoted to PROJECT_MEMBER.
+  it('still resolves a client who is also a team member to client', async () => {
+    const project = projectWith({ client: USER, teamMembers: [{ memberId: USER }] });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_CLIENT);
+  });
+
+  // The one assertion that proves nobody gains access they should not have.
+  it('still resolves a non-member to viewer', async () => {
+    const project = projectWith({ teamMembers: [{ memberId: OTHER }] });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_VIEWER);
+  });
+
+  it('still resolves a user with no relationship at all to viewer', async () => {
+    const project = projectWith({ client: OTHER });
+
+    await expect(resolve(project)).resolves.toBe(ProjectRole.PROJECT_VIEWER);
+  });
+
+  it('still leaves org-level role resolution untouched', async () => {
+    const { ROLE_PERMISSIONS } = require('../permission-definitions');
+    const project = projectWith({ teamMembers: [{ memberId: USER }] });
+
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    (Project.find as jest.Mock).mockResolvedValue([project]);
+
+    const permissions = await PermissionService.getUserPermissions(USER.toString());
+
+    expect(permissions.userRole).toBe(Role.TEAM_MEMBER);
+    expect(permissions.globalPermissions).toEqual(ROLE_PERMISSIONS[Role.TEAM_MEMBER]);
+    // STANDUP_VIEW is withheld org-wide on purpose (permission-definitions.ts)
+    // so that it can be granted per project. That stays true.
+    expect(permissions.globalPermissions).not.toContain(Permission.STANDUP_VIEW);
+  });
+});
+
+// D8: teamMembers holds subdocuments, so the membership check and the project
+// lookup both have to target `memberId`.
+describe('Project role resolution for team members (D8)', () => {
+  const USER = new mongoose.Types.ObjectId();
+  const OTHER = new mongoose.Types.ObjectId();
+
+  const projectWith = (overrides: Record<string, unknown>) => ({
+    _id: new mongoose.Types.ObjectId(),
+    organization: 'org123',
+    createdBy: OTHER,
+    teamMembers: [] as unknown[],
+    projectRoles: [] as unknown[],
+    ...overrides
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('resolves a teamMembers subdocument entry to project member', async () => {
+    const project = projectWith({ teamMembers: [{ memberId: USER, hourlyRate: 50 }] });
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    (Project.find as jest.Mock).mockResolvedValue([project]);
+
+    const permissions = await PermissionService.getUserPermissions(USER.toString());
+
+    expect(permissions.projectRoles.get(project._id.toString()))
+      .toBe(ProjectRole.PROJECT_MEMBER);
+  });
+
+  // The observed production symptom: 403 on every planning page load for a
+  // team member of a UI-created project, which persists `projectRoles: []`.
+  //
+  // Reproducing it needs a Project.find stub that actually honours the $or the
+  // service builds - the broken `{ teamMembers: user._id }` clause never
+  // matches a subdocument array, so the project is not loaded at all and the
+  // user ends up with no project permissions whatsoever.
+  const findHonouringQuery = (docs: Array<Record<string, unknown>>) => {
+    const read = (doc: Record<string, unknown>, path: string) =>
+      path.split('.').reduce<unknown>((node, key) => {
+        if (Array.isArray(node)) {
+          return node.map(item => (item as Record<string, unknown>)?.[key]);
+        }
+        return (node as Record<string, unknown>)?.[key];
+      }, doc);
+
+    const matches = (doc: Record<string, unknown>, query: Record<string, unknown>) =>
+      (query.$or as Array<Record<string, unknown>>).some(clause =>
+        Object.entries(clause).some(([path, wanted]) => {
+          const actual = read(doc, path);
+          const expected = String(wanted);
+          return Array.isArray(actual)
+            ? actual.some(value => value != null && String(value) === expected)
+            : actual != null && String(actual) === expected;
+        })
+      );
+
+    (Project.find as jest.Mock).mockImplementation((query: Record<string, unknown>) =>
+      Promise.resolve(docs.filter(doc => matches(doc, query)))
+    );
+  };
+
+  it('grants a team member STANDUP_VIEW on a project with no projectRoles', async () => {
+    const project = projectWith({ teamMembers: [{ memberId: USER }] });
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    findHonouringQuery([project]);
+
+    await expect(
+      PermissionService.hasPermission(
+        USER.toString(),
+        Permission.STANDUP_VIEW,
+        project._id.toString()
+      )
+    ).resolves.toBe(true);
+  });
+
+  // PROJECT_VIEWER also carries STANDUP_VIEW, so the role downgrade shows up in
+  // the member-only capabilities. This pins what the fallback was costing.
+  it('grants a team member the member-only stand-up capabilities', async () => {
+    const project = projectWith({ teamMembers: [{ memberId: USER }] });
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    findHonouringQuery([project]);
+
+    await expect(
+      PermissionService.hasPermission(
+        USER.toString(),
+        Permission.STANDUP_ALLOCATE_OWN,
+        project._id.toString()
+      )
+    ).resolves.toBe(true);
+  });
+
+  // ... and a non-member still gets nothing, through the same honest stub.
+  it('still denies a non-member, with the query honoured', async () => {
+    const project = projectWith({ teamMembers: [{ memberId: OTHER }] });
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    findHonouringQuery([project]);
+
+    await expect(
+      PermissionService.hasPermission(
+        USER.toString(),
+        Permission.STANDUP_VIEW,
+        project._id.toString()
+      )
+    ).resolves.toBe(false);
+  });
+
+  // Guards the reintroduction route for this exact defect: the day anyone adds
+  // `.populate('teamMembers.memberId')` to the Project.find in
+  // getUserPermissions, `memberId` becomes a user document and a comparison
+  // that only understands the unpopulated shape silently drops every team
+  // member back to PROJECT_VIEWER.
+  it('resolves a populated teamMembers.memberId to project member', async () => {
+    const project = projectWith({
+      teamMembers: [{ memberId: { _id: USER, firstName: 'Dev', email: 'dev@example.test' } }]
+    });
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    (Project.find as jest.Mock).mockResolvedValue([project]);
+
+    const permissions = await PermissionService.getUserPermissions(USER.toString());
+
+    expect(permissions.projectRoles.get(project._id.toString()))
+      .toBe(ProjectRole.PROJECT_MEMBER);
+  });
+
+  it('looks projects up by teamMembers.memberId, not by teamMembers', async () => {
+    mockUserFindById({ _id: USER, role: Role.TEAM_MEMBER, organization: 'org123' });
+    (Project.find as jest.Mock).mockResolvedValue([]);
+
+    await PermissionService.getUserPermissions(USER.toString());
+
+    const [query] = (Project.find as jest.Mock).mock.calls[0];
+    expect(query.$or).toContainEqual({ 'teamMembers.memberId': USER });
+    expect(query.$or).not.toContainEqual({ teamMembers: USER });
   });
 });

@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
@@ -18,6 +19,9 @@ import { DeleteCustomStatusModal } from '@/components/sprints/DeleteCustomStatus
 import { DeleteSubtaskModal } from '@/components/sprints/DeleteSubtaskModal'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { hasStandups, isLiveSprint, type SprintState } from '@/lib/standup/sprint-states'
+import { standupStrings } from '@/lib/standup/strings'
+import { InfoTooltip } from '@/components/ui/InfoTooltip'
 import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
 import { DEFAULT_TASK_STATUS_OPTIONS, DEFAULT_TASK_STATUS_BADGE_MAP, DEFAULT_TASK_STATUS_KEYS, type TaskStatusOption } from '@/constants/taskStatuses'
 import { usePermissions } from '@/lib/permissions/permission-context'
@@ -48,6 +52,7 @@ import {
   ChevronDown,
   ChevronRight,
   CheckSquare,
+  ClipboardCheck,
   Plus,
   Briefcase,
   Target,
@@ -70,7 +75,8 @@ interface Sprint {
   _id: string
   name: string
   description: string
-  status: 'planning' | 'active' | 'completed' | 'cancelled'
+  // Spec §8.1 adds `draft` and `planned` to the four states Kanvaro shipped with.
+  status: SprintState
   project: {
     _id: string
     name: string
@@ -85,11 +91,13 @@ interface Sprint {
     firstName: string
     lastName: string
     email: string
+    avatar?: string
   }>
   createdBy: {
     firstName: string
     lastName: string
     email: string
+    avatar?: string
   }
   progress: {
     completionPercentage: number
@@ -278,7 +286,6 @@ const PRIORITY_CONFIG: Record<string, { label: string; icon: any; cls: string }>
 
 export default function SprintDetailPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
-
   const router = useRouter()
   const params = useParams()
   const sprintId = params.id as string
@@ -549,6 +556,12 @@ export default function SprintDetailPage() {
   const canStartSprint = hasPermission(Permission.SPRINT_START)
   const canCompleteSprint = hasPermission(Permission.SPRINT_COMPLETE)
   const canCreateTask = hasPermission(Permission.TASK_CREATE)
+  // Project-scoped: STANDUP_VIEW is never granted org-wide (see
+  // Role.TEAM_MEMBER in permission-definitions.ts), only per-project via
+  // PROJECT_MEMBER — checking it without a projectId always resolves false
+  // for a plain team member, hiding the button from exactly the sprints they
+  // are on.
+  const canViewStandups = hasPermission(Permission.STANDUP_VIEW, sprint?.project?._id)
 
   const totalTasks = sprint?.progress?.totalTasks ?? sprintTasks.length
   const hasTasks = (totalTasks ?? 0) > 0
@@ -1862,7 +1875,7 @@ export default function SprintDetailPage() {
       const sprintList: SprintOption[] = Array.isArray(data.data) ? data.data : []
       const filtered = sprintList.filter(
         sprintOption =>
-          sprintOption._id !== excludeSprintId && ['planning', 'active'].includes(sprintOption.status)
+          sprintOption._id !== excludeSprintId && isLiveSprint(sprintOption.status)
       )
 
       setAvailableSprints(filtered)
@@ -1917,6 +1930,9 @@ export default function SprintDetailPage() {
   }
 
   const handleStartSprint = async () => {
+    // The button only carries aria-disabled, which styles and announces but does
+    // not block clicks, so a double-click would otherwise POST /start twice.
+    if (startingSprint) return
     if (!canStartSprint) {
       setActionError('You do not have permission to start this sprint.')
       notifyError({ title: 'You do not have permission to start this sprint.' })
@@ -1925,6 +1941,14 @@ export default function SprintDetailPage() {
     if (!hasTasks) {
       setActionError('Add tasks to this sprint before starting it.')
       notifyError({ title: 'Add tasks to this sprint before starting it.' })
+      return
+    }
+    // The server refuses this too; saying so here saves a round trip and, more
+    // to the point, names the fix instead of reporting a failure.
+    if (sprint?.status !== 'planned') {
+      const reason = standupStrings.planning.startBlockedNotPlanned()
+      setActionError(reason)
+      notifyError({ title: reason })
       return
     }
     try {
@@ -2031,7 +2055,7 @@ export default function SprintDetailPage() {
         const allSprintsList = allSprintsData.data || []
         const nextSprint = allSprintsList.find((s: Sprint) => s.name === nextSprintName)
 
-        if (nextSprint && ['planning', 'active'].includes(nextSprint.status)) {
+        if (nextSprint && isLiveSprint(nextSprint.status)) {
           // Next sprint exists - auto-select it
           setSelectedTargetSprintId(nextSprint._id)
           setCompletionMode('existing')
@@ -2373,9 +2397,25 @@ export default function SprintDetailPage() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   }
 
+  // A sprint belongs to exactly one project — show that trail regardless of
+  // whether this page was reached from the cross-project Sprints list or a
+  // standup screen's "View Sprint" link, so the project context set up
+  // earlier in the visit doesn't disappear here. Falls back to the flat
+  // "Sprints" crumb only while the sprint (and its project) hasn't loaded yet.
+  const breadcrumbItems = sprint?.project?._id
+    ? [
+        { label: 'Projects', href: '/projects' },
+        { label: 'View Project', href: `/projects/${sprint.project._id}` },
+        { label: 'View Sprint' }
+      ]
+    : [
+        { label: 'Sprints', href: '/sprints' },
+        { label: 'View Sprint' }
+      ]
+
   if (loading) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <div className="flex items-center justify-center h-64">
           <div className="text-center space-y-3">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-[var(--apple-system-blue)]" />
@@ -2388,7 +2428,7 @@ export default function SprintDetailPage() {
 
   if (error || !sprint) {
     return (
-      <MainLayout>
+      <MainLayout breadcrumbItems={breadcrumbItems}>
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <XCircle className="h-12 w-12 text-[var(--apple-system-red)]" />
           <h2 className="text-[22px] font-semibold text-[var(--apple-label)]">{error || 'Sprint not found'}</h2>
@@ -2404,8 +2444,13 @@ export default function SprintDetailPage() {
     )
   }
 
+  // Only relevant when the Start Sprint button is shown while not yet
+  // startable (`planning`); once `planned`, the sprint is ready to start and
+  // needs no explanation.
+  const startReason = sprint.status === 'planned' ? null : standupStrings.planning.startBlockedNotPlanned()
+
   return (
-    <MainLayout>
+    <MainLayout breadcrumbItems={breadcrumbItems}>
       <div className="space-y-6 overflow-x-hidden animate-in fade-in-0 duration-300">
 
         {/* ── Page Header ─────────────────────────────────────────────────────── */}
@@ -2437,6 +2482,18 @@ export default function SprintDetailPage() {
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 text-[12px] font-medium border border-blue-200 dark:border-blue-800/60">
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                     Planning
+                  </span>
+                )}
+                {sprint.status === 'draft' && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 text-[12px] font-medium border">
+                    <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                    Draft
+                  </span>
+                )}
+                {sprint.status === 'planned' && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800/60 text-[12px] font-medium border">
+                    <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                    Planned
                   </span>
                 )}
                 {sprint.status === 'completed' && (
@@ -2480,57 +2537,92 @@ export default function SprintDetailPage() {
                 </button>
               )}
 
-              {sprint.status === 'planning' && canStartSprint && (
-                <button
-                  type="button"
-                  onClick={handleStartSprint}
-                  disabled={startingSprint || !hasTasks}
-                  className={`inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold px-4 h-9 shadow-sm transition-all ${
-                    !hasTasks
-                      ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed shadow-none'
-                      : 'bg-[#16a34a] hover:bg-[#15803d] text-white disabled:opacity-40 cursor-pointer'
-                  }`}
-                >
-                  {startingSprint ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className={`h-4 w-4 ${!hasTasks ? 'fill-gray-400 dark:fill-gray-500' : 'fill-white'}`} />
-                  )}
-                  <span>{startingSprint ? 'Starting…' : 'Start Sprint'}</span>
-                </button>
+              {/* A sprint can only start once it is Planned. It is still
+                  rendered while Planning, aria-disabled with the reason and a
+                  route to the fix: a button that simply disappears tells
+                  the PM nothing about why they cannot start. */}
+              {(sprint.status === 'planning' || sprint.status === 'planned') && canStartSprint && (
+                <div className="inline-flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleStartSprint}
+                    aria-disabled={startingSprint || sprint.status !== 'planned' || !hasTasks}
+                    aria-describedby="start-sprint-reason"
+                    className={`inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold px-4 h-9 shadow-sm transition-all ${
+                      sprint.status !== 'planned' || !hasTasks
+                        ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed shadow-none'
+                        : 'bg-[#16a34a] hover:bg-[#15803d] text-white cursor-pointer'
+                    }`}
+                  >
+                    {startingSprint ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className={`h-4 w-4 ${sprint.status !== 'planned' || !hasTasks ? 'fill-gray-400 dark:fill-gray-500' : 'fill-white'}`} />
+                    )}
+                    <span>{startingSprint ? 'Starting…' : 'Start Sprint'}</span>
+                  </button>
+                  {startReason && <InfoTooltip id="start-sprint-reason" content={startReason} />}
+                </div>
               )}
 
-              {/* Create New Task Button */}
-              {canCreateTask && (
+              {/* The planning gate: stand-ups cannot run until this sprint
+                  has been planned, so the route to it is offered on every
+                  sprint that has not yet passed it.
+                  Gated on *view*, not edit: planning poker is a team activity
+                  and a team member with no sprint-edit rights still has to
+                  reach the screen to cast a vote. Every action on the page is
+                  permission-checked in its own right, server side. */}
+              {canViewSprint && ['draft', 'planning', 'planned'].includes(sprint.status) && (
                 <button
                   type="button"
-                  onClick={() => setShowCreateTaskModal(true)}
+                  onClick={() => router.push(`/sprints/${sprintId}/planning`)}
                   className="inline-flex items-center justify-center gap-1.5 rounded-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/60 text-gray-700 dark:text-gray-200 text-[13px] font-medium px-4 h-9 shadow-sm transition-all cursor-pointer"
                 >
-                  <Plus className="h-4 w-4" />
-                  <span>Create New Task</span>
+                  <ClipboardCheck className="h-4 w-4" />
+                  <span>{sprint.status === 'planned' ? 'Planning' : 'Plan Sprint'}</span>
+                </button>
+              )}
+              {/* Once planning has generated a schedule, this is the only
+                  route from the sprint page to it — otherwise the schedule
+                  hub is reachable only through the project's "Stand-ups"
+                  tab, several clicks away from where a PM is already
+                  looking at this sprint. */}
+              {canViewStandups && hasStandups(sprint.status) && (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/projects/${sprint.project._id}/standups`)}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/60 text-gray-700 dark:text-gray-200 text-[13px] font-medium px-4 h-9 shadow-sm transition-all cursor-pointer"
+                >
+                  <Calendar className="h-4 w-4" />
+                  <span>Stand-ups</span>
                 </button>
               )}
 
-              {/* Add Task Button (Redirects to Backlog) */}
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => router.push(sprint?.project?._id ? `/backlog?project=${sprint.project._id}` : '/backlog')}
-                      className="h-9 w-9 rounded-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/60 text-gray-600 dark:text-gray-300 flex items-center justify-center shadow-sm transition-all cursor-pointer"
-                      title="Add Task"
-                      aria-label="Add Task"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs font-medium">
-                    Add Task
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              {/* Create Task Button (opens the create task page, which returns here) */}
+              {canCreateTask && (
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const params = new URLSearchParams({ returnTo: `/sprints/${sprintId}` })
+                          if (sprint?.project?._id) params.set('project', sprint.project._id)
+                          router.push(`/tasks/create-new-task?${params.toString()}`)
+                        }}
+                        className="h-9 w-9 rounded-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/60 text-gray-600 dark:text-gray-300 flex items-center justify-center shadow-sm transition-all cursor-pointer"
+                        title="Create Task"
+                        aria-label="Create Task"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs font-medium">
+                      Create Task
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
 
               {/* Edit Icon Button */}
               {canEditSprint && (
@@ -2598,7 +2690,7 @@ export default function SprintDetailPage() {
                   <span className="text-gray-300 dark:text-gray-600">·</span>
                   <div className="flex items-center gap-1.5">
                     <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span>Capacity:</span>
+                    <span title="A planning figure you entered. Stand-up capacity is computed from each member's working days.">Planned capacity:</span>
                     <span className="font-semibold text-gray-800 dark:text-gray-200 font-apple-mono">
                       {sprint.capacity || 0} hrs
                     </span>
@@ -2645,13 +2737,12 @@ export default function SprintDetailPage() {
               <div className="flex flex-col sm:items-end">
                 <span className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">Created By</span>
                 <div className="mt-1.5 flex items-center justify-end">
-                  <div
-                    className="h-8 w-8 rounded-full flex items-center justify-center text-white text-[12px] font-semibold overflow-hidden border-2 border-white dark:border-gray-800 shadow-sm"
-                    style={{ background: 'var(--apple-card-gradient, linear-gradient(135deg, #3b82f6, #1d4ed8))' }}
-                    title={`${sprint.createdBy?.firstName || ''} ${sprint.createdBy?.lastName || ''}`.trim() || 'Creator'}
-                  >
-                    {`${sprint.createdBy?.firstName || ''} ${sprint.createdBy?.lastName || ''}`.trim().split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || <User className="h-4 w-4" />}
-                  </div>
+                  <GravatarAvatar
+                    user={sprint.createdBy}
+                    size={32}
+                    gravatarOptions={{ default: 'identicon' }}
+                    className="border-2 border-white dark:border-gray-800 shadow-sm"
+                  />
                 </div>
               </div>
 
@@ -2662,25 +2753,15 @@ export default function SprintDetailPage() {
                   {sprint.teamMembers && sprint.teamMembers.length > 0 ? (
                     sprint.teamMembers.map((member, index) => {
                       const memberName = `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'Unknown User'
-                      const initials = memberName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-                      const bgColors = [
-                        'bg-slate-700',
-                        'bg-emerald-600',
-                        'bg-sky-600',
-                        'bg-indigo-600',
-                        'bg-amber-600',
-                        'bg-rose-600',
-                        'bg-purple-600'
-                      ]
-                      const bgColor = bgColors[index % bgColors.length]
                       return (
-                        <div
-                          key={member._id || index}
-                          className={`h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-semibold border-2 border-white dark:border-gray-900 shadow-sm ${bgColor} select-none flex-shrink-0`}
-                          title={memberName}
-                        >
-                          {initials}
-                        </div>
+                        <span key={member._id || index} title={memberName} className="flex-shrink-0">
+                        <GravatarAvatar
+                          user={{ firstName: member.firstName, lastName: member.lastName, email: member.email, avatar: member.avatar }}
+                          size={28}
+                          gravatarOptions={{ default: 'identicon' }}
+                          className="border-2 border-white dark:border-gray-900 shadow-sm"
+                        />
+                        </span>
                       )
                     })
                   ) : (
@@ -4987,7 +5068,7 @@ export default function SprintDetailPage() {
                           </div>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-sm text-foreground">Capacity (hours)</Label>
+                          <Label className="text-sm text-foreground">Planned capacity (hours, optional)</Label>
                           <Input
                             type="number"
                             min="0"
