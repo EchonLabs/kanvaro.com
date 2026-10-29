@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
 import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
+import { TaskDependencies, syncTaskDependencies } from '@/components/tasks/TaskDependencies'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import TaskCategoryManagerModal from '@/components/tasks/TaskCategoryManagerModal'
@@ -154,6 +155,10 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
   const [initialFormData, setInitialFormData] = useState<TaskFormData | null>(null)
   const [initialSubtasks, setInitialSubtasks] = useState<SubtaskItem[]>([])
   const [availableStatuses, setAvailableStatuses] = useState<Array<{ value: SubtaskStatus; label: string }>>(SUBTASK_STATUS_OPTIONS)
+  const [draftBlockedBy, setDraftBlockedBy] = useState<any[]>([])
+  const [initialDependencies, setInitialDependencies] = useState<any[]>([])
+  const [draftBlocking, setDraftBlocking] = useState<any[]>([])
+  const [initialBlockingTasks, setInitialBlockingTasks] = useState<any[]>([])
 
   const taskProjectId = getTaskProjectId(task)
 
@@ -265,6 +270,27 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
         : []
       setSubtasks(initialSubtasksData)
       setInitialSubtasks(initialSubtasksData)
+
+      const deps = task.dependencies || []
+      const blk = task.blockingTasks || []
+      setDraftBlockedBy(deps)
+      setInitialDependencies(deps)
+      setDraftBlocking(blk)
+      setInitialBlockingTasks(blk)
+
+      if (task?._id) {
+        fetch(`/api/tasks/${task._id}/dependencies`)
+          .then((res) => res.json())
+          .then((json) => {
+            if (json.success && json.data) {
+              setDraftBlockedBy(json.data.blockedBy || [])
+              setInitialDependencies(json.data.blockedBy || [])
+              setDraftBlocking(json.data.blocking || [])
+              setInitialBlockingTasks(json.data.blocking || [])
+            }
+          })
+          .catch((err) => console.error('Failed to load dependencies in EditTaskModal:', err))
+      }
 
       // Get project ID - use task.project if available
       const getProjectId = async () => {
@@ -566,6 +592,16 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
       const data = await response.json()
 
       if (data.success) {
+        if (task?._id) {
+          await syncTaskDependencies(
+            task._id,
+            initialDependencies,
+            initialBlockingTasks,
+            draftBlockedBy,
+            draftBlocking
+          )
+        }
+
         notifySuccess({ title: 'Task Updated', message: 'Task updated successfully' })
         // Call update callback asynchronously to not block UI
         setTimeout(() => {
@@ -576,8 +612,8 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
         const message = data.error || 'Failed to update task'
         notifyError({ title: 'Failed to Update Task', message })
       }
-    } catch (error) {
-      notifyError({ title: 'Failed to Update Task', message: 'Failed to update task' })
+    } catch (error: any) {
+      notifyError({ title: 'Failed to Update Task', message: error?.message || 'Failed to update task' })
     } finally {
       setLoading(false)
     }
@@ -701,6 +737,19 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
       ) {
         return true
       }
+    }
+
+    // Check if dependencies have changed
+    const initialDepIds = (initialDependencies || []).map((t: any) => (t?._id || t).toString()).sort()
+    const draftDepIds = (draftBlockedBy || []).map((t: any) => (t?._id || t).toString()).sort()
+    if (JSON.stringify(initialDepIds) !== JSON.stringify(draftDepIds)) {
+      return true
+    }
+
+    const initialBlkIds = (initialBlockingTasks || []).map((t: any) => (t?._id || t).toString()).sort()
+    const draftBlkIds = (draftBlocking || []).map((t: any) => (t?._id || t).toString()).sort()
+    if (JSON.stringify(initialBlkIds) !== JSON.stringify(draftBlkIds)) {
+      return true
     }
 
     return false
@@ -1277,6 +1326,23 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
                   disabled={loading}
                 />
               </div>
+
+              {/* Dependencies Section */}
+              {task?._id && (
+                <div className="pt-4 border-t border-[var(--apple-separator)]">
+                  <TaskDependencies
+                    taskId={task._id}
+                    taskStatus={formData.status || task.status}
+                    initialBlockedBy={draftBlockedBy}
+                    initialBlocking={draftBlocking}
+                    staged={true}
+                    onChange={({ blockedBy, blocking }) => {
+                      setDraftBlockedBy(blockedBy)
+                      setDraftBlocking(blocking)
+                    }}
+                  />
+                </div>
+              )}
 
             </form>
           </CardContent>
