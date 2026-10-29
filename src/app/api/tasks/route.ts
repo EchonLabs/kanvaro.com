@@ -571,7 +571,8 @@ export async function GET(request: NextRequest) {
       { path: 'subtasks.assignedTo', select: '_id firstName lastName email avatar' },
       { path: 'subtasks.story', select: '_id title' },
       { path: 'createdBy', select: 'firstName lastName email' },
-      { path: 'movedFromSprint', select: '_id name' }
+      { path: 'movedFromSprint', select: '_id name' },
+      { path: 'dependencies', select: '_id displayId taskNumber title status' }
     ];
 
     console.log('[Tasks GET] Executing database query');
