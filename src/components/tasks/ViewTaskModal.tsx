@@ -1,11 +1,13 @@
 'use client'
 
+import React from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { AttachmentList } from '@/components/ui/AttachmentList'
 import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { TaskDependencies } from '@/components/tasks/TaskDependencies'
 import { 
   X, 
   Calendar, 
@@ -46,9 +48,9 @@ export default function ViewTaskModal({
   canDelete = true,
   hideDeleteWhenDisabled = false
 }: ViewTaskModalProps) {
-  if (!isOpen || !task) return null
-
   const { formatDate, formatTime } = useDateTime()
+
+  if (!isOpen || !task) return null
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -418,6 +420,15 @@ export default function ViewTaskModal({
               </div>
             </div>
           )}
+
+          {/* Dependencies */}
+          <TaskDependencies
+            taskId={task._id}
+            taskStatus={task.status}
+            initialBlockedBy={task.dependencies}
+            initialBlocking={task.blockingTasks}
+            readOnly={!canEdit}
+          />
 
           {/* Created/Updated Info */}
           <div className="pt-4 border-t">

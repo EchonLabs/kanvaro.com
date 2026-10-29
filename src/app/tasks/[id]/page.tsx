@@ -72,6 +72,7 @@ import TaskActivityLog from '@/components/tasks/TaskActivityLog'
 import { StartTimerModal } from '@/components/time-tracking/StartTimerModal'
 import { CategoryBadge } from '@/components/tasks/TasksShared'
 import { detectClientTimezone } from '@/lib/timezone'
+import { TaskDependencies } from '@/components/tasks/TaskDependencies'
 
 interface Task {
   _id: string
@@ -207,6 +208,8 @@ interface Task {
       title?: string
     }>
   }>
+  dependencies?: any[]
+  blockingTasks?: any[]
 }
 
 interface AssignableUser {
@@ -1958,6 +1961,7 @@ export default function TaskDetailPage() {
 
   const editAllowed = hasPermission(Permission.TASK_EDIT_ALL) || isCreator(task)
   const deleteAllowed = hasPermission(Permission.TASK_DELETE_ALL)
+  const canManageDependencies = editAllowed || hasPermission(Permission.TASK_UPDATE)
 
   const attachmentListItems = (task.attachments || []).map(attachment => ({
     name: attachment.name,
@@ -3001,6 +3005,16 @@ export default function TaskDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Task Dependencies */}
+            <TaskDependencies
+              taskId={task._id}
+              taskStatus={task.status}
+              initialBlockedBy={task.dependencies || []}
+              initialBlocking={task.blockingTasks || []}
+              onUpdated={fetchTask}
+              readOnly={!canManageDependencies}
+            />
 
             {/* Comments */}
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">

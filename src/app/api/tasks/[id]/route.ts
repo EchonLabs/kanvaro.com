@@ -369,6 +369,61 @@ function sanitizeAttachments(
     })
 }
 
+/**
+ * Automatically adjust dependent task dates when a blocking task's schedule changes (delayed)
+ */
+async function adjustDependentTasksSchedule(
+  blockingTaskId: string | mongoose.Types.ObjectId,
+  delayMs: number,
+  organizationId: any,
+  visited: Set<string> = new Set()
+): Promise<string[]> {
+  const blockingIdStr = blockingTaskId.toString()
+  if (visited.has(blockingIdStr) || delayMs <= 0) return []
+  visited.add(blockingIdStr)
+
+  const adjustedTaskIds: string[] = []
+
+  // Find all tasks that depend directly on this blocking task
+  const dependentTasks = await Task.find({
+    dependencies: new mongoose.Types.ObjectId(blockingIdStr),
+    organization: organizationId
+  }).select('_id startDate dueDate dependencies title displayId')
+
+  for (const depTask of dependentTasks) {
+    const depIdStr = depTask._id.toString()
+    if (visited.has(depIdStr)) continue
+
+    const updates: Record<string, any> = { updatedAt: new Date() }
+
+    if (depTask.startDate) {
+      const oldStart = new Date(depTask.startDate).getTime()
+      updates.startDate = new Date(oldStart + delayMs)
+    }
+
+    if (depTask.dueDate) {
+      const oldDue = new Date(depTask.dueDate).getTime()
+      updates.dueDate = new Date(oldDue + delayMs)
+    }
+
+    if (updates.startDate || updates.dueDate) {
+      await Task.updateOne({ _id: depTask._id }, { $set: updates })
+      adjustedTaskIds.push(depIdStr)
+
+      // Recursively cascade to downstream tasks dependent on depTask
+      const downstreamIds = await adjustDependentTasksSchedule(
+        depTask._id,
+        delayMs,
+        organizationId,
+        visited
+      )
+      adjustedTaskIds.push(...downstreamIds)
+    }
+  }
+
+  return adjustedTaskIds
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -443,7 +498,12 @@ export async function GET(
         },
         { path: 'sprint', select: 'name status startDate endDate' },
         { path: 'parentTask', select: 'title' },
-        { path: 'attachments.uploadedBy', select: 'firstName lastName email' }
+        { path: 'attachments.uploadedBy', select: 'firstName lastName email' },
+        {
+          path: 'dependencies',
+          select: '_id displayId taskNumber title status priority type project assignedTo dueDate',
+          populate: { path: 'assignedTo.user', select: '_id firstName lastName email avatar' }
+        }
       ])
 
     if (!task) {
@@ -453,9 +513,20 @@ export async function GET(
       )
     }
 
+    const blockingTasks = await Task.find({
+      dependencies: task._id,
+      organization: organizationId
+    })
+      .select('_id displayId taskNumber title status priority type project assignedTo dueDate')
+      .populate('assignedTo.user', '_id firstName lastName email avatar')
+      .lean()
+
+    const taskData = task.toObject()
+    taskData.blockingTasks = blockingTasks || []
+
     return NextResponse.json({
       success: true,
-      data: task
+      data: taskData
     })
 
   } catch (error) {
@@ -552,6 +623,15 @@ export async function PUT(
       } else {
         const numeric = typeof value === 'number' ? value : Number(value)
         updateData.estimatedHours = Number.isFinite(numeric) ? numeric : undefined
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'startDate')) {
+      const value = updateData.startDate
+      if (!value) {
+        updateData.startDate = undefined
+      } else {
+        updateData.startDate = new Date(value)
       }
     }
 
@@ -675,6 +755,7 @@ export async function PUT(
       )
     }
 
+    let scheduleDelayMs = 0
     if (Object.prototype.hasOwnProperty.call(updateData, 'dueDate')) {
       const oldTime = currentTask.dueDate ? new Date(currentTask.dueDate).getTime() : null
       const newTime = updateData.dueDate ? new Date(updateData.dueDate).getTime() : null
@@ -683,6 +764,9 @@ export async function PUT(
           dueSoon24h: false,
           overdue: false
         }
+      }
+      if (oldTime && newTime && newTime > oldTime) {
+        scheduleDelayMs = newTime - oldTime
       }
     }
 
@@ -888,13 +972,30 @@ export async function PUT(
       }
     }
 
-    // Subtask completion rules:
+    // Sanitize dependencies if provided
+    if (Object.prototype.hasOwnProperty.call(updateData, 'dependencies')) {
+      if (Array.isArray(updateData.dependencies)) {
+        updateData.dependencies = updateData.dependencies
+          .map((d: any) => (typeof d === 'object' && d !== null && '_id' in d ? d._id : d))
+          .filter((id: any) => mongoose.Types.ObjectId.isValid(id))
+          .map((id: any) => new mongoose.Types.ObjectId(id))
+      } else {
+        delete updateData.dependencies
+      }
+    }
+
+    // Subtask and Dependency completion rules:
     // 1. Task cannot be marked done if any subtask or nested subtask is incomplete
-    // 2. If all subtasks are completed, automatically mark the main task as complete
-    // 3. If a done task has subtasks updated to incomplete, revert task to in_progress
+    // 2. Task cannot be marked done if any prerequisite blocking dependency is incomplete (Option B Guard)
+    // 3. If all subtasks are completed, automatically mark the main task as complete (provided no blockers exist)
+    // 4. If a done task has subtasks updated to incomplete, revert task to in_progress
     const effectiveSubtasks = Object.prototype.hasOwnProperty.call(updateData, 'subtasks')
       ? updateData.subtasks
       : (currentTask.subtasks && Array.isArray(currentTask.subtasks) ? currentTask.subtasks : [])
+
+    const effectiveDependencies = Object.prototype.hasOwnProperty.call(updateData, 'dependencies')
+      ? updateData.dependencies
+      : currentTask.dependencies
 
     if (updateData.status === 'done') {
       if (hasAnyIncompleteSubtasks(effectiveSubtasks)) {
@@ -903,11 +1004,52 @@ export async function PUT(
           { status: 400 }
         )
       }
+
+      // Check for incomplete blocking dependencies
+      if (effectiveDependencies && Array.isArray(effectiveDependencies) && effectiveDependencies.length > 0) {
+        const depIds = effectiveDependencies.map((d: any) =>
+          typeof d === 'object' && d !== null && '_id' in d ? d._id : d
+        ).filter(Boolean)
+
+        if (depIds.length > 0) {
+          const incompleteBlockers = await Task.find({
+            _id: { $in: depIds },
+            status: { $nin: ['done', 'cancelled'] }
+          }).select('displayId taskNumber title').lean()
+
+          if (incompleteBlockers.length > 0) {
+            const blockerNames = incompleteBlockers
+              .map((b: any) => b.displayId || `#${b.taskNumber || ''}`)
+              .join(', ')
+            return NextResponse.json(
+              { error: `Cannot mark task as complete: blocked by incomplete task(s): ${blockerNames}.` },
+              { status: 400 }
+            )
+          }
+        }
+      }
+
       updateData.completedAt = new Date()
     } else if (Object.prototype.hasOwnProperty.call(updateData, 'subtasks')) {
       if (effectiveSubtasks.length > 0 && areAllSubtasksCompleted(effectiveSubtasks)) {
-        updateData.status = 'done'
-        updateData.completedAt = new Date()
+        // Only auto-mark 'done' if there are no incomplete blockers
+        const depIds = (effectiveDependencies || []).map((d: any) =>
+          typeof d === 'object' && d !== null && '_id' in d ? d._id : d
+        ).filter(Boolean)
+
+        let isBlocked = false
+        if (depIds.length > 0) {
+          const incompleteCount = await Task.countDocuments({
+            _id: { $in: depIds },
+            status: { $nin: ['done', 'cancelled'] }
+          })
+          if (incompleteCount > 0) isBlocked = true
+        }
+
+        if (!isBlocked) {
+          updateData.status = 'done'
+          updateData.completedAt = new Date()
+        }
       } else if (hasAnyIncompleteSubtasks(effectiveSubtasks)) {
         if (currentTask.status === 'done' || updateData.status === 'done') {
           updateData.status = 'in_progress'
@@ -977,7 +1119,12 @@ export async function PUT(
         },
         { path: 'sprint', select: 'name status startDate endDate teamMembers' },
         { path: 'parentTask', select: 'title' },
-        { path: 'attachments.uploadedBy', select: 'firstName lastName email' }
+        { path: 'attachments.uploadedBy', select: 'firstName lastName email' },
+        {
+          path: 'dependencies',
+          select: '_id displayId taskNumber title status priority type project assignedTo dueDate',
+          populate: { path: 'assignedTo.user', select: '_id firstName lastName email avatar' }
+        }
       ])
       .lean()
 
@@ -1009,6 +1156,19 @@ export async function PUT(
 
     // Cast to LeanTask type for type safety (using unknown first to avoid type errors)
     const task: LeanTask = taskResultTyped as unknown as LeanTask
+
+    // Automatically adjust dependent tasks' schedule if blocking task was delayed
+    if (scheduleDelayMs > 0) {
+      try {
+        const adjustedIds = await adjustDependentTasksSchedule(taskId, scheduleDelayMs, organizationId)
+        if (adjustedIds.length > 0) {
+          console.log(`[Task Schedule Auto-Adjust] Shifted ${adjustedIds.length} dependent task(s) by ${Math.round(scheduleDelayMs / 86400000)} days due to blocking task ${taskId} delay`)
+          invalidateCache(`tasks:*:org:${organizationId}:*`).catch(() => {})
+        }
+      } catch (err) {
+        console.error('Failed to auto-adjust dependent tasks schedule:', err)
+      }
+    }
 
     // Prepare response immediately
     const responseData = {

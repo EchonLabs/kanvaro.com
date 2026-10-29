@@ -75,7 +75,9 @@ export async function generateGanttData(
         start: task.startDate,
         end: task.dueDate,
         progress,
-        dependencies: task.dependencies.map((dep: any) => dep.toString()),
+        dependencies: Array.isArray(task.dependencies)
+          ? task.dependencies.map((dep: any) => (dep?._id || dep).toString())
+          : [],
         type: 'task',
         status: task.status,
         priority: task.priority,
@@ -102,10 +104,12 @@ export async function generateGanttData(
     })
   }
 
-  // Calculate overall date range
-  const allDates = ganttTasks.flatMap(task => [task.start, task.end])
-  const minDate = allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : new Date()
-  const maxDate = allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : new Date()
+  // Overall date range (includes current date with padding)
+  const allDates = [...ganttTasks.flatMap(t => [t.start, t.end]), new Date()]
+  const minDate = new Date(Math.min(...allDates.map(d => new Date(d).getTime())))
+  const maxDate = new Date(Math.max(...allDates.map(d => new Date(d).getTime())))
+  minDate.setDate(minDate.getDate() - 3)
+  maxDate.setDate(maxDate.getDate() + 7)
   
   const totalDuration = maxDate.getTime() - minDate.getTime()
 

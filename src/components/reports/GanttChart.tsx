@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/Button'
-import { ZoomIn, ZoomOut, Calendar, User, AlertTriangle, Layers, ArrowRight } from 'lucide-react'
+import { ZoomIn, ZoomOut, Calendar, User, AlertTriangle, Layers, ArrowRight, Link2 } from 'lucide-react'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { cn } from '@/lib/utils'
 import { GanttTask } from '@/lib/gantt'
@@ -74,15 +74,66 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
 
   const sprintRowTop  = (i: number) => SECTION_H + i * SPRINT_ROW_H
   const taskRowTop    = (i: number) => sprintAreaH + SECTION_H + i * ROW_HEIGHT
+  const startTime     = safeStart.getTime()
 
-  const getBarPosition = (task: GanttTask) => {
+  const getBarPosition = useCallback((task: GanttTask) => {
     const start = task.start instanceof Date ? task.start : new Date(task.start)
     const end   = task.end   instanceof Date ? task.end   : new Date(task.end)
-    const left  = Math.max(0, Math.floor((start.getTime() - safeStart.getTime()) / 86400000)) * dayWidth
+    const left  = Math.max(0, Math.floor((start.getTime() - startTime) / 86400000)) * dayWidth
     const width = Math.max(task.type === 'sprint' ? 80 : 64,
       Math.ceil((end.getTime() - start.getTime()) / 86400000) * dayWidth)
     return { left, width }
-  }
+  }, [startTime, dayWidth])
+
+  // Dependency arrow paths
+  const BAR_H = ROW_HEIGHT - 18
+  const dependencyLines = useMemo(() => {
+    const posMap = new Map<string, { startX: number; endX: number; centerY: number }>()
+    taskRows.forEach((task, i) => {
+      const { left, width } = getBarPosition(task)
+      const barTop = taskSectionTop + SECTION_H + i * ROW_HEIGHT + (ROW_HEIGHT - BAR_H) / 2
+      posMap.set(task.id, { startX: left, endX: left + width, centerY: barTop + BAR_H / 2 })
+    })
+
+    const lines: { id: string; fromId: string; toId: string; path: string }[] = []
+    taskRows.forEach((toTask) => {
+      if (!Array.isArray(toTask.dependencies)) return
+      const toPos = posMap.get(toTask.id)
+      if (!toPos) return
+
+      toTask.dependencies.forEach((fromId) => {
+        if (!fromId || fromId === toTask.id) return
+        const fromPos = posMap.get(fromId)
+        if (!fromPos) return
+
+        const x1 = fromPos.endX
+        const y1 = fromPos.centerY
+        const x2 = toPos.startX
+        const y2 = toPos.centerY
+
+        let path: string
+        if (y1 === y2) {
+          path = `M ${x1} ${y1} H ${x2}`
+        } else if (x2 >= x1 + 16) {
+          const cx = x2 - 12
+          const dirY = y2 > y1 ? 1 : -1
+          const r = Math.min(10, Math.max(2, (cx - x1) / 2), Math.abs(y2 - y1) / 2)
+          path = `M ${x1} ${y1} H ${cx - r} Q ${cx} ${y1}, ${cx} ${y1 + dirY * r} V ${y2 - dirY * r} Q ${cx} ${y2}, ${cx + r} ${y2} H ${x2}`
+        } else {
+          const ex = x1 + 12
+          const cx = x2 - 12
+          const dirY = y2 > y1 ? 1 : -1
+          const gapY = y1 + dirY * 26
+          const r = 6
+          path = `M ${x1} ${y1} H ${ex - r} Q ${ex} ${y1}, ${ex} ${y1 + dirY * r} V ${gapY - dirY * r} Q ${ex} ${gapY}, ${ex - r} ${gapY} H ${cx + r} Q ${cx} ${gapY}, ${cx} ${gapY + dirY * r} V ${y2 - dirY * r} Q ${cx} ${y2}, ${cx + r} ${y2} H ${x2}`
+        }
+
+        lines.push({ id: `${fromId}->${toTask.id}`, fromId, toId: toTask.id, path })
+      })
+    })
+
+    return lines
+  }, [taskRows, taskSectionTop, getBarPosition, BAR_H])
 
   // Month / day header
   const timelineDates: Date[] = []
@@ -103,6 +154,23 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
   const showTodayLine = todayOffset >= 0 && todayOffset <= totalDays
 
   const LEFT_PANEL_W = 220
+
+  const scrollToToday = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    if (!containerRef.current) return
+    const containerW = containerRef.current.clientWidth || 1000
+    const visibleTimelineW = Math.max(300, containerW - LEFT_PANEL_W)
+    const targetScroll = Math.max(0, (todayOffset * dayWidth + dayWidth / 2) - (visibleTimelineW / 2))
+    containerRef.current.scrollTo({ left: targetScroll, behavior })
+  }, [todayOffset, dayWidth])
+
+  // Automatically center Today
+  useEffect(() => {
+    if (!containerRef.current || !showTodayLine) return
+    const timer = setTimeout(() => {
+      scrollToToday('auto')
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [startTime, showTodayLine, scrollToToday])
 
   return (
     <div className={cn('w-full', className)}>
@@ -129,6 +197,20 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
           ))}
         </div>
 
+        <div className="flex items-center gap-2">
+          {showTodayLine && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => scrollToToday('smooth')}
+              className="h-7 px-2.5 rounded-full text-[11px] font-medium border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] hover:bg-card text-[var(--apple-label)] apple-transition flex items-center gap-1.5 shadow-sm"
+              title="Center current date in the middle of timeline"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--apple-chart-color)] animate-pulse" />
+              Today
+            </Button>
+          )}
+
         {/* Zoom control */}
         <div className="flex items-center gap-1 rounded-full border border-[var(--apple-separator)] bg-[var(--apple-tertiary-fill)] p-0.5 px-1">
           <Button
@@ -151,6 +233,7 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
             <ZoomIn className="h-3.5 w-3.5" />
           </Button>
         </div>
+        </div>
       </div>
 
       {/* ── Chart body ── */}
@@ -159,11 +242,11 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
 
           {/* ── Left panel ── */}
           <div
-            className="flex-shrink-0 border-r border-[var(--apple-separator)] sticky left-0 z-20 bg-card"
+            className="flex-shrink-0 border-r border-[var(--apple-separator)] sticky left-0 z-30 bg-card"
             style={{ width: LEFT_PANEL_W }}
           >
             {/* Timeline header placeholder (aligns with the month+day rows) */}
-            <div className="sticky top-0 z-20 border-b border-[var(--apple-separator)] bg-card" style={{ height: 52 }}>
+            <div className="sticky top-0 z-40 border-b border-[var(--apple-separator)] bg-card" style={{ height: 52 }}>
               <div className="flex items-end h-full px-4 pb-1.5">
                 <span className="apple-section-label text-[var(--apple-secondary-label)]">Name</span>
               </div>
@@ -251,7 +334,7 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                           : 'hover:bg-[var(--apple-tertiary-fill)]'
                       )}
                       style={{ height: ROW_HEIGHT }}
-                      onClick={() => { setSelected(task.id); onTaskClick?.(task) }}
+                      onClick={() => onTaskClick?.(task)}
                     >
                       {/* Priority dot */}
                       <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', PRIORITY_DOT[task.priority] ?? 'bg-gray-400')} />
@@ -259,7 +342,7 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                       <div className="min-w-0 flex-1">
                         <p className={cn(
                           'text-[12px] font-medium leading-tight truncate',
-                          isSelected ? 'text-[var(--apple-chart-color)]' : 'text-[var(--apple-label)]'
+                          isSelected ? 'text-[var(--apple-chart-color)] font-semibold' : 'text-[var(--apple-label)]'
                         )}>
                           {task.title}
                         </p>
@@ -268,6 +351,15 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                             <span className="flex items-center gap-0.5 text-[10px] text-[var(--apple-tertiary-label)] truncate">
                               <User className="h-2.5 w-2.5 flex-shrink-0" />
                               {task.assignee}
+                            </span>
+                          )}
+                          {Array.isArray(task.dependencies) && task.dependencies.length > 0 && (
+                            <span
+                              className="flex items-center gap-0.5 text-[10px] text-[var(--apple-chart-color)] font-apple-mono flex-shrink-0"
+                              title={`${task.dependencies.length} dependenc${task.dependencies.length > 1 ? 'ies' : 'y'}`}
+                            >
+                              <Link2 className="h-2.5 w-2.5 flex-shrink-0" />
+                              {task.dependencies.length}
                             </span>
                           )}
                           {isOverdue && <AlertTriangle className="h-2.5 w-2.5 text-red-500 flex-shrink-0" />}
@@ -284,16 +376,16 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
           <div className="relative flex-1" style={{ width: totalDays * dayWidth }}>
 
             {/* Month + day header (sticky) */}
-            <div className="sticky top-0 z-10 border-b border-[var(--apple-separator)] bg-card" style={{ height: 52 }}>
+            <div className="sticky top-0 z-20 border-b border-[var(--apple-separator)] bg-card" style={{ height: 52 }}>
               {/* Month row */}
-              <div className="flex border-b border-[var(--apple-separator)]" style={{ height: 24 }}>
+              <div className="flex border-b border-[var(--apple-separator)] bg-card" style={{ height: 24 }}>
                 {months.map((m, i) => (
                   <div
                     key={i}
-                    className="flex-shrink-0 border-r border-[var(--apple-separator)] flex items-center px-2"
+                    className="flex-shrink-0 border-r border-[var(--apple-separator)] flex items-center px-2 overflow-hidden min-w-0 bg-card"
                     style={{ width: m.count * dayWidth }}
                   >
-                    <span className="text-[10px] font-semibold text-[var(--apple-secondary-label)] tracking-[0.04em] uppercase truncate">
+                    <span className="text-[10px] font-semibold text-[var(--apple-secondary-label)] tracking-[0.04em] uppercase truncate select-none">
                       {m.label}
                     </span>
                   </div>
@@ -387,6 +479,63 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                 </>
               )}
 
+              {/* ── Dependency Arrows ── */}
+              {dependencyLines.length > 0 && (
+                <svg
+                  className="absolute inset-0 pointer-events-none z-[5]"
+                  style={{ width: totalDays * dayWidth, height: totalBodyH }}
+                >
+                  <defs>
+                    <marker
+                      id="gantt-arrow"
+                      viewBox="0 0 10 10"
+                      refX="8"
+                      refY="5"
+                      markerWidth="5"
+                      markerHeight="5"
+                      orient="auto"
+                    >
+                      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="currentColor" />
+                    </marker>
+                    <marker
+                      id="gantt-arrow-active"
+                      viewBox="0 0 10 10"
+                      refX="8"
+                      refY="5"
+                      markerWidth="6"
+                      markerHeight="6"
+                      orient="auto"
+                    >
+                      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="var(--apple-chart-color)" />
+                    </marker>
+                  </defs>
+
+                  {dependencyLines.map((line) => {
+                    const isRelated = selectedTask && (selectedTask === line.fromId || selectedTask === line.toId)
+                    return (
+                      <path
+                        key={line.id}
+                        d={line.path}
+                        fill="none"
+                        stroke={isRelated ? 'var(--apple-chart-color)' : 'currentColor'}
+                        strokeWidth={isRelated ? 2 : 1.25}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        markerEnd={isRelated ? 'url(#gantt-arrow-active)' : 'url(#gantt-arrow)'}
+                        className={cn(
+                          'transition-all duration-200',
+                          isRelated
+                            ? 'text-[var(--apple-chart-color)] opacity-100'
+                            : selectedTask
+                            ? 'text-neutral-400 dark:text-neutral-600 opacity-15'
+                            : 'text-neutral-400 dark:text-neutral-500 opacity-40'
+                        )}
+                      />
+                    )
+                  })}
+                </svg>
+              )}
+
               {/* ── Sprint phase bars ── */}
               {sprintRows.map((sprint, i) => {
                 const { left, width } = getBarPosition(sprint)
@@ -449,9 +598,9 @@ export function GanttChart({ tasks, startDate, endDate, onTaskClick, className }
                 return (
                   <div
                     key={task.id}
-                    className="absolute flex items-center cursor-pointer"
+                    className="absolute flex items-center cursor-pointer z-10"
                     style={{ top: barTop, left, width, height: BAR_H }}
-                    onClick={() => { setSelected(task.id); onTaskClick?.(task) }}
+                    onClick={() => setSelected(prev => prev === task.id ? null : task.id)}
                   >
                     <div
                       className={cn(
