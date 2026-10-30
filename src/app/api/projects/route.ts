@@ -145,33 +145,51 @@ export async function GET(request: NextRequest) {
       }))
     })
 
-    // Calculate progress for each project
-    const projectsWithProgress = await Promise.all(
-      projects.map(async (project) => {
-        const tasks = await Task.find({ 
-          project: project._id,
-          organization: organizationId
-        })
-        
-        const totalTasks = tasks.length
-        // Consider tasks with status 'done' or 'completed' as completed
-        const tasksCompleted = tasks.filter(
-          task => task.status === 'done' || task.status === 'completed'
-        ).length
-        const completionPercentage = totalTasks > 0 
-          ? Math.round((tasksCompleted / totalTasks) * 100) 
-          : 0
-
-        return {
-          ...project.toObject(),
-          progress: {
-            completionPercentage,
-            tasksCompleted,
-            totalTasks
+    // Calculate progress for each project in a single aggregation
+    const projectIds = projects.map(p => p._id)
+    const taskStats = projectIds.length > 0 ? await Task.aggregate([
+      {
+        $match: {
+          project: { $in: projectIds },
+          organization: new mongoose.Types.ObjectId(String(organizationId))
+        }
+      },
+      {
+        $group: {
+          _id: '$project',
+          totalTasks: { $sum: 1 },
+          tasksCompleted: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['done', 'completed']] },
+                1,
+                0
+              ]
+            }
           }
         }
-      })
-    )
+      }
+    ]) : []
+
+    const statsMap = new Map(taskStats.map(s => [s._id.toString(), s]))
+
+    const projectsWithProgress = projects.map((project) => {
+      const stats = statsMap.get(project._id.toString())
+      const totalTasks = stats?.totalTasks || 0
+      const tasksCompleted = stats?.tasksCompleted || 0
+      const completionPercentage = totalTasks > 0
+        ? Math.round((tasksCompleted / totalTasks) * 100)
+        : 0
+
+      return {
+        ...project.toObject(),
+        progress: {
+          completionPercentage,
+          tasksCompleted,
+          totalTasks
+        }
+      }
+    })
 
     return NextResponse.json({
       success: true,
