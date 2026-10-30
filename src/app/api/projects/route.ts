@@ -120,22 +120,24 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const projects = await Project.find(projectQuery)
-      .select('name startDate endDate createdBy teamMembers client status priority settings')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('client', 'firstName lastName email')
-      .populate('teamMembers.memberId', 'firstName lastName email avatar _id')
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-
-    const total = await Project.countDocuments(projectQuery)
+    const [projects, total] = await Promise.all([
+      Project.find(projectQuery)
+        .select('name startDate endDate createdBy teamMembers client status priority settings')
+        .populate('createdBy', 'firstName lastName email')
+        .populate('client', 'firstName lastName email')
+        .populate('teamMembers.memberId', 'firstName lastName email avatar _id')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Project.countDocuments(projectQuery)
+    ])
 
     console.log('Projects API - Query results:', {
       query: projectQuery,
       totalProjectsFound: total,
       projectsReturned: projects.length,
-      projects: projects.map(p => ({
+      projects: projects.map((p: any) => ({
         _id: p._id,
         name: p.name,
         createdBy: p.createdBy?._id,
@@ -146,7 +148,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Calculate progress for each project in a single aggregation
-    const projectIds = projects.map(p => p._id)
+    const projectIds = (projects as any[]).map((p: any) => p._id)
     const taskStats = projectIds.length > 0 ? await Task.aggregate([
       {
         $match: {
@@ -173,7 +175,7 @@ export async function GET(request: NextRequest) {
 
     const statsMap = new Map(taskStats.map(s => [s._id.toString(), s]))
 
-    const projectsWithProgress = projects.map((project) => {
+    const projectsWithProgress = (projects as any[]).map((project: any) => {
       const stats = statsMap.get(project._id.toString())
       const totalTasks = stats?.totalTasks || 0
       const tasksCompleted = stats?.tasksCompleted || 0
@@ -181,8 +183,9 @@ export async function GET(request: NextRequest) {
         ? Math.round((tasksCompleted / totalTasks) * 100)
         : 0
 
+      const projectData = (project as any).toObject ? (project as any).toObject() : project
       return {
-        ...project.toObject(),
+        ...projectData,
         progress: {
           completionPercentage,
           tasksCompleted,

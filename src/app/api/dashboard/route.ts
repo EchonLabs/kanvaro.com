@@ -151,14 +151,22 @@ export async function GET(request: NextRequest) {
       getTeamActivity(organizationId, userId, canViewAll, canViewAll)
     ])
 
-    const timeStats = await getTimeStats(
-      organizationId,
-      startOfDay,
-      startOfWeek,
-      startOfMonth,
-      now,
-      { userId }
-    )
+    const [timeStats, lastMonthStats] = await Promise.all([
+      getTimeStats(
+        organizationId,
+        startOfDay,
+        startOfWeek,
+        startOfMonth,
+        now,
+        { userId }
+      ),
+      getLastMonthStats(
+        organizationId,
+        startOfLastMonth,
+        endOfLastMonth,
+        { userId }
+      )
+    ])
 
     // Batch-aggregate total time tracked (minutes) per project — one query for all recent projects
     const recentProjectIds = recentProjects.map(p => p._id)
@@ -236,12 +244,6 @@ export async function GET(request: NextRequest) {
     console.log('Dashboard total hours tracked:', stats.hoursTracked)
 
     // Calculate changes from last month
-    const lastMonthStats = await getLastMonthStats(
-      organizationId,
-      startOfLastMonth,
-      endOfLastMonth,
-      { userId }
-    )
     const changes = {
       activeProjects: activeProjects - lastMonthStats.activeProjects,
       completedTasks: completedTasks - lastMonthStats.completedTasks,
@@ -341,93 +343,113 @@ async function getTimeStats(
     matchFilter.user = options.userId
   }
 
-  const [todayStats, weekStats, monthStats] = await Promise.all([
-    TimeEntry.aggregate([
-      {
-        $match: {
-          ...matchFilter,
-          startTime: { $gte: startOfDay, $lte: endDate }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalDuration: { $sum: '$duration' },
-          totalCost: { 
-            $sum: { 
-              $cond: [
-                { $and: ['$hourlyRate', '$duration', { $eq: ['$isBillable', true] }] },
-                { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
-                0
-              ]
-            }
+  // Determine the earliest date between startOfMonth and startOfWeek to properly handle month boundaries
+  const earliestDate = startOfWeek < startOfMonth ? startOfWeek : startOfMonth
+
+  const [statsResult] = await TimeEntry.aggregate([
+    {
+      $match: {
+        ...matchFilter,
+        startTime: { $gte: earliestDate, $lte: endDate }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        monthDuration: {
+          $sum: {
+            $cond: [
+              { $gte: ['$startTime', startOfMonth] },
+              '$duration',
+              0
+            ]
+          }
+        },
+        monthCost: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $gte: ['$startTime', startOfMonth] },
+                  '$hourlyRate',
+                  '$duration',
+                  { $eq: ['$isBillable', true] }
+                ]
+              },
+              { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
+              0
+            ]
+          }
+        },
+        weekDuration: {
+          $sum: {
+            $cond: [
+              { $gte: ['$startTime', startOfWeek] },
+              '$duration',
+              0
+            ]
+          }
+        },
+        weekCost: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $gte: ['$startTime', startOfWeek] },
+                  '$hourlyRate',
+                  '$duration',
+                  { $eq: ['$isBillable', true] }
+                ]
+              },
+              { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
+              0
+            ]
+          }
+        },
+        todayDuration: {
+          $sum: {
+            $cond: [
+              { $gte: ['$startTime', startOfDay] },
+              '$duration',
+              0
+            ]
+          }
+        },
+        todayCost: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $gte: ['$startTime', startOfDay] },
+                  '$hourlyRate',
+                  '$duration',
+                  { $eq: ['$isBillable', true] }
+                ]
+              },
+              { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
+              0
+            ]
           }
         }
       }
-    ]),
-    TimeEntry.aggregate([
-      {
-        $match: {
-          ...matchFilter,
-          startTime: { $gte: startOfWeek, $lte: endDate }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalDuration: { $sum: '$duration' },
-          totalCost: { 
-            $sum: { 
-              $cond: [
-                { $and: ['$hourlyRate', '$duration', { $eq: ['$isBillable', true] }] },
-                { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
-                0
-              ]
-            }
-          }
-        }
-      }
-    ]),
-    TimeEntry.aggregate([
-      {
-        $match: {
-          ...matchFilter,
-          startTime: { $gte: startOfMonth, $lte: endDate }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalDuration: { $sum: '$duration' },
-          totalCost: { 
-            $sum: { 
-              $cond: [
-                { $and: ['$hourlyRate', '$duration', { $eq: ['$isBillable', true] }] },
-                { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
-                0
-              ]
-            }
-          }
-        }
-      }
-    ])
+    }
   ])
 
   return {
     today: {
-      duration: todayStats[0]?.totalDuration || 0,
-      cost: todayStats[0]?.totalCost || 0
+      duration: statsResult?.todayDuration || 0,
+      cost: statsResult?.todayCost || 0
     },
     week: {
-      duration: weekStats[0]?.totalDuration || 0,
-      cost: weekStats[0]?.totalCost || 0
+      duration: statsResult?.weekDuration || 0,
+      cost: statsResult?.weekCost || 0
     },
     month: {
-      duration: monthStats[0]?.totalDuration || 0,
-      cost: monthStats[0]?.totalCost || 0
+      duration: statsResult?.monthDuration || 0,
+      cost: statsResult?.monthCost || 0
     },
-    totalDuration: monthStats[0]?.totalDuration || 0,
-    totalCost: monthStats[0]?.totalCost || 0
+    totalDuration: statsResult?.monthDuration || 0,
+    totalCost: statsResult?.monthCost || 0
   }
 }
 
