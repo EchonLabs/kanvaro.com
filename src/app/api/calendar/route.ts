@@ -39,15 +39,16 @@ export async function GET(request: NextRequest) {
       Task.find({
         organization: organizationId,
         $or: [
-          { assignedTo: userId },
+          { 'assignedTo.user': userId },
           { createdBy: userId }
         ],
         ...(Object.keys(dateFilter).length > 0 && { dueDate: dateFilter })
       })
         .populate('project', 'name')
-        .populate('assignedTo', 'firstName lastName email')
+        .populate('assignedTo.user', 'firstName lastName email')
         .populate('createdBy', 'firstName lastName email')
-        .sort({ dueDate: 1 }),
+        .sort({ dueDate: 1 })
+        .lean(),
       
       Sprint.find({
         organization: organizationId,

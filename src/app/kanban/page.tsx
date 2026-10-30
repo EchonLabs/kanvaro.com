@@ -500,8 +500,7 @@ export default function KanbanPage() {
 
   useEffect(() => {
     fetchSelectedProject(projectFilter)
-    if (projectFilter !== 'all') fetchProjects(true)
-  }, [projectFilter, fetchSelectedProject, fetchProjects])
+  }, [projectFilter, fetchSelectedProject])
 
   const checkAuth = useCallback(async () => {
     try {
