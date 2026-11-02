@@ -1,3 +1,19 @@
+# [1.49.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.48.0...v1.49.0) (2026-11-02)
+
+
+### Bug Fixes
+
+* address review feedback on dependency permission checks and assignees ([aede5c1](https://github.com/EchonLabs/kanvaro.com/commit/aede5c13b685a8026d03e875a488d0df1b13515a))
+* enforce permission checks in task dependencies endpoints ([7c68538](https://github.com/EchonLabs/kanvaro.com/commit/7c685387cb7acc6f5ae17bed370dd6d310a03e0d))
+
+
+### Features
+
+* add TaskDependencies component and integrate into view/edit views ([74cc7b4](https://github.com/EchonLabs/kanvaro.com/commit/74cc7b4f595b7b610748eb96afe5775d8a9328dd))
+* implement task dependencies API, cycle detection, and completion validation ([0be31ad](https://github.com/EchonLabs/kanvaro.com/commit/0be31ad11eca787b26a888b69244adee8d899f9f))
+* implement task dependencies API, cycle detection, and completion validation ([dd34723](https://github.com/EchonLabs/kanvaro.com/commit/dd347237fc448a3a6c0fa283ca0ffe8d0e012d74))
+* integrate task dependencies into task creation views ([af0fe10](https://github.com/EchonLabs/kanvaro.com/commit/af0fe10f871d65cc9a88d917714b19a4f0ab8c8e))
+
 # [1.48.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.47.0...v1.48.0) (2026-10-27)
 
 
