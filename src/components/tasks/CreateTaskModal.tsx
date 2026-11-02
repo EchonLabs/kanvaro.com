@@ -28,6 +28,7 @@ import { AttachmentList } from '@/components/ui/AttachmentList'
 import { useNotify } from '@/lib/notify'
 import { TASK_TITLE_MAX_WORDS, countWords, truncateToMaxWords } from '@/lib/text/word-limit'
 import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
+import { TaskDependencies, syncTaskDependencies } from '@/components/tasks/TaskDependencies'
 import { Permission, PermissionGate } from '@/lib/permissions'
 import TaskCategoryManagerModal from './TaskCategoryManagerModal'
 
@@ -198,6 +199,8 @@ export default function CreateTaskModal({
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
   const [attachmentError, setAttachmentError] = useState('')
+  const [draftBlockedBy, setDraftBlockedBy] = useState<any[]>([])
+  const [draftBlocking, setDraftBlocking] = useState<any[]>([])
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
 
@@ -470,6 +473,8 @@ export default function CreateTaskModal({
       setAttachments([])
       setAttachmentError('')
       setIsUploadingAttachment(false)
+      setDraftBlockedBy([])
+      setDraftBlocking([])
     }
   }, [isOpen, projectId])
 
@@ -689,6 +694,22 @@ export default function CreateTaskModal({
         }
       }
 
+      // Sync dependencies if any were staged
+      const createdTaskId = data.data?._id
+      if (createdTaskId && (draftBlockedBy.length > 0 || draftBlocking.length > 0)) {
+        try {
+          await syncTaskDependencies(
+            createdTaskId,
+            [],
+            [],
+            draftBlockedBy,
+            draftBlocking
+          )
+        } catch (depErr) {
+          console.error('Failed to sync dependencies for new task:', depErr)
+        }
+      }
+
       notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
       setError('')
       onTaskCreated()
@@ -716,6 +737,8 @@ export default function CreateTaskModal({
       if (!projectId) setSelectedProjectId('')
       setAttachments([])
       setAttachmentError('')
+      setDraftBlockedBy([])
+      setDraftBlocking([])
       onClose()
 
       if (!stayOnCurrentPage) {
@@ -1416,6 +1439,20 @@ export default function CreateTaskModal({
                   }
                 }}
                 disabled={loading}
+              />
+            </div>
+
+            {/* Dependencies Section */}
+            <div className="mt-4 pt-4 border-t border-[var(--apple-separator)]">
+              <TaskDependencies
+                taskStatus={defaultStatus || 'backlog'}
+                initialBlockedBy={draftBlockedBy}
+                initialBlocking={draftBlocking}
+                staged={true}
+                onChange={({ blockedBy, blocking }) => {
+                  setDraftBlockedBy(blockedBy)
+                  setDraftBlocking(blocking)
+                }}
               />
             </div>
 

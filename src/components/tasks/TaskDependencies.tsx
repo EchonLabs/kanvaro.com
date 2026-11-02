@@ -55,7 +55,7 @@ export interface DependencyTask {
 }
 
 interface TaskDependenciesProps {
-  taskId: string
+  taskId?: string
   taskStatus?: string
   initialBlockedBy?: DependencyTask[]
   initialBlocking?: DependencyTask[]
@@ -143,7 +143,7 @@ export async function syncTaskDependencies(
 const EMPTY_DEPENDENCIES: DependencyTask[] = []
 
 export function TaskDependencies({
-  taskId,
+  taskId = '',
   taskStatus,
   initialBlockedBy = EMPTY_DEPENDENCIES,
   initialBlocking = EMPTY_DEPENDENCIES,
@@ -252,7 +252,7 @@ export function TaskDependencies({
           // Exclude the current task and already linked tasks in the selected relationship
           const currentList = relationshipType === 'blocked_by' ? blockedByRef.current : blockingRef.current
           const currentLinkedIds = new Set(currentList.map((t) => (t?._id || t).toString()))
-          currentLinkedIds.add(taskId.toString())
+          if (taskId) currentLinkedIds.add(taskId.toString())
 
           const filtered = list.filter((t: any) => !currentLinkedIds.has(t._id?.toString()))
           setSearchResults(filtered)
