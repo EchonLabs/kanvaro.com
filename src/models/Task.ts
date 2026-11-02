@@ -131,7 +131,8 @@ export interface ITask extends Document {
   startDate?: Date
   completedAt?: Date
   labels: string[]
-  dependencies: mongoose.Types.ObjectId[]
+  dependencies: mongoose.Types.ObjectId[] | any[]
+  blockingTasks?: mongoose.Types.ObjectId[] | any[]
   attachments: {
     name: string
     url: string
@@ -562,6 +563,7 @@ TaskSchema.index({ project: 1, status: 1, createdAt: -1 })
 TaskSchema.index({ dueDate: 1, status: 1, archived: 1 })
 TaskSchema.index({ dueDate: 1, 'remindersSent.dueSoon24h': 1 })
 TaskSchema.index({ dueDate: 1, 'remindersSent.overdue': 1 })
+TaskSchema.index({ dependencies: 1 })
 TaskSchema.index({ title: 'text', description: 'text' })
 
 // ---------------------------------------------------------------------------
