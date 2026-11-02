@@ -9,8 +9,8 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 
 const TASK_POPULATE_FIELDS = '_id displayId taskNumber title status priority type project assignedTo dueDate'
 
-// Authenticate, validate task ID parameter, and verify user permissions
-async function authAndConnect(taskId: string, action: 'read' | 'write' = 'read') {
+// Authenticate user, validate task ID, and verify task belongs to user's organization
+async function getTaskAndAuthorize(taskId: string) {
   const auth = await authenticateUser()
   if ('error' in auth) return { error: auth.error, status: auth.status }
   await connectDB()
@@ -18,66 +18,68 @@ async function authAndConnect(taskId: string, action: 'read' | 'write' = 'read')
     return { error: 'Invalid task ID', status: 400 }
   }
 
-  const userId = auth.user.id
-  const organizationId = auth.user.organization
-
-  // Verify task exists and belongs to the user's organization
-  const task = await Task.findOne({ _id: taskId, organization: organizationId }).select('_id project assignedTo createdBy')
+  const task = await Task.findOne({ _id: taskId, organization: auth.user.organization })
+    .select('_id displayId title status project assignedTo createdBy')
   if (!task) {
     return { error: 'Task not found or unauthorized', status: 404 }
-  }
-
-  const isAssignee = Array.isArray(task.assignedTo) && task.assignedTo.some((a: any) => (a.user?._id || a.user || a)?.toString() === userId.toString())
-  const isCreator = task.createdBy && task.createdBy.toString() === userId.toString()
-  const projectId = task.project?.toString()
-
-  if (action === 'read') {
-    const [hasTaskViewAll, hasProjectViewAll, canViewAssignedProjects] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ASSIGNED_PROJECTS)
-    ])
-
-    let hasAccess = hasTaskViewAll || hasProjectViewAll || isAssignee || isCreator
-    if (!hasAccess && canViewAssignedProjects && projectId) {
-      const accessibleProjects = await PermissionService.getAccessibleProjects(userId)
-      hasAccess = accessibleProjects.includes(projectId)
-    }
-
-    if (!hasAccess) {
-      return { error: 'Unauthorized to view task dependencies', status: 403 }
-    }
-  } else {
-    const [hasTaskEditAll, hasProjectViewAll, canEditAssignedProjects, canTaskUpdate] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TASK_EDIT_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.TASK_EDIT_ASSIGNED_PROJECTS),
-      PermissionService.hasPermission(userId, Permission.TASK_UPDATE, projectId)
-    ])
-
-    let hasAccess = hasTaskEditAll || hasProjectViewAll || canTaskUpdate || isAssignee || isCreator
-    if (!hasAccess && canEditAssignedProjects && projectId) {
-      const accessibleProjects = await PermissionService.getAccessibleProjects(userId)
-      hasAccess = accessibleProjects.includes(projectId)
-    }
-
-    if (!hasAccess) {
-      return { error: 'Unauthorized to manage task dependencies', status: 403 }
-    }
   }
 
   return { user: auth.user, task }
 }
 
+// Verify user has permission to view the task
+async function canViewTask(userId: string, task: any): Promise<boolean> {
+  const isAssignee = Array.isArray(task.assignedTo) && task.assignedTo.some((a: any) => (a.user?._id || a.user || a)?.toString() === userId.toString())
+  const isCreator = task.createdBy?.toString() === userId.toString()
+  if (isAssignee || isCreator) return true
+
+  const [hasTaskViewAll, hasProjectViewAll, canViewAssignedProjects] = await Promise.all([
+    PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL),
+    PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
+    PermissionService.hasPermission(userId, Permission.TASK_VIEW_ASSIGNED_PROJECTS)
+  ])
+  if (hasTaskViewAll || hasProjectViewAll) return true
+
+  if (canViewAssignedProjects && task.project) {
+    const accessibleProjects = await PermissionService.getAccessibleProjects(userId)
+    return accessibleProjects.includes(task.project.toString())
+  }
+  return false
+}
+
+// Verify user has permission to modify the task
+async function canEditTask(userId: string, task: any): Promise<boolean> {
+  const isAssignee = Array.isArray(task.assignedTo) && task.assignedTo.some((a: any) => (a.user?._id || a.user || a)?.toString() === userId.toString())
+  const isCreator = task.createdBy?.toString() === userId.toString()
+  const projectId = task.project?.toString()
+
+  const [hasTaskEditAll, hasProjectViewAll, canEditAssignedProjects] = await Promise.all([
+    PermissionService.hasPermission(userId, Permission.TASK_EDIT_ALL),
+    PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
+    PermissionService.hasPermission(userId, Permission.TASK_EDIT_ASSIGNED_PROJECTS)
+  ])
+  if (hasTaskEditAll || hasProjectViewAll || isAssignee || isCreator) return true
+
+  if (canEditAssignedProjects && projectId) {
+    const accessibleProjects = await PermissionService.getAccessibleProjects(userId)
+    return accessibleProjects.includes(projectId)
+  }
+  return false
+}
+
 // Extract targetTaskId and relationship from body or query params
-async function getDependencyPayload(req: NextRequest) {
+async function getDependencyPayload(req: NextRequest): Promise<{ targetTaskId: string; relationship: string }> {
   try {
-    return await req.json()
+    const body = await req.json()
+    return {
+      targetTaskId: String(body?.targetTaskId || ''),
+      relationship: String(body?.relationship || ''),
+    }
   } catch {
     const url = new URL(req.url)
     return {
-      targetTaskId: url.searchParams.get('targetTaskId'),
-      relationship: url.searchParams.get('relationship'),
+      targetTaskId: url.searchParams.get('targetTaskId') || '',
+      relationship: url.searchParams.get('relationship') || '',
     }
   }
 }
@@ -96,6 +98,13 @@ function validatePayload(taskId: string, targetTaskId: any, relationship: any) {
   return null
 }
 
+// Helper to fetch string dependency IDs for a given task
+async function getTaskDependencyIds(taskId: string, orgId: any): Promise<string[]> {
+  const task: any = await Task.findOne({ _id: taskId, organization: orgId }).select('dependencies').lean()
+  if (!task || !Array.isArray(task.dependencies)) return []
+  return task.dependencies.map((dep: any) => (dep?._id || dep).toString())
+}
+
 // Check if a dependency chain would create an infinite cycle
 async function wouldCreateCycle(fromId: string, toId: string, orgId: any): Promise<boolean> {
   const visited = new Set<string>()
@@ -107,13 +116,10 @@ async function wouldCreateCycle(fromId: string, toId: string, orgId: any): Promi
     if (visited.has(current)) continue
     visited.add(current)
 
-    const t = await Task.findOne({ _id: current, organization: orgId }).select('dependencies').lean()
-    if (t && Array.isArray((t as any).dependencies)) {
-      for (const depId of (t as any).dependencies) {
-        const depStr = (depId?._id || depId).toString()
-        if (depStr === toId) return true
-        if (!visited.has(depStr)) queue.push(depStr)
-      }
+    const depIds = await getTaskDependencyIds(current, orgId)
+    for (const depId of depIds) {
+      if (depId === toId) return true
+      if (!visited.has(depId)) queue.push(depId)
     }
   }
   return false
@@ -146,8 +152,12 @@ async function fetchDependencies(taskId: string, orgId: any) {
  */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const auth = await authAndConnect(params.id, 'read')
+    const auth = await getTaskAndAuthorize(params.id)
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
+    if (!(await canViewTask(auth.user.id, auth.task))) {
+      return NextResponse.json({ error: 'Unauthorized to view task dependencies' }, { status: 403 })
+    }
 
     const data = await fetchDependencies(params.id, auth.user.organization)
     return NextResponse.json({ success: true, data })
@@ -162,21 +172,23 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const auth = await authAndConnect(params.id, 'write')
+    const auth = await getTaskAndAuthorize(params.id)
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
+    if (!(await canEditTask(auth.user.id, auth.task))) {
+      return NextResponse.json({ error: 'Unauthorized to manage task dependencies' }, { status: 403 })
+    }
 
     const { targetTaskId, relationship } = await getDependencyPayload(req)
     const validationError = validatePayload(params.id, targetTaskId, relationship)
     if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
 
     const orgId = auth.user.organization
-    const [currentTask, targetTask] = await Promise.all([
-      Task.findOne({ _id: params.id, organization: orgId }).select('_id displayId title status'),
-      Task.findOne({ _id: targetTaskId, organization: orgId }).select('_id displayId title status')
-    ])
+    const currentTask = auth.task
+    const targetTask = await Task.findOne({ _id: targetTaskId, organization: orgId }).select('_id displayId title status')
 
-    if (!currentTask || !targetTask) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    if (!targetTask) {
+      return NextResponse.json({ error: 'Target task not found' }, { status: 404 })
     }
 
     if (['done', 'cancelled'].includes(targetTask.status) || ['done', 'cancelled'].includes(currentTask.status)) {
@@ -218,8 +230,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
  */
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const auth = await authAndConnect(params.id, 'write')
+    const auth = await getTaskAndAuthorize(params.id)
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
+    if (!(await canEditTask(auth.user.id, auth.task))) {
+      return NextResponse.json({ error: 'Unauthorized to manage task dependencies' }, { status: 403 })
+    }
 
     const { targetTaskId, relationship } = await getDependencyPayload(req)
     const validationError = validatePayload(params.id, targetTaskId, relationship)
@@ -227,10 +243,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
     const orgId = auth.user.organization
     const dependentId = relationship === 'blocked_by' ? params.id : targetTaskId
-    const blockerId = relationship === 'blocked_by' ? targetTaskId : params.id
+    const blockerId: string = relationship === 'blocked_by' ? targetTaskId : params.id
 
     await Task.findByIdAndUpdate(dependentId, {
-      $pull: { dependencies: new mongoose.Types.ObjectId(blockerId) }
+      $pull: { dependencies: new mongoose.Types.ObjectId(blockerId as string) }
     })
 
     await logTaskActivity({
