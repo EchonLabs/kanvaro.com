@@ -4,11 +4,8 @@ import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect, typ
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase, cn } from '@/lib/utils'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { useAuthContext } from '@/contexts/AuthContext'
 import {
@@ -72,6 +69,7 @@ import TaskActivityLog from '@/components/tasks/TaskActivityLog'
 import { StartTimerModal } from '@/components/time-tracking/StartTimerModal'
 import { CategoryBadge } from '@/components/tasks/TasksShared'
 import { detectClientTimezone } from '@/lib/timezone'
+import { TaskDependencies } from '@/components/tasks/TaskDependencies'
 
 interface Task {
   _id: string
@@ -207,6 +205,8 @@ interface Task {
       title?: string
     }>
   }>
+  dependencies?: any[]
+  blockingTasks?: any[]
 }
 
 interface AssignableUser {
@@ -1956,8 +1956,18 @@ export default function TaskDetailPage() {
     return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
   }
 
+  const isAssignee = Array.isArray(task?.assignedTo) && task.assignedTo.some(a => {
+    const uId = (a as any)?.user?._id || (a as any)?.user?.id || (a as any)?.user || (a as any)?._id || a
+    return uId && currentUserId && uId.toString() === currentUserId.toString()
+  })
+
   const editAllowed = hasPermission(Permission.TASK_EDIT_ALL) || isCreator(task)
   const deleteAllowed = hasPermission(Permission.TASK_DELETE_ALL)
+  const canManageDependencies =
+    editAllowed ||
+    isAssignee ||
+    hasPermission(Permission.TASK_EDIT_ASSIGNED_PROJECTS) ||
+    hasPermission(Permission.TASK_UPDATE)
 
   const attachmentListItems = (task.attachments || []).map(attachment => ({
     name: attachment.name,
@@ -1985,7 +1995,6 @@ export default function TaskDetailPage() {
     }
     return candidate?.toString?.() ?? null
   })()
-  const isAssignee = task.assignedTo?.some(assignee => assignee.user?._id === currentUserId) || false
 
   const isRelevantActiveTimer = Boolean(
     hasActiveTimer &&
@@ -3001,6 +3010,16 @@ export default function TaskDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Task Dependencies */}
+            <TaskDependencies
+              taskId={task._id}
+              taskStatus={task.status}
+              initialBlockedBy={task.dependencies || []}
+              initialBlocking={task.blockingTasks || []}
+              onUpdated={fetchTask}
+              readOnly={!canManageDependencies}
+            />
 
             {/* Comments */}
             <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card shadow-[0_1px_4px_rgba(0,0,0,0.07)] dark:shadow-none overflow-hidden">

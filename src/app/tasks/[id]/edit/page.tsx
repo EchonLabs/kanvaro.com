@@ -16,6 +16,7 @@ import { AttachmentList } from '@/components/ui/AttachmentList'
 import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar, Paperclip, X, Settings2 } from 'lucide-react'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
+import { TaskDependencies, syncTaskDependencies } from '@/components/tasks/TaskDependencies'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import TaskCategoryManagerModal from '@/components/tasks/TaskCategoryManagerModal'
@@ -389,6 +390,10 @@ export default function EditTaskPage() {
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [taskDependencies, setTaskDependencies] = useState<any[]>([])
+  const [originalDependencies, setOriginalDependencies] = useState<any[]>([])
+  const [taskBlocking, setTaskBlocking] = useState<any[]>([])
+  const [originalBlocking, setOriginalBlocking] = useState<any[]>([])
 
   // Use the notification hook
   const { success: notifySuccess, error: notifyError } = useNotify()
@@ -460,6 +465,10 @@ export default function EditTaskPage() {
         setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
         updateAssignees(() => initialAssignees)
         setOriginalAssignedTo(initialAssignees)
+        setTaskDependencies(data.data?.dependencies || [])
+        setOriginalDependencies(data.data?.dependencies || [])
+        setTaskBlocking(data.data?.blockingTasks || [])
+        setOriginalBlocking(data.data?.blockingTasks || [])
 
         // Initialize hourly rates
         const initialRates: Record<string, string> = {}
@@ -860,6 +869,17 @@ export default function EditTaskPage() {
       const data = await res.json()
 
       if (data.success) {
+        // Sync staged dependencies if any changed
+        await syncTaskDependencies(
+          taskId,
+          originalDependencies,
+          originalBlocking,
+          taskDependencies,
+          taskBlocking
+        )
+        setOriginalDependencies(taskDependencies)
+        setOriginalBlocking(taskBlocking)
+
         // Optimistically update the UI immediately without re-fetching
         // The API already returns the updated task data
         const mappedTask = mapTaskFormState(data.data)
@@ -883,8 +903,8 @@ export default function EditTaskPage() {
       } else {
         notifyError({ title: 'Failed to Save Task', message: data.error || 'Failed to save task' })
       }
-    } catch (e) {
-      notifyError({ title: 'Failed to Save Task', message: 'Failed to save task' })
+    } catch (e: any) {
+      notifyError({ title: 'Failed to Save Task', message: e?.message || 'Failed to save task' })
     } finally {
       setSaving(false)
     }
@@ -921,7 +941,15 @@ export default function EditTaskPage() {
 
     const assigneesChanged = JSON.stringify(assignedTo) !== JSON.stringify(originalAssignedTo)
 
-    return taskChanged || subtasksChanged || labelsChanged || attachmentsChanged || assigneesChanged
+    const initialDepIds = (originalDependencies || []).map((t: any) => (t?._id || t).toString()).sort()
+    const currentDepIds = (taskDependencies || []).map((t: any) => (t?._id || t).toString()).sort()
+    const dependenciesChanged = JSON.stringify(initialDepIds) !== JSON.stringify(currentDepIds)
+
+    const initialBlkIds = (originalBlocking || []).map((t: any) => (t?._id || t).toString()).sort()
+    const currentBlkIds = (taskBlocking || []).map((t: any) => (t?._id || t).toString()).sort()
+    const blockingChanged = JSON.stringify(initialBlkIds) !== JSON.stringify(currentBlkIds)
+
+    return taskChanged || subtasksChanged || labelsChanged || attachmentsChanged || assigneesChanged || dependenciesChanged || blockingChanged
   }, [
     task,
     originalTask,
@@ -931,7 +959,11 @@ export default function EditTaskPage() {
     comparableOriginalAttachments,
     labelsInput,
     assignedTo,
-    originalAssignedTo
+    originalAssignedTo,
+    taskDependencies,
+    originalDependencies,
+    taskBlocking,
+    originalBlocking
   ])
 
   const isValid = useMemo(() => {
@@ -1548,6 +1580,18 @@ export default function EditTaskPage() {
               users={users}
               stories={stories}
               onAssigneeAdded={handleAssigneeAdded}
+            />
+
+            <TaskDependencies
+              taskId={taskId}
+              taskStatus={task?.status}
+              initialBlockedBy={taskDependencies}
+              initialBlocking={taskBlocking}
+              staged={true}
+              onChange={({ blockedBy, blocking }) => {
+                setTaskDependencies(blockedBy)
+                setTaskBlocking(blocking)
+              }}
             />
 
             <div className="flex justify-end space-x-2 pt-2">

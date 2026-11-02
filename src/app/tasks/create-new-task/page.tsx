@@ -28,6 +28,7 @@ import {
 import { AttachmentList } from '@/components/ui/AttachmentList'
 import { countWords, TASK_TITLE_MAX_WORDS, truncateToMaxWords } from '@/lib/text/word-limit'
 import { SubtasksEditor, SubtaskItem } from '@/components/tasks/SubtasksEditor'
+import { TaskDependencies, syncTaskDependencies } from '@/components/tasks/TaskDependencies'
 import { computeIsFormValid } from './isFormValid'
 
 interface Project {
@@ -167,6 +168,8 @@ export default function CreateTaskPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
   const [attachmentError, setAttachmentError] = useState('')
+  const [draftBlockedBy, setDraftBlockedBy] = useState<any[]>([])
+  const [draftBlocking, setDraftBlocking] = useState<any[]>([])
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   // Where to land after a successful create (e.g. the sprint view that sent us here).
@@ -418,6 +421,22 @@ export default function CreateTaskPage() {
       }
 
       if (data.success) {
+        // Sync dependencies if any were staged
+        const createdTaskId = data.data?._id
+        if (createdTaskId && (draftBlockedBy.length > 0 || draftBlocking.length > 0)) {
+          try {
+            await syncTaskDependencies(
+              createdTaskId,
+              [],
+              [],
+              draftBlockedBy,
+              draftBlocking
+            )
+          } catch (depErr) {
+            console.error('Failed to sync dependencies for new task:', depErr)
+          }
+        }
+
         notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
         router.push(returnToRef.current ?? '/backlog')
         setAttachments([])
@@ -1223,6 +1242,20 @@ export default function CreateTaskPage() {
                     }
                   }}
                   disabled={loading}
+                />
+              </div>
+
+              {/* Dependencies Section */}
+              <div className="pt-6 mt-6 border-t border-muted">
+                <TaskDependencies
+                  taskStatus="backlog"
+                  initialBlockedBy={draftBlockedBy}
+                  initialBlocking={draftBlocking}
+                  staged={true}
+                  onChange={({ blockedBy, blocking }) => {
+                    setDraftBlockedBy(blockedBy)
+                    setDraftBlocking(blocking)
+                  }}
                 />
               </div>
 
