@@ -118,7 +118,7 @@ export function SummaryPrintDocument({
           <tbody>
             {summary.completedYesterday.map((row) => (
               <tr key={row.taskId}>
-                <td className="mono">{row.taskKey ?? '—'}</td>
+                <td className="mono">{row.taskKey ?? 'N/A'}</td>
                 <td>{row.title ?? row.taskKey ?? row.taskId}</td>
               </tr>
             ))}
@@ -142,8 +142,8 @@ export function SummaryPrintDocument({
               return (
                 <tr key={index}>
                   <td className="mono">{field(row, 'taskKey') ?? field(row, 'allocationId') ?? 'Task'}</td>
-                  <td>{field(row, 'name') ?? '—'}</td>
-                  <td className="cap">{field(row, 'outcome') ?? '—'}</td>
+                  <td>{field(row, 'name') ?? 'N/A'}</td>
+                  <td className="cap">{field(row, 'outcome') ?? 'N/A'}</td>
                   <td className={`r mono${variance > 0 ? ' bad' : ''}`}>
                     {formatMinutesAsHours(variance, { signed: true })}
                   </td>
@@ -171,7 +171,7 @@ export function SummaryPrintDocument({
             <tbody>
               {member.allocations.map((allocation, index) => (
                 <tr key={`${allocation.taskId}-${index}`}>
-                  <td className="mono key">{allocation.taskKey ?? '—'}</td>
+                  <td className="mono key">{allocation.taskKey ?? 'N/A'}</td>
                   <td>{allocation.taskTitle ?? ''}</td>
                   <td className="r mono">{hours(allocation.plannedMinutes)}</td>
                 </tr>
@@ -193,7 +193,7 @@ export function SummaryPrintDocument({
           <tbody>
             {summary.debtMovements.map((row, index) => (
               <tr key={index}>
-                <td>{field(row, 'name') ?? field(row, 'memberId') ?? '—'}</td>
+                <td>{field(row, 'name') ?? field(row, 'memberId') ?? 'N/A'}</td>
                 <td className="r mono">{hours(row.outstandingDebtMinutes)}</td>
                 <td className="r mono">{hours(row.surplusMinutes)}</td>
               </tr>

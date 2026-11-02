@@ -109,7 +109,7 @@ export function SprintCloseReadinessPanel({
                     {task.taskKey ?? task.taskId}
                   </td>
                   <td className="py-2 pr-2 apple-type-subheadline text-[var(--plan-secondary)]">
-                    {task.ownerName ?? '—'}
+                    {task.ownerName ?? 'N/A'}
                   </td>
                   <td className="py-2 pr-2 font-apple-mono apple-type-subheadline tabular-nums text-[var(--plan-secondary)]">
                     {formatMinutesAsHours(task.remainingEstimateMinutes, { locale })}
