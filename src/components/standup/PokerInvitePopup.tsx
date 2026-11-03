@@ -60,6 +60,8 @@ function rememberDismissed(sessionId: string): string[] {
   return next
 }
 
+let inFlightOpenInvitesPromise: Promise<any> | null = null
+
 export function PokerInvitePopup() {
   const pathname = usePathname()
   const [invites, setInvites] = useState<OpenInvite[]>([])
@@ -84,9 +86,17 @@ export function PokerInvitePopup() {
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch('/api/poker-sessions/open-for-me')
-      if (!response.ok) return
-      const payload = await response.json()
+      if (!inFlightOpenInvitesPromise) {
+        inFlightOpenInvitesPromise = (async () => {
+          const response = await fetch('/api/poker-sessions/open-for-me')
+          if (!response.ok) return null
+          return response.json()
+        })().finally(() => {
+          inFlightOpenInvitesPromise = null
+        })
+      }
+      const payload = await inFlightOpenInvitesPromise
+      if (!payload) return
       const sessions: OpenInvite[] = payload?.data?.sessions ?? []
       // Authoritative: a session that is no longer open drops out here.
       setInvites(sessions)

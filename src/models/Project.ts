@@ -215,6 +215,7 @@ ProjectSchema.index({ startDate: 1, endDate: 1 })
 ProjectSchema.index({ archived: 1 })
 ProjectSchema.index({ organization: 1, archived: 1 })
 ProjectSchema.index({ organization: 1, createdAt: -1 })
+ProjectSchema.index({ organization: 1, updatedAt: -1 })
 ProjectSchema.index({ organization: 1, status: 1, createdAt: -1 })
 ProjectSchema.index({ organization: 1, projectNumber: 1 }, { unique: true })
 

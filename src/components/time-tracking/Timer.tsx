@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/Toast'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { detectClientTimezone } from '@/lib/timezone'
 import { cn } from '@/lib/utils'
+import { fetchActiveTimer } from '@/lib/timer-client'
 
 interface TimerProps {
   userId: string
@@ -173,10 +174,9 @@ export function Timer({
 
     try {
       const tz = detectClientTimezone()
-      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}&timezone=${encodeURIComponent(tz)}`)
-      const data = await response.json()
+      const { ok, data } = await fetchActiveTimer(userId, organizationId, tz)
 
-      if (response.ok) {
+      if (ok) {
         // If server enforced an auto-stop (e.g., max session/daily reached), show snackbar
         if (data?.activeTimer === null && data?.autoStopped && !autoStopNotifiedRef.current) {
           autoStopNotifiedRef.current = true

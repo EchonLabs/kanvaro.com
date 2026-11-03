@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules, focusSearchInput, truncateText } from '@/lib/utils'
-import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permission-context'
+import { useFeaturePermissions, usePermissions, usePermissionContext } from '@/lib/permissions/permission-context'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -27,6 +27,7 @@ import { detectClientTimezone } from '@/lib/timezone'
 import { ManualTimeLogModal } from '@/components/time-tracking/ManualTimeLogModal'
 import { validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { fetchActiveTimer } from '@/lib/timer-client'
 
 // Super Admin, Admin, and HR can log time for any org member, on any date; everyone else may
 // only log their own time, gated by the allowMembersToAddTimeLogs org setting. Keep in sync
@@ -109,7 +110,7 @@ export function TimeLogs({
   const pathname = usePathname()
   const { user } = useAuthContext()
   const { organization } = useOrganization()
-  const { hasPermission } = usePermissions()
+  const { hasPermission, loading: permissionsLoading } = usePermissionContext()
 
   // Permission flags used throughout the component
   const canViewEmployeeFilter = hasPermission(Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ)
@@ -317,7 +318,7 @@ export function TimeLogs({
   // Fetch projects for filter
   useEffect(() => {
     const fetchFilterProjects = async () => {
-      if (!resolvedOrgId) return
+      if (!resolvedOrgId || permissionsLoading) return
       setFilterProjectsLoading(true)
       try {
         const response = await fetch('/api/projects?limit=1000')
@@ -364,7 +365,7 @@ export function TimeLogs({
       }
     }
     fetchFilterProjects()
-  }, [resolvedOrgId, resolvedUserId, canViewEmployeeFilter])
+  }, [resolvedOrgId, resolvedUserId, canViewEmployeeFilter, permissionsLoading])
 
   // Memoized fetch tasks for filter to support pagination and search
   const fetchFilterTasks = useCallback(async (search: string = '') => {
@@ -421,7 +422,7 @@ export function TimeLogs({
   // Fetch employees for filter (only if user has permission)
   useEffect(() => {
     const fetchFilterEmployees = async () => {
-      if (!canViewEmployeeFilter || !resolvedOrgId) {
+      if (!canViewEmployeeFilter || !resolvedOrgId || permissionsLoading) {
         setFilterEmployees([])
         return
       }
@@ -442,7 +443,7 @@ export function TimeLogs({
       }
     }
     fetchFilterEmployees()
-  }, [canViewEmployeeFilter, resolvedOrgId])
+  }, [canViewEmployeeFilter, resolvedOrgId, permissionsLoading])
 
   // Fetch organization settings for application-level allowManualTimeSubmission
   // Load settings immediately to ensure buttons show based on actual settings
@@ -1070,15 +1071,9 @@ export function TimeLogs({
     if (!resolvedUserId || !resolvedOrgId) return
     try {
       const tz = detectClientTimezone()
-      const params = new URLSearchParams({
-        userId: resolvedUserId,
-        organizationId: resolvedOrgId,
-        timezone: tz
-      })
-      const response = await fetch(`/api/time-tracking/timer?${params}`)
-      const data = await response.json()
+      const { ok, data } = await fetchActiveTimer(resolvedUserId, resolvedOrgId, tz)
 
-      if (response.ok && data.activeTimer) {
+      if (ok && data.activeTimer) {
         setActiveTimerEntry(mapActiveTimerPayload(data.activeTimer))
       } else {
         setActiveTimerEntry(null)
@@ -1197,7 +1192,7 @@ export function TimeLogs({
   }, [resolvedUserId, resolvedOrgId, projectId, taskId, pagination.page, pagination.limit, filters, canViewEmployeeFilter])
 
   useEffect(() => {
-    if (!authResolving) {
+    if (!authResolving && !permissionsLoading) {
       loadTimeEntries()
       loadActiveTimer()
       const syncInterval = setInterval(() => {
@@ -1205,7 +1200,7 @@ export function TimeLogs({
       }, 30000)
       return () => clearInterval(syncInterval)
     }
-  }, [authResolving, loadTimeEntries, loadActiveTimer, refreshKey])
+  }, [authResolving, permissionsLoading, loadTimeEntries, loadActiveTimer, refreshKey])
 
 
   const handleApproveEntries = async (action: 'approve' | 'reject', entryId?: string) => {
