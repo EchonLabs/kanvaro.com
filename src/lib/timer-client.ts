@@ -12,9 +12,9 @@ export async function fetchActiveTimer(
   if (!promise) {
     promise = (async () => {
       const response = await fetch(
-        `/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}&timezone=${encodeURIComponent(timezone)}`
+        `/api/time-tracking/timer?userId=${encodeURIComponent(userId)}&organizationId=${encodeURIComponent(organizationId)}&timezone=${encodeURIComponent(timezone)}`
       )
-      const data = await response.json()
+      const data = await response.json().catch(() => null)
       return { ok: response.ok, data }
     })().finally(() => {
       inFlightTimerPromises.delete(key)
@@ -24,4 +24,3 @@ export async function fetchActiveTimer(
 
   return promise
 }
-

@@ -30,6 +30,7 @@ import { useToast } from '@/components/ui/Toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn, focusSearchInput } from '@/lib/utils'
 import { detectClientTimezone } from '@/lib/timezone'
+import { fetchActiveTimer as fetchSharedActiveTimer } from '@/lib/timer-client'
 
 interface Project {
   _id: string
@@ -196,15 +197,8 @@ export default function TimerPage() {
 
     try {
       const tz = detectClientTimezone()
-      const params = new URLSearchParams({
-        userId: user.id,
-        organizationId: user.organization,
-        timezone: tz
-      })
-
-      const response = await fetch(`/api/time-tracking/timer?${params.toString()}`)
-      if (response.ok) {
-        const data = await response.json()
+      const { ok, data } = await fetchSharedActiveTimer(user.id, user.organization, tz)
+      if (ok) {
         if (typeof data?.dailyHoursLogged === 'number') {
           setDailyHoursLogged(data.dailyHoursLogged)
         }
@@ -551,15 +545,13 @@ export default function TimerPage() {
     if (!effectiveUser) return
 
     try {
-      const params = new URLSearchParams({
-        userId: effectiveUser.id,
-        organizationId: effectiveUser.organization,
-        timezone: detectClientTimezone()
-      })
-      const response = await fetch(`/api/time-tracking/timer?${params.toString()}`)
-      const data = await response.json()
+      const { ok, data } = await fetchSharedActiveTimer(
+        effectiveUser.id,
+        effectiveUser.organization,
+        detectClientTimezone()
+      )
 
-      if (response.ok) {
+      if (ok) {
         if (typeof data?.dailyHoursLogged === 'number') {
           setDailyHoursLogged(data.dailyHoursLogged)
         }

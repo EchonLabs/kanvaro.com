@@ -69,6 +69,7 @@ import TaskActivityLog from '@/components/tasks/TaskActivityLog'
 import { StartTimerModal } from '@/components/time-tracking/StartTimerModal'
 import { CategoryBadge } from '@/components/tasks/TasksShared'
 import { detectClientTimezone } from '@/lib/timezone'
+import { fetchActiveTimer } from '@/lib/timer-client'
 import { TaskDependencies } from '@/components/tasks/TaskDependencies'
 
 interface Task {
@@ -456,16 +457,13 @@ export default function TaskDetailPage() {
 
     try {
       const tz = detectClientTimezone()
-      const response = await fetch(
-        `/api/time-tracking/timer?userId=${encodeURIComponent(currentUserId)}&organizationId=${encodeURIComponent(currentOrganizationId)}&timezone=${encodeURIComponent(tz)}`
-      )
+      const { ok, data } = await fetchActiveTimer(currentUserId, currentOrganizationId, tz)
 
-      if (!response.ok) {
+      if (!ok) {
         setActiveTimer(null)
         return
       }
 
-      const data = await response.json().catch(() => null)
       setActiveTimer(data?.activeTimer ?? null)
     } catch (error) {
       console.error('Failed to load active timer:', error)
