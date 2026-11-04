@@ -1,3 +1,15 @@
+## [1.49.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.49.0...v1.49.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* deduplicate active timer requests across task and time tracking pages ([be00496](https://github.com/EchonLabs/kanvaro.com/commit/be004961751043ac2bd4a86f4a39283211747751))
+* deduplicate concurrent API requests on mount and optimize dashboard queries ([3f78312](https://github.com/EchonLabs/kanvaro.com/commit/3f78312856d0cfe87d4e5be8f6692a8de30e1738))
+* optimize compound indexes for tasks, time entries, and projects ([f44f58a](https://github.com/EchonLabs/kanvaro.com/commit/f44f58aa32c98cab6679cf619caf16c5c486822e))
+* optimize project listing and dashboard time aggregations ([8696264](https://github.com/EchonLabs/kanvaro.com/commit/869626428c388b260a752a1bc233031e69e0954d))
+* optimize time tracking queries, background sync, and UI triggers ([a5af925](https://github.com/EchonLabs/kanvaro.com/commit/a5af9253c3df7e9e62eece97584c876e69e25ade))
+* replace sequential loops with batch MongoDB aggregations ([2b15a83](https://github.com/EchonLabs/kanvaro.com/commit/2b15a839184496c5c61688aab32cfafc48272aeb))
+
 # [1.49.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.48.0...v1.49.0) (2026-11-02)
 
 
