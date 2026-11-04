@@ -198,17 +198,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get time entries with pagination
+    // Get time entries with pagination (run find and count concurrently)
     const skip = (page - 1) * limit
-    const timeEntries = await TimeEntry.find(query)
-      .populate('project', 'name settings')
-      .populate({ path: 'task', model: Task, select: 'title' })
-      .populate('user', 'firstName lastName email')
-      .populate('approvedBy', 'firstName lastName')
-      .sort({ startTime: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean()
+    const [timeEntries, total] = await Promise.all([
+      TimeEntry.find(query)
+        .populate('project', 'name settings')
+        .populate({ path: 'task', model: Task, select: 'title' })
+        .populate('user', 'firstName lastName email')
+        .populate('approvedBy', 'firstName lastName')
+        .sort({ startTime: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      TimeEntry.countDocuments(query)
+    ])
 
     // Normalize the response - ensure project and task are properly formatted
     // Handle cases where project/task might be deleted (populate returns null)
@@ -242,8 +245,6 @@ export async function GET(request: NextRequest) {
         task
       }
     })
-
-    const total = await TimeEntry.countDocuments(query)
 
     // Calculate totals
     const searchParamsObj = Object.fromEntries(searchParams.entries());

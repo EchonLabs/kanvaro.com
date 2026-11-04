@@ -32,6 +32,7 @@ const PermissionContext = createContext<PermissionContextType | undefined>(undef
 
 // Cache permissions to prevent repeated API calls
 let permissionsCache: UserPermissions | null = null;
+let inFlightPermissionsPromise: Promise<UserPermissions> | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const STORAGE_KEY = 'kanvaro_permissions';
@@ -60,6 +61,7 @@ if (typeof window !== 'undefined') {
   // Global function to clear permission cache for debugging
   (window as any).clearPermissionCache = () => {
     permissionsCache = null;
+    inFlightPermissionsPromise = null;
     cacheTimestamp = 0;
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(STORAGE_TIMESTAMP_KEY);
@@ -110,17 +112,24 @@ export function PermissionProvider({ children, initialPermissions }: PermissionP
         return;
       }
       
-      const response = await fetch('/api/auth/permissions');
-      if (!response.ok) {
-        throw new Error('Failed to fetch permissions');
+      if (!inFlightPermissionsPromise) {
+        inFlightPermissionsPromise = (async () => {
+          const response = await fetch('/api/auth/permissions');
+          if (!response.ok) {
+            throw new Error('Failed to fetch permissions');
+          }
+          const data = await response.json();
+          permissionsCache = data;
+          cacheTimestamp = Date.now();
+          savePermissionsToStorage(data);
+          return data;
+        })().finally(() => {
+          inFlightPermissionsPromise = null;
+        });
       }
-      
-      const data = await response.json();
+
+      const data = await inFlightPermissionsPromise;
       setPermissions(data);
-      // Cache the data in memory and sessionStorage
-      permissionsCache = data;
-      cacheTimestamp = Date.now();
-      savePermissionsToStorage(data);
     } catch (err) {
       // If we already have permissions (e.g. from cache or default), don't show error yet
       if (permissions) {

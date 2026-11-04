@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { INotification } from '@/models/Notification'
 
+// Module-level in-flight promise map to deduplicate simultaneous calls
+const inFlightNotificationPromises = new Map<string, Promise<any>>()
+
 interface UseNotificationsOptions {
   limit?: number
   offset?: number
@@ -55,25 +58,33 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         params.append('type', type)
       }
 
-      const response = await fetch(`/api/notifications?${params}`)
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch notifications')
+      const cacheKey = params.toString()
+      let fetchPromise = inFlightNotificationPromises.get(cacheKey)
+      if (!fetchPromise) {
+        fetchPromise = (async () => {
+          const response = await fetch(`/api/notifications?${cacheKey}`)
+          if (!response.ok) {
+            throw new Error('Failed to fetch notifications')
+          }
+          const result = await response.json()
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to fetch notifications')
+          }
+          return result
+        })().finally(() => {
+          inFlightNotificationPromises.delete(cacheKey)
+        })
+        inFlightNotificationPromises.set(cacheKey, fetchPromise)
       }
 
-      const result = await response.json()
-      
-      if (result.success) {
-        setData(prev => ({
-          ...prev,
-          notifications: result.data.notifications,
-          total: result.data.total,
-          unreadCount: result.data.unreadCount,
-          loading: false
-        }))
-      } else {
-        throw new Error(result.error || 'Failed to fetch notifications')
-      }
+      const result = await fetchPromise
+      setData(prev => ({
+        ...prev,
+        notifications: result.data.notifications,
+        total: result.data.total,
+        unreadCount: result.data.unreadCount,
+        loading: false
+      }))
     } catch (error) {
       console.error('Error fetching notifications:', error)
       setData(prev => ({

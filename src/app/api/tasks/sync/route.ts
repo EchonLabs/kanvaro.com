@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const filters: any = {
       organization: organizationId,
       $or: [
-        { assignedTo: userId },
+        { 'assignedTo.user': userId },
         { createdBy: userId }
       ]
     }
@@ -49,12 +49,13 @@ export async function GET(request: NextRequest) {
     // Get tasks that have been updated since the last sync
     const tasks = await Task.find(filters)
       .populate('project', '_id name')
-      .populate('assignedTo', 'firstName lastName email')
+      .populate('assignedTo.user', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .populate('story', 'title')
       .populate('parentTask', 'title')
       .sort({ updatedAt: -1 })
-      .limit(100) // Limit to prevent large responses
+      .limit(100)
+      .lean()
 
     // Drop orphan tasks with missing project
     const validTasks = tasks.filter((t: any) => !!t.project)

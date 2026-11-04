@@ -90,9 +90,9 @@ export async function GET(request: NextRequest) {
 
     // Parallel data fetching
     const [
-      projects,
-      tasks,
-      timeEntries,
+      projectsCount,
+      tasksCount,
+      timeEntriesCount,
       teamMembers,
       activeProjects,
       completedTasks,
@@ -100,22 +100,14 @@ export async function GET(request: NextRequest) {
       recentTasks,
       teamActivity
     ] = await Promise.all([
-      // Get all projects for stats (organization-wide)
-      Project.find(projectsQuery)
-        .populate('createdBy', 'firstName lastName email')
-        .populate('teamMembers', 'firstName lastName email')
-        .populate('client', 'firstName lastName email'),
+      // Get all projects count for stats (organization-wide)
+      Project.countDocuments(projectsQuery),
 
-      // Get all tasks for stats (role-based)
-      Task.find(canViewAll ? tasksQuery : userTasksQuery)
-        .populate('assignedTo', 'firstName lastName email')
-        .populate('createdBy', 'firstName lastName email')
-        .populate('project', 'name'),
+      // Get all tasks count for stats (role-based)
+      Task.countDocuments(canViewAll ? tasksQuery : userTasksQuery),
 
-      // Get all time entries for stats (organization-wide)
-      TimeEntry.find(timeEntriesQuery)
-        .populate('project', 'name')
-        .populate('task', 'title'),
+      // Get all time entries count for stats (organization-wide)
+      TimeEntry.countDocuments(timeEntriesQuery),
 
       // Get active team members count (only active users)
       User.countDocuments({ 
@@ -159,54 +151,84 @@ export async function GET(request: NextRequest) {
       getTeamActivity(organizationId, userId, canViewAll, canViewAll)
     ])
 
-    const timeStats = await getTimeStats(
-      organizationId,
-      startOfDay,
-      startOfWeek,
-      startOfMonth,
-      now,
-      { userId }
-    )
+    const [timeStats, lastMonthStats] = await Promise.all([
+      getTimeStats(
+        organizationId,
+        startOfDay,
+        startOfWeek,
+        startOfMonth,
+        now,
+        { userId }
+      ),
+      getLastMonthStats(
+        organizationId,
+        startOfLastMonth,
+        endOfLastMonth,
+        { userId }
+      )
+    ])
 
     // Batch-aggregate total time tracked (minutes) per project — one query for all recent projects
     const recentProjectIds = recentProjects.map(p => p._id)
-    const projectHoursAgg = await TimeEntry.aggregate([
-      {
-        $match: {
-          organization: organizationId,
-          project: { $in: recentProjectIds },
-          status: 'completed'
+    const [projectHoursAgg, recentTaskStats] = await Promise.all([
+      recentProjectIds.length > 0 ? TimeEntry.aggregate([
+        {
+          $match: {
+            organization: new Types.ObjectId(String(organizationId)),
+            project: { $in: recentProjectIds },
+            status: 'completed'
+          }
+        },
+        {
+          $group: {
+            _id: '$project',
+            totalDuration: { $sum: '$duration' }
+          }
         }
-      },
-      {
-        $group: {
-          _id: '$project',
-          totalDuration: { $sum: '$duration' }
+      ]) : [],
+      recentProjectIds.length > 0 ? Task.aggregate([
+        {
+          $match: {
+            project: { $in: recentProjectIds }
+          }
+        },
+        {
+          $group: {
+            _id: '$project',
+            totalTasks: { $sum: 1 },
+            completedTasks: {
+              $sum: {
+                $cond: [{ $eq: ['$status', 'done'] }, 1, 0]
+              }
+            }
+          }
         }
-      }
+      ]) : []
     ])
+
     const projectHoursMap = new Map(
       projectHoursAgg.map((r: any) => [r._id.toString(), r.totalDuration as number])
     )
+    const taskStatsMap = new Map(
+      recentTaskStats.map((r: any) => [r._id.toString(), r])
+    )
 
     // Calculate project progress + attach hoursTracked
-    const projectsWithProgress = await Promise.all(
-      recentProjects.map(async (project) => {
-        const projectTasks = await Task.find({ project: project._id })
-        const totalTasks = projectTasks.length
-        const completedTasks = projectTasks.filter(task => task.status === 'done').length
-        const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
-        const hoursTracked = projectHoursMap.get(project._id.toString()) ?? 0
+    const projectsWithProgress = recentProjects.map((project) => {
+      const pStats = taskStatsMap.get(project._id.toString())
+      const totalTasks = pStats?.totalTasks || 0
+      const completedTasks = pStats?.completedTasks || 0
+      const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+      const hoursTracked = projectHoursMap.get(project._id.toString()) ?? 0
 
-        return {
-          ...project.toObject(),
-          progress,
-          tasksCompleted: completedTasks,
-          totalTasks,
-          hoursTracked   // total minutes tracked against this project
-        }
-      })
-    )
+      return {
+        ...project.toObject(),
+        progress,
+        tasksCompleted: completedTasks,
+        totalTasks,
+        hoursTracked   // total minutes tracked against this project
+      }
+    })
 
     // Calculate statistics
     const stats = {
@@ -214,20 +236,14 @@ export async function GET(request: NextRequest) {
       completedTasks,
       teamMembers,
       hoursTracked: timeStats.totalDuration,
-      projectsCount: projects.length,
-      tasksCount: tasks.length,
-      timeEntriesCount: timeEntries.length
+      projectsCount,
+      tasksCount,
+      timeEntriesCount
     }
 
     console.log('Dashboard total hours tracked:', stats.hoursTracked)
 
     // Calculate changes from last month
-    const lastMonthStats = await getLastMonthStats(
-      organizationId,
-      startOfLastMonth,
-      endOfLastMonth,
-      { userId }
-    )
     const changes = {
       activeProjects: activeProjects - lastMonthStats.activeProjects,
       completedTasks: completedTasks - lastMonthStats.completedTasks,
@@ -327,93 +343,113 @@ async function getTimeStats(
     matchFilter.user = options.userId
   }
 
-  const [todayStats, weekStats, monthStats] = await Promise.all([
-    TimeEntry.aggregate([
-      {
-        $match: {
-          ...matchFilter,
-          startTime: { $gte: startOfDay, $lte: endDate }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalDuration: { $sum: '$duration' },
-          totalCost: { 
-            $sum: { 
-              $cond: [
-                { $and: ['$hourlyRate', '$duration', { $eq: ['$isBillable', true] }] },
-                { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
-                0
-              ]
-            }
+  // Determine the earliest date between startOfMonth and startOfWeek to properly handle month boundaries
+  const earliestDate = startOfWeek < startOfMonth ? startOfWeek : startOfMonth
+
+  const [statsResult] = await TimeEntry.aggregate([
+    {
+      $match: {
+        ...matchFilter,
+        startTime: { $gte: earliestDate, $lte: endDate }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        monthDuration: {
+          $sum: {
+            $cond: [
+              { $gte: ['$startTime', startOfMonth] },
+              '$duration',
+              0
+            ]
+          }
+        },
+        monthCost: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $gte: ['$startTime', startOfMonth] },
+                  '$hourlyRate',
+                  '$duration',
+                  { $eq: ['$isBillable', true] }
+                ]
+              },
+              { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
+              0
+            ]
+          }
+        },
+        weekDuration: {
+          $sum: {
+            $cond: [
+              { $gte: ['$startTime', startOfWeek] },
+              '$duration',
+              0
+            ]
+          }
+        },
+        weekCost: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $gte: ['$startTime', startOfWeek] },
+                  '$hourlyRate',
+                  '$duration',
+                  { $eq: ['$isBillable', true] }
+                ]
+              },
+              { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
+              0
+            ]
+          }
+        },
+        todayDuration: {
+          $sum: {
+            $cond: [
+              { $gte: ['$startTime', startOfDay] },
+              '$duration',
+              0
+            ]
+          }
+        },
+        todayCost: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $gte: ['$startTime', startOfDay] },
+                  '$hourlyRate',
+                  '$duration',
+                  { $eq: ['$isBillable', true] }
+                ]
+              },
+              { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
+              0
+            ]
           }
         }
       }
-    ]),
-    TimeEntry.aggregate([
-      {
-        $match: {
-          ...matchFilter,
-          startTime: { $gte: startOfWeek, $lte: endDate }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalDuration: { $sum: '$duration' },
-          totalCost: { 
-            $sum: { 
-              $cond: [
-                { $and: ['$hourlyRate', '$duration', { $eq: ['$isBillable', true] }] },
-                { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
-                0
-              ]
-            }
-          }
-        }
-      }
-    ]),
-    TimeEntry.aggregate([
-      {
-        $match: {
-          ...matchFilter,
-          startTime: { $gte: startOfMonth, $lte: endDate }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalDuration: { $sum: '$duration' },
-          totalCost: { 
-            $sum: { 
-              $cond: [
-                { $and: ['$hourlyRate', '$duration', { $eq: ['$isBillable', true] }] },
-                { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
-                0
-              ]
-            }
-          }
-        }
-      }
-    ])
+    }
   ])
 
   return {
     today: {
-      duration: todayStats[0]?.totalDuration || 0,
-      cost: todayStats[0]?.totalCost || 0
+      duration: statsResult?.todayDuration || 0,
+      cost: statsResult?.todayCost || 0
     },
     week: {
-      duration: weekStats[0]?.totalDuration || 0,
-      cost: weekStats[0]?.totalCost || 0
+      duration: statsResult?.weekDuration || 0,
+      cost: statsResult?.weekCost || 0
     },
     month: {
-      duration: monthStats[0]?.totalDuration || 0,
-      cost: monthStats[0]?.totalCost || 0
+      duration: statsResult?.monthDuration || 0,
+      cost: statsResult?.monthCost || 0
     },
-    totalDuration: monthStats[0]?.totalDuration || 0,
-    totalCost: monthStats[0]?.totalCost || 0
+    totalDuration: statsResult?.monthDuration || 0,
+    totalCost: statsResult?.monthCost || 0
   }
 }
 

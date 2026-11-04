@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { detectClientTimezone } from '@/lib/timezone'
+import { fetchActiveTimer } from '@/lib/timer-client'
 
 interface TimeTrackingSettings {
   allowTimeTracking: boolean
@@ -77,10 +78,9 @@ export function useTimeTracking(userId: string, organizationId: string) {
   const loadActiveTimer = useCallback(async () => {
     try {
       const tz = detectClientTimezone()
-      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}&timezone=${encodeURIComponent(tz)}`)
-      const data = await response.json()
+      const { ok, data } = await fetchActiveTimer(userId, organizationId, tz)
       
-      if (response.ok) {
+      if (ok) {
         setActiveTimer(data.activeTimer)
       }
     } catch (error) {

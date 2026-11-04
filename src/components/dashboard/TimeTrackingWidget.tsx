@@ -15,6 +15,7 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { applyRoundingRules } from '@/lib/utils'
 import { detectClientTimezone } from '@/lib/timezone'
+import { fetchActiveTimer } from '@/lib/timer-client'
 
 interface TimeTrackingWidgetProps {
   userId: string
@@ -113,10 +114,9 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   const loadActiveTimer = useCallback(async () => {
     try {
       const tz = detectClientTimezone()
-      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}&timezone=${encodeURIComponent(tz)}`)
-      const data = await response.json()
+      const { ok, data } = await fetchActiveTimer(userId, organizationId, tz)
 
-      if (response.ok) {
+      if (ok) {
         // Server-enforced auto-stop response (max session/daily reached)
         if (data?.activeTimer === null && data?.autoStopped && !autoStopNotifiedRef.current) {
           autoStopNotifiedRef.current = true
@@ -156,8 +156,6 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
         weekCost: propTimeStats.week.cost,
         monthCost: propTimeStats.month.cost
       })
-    } else {
-      loadTimeStats()
     }
 
     // Refresh active timer every 30 seconds to sync with server

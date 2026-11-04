@@ -301,27 +301,20 @@ export function ManualTimeLogModal({
     }
   }, [selectedEmployeeId])
 
-  // Load tasks when project changes
+  // Load tasks when project or taskSearch changes (debounced for search)
   useEffect(() => {
-    if (selectedEmployeeId && selectedProjectId) {
-      loadTasks(selectedEmployeeId, selectedProjectId, '')
-    } else {
+    if (!selectedEmployeeId || !selectedProjectId) {
       setTasks([])
       setSelectedTaskId('')
+      return
     }
-  }, [selectedEmployeeId, selectedProjectId, loadTasks])
 
-  // Debounced task search
-  useEffect(() => {
     const timer = setTimeout(() => {
-      if (selectedEmployeeId && selectedProjectId && taskSearch) {
-        loadTasks(selectedEmployeeId, selectedProjectId, taskSearch)
-      } else if (selectedEmployeeId && selectedProjectId && !taskSearch) {
-        loadTasks(selectedEmployeeId, selectedProjectId, '')
-      }
-    }, 500)
+      loadTasks(selectedEmployeeId, selectedProjectId, taskSearch)
+    }, taskSearch ? 300 : 0)
+
     return () => clearTimeout(timer)
-  }, [taskSearch, selectedEmployeeId, selectedProjectId, loadTasks])
+  }, [selectedEmployeeId, selectedProjectId, taskSearch, loadTasks])
 
 
   const resetForm = () => {
