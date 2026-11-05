@@ -60,6 +60,7 @@ import {
   TYPE_BADGE,
   DEFAULT_KANBAN_COLUMNS,
 } from '@/lib/kanban-tokens'
+import { DEFAULT_TASK_STATUS_KEYS } from '@/constants/taskStatuses'
 
 interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
   project?: {
@@ -495,6 +496,24 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
       // Handle cross-column moves
       const originalStatus = activeTask.status
 
+      // In "All Projects" view the board shows every project's columns, so
+      // block a drop into a status the task's own project does not have.
+      if (selectedProjectId === 'all') {
+        const taskProjectId = (activeTask.project as any)?._id?.toString() || (activeTask.project as any)?.toString()
+        const taskProject = projects.find(p => (p as any)._id?.toString() === taskProjectId)
+        const customStatuses = taskProject?.settings?.kanbanStatuses
+        const allowedStatuses: string[] = customStatuses && customStatuses.length > 0
+          ? customStatuses.map(s => s.key)
+          : [...DEFAULT_TASK_STATUS_KEYS]
+        if (newStatus !== 'backlog' && !allowedStatuses.includes(newStatus)) {
+          notifyError({
+            title: 'Cannot Move Task',
+            message: `Status "${columns.find(c => c.id === newStatus)?.title || formatToTitleCase(newStatus)}" is not available for project "${taskProject?.name || (activeTask.project as any)?.name || 'this project'}".`
+          })
+          return
+        }
+      }
+
       // Optimistic update - update UI immediately
       setTasks(tasks.map(task =>
         task._id?.toString() === activeId ? { ...task, status: newStatus } as PopulatedTask : task
@@ -516,7 +535,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
           // Revert optimistic update on failure
           console.error('Failed to update task status:', data.error)
           notifyError({
-            title: 'Cannot Update Status',
+            title: 'Cannot Move Task',
             message: data.error || 'Failed to update task status'
           })
           setTasks(tasks.map(task =>
