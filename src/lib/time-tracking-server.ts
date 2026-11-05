@@ -320,15 +320,16 @@ export async function stopTimerInternal(
   
   const isAutoStop = options.reason === 'auto_max_session' || options.reason === 'auto_max_daily'
   let effectiveLimitMinutes: number | null = null
+
+  // Calculate session limit - use timer's stored limit or settings
+  const sessionLimitHours = activeTimer.maxSessionHours || stopSettings.maxSessionHours
+  const sessionLimitMinutes = sessionLimitHours
+    ? sessionLimitHours * MINUTES_PER_HOUR
+    : null
   
   if (isAutoStop) {
     const isSessionStop = options.reason === 'auto_max_session'
     const isDailyStop = options.reason === 'auto_max_daily'
-
-    // Calculate session limit - always enforceable if it was the reason for stop
-    const sessionLimitMinutes = stopSettings.maxSessionHours
-      ? stopSettings.maxSessionHours * MINUTES_PER_HOUR
-      : null
 
     // Calculate daily remaining limit - only enforceable if allowOvertime is false
     let dailyRemainingMinutes: number | null = null
@@ -354,11 +355,18 @@ export async function stopTimerInternal(
       const totalPausedMs = (activeTimer.totalPausedDuration || 0) * 60 * 1000
       endTime = new Date(activeTimer.startTime.getTime() + maxDurationMs + totalPausedMs)
     }
+  } else if (sessionLimitMinutes) {
+    // Safety net: Even for manual stops, never allow recording more than the session limit
+    if (calculateCurrentDurationMinutes(activeTimer, endTime) > sessionLimitMinutes) {
+      effectiveLimitMinutes = sessionLimitMinutes
+      const totalPausedMs = (activeTimer.totalPausedDuration || 0) * 60 * 1000
+      endTime = new Date(activeTimer.startTime.getTime() + sessionLimitMinutes * 60 * 1000 + totalPausedMs)
+    }
   }
 
   let totalDuration = calculateCurrentDurationMinutes(activeTimer, endTime)
   
-  if (isAutoStop && effectiveLimitMinutes !== null && totalDuration > effectiveLimitMinutes) {
+  if (effectiveLimitMinutes !== null && totalDuration > effectiveLimitMinutes) {
     totalDuration = effectiveLimitMinutes
   }
   
@@ -486,8 +494,10 @@ export async function enforceTimerLimitsInternal(
   const currentDuration = calculateCurrentDurationMinutes(activeTimer, now)
 
   // Check max session hours limit - ALWAYS enforce if set
-  if (stopSettings.maxSessionHours) {
-    const sessionLimitMinutes = stopSettings.maxSessionHours * MINUTES_PER_HOUR
+  const sessionLimitHours = activeTimer.maxSessionHours || stopSettings.maxSessionHours
+
+  if (sessionLimitHours) {
+    const sessionLimitMinutes = sessionLimitHours * MINUTES_PER_HOUR
     if (currentDuration >= sessionLimitMinutes) {
       const result = await stopTimerInternal(activeTimer, {
         stopSettings,
