@@ -118,6 +118,8 @@ TimeEntrySchema.index({ organization: 1, status: 1, startTime: 1 })
 TimeEntrySchema.index({ organization: 1, project: 1, status: 1 })
 TimeEntrySchema.index({ organization: 1, user: 1, startTime: -1 })
 TimeEntrySchema.index({ organization: 1, project: 1, startTime: -1 })
+TimeEntrySchema.index({ organization: 1, startTime: -1 })
+TimeEntrySchema.index({ organization: 1, isApproved: 1, startTime: -1 })
 // Backs getLoggedMinutes(taskId, memberId, dateRange) — the stand-up variance
 // engine runs this for every allocation on every stand-up, so it is the hottest
 // read path in that module.
