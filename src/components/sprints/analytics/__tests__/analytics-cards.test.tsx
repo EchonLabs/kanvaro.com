@@ -241,10 +241,10 @@ describe('the hero and the headline tiles', () => {
     expect(screen.getByRole('link', { name: s.backToSprint() })).toHaveAttribute('href', '/sprints/sprint-1')
   })
 
-  it('shows dashes, not zeros, on an empty sprint', () => {
+  it('shows N/A, not zeros, on an empty sprint', () => {
     render(<AnalyticsStatGrid headline={buildAnalyticsPayload(emptyInputs(), 'aggregate').headline} />)
 
     const values = screen.getAllByTestId('stat-card-value').map((node) => node.textContent)
-    expect(values).toEqual(['—', '—', '—', '—'])
+    expect(values).toEqual(['N/A', 'N/A', 'N/A', 'N/A'])
   })
 })

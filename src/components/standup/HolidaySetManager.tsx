@@ -210,14 +210,14 @@ export function HolidaySetManager() {
     // be written by someone who knows why.
     const reason = window.prompt(
       `Withdraw "${holiday.name}" on ${holiday.date}?\n\n` +
-        'The date stays on record and keeps its history — it simply stops affecting ' +
+        'The date stays on record and keeps its history. It simply stops affecting ' +
         `future stand-ups. Give a reason of at least ${REVOKE_REASON_MIN_LENGTH} characters.`
     )
     if (reason === null) return
 
     if (reason.trim().length < REVOKE_REASON_MIN_LENGTH) {
       notifyError({
-        title: `That reason is too short — give at least ${REVOKE_REASON_MIN_LENGTH} characters so whoever reads the calendar next knows why.`
+        title: `That reason is too short. Give at least ${REVOKE_REASON_MIN_LENGTH} characters so whoever reads the calendar next knows why.`
       })
       return
     }
@@ -413,7 +413,7 @@ export function HolidaySetManager() {
                   {sets.map((set) => (
                     <SelectItem key={set.id} value={set.id}>
                       {set.name}
-                      {set.source === 'api' ? ' — API' : ' — Seeded/manual'}
+                      {set.source === 'api' ? ': API' : ': Seeded/manual'}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -431,7 +431,7 @@ export function HolidaySetManager() {
                 id="holiday-api-key"
                 type="password"
                 value={apiKeyInput}
-                placeholder={hasApiKey ? 'Key configured — enter a new key to replace it' : 'Paste your API key'}
+                placeholder={hasApiKey ? 'Key configured. Enter a new key to replace it' : 'Paste your API key'}
                 onChange={(event) => setApiKeyInput(event.target.value)}
               />
             </div>
@@ -515,9 +515,9 @@ export function HolidaySetManager() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="public">Public — everyone is off</SelectItem>
-                  <SelectItem value="company">Company — organisation closure</SelectItem>
-                  <SelectItem value="optional">Optional — only those who observe it</SelectItem>
+                  <SelectItem value="public">Public: everyone is off</SelectItem>
+                  <SelectItem value="company">Company: organisation closure</SelectItem>
+                  <SelectItem value="optional">Optional: only those who observe it</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -606,7 +606,7 @@ function HolidayTile({
     <div
       title={
         revoked
-          ? `${holiday.name} — withdrawn${holiday.revokeReason ? `: ${holiday.revokeReason}` : ''}`
+          ? `${holiday.name} (withdrawn${holiday.revokeReason ? `: ${holiday.revokeReason}` : ''})`
           : holiday.name
       }
       // The org's own accent theme (Settings → Organization → Accent Theme,
