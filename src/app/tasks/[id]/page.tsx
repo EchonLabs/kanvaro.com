@@ -2298,7 +2298,7 @@ export default function TaskDetailPage() {
                       <Target className="h-4 w-4 text-[var(--apple-system-blue)]" />
                       <span className="apple-section-label text-[var(--apple-tertiary-label)]">Sprint</span>
                     </div>
-                    <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">{sprintDetails.name || '—'}</p>
+                    <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">{sprintDetails.name || 'N/A'}</p>
                     {sprintDetails.status && <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">{formatToTitleCase(sprintDetails.status)}</p>}
                     {(sprintDetails.startDate || sprintDetails.endDate) && (
                       <p className="text-[12px] text-[var(--apple-tertiary-label)] mt-1">

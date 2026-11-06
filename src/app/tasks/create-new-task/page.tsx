@@ -881,7 +881,7 @@ export default function CreateTaskPage() {
                       <label className="text-sm font-medium text-foreground">Assigned To</label>
                       <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[var(--apple-tertiary-label)]">
                         <Info className="h-3 w-3 shrink-0" />
-                        Optional — tasks are assigned during sprint planning.
+                        Optional. Tasks are assigned during sprint planning.
                       </p>
                       <div className="space-y-2 mt-1">
                         <Select
