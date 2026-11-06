@@ -201,7 +201,7 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
   const nameFor = (memberId: unknown) => nameById.get(String(memberId)) ?? String(memberId ?? '')
 
   lines.push(
-    `# Stand-up — ${summary.headerFacts.standupDate} (Day ${summary.headerFacts.dayNumber} of ${summary.headerFacts.totalDays})`
+    `# Stand-up: ${summary.headerFacts.standupDate} (Day ${summary.headerFacts.dayNumber} of ${summary.headerFacts.totalDays})`
   )
   lines.push(`Facilitator: ${summary.headerFacts.facilitatorName}`)
   lines.push(`Duration: ${summary.headerFacts.durationMinutes} minutes`)
@@ -261,7 +261,7 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
     const severity = field(row, 'severity')
     const status = field(row, 'status')
     const meta = [blockerType, severity].filter(Boolean).join(', ')
-    lines.push(`- ${description}${meta ? ` (${meta})` : ''}${status ? ` — ${status}` : ''}`)
+    lines.push(`- ${description}${meta ? ` (${meta})` : ''}${status ? ` (${status})` : ''}`)
   }
   lines.push('')
 
@@ -283,7 +283,7 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
       standupStrings.carryForward.itemTypeLabel(field(row, 'type') ?? '')
     const ageBand = field(row, 'ageBand')
     const status = field(row, 'status')
-    lines.push(`- ${label}${ageBand ? ` (${ageBand})` : ''}${status ? ` — ${status}` : ''}`)
+    lines.push(`- ${label}${ageBand ? ` (${ageBand})` : ''}${status ? ` (${status})` : ''}`)
   }
   lines.push('')
 

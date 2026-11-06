@@ -124,7 +124,7 @@ describe('renderSummaryMarkdown', () => {
 
   it('produces the expected header line', () => {
     const output = renderSummaryMarkdown(fixture)
-    expect(output).toContain('# Stand-up — 2026-08-10 (Day 3 of 9)')
+    expect(output).toContain('# Stand-up: 2026-08-10 (Day 3 of 9)')
   })
 
   it('produces the expected attendance lines', () => {
@@ -161,13 +161,13 @@ describe('renderSummaryMarkdown', () => {
 
   it('renders blockers raised/resolved as prose — not JSON', () => {
     const output = renderSummaryMarkdown(fixture)
-    expect(output).toContain('- Waiting on vendor sandbox (external_party, high) — open')
+    expect(output).toContain('- Waiting on vendor sandbox (external_party, high) (open)')
     expect(output).toContain('- Vendor restored access.')
   })
 
   it('renders carry-forward rows as prose — not JSON', () => {
     const output = renderSummaryMarkdown(fixture)
-    expect(output).toContain('- KAN-5 (3-5) — open')
+    expect(output).toContain('- KAN-5 (3-5) (open)')
   })
 
   it('renders pmNotes under its own heading only when present', () => {
