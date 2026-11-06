@@ -573,7 +573,7 @@ export const standupStrings = {
      * way to tell a missing panel from an empty one.
      */
     panelPending: ({ phase }: { phase: string }) =>
-      `Not built yet — arrives in ${phase}.`,
+      `Not built yet. It arrives in ${phase}.`,
 
     /**
      * ALO-16's confirmation. Raised by the run screen once the server has
@@ -642,7 +642,7 @@ export const standupStrings = {
     completeReady: () => 'All checks passed.',
     jumpToFailure: () => 'Fix',
     checksUnavailable: () =>
-      "This stand-up's checklist could not be loaded, so Complete is disabled until it can be — completing blind would risk skipping a real failure.",
+      "This stand-up's checklist could not be loaded, so Complete is disabled until it can be. Completing blind would risk skipping a real failure.",
     everythingChecksOut: () => 'Nothing needs attention.',
     showPassedChecks: ({ count }: { count: number }) =>
       count === 1 ? 'Show 1 more check' : `Show ${count} more checks`,
@@ -706,7 +706,7 @@ export const standupStrings = {
      * finished planning, so generation never ran) and gives a next step.
      */
     noStandupHint: () =>
-      'Your current sprint may still be in planning — stand-ups are only scheduled once planning is complete. Check with your PM, or view your projects.',
+      'Your current sprint may still be in planning. Stand-ups are only scheduled once planning is complete. Check with your PM, or view your projects.',
     noStandupProjectsLink: () => 'View your projects',
     /**
      * This route is reachable for every stand-up status — including
@@ -863,16 +863,16 @@ export const standupStrings = {
     capacityUnder: ({ hours }: { hours: string }) => `You have ${hours} unplanned today.`,
     capacityOver: ({ hours }: { hours: string }) => `You're planned ${hours} beyond your capacity today.`,
     capacityZero: () => 'Nothing is planned for you today yet.',
-    capacityUnavailable: () => "You're down as unavailable today — nothing is planned.",
+    capacityUnavailable: () => "You're down as unavailable today. Nothing is planned.",
     debtSentence: ({ hours }: { hours: string }) =>
       `You are ${hours} over estimate on this sprint's completed and in-flight work.`,
     surplusSentence: ({ hours }: { hours: string }) =>
       `You're ${hours} ahead of estimate on this sprint's work.`,
     strandedSentence: ({ hours }: { hours: string }) =>
       `${hours} is still assigned to you for a day you're not available.`,
-    yesterdayEmpty: () => "Nothing to review yet — your previous stand-up hasn't closed.",
+    yesterdayEmpty: () => "Nothing to review yet. Your previous stand-up hasn't closed.",
     statusFor: ({ key }: { key: string }) => `Status for ${key}`,
-    todayEmpty: () => 'Nothing planned for you yet — your PM assigns work at the stand-up.',
+    todayEmpty: () => 'Nothing planned for you yet. Your PM assigns work at the stand-up.',
     /**
      * Deliberately status-agnostic — this row-level card is shown whatever
      * the stand-up's status is (Scheduled, Completed, Missed, …), and "the
@@ -1073,7 +1073,7 @@ export const standupStrings = {
     blocked: ({ planned, locale }: { planned: Minutes; locale?: string }) =>
       `Blocked. The ${formatMinutesAsHours(planned, {
         locale
-      })} planned here is not counted as an overrun — the blocker owns this row.`,
+      })} planned here is not counted as an overrun. The blocker owns this row.`,
 
     descoped: () =>
       'Removed from the sprint. Logged time is kept for reporting, and the carry-forward item closes.',
@@ -1087,7 +1087,7 @@ export const standupStrings = {
       'The owner was away, so nothing here counts as an overrun and no estimate debt accrues.',
 
     noTimeLoggedButProgressed: () =>
-      'Status moved but no time was logged. Enter the actual hours — nothing accrues until they exist.',
+      'Status moved but no time was logged. Enter the actual hours. Nothing accrues until they exist.',
 
     /**
      * §12.3's absorb-policy banner. Says what the debt *means* for today's
@@ -1169,7 +1169,7 @@ export const standupStrings = {
     }) =>
       `${name}’s new total on this task would be ${formatMinutesAsHours(total, { locale })}.`,
     reviseDetailRequired: ({ minLength }: { minLength: number }) =>
-      `Say a little more — at least ${minLength} characters.`,
+      `Say a little more. Use at least ${minLength} characters.`,
     reasonRequired: ({ minLength }: { minLength: number }) =>
       `Give a reason of at least ${minLength} characters for the planned time that did not happen.`,
 
@@ -1311,8 +1311,8 @@ export const standupStrings = {
     sprintDays: () => 'This sprint',
     dayLabel: ({ number, total }: { number: number; total: number }) =>
       `Day ${number} of ${total}`,
-    dayOne: () => 'Day one — assignment',
-    finalDay: () => 'Final day — sprint close',
+    dayOne: () => 'Day one: assignment',
+    finalDay: () => 'Final day: sprint close',
     frozenDayNumber: ({ number }: { number: number }) => `Ran as day ${number}`,
     backfilled: () => 'Back-filled',
     calendarAnomaly: () =>
@@ -1375,7 +1375,7 @@ export const standupStrings = {
       Completed: 'Completed',
       Reopened: 'Reopened',
       Missed: 'Missed',
-      Skipped_Holiday: 'Skipped — not a working day',
+      Skipped_Holiday: 'Skipped: not a working day',
       Cancelled: 'Cancelled'
     } as Record<string, string>
   },
@@ -1505,9 +1505,9 @@ export const standupStrings = {
     crossProjectLoadUnavailable:
       'Capacity shown here does not account for what this person is allocated on other projects today.',
     leaveDataManual:
-      'This project has no connected leave calendar — capacity assumes nobody is on leave unless a PM enters it manually.',
+      'This project has no connected leave calendar. Capacity assumes nobody is on leave unless a PM enters it manually.',
     timeLoggingManual:
-      'This project has no logged time yet — variance is being tracked from hours the PM enters manually.'
+      'This project has no logged time yet. Variance is being tracked from hours the PM enters manually.'
   },
 
   /**
