@@ -576,6 +576,9 @@ TaskSchema.index({ organization: 1, status: 1, completedAt: -1 })
 TaskSchema.index({ project: 1, title: 1 })
 TaskSchema.index({ project: 1, taskNumber: 1 })
 TaskSchema.index({ title: 'text', description: 'text' })
+TaskSchema.index({ organization: 1, archived: 1, createdAt: -1 })
+TaskSchema.index({ organization: 1, sprint: 1, archived: 1 })
+TaskSchema.index({ project: 1, sprint: 1, archived: 1 })
 
 // ---------------------------------------------------------------------------
 // DAT-6 / DAT-7 — estimate immutability, enforced at the model layer.

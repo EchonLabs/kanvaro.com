@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
         .populate('createdBy', 'firstName lastName email')
         .populate('teamMembers', 'firstName lastName email')
         .sort({ startDate: 1 })
+        .lean()
     ])
 
     // Format tasks as calendar events
