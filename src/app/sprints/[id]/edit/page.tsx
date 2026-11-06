@@ -131,7 +131,7 @@ export default function EditSprintPage() {
       setMembersError('')
       const [projectResponse, membersResponse] = await Promise.all([
         fetch(`/api/projects/${projectId}`),
-        fetch('/api/members?limit=10000&page=1')
+        fetch('/api/members?limit=10000&page=1&minimal=true')
       ])
 
       const projectData = await projectResponse.json()

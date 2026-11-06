@@ -802,7 +802,7 @@ const [searchQuery, setSearchQuery] = useState('')
   useEffect(() => {
     const loadProjects = async () => {
       try {
-        const response = await fetch('/api/projects?limit=1000&page=1')
+        const response = await fetch('/api/projects?limit=1000&page=1&minimal=true')
         if (response.ok) {
           const data = await response.json()
           if (data.success && Array.isArray(data.data)) {
