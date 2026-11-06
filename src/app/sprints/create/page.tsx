@@ -115,7 +115,7 @@ export default function CreateSprintPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/members?limit=10000&page=1')
+      const response = await fetch('/api/members?limit=10000&page=1&minimal=true')
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data?.members)) {

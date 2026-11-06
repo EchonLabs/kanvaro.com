@@ -341,7 +341,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     const loadFilterData = async () => {
       try {
         // Load projects
-        const projectsRes = await fetch(`/api/projects?all=true`)
+        const projectsRes = await fetch('/api/projects?all=true&minimal=true')
         if (projectsRes.ok) {
           const projectsData = await projectsRes.json()
           if (projectsData.success) {

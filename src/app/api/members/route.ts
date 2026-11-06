@@ -80,6 +80,33 @@ export async function GET(request: NextRequest) {
       filters.isActive = false
     }
 
+    const minimal = searchParams.get('minimal') === 'true'
+
+    // Fast-path for dropdowns and pickers: skip partner/role populates and return lean member summary
+    if (minimal) {
+      const [members, total] = await Promise.all([
+        User.find(filters)
+          .select('_id firstName lastName email isActive')
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .lean(),
+        User.countDocuments(filters)
+      ])
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          members,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit) || 1
+          }
+        }
+      })
+    }
+
     // Get members with custom role and partner information
     const members = await User.find(filters)
       .select('-password')

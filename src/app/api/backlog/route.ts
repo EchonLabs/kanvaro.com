@@ -544,6 +544,7 @@ export async function GET(request: NextRequest) {
             .populate('createdBy', 'firstName lastName email')
             .populate('story', 'title')
             .populate('sprint', 'name status')
+            .lean()
         : Promise.resolve([]),
 
       includeStories
@@ -552,6 +553,7 @@ export async function GET(request: NextRequest) {
             .populate('createdBy', 'firstName lastName email')
             .populate('epic', 'title')
             .populate('sprint', 'name status')
+            .lean()
         : Promise.resolve([]),
 
       includeEpics
@@ -559,12 +561,13 @@ export async function GET(request: NextRequest) {
             .populate('project', 'name')
             .populate('assignedTo', 'firstName lastName email')
             .populate('createdBy', 'firstName lastName email')
+            .lean()
         : Promise.resolve([])
     ])
 
     const allItems = [
       ...tasks.map(task => {
-        const taskObj = task.toObject()
+        const taskObj = (typeof (task as any).toObject === 'function' ? (task as any).toObject() : task) as any
         // assignedTo is already an array of populated user objects
         return {
           ...taskObj,
@@ -573,7 +576,7 @@ export async function GET(request: NextRequest) {
         }
       }),
       ...stories.map(story => {
-        const storyObj = story.toObject()
+        const storyObj = (typeof (story as any).toObject === 'function' ? (story as any).toObject() : story) as any
         // Normalize assignedTo for stories: convert single user to array
         const normalizedAssignedTo = storyObj.assignedTo ? [storyObj.assignedTo] : []
         return {
@@ -583,7 +586,7 @@ export async function GET(request: NextRequest) {
         }
       }),
       ...epics.map(epic => {
-        const epicObj = epic.toObject()
+        const epicObj = (typeof (epic as any).toObject === 'function' ? (epic as any).toObject() : epic) as any
         // Normalize assignedTo for epics: convert single user to array
         const normalizedAssignedTo = epicObj.assignedTo ? [epicObj.assignedTo] : []
         return {

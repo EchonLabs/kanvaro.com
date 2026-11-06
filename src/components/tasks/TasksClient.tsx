@@ -601,7 +601,7 @@ export default function TasksClient({
 
         const loadUsers = async () => {
             try {
-                const response = await fetch('/api/members?all=true')
+                const response = await fetch('/api/members?all=true&minimal=true')
                 if (response.ok) {
                     const data = await response.json()
                     if (data.success && data.data?.members && Array.isArray(data.data.members)) {
