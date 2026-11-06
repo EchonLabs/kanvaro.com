@@ -185,7 +185,7 @@ describe('GET /api/standups/:id/summary/export', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toContain('text/markdown')
-    expect(text).toContain('# Stand-up — 2026-08-17 (Day 1 of 5)')
+    expect(text).toContain('# Stand-up: 2026-08-17 (Day 1 of 5)')
     expect(text).toContain('Kasun: present')
 
     // UI-10/OVR-10: the override renders as readable prose with its

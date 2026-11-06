@@ -73,7 +73,7 @@ export function DebtLedgerDrawer({
     <div aria-labelledby="debt-ledger-title" className="flex flex-col gap-4 p-5">
       <div className="flex flex-col gap-1">
         <h3 id="debt-ledger-title" className="apple-type-body font-semibold text-[var(--plan-text)]">
-          {standupStrings.debt.ledgerTitle()} — {memberName}
+          {standupStrings.debt.ledgerTitle()}: {memberName}
         </h3>
 
         {/* VAR-6 / E42: a negative balance is surplus and says so. */}

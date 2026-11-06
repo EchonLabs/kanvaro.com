@@ -2,7 +2,7 @@ import { formatMinutesAsHours, minutes } from '@/lib/standup/minutes'
 import { cn } from '@/lib/utils'
 
 /** What a zero or missing figure renders as: muted, so only real numbers draw the eye. */
-export const DASH = '—'
+export const DASH = 'N/A'
 
 /** Every hour string on the screen, through the module's one formatter (NFR-P1). */
 export function hours(value: number, options: { signed?: boolean } = {}): string {
