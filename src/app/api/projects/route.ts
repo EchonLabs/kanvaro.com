@@ -120,6 +120,31 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    const minimal = searchParams.get('minimal') === 'true'
+
+    // Fast-path for dropdowns and pickers: skip aggregations, calculations, and heavy populates
+    if (minimal) {
+      const [projects, total] = await Promise.all([
+        Project.find(projectQuery)
+          .select('_id name')
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .lean(),
+        Project.countDocuments(projectQuery)
+      ])
+
+      return NextResponse.json({
+        success: true,
+        data: projects,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit) || 1
+        }
+      })
+    }
+
     const [projects, total] = await Promise.all([
       Project.find(projectQuery)
         .select('name startDate endDate createdBy teamMembers client status priority settings')
