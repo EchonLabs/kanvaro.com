@@ -120,16 +120,17 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    const isAll = searchParams.get('all') === 'true'
     const minimal = searchParams.get('minimal') === 'true'
 
     // Fast-path for dropdowns and pickers: skip aggregations, calculations, and heavy populates
     if (minimal) {
+      let query = Project.find(projectQuery).select('_id name')
+      if (!isAll) {
+        query = query.skip((page - 1) * limit).limit(limit)
+      }
       const [projects, total] = await Promise.all([
-        Project.find(projectQuery)
-          .select('_id name')
-          .skip((page - 1) * limit)
-          .limit(limit)
-          .lean(),
+        query.lean(),
         Project.countDocuments(projectQuery)
       ])
 
@@ -137,10 +138,10 @@ export async function GET(request: NextRequest) {
         success: true,
         data: projects,
         pagination: {
-          page,
-          limit,
+          page: isAll ? 1 : page,
+          limit: isAll ? total : limit,
           total,
-          totalPages: Math.ceil(total / limit) || 1
+          totalPages: isAll ? 1 : (Math.ceil(total / limit) || 1)
         }
       })
     }

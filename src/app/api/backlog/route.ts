@@ -566,35 +566,23 @@ export async function GET(request: NextRequest) {
     ])
 
     const allItems = [
-      ...tasks.map(task => {
-        const taskObj = (typeof (task as any).toObject === 'function' ? (task as any).toObject() : task) as any
-        // assignedTo is already an array of populated user objects
-        return {
-          ...taskObj,
-          taskType: taskObj.type,
-          type: 'task'
-        }
-      }),
-      ...stories.map(story => {
-        const storyObj = (typeof (story as any).toObject === 'function' ? (story as any).toObject() : story) as any
+      ...tasks.map(task => ({
+        ...task,
+        taskType: (task as any).type,
+        type: 'task'
+      })),
+      ...stories.map(story => ({
+        ...story,
         // Normalize assignedTo for stories: convert single user to array
-        const normalizedAssignedTo = storyObj.assignedTo ? [storyObj.assignedTo] : []
-        return {
-          ...storyObj,
-          assignedTo: normalizedAssignedTo,
-          type: 'story'
-        }
-      }),
-      ...epics.map(epic => {
-        const epicObj = (typeof (epic as any).toObject === 'function' ? (epic as any).toObject() : epic) as any
+        assignedTo: (story as any).assignedTo ? [(story as any).assignedTo] : [],
+        type: 'story'
+      })),
+      ...epics.map(epic => ({
+        ...epic,
         // Normalize assignedTo for epics: convert single user to array
-        const normalizedAssignedTo = epicObj.assignedTo ? [epicObj.assignedTo] : []
-        return {
-          ...epicObj,
-          assignedTo: normalizedAssignedTo,
-          type: 'epic'
-        }
-      })
+        assignedTo: (epic as any).assignedTo ? [(epic as any).assignedTo] : [],
+        type: 'epic'
+      }))
     ]
 
     const compareItems = (a: any, b: any) => {

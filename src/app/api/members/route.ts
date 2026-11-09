@@ -80,16 +80,17 @@ export async function GET(request: NextRequest) {
       filters.isActive = false
     }
 
+    const isAll = searchParams.get('all') === 'true'
     const minimal = searchParams.get('minimal') === 'true'
 
     // Fast-path for dropdowns and pickers: skip partner/role populates and return lean member summary
     if (minimal) {
+      let query = User.find(filters).select('_id firstName lastName email isActive')
+      if (!isAll) {
+        query = query.skip((page - 1) * limit).limit(limit)
+      }
       const [members, total] = await Promise.all([
-        User.find(filters)
-          .select('_id firstName lastName email isActive')
-          .skip((page - 1) * limit)
-          .limit(limit)
-          .lean(),
+        query.lean(),
         User.countDocuments(filters)
       ])
 
@@ -98,10 +99,10 @@ export async function GET(request: NextRequest) {
         data: {
           members,
           pagination: {
-            page,
-            limit,
+            page: isAll ? 1 : page,
+            limit: isAll ? total : limit,
             total,
-            totalPages: Math.ceil(total / limit) || 1
+            totalPages: isAll ? 1 : (Math.ceil(total / limit) || 1)
           }
         }
       })
