@@ -61,6 +61,7 @@ import { DateRange } from 'react-day-picker'
 import { format } from 'date-fns'
 import { useNotify } from '@/lib/notify'
 import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
+import { DEFAULT_TASK_STATUS_KEYS } from '@/constants/taskStatuses'
 import { useAuthContext } from '@/contexts/AuthContext'
 import VirtualizedColumn from '@/components/tasks/VirtualizedColumn'
 import SharedSortableTask from '@/components/tasks/SortableTask'
@@ -673,6 +674,25 @@ export default function KanbanPage() {
       }
     }
 
+    if (newStatus !== activeTaskItem.status) {
+      const taskProjectId = (typeof activeTaskItem.project === 'object' ? activeTaskItem.project?._id : activeTaskItem.project)?.toString()
+      const taskProject = projects.find(p => (p as any)._id?.toString() === taskProjectId)
+      const customStatuses = taskProject?.settings?.kanbanStatuses
+      const allowedStatuses: string[] = Array.isArray(customStatuses) && customStatuses.length > 0
+        ? customStatuses.map((s: any) => s.key)
+        : [...DEFAULT_TASK_STATUS_KEYS]
+
+      if (newStatus !== 'backlog' && !allowedStatuses.includes(newStatus)) {
+        const colTitle = columns.find(c => c.id === newStatus)?.title || formatToTitleCase(newStatus)
+        const projName = taskProject?.name || activeTaskItem.project?.name || 'this project'
+        notifyError({
+          title: 'Cannot Move Task',
+          message: `Status "${colTitle}" is not available for project "${projName}".`
+        })
+        return
+      }
+    }
+
     const originalTask = { ...activeTaskItem }
     if (newStatus !== activeTaskItem.status || shouldReorder) {
       setPendingUpdates(prev => new Set(prev).add(activeId))
@@ -712,10 +732,13 @@ export default function KanbanPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: newStatus, position: newPosition }),
           })
-          if (!response.ok) throw new Error('Failed to update task')
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}))
+            throw new Error(data.error || 'Failed to update task')
+          }
         }
         setPendingUpdates(prev => { const s = new Set(prev); s.delete(activeId); return s })
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to sync task update:', error)
         setTasks(prevTasks => {
           const updated = [...prevTasks]
@@ -724,7 +747,7 @@ export default function KanbanPage() {
           return updated
         })
         setPendingUpdates(prev => { const s = new Set(prev); s.delete(activeId); return s })
-        notifyError({ title: 'Update Failed', message: 'Failed to update task. Changes have been reverted.' })
+        notifyError({ title: 'Update Failed', message: error?.message || 'Failed to update task. Changes have been reverted.' })
       }
     }
   }
@@ -743,7 +766,7 @@ export default function KanbanPage() {
         await handleTaskDelete(selectedTask._id)
         setShowDeleteConfirmModal(false)
         setSelectedTask(null)
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to delete task:', error)
         notifyError({ title: 'Failed to Delete Task', message: 'Failed to delete task. Please try again.' })
       }

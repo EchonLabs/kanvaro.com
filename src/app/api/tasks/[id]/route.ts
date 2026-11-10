@@ -18,6 +18,7 @@ import { resolveBaseUrl } from '@/lib/request-base-url'
 import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
 import { closeCarryForwardItemsForDeletedTask } from '@/lib/standup/carry-forward-service'
 import { hoursToMinutes } from '@/lib/standup/minutes'
+import { DEFAULT_TASK_STATUS_KEYS } from '@/constants/taskStatuses'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
@@ -753,6 +754,26 @@ export async function PUT(
         { error: 'Task not found or unauthorized' },
         { status: 404 }
       )
+    }
+
+    // Reject a status the task's project does not have (e.g. a drag from the
+    // "All Projects" board into another project's custom column). 'backlog' is
+    // a system status used by the sprint/backlog flows, so it is always allowed.
+    if (typeof updateData.status === 'string' && updateData.status !== currentTask.status) {
+      const statusProjectId = updateData.project || (currentTask.project as any)?._id?.toString() || currentTask.project?.toString()
+      const statusProject = await Project.findOne({ _id: statusProjectId, organization: organizationId })
+        .select('settings.kanbanStatuses')
+        .lean()
+      const customStatuses = (statusProject as any)?.settings?.kanbanStatuses
+      const allowedStatuses: string[] = Array.isArray(customStatuses) && customStatuses.length > 0
+        ? customStatuses.map((s: any) => s.key)
+        : [...DEFAULT_TASK_STATUS_KEYS]
+      if (updateData.status !== 'backlog' && !allowedStatuses.includes(updateData.status)) {
+        return NextResponse.json(
+          { success: false, error: `Status "${updateData.status}" is not available for this task's project` },
+          { status: 400 }
+        )
+      }
     }
 
     let scheduleDelayMs = 0

@@ -1,3 +1,11 @@
+## [1.49.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.49.1...v1.49.2) (2026-11-09)
+
+
+### Bug Fixes
+
+* enforce active timer maxSessionHours cap on manual stops and cron cleanup ([7e51e2d](https://github.com/EchonLabs/kanvaro.com/commit/7e51e2d330e4e65b08f9683be7861d50faf03deb))
+* validate task status against project columns on drag and drop ([4da52ba](https://github.com/EchonLabs/kanvaro.com/commit/4da52ba40627fe3357bfb17837b6f8b7e7630c13))
+
 ## [1.49.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.49.0...v1.49.1) (2026-11-04)
 
 
