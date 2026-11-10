@@ -139,6 +139,66 @@ describe('GET /api/standups/:id/summary', () => {
     expect(payload.error.code).toBe('NOT_FOUND')
   })
 
+  it('says not_completed for a stand-up that has not completed, even if a stale summary exists', async () => {
+    const standup = await seedStandup({ status: 'In_Progress' })
+    await seedSummary(standup._id as mongoose.Types.ObjectId)
+
+    const response = await summaryRoute.GET(buildGet(`/api/standups/${standup._id}/summary`), {
+      params: { id: String(standup._id) }
+    })
+    const payload = await response.json()
+
+    expect(response.status).toBe(404)
+    expect(payload.error.details.reason).toBe('not_completed')
+  })
+
+  it('says summary_missing for a completed stand-up whose summary is gone', async () => {
+    const standup = await seedStandup({ status: 'Completed' })
+
+    const response = await summaryRoute.GET(buildGet(`/api/standups/${standup._id}/summary`), {
+      params: { id: String(standup._id) }
+    })
+    const payload = await response.json()
+
+    expect(response.status).toBe(404)
+    expect(payload.error.code).toBe('NOT_FOUND')
+    expect(payload.error.details.reason).toBe('summary_missing')
+  })
+
+  it('still shows the last summary of a reopened stand-up', async () => {
+    const standup = await seedStandup({ status: 'Reopened' })
+    await seedSummary(standup._id as mongoose.Types.ObjectId)
+
+    const response = await summaryRoute.GET(buildGet(`/api/standups/${standup._id}/summary`), {
+      params: { id: String(standup._id) }
+    })
+
+    expect(response.status).toBe(200)
+  })
+
+  it('returns a recorded day outcome with member names joined on read', async () => {
+    const standup = await seedStandup()
+    await seedSummary(standup._id as mongoose.Types.ObjectId, {
+      dayOutcome: {
+        recordedAt: new Date(),
+        recordedByStandup: String(anyId()),
+        recordedByStandupDate: '2026-08-18',
+        completedTasks: [],
+        varianceTable: [],
+        memberTotals: [{ memberId: String(member), plannedMinutes: 240, loggedMinutesOnDay: 200, dayVarianceMinutes: -40 }]
+      }
+    })
+
+    const response = await summaryRoute.GET(buildGet(`/api/standups/${standup._id}/summary`), {
+      params: { id: String(standup._id) }
+    })
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.data.dayOutcome.recordedByStandupDate).toBe('2026-08-18')
+    expect(payload.data.dayOutcome.memberTotals[0]).toMatchObject({ memberId: String(member), plannedMinutes: 240 })
+  })
+
   it('gates on standup:view, not a write permission', () => {
     const fs = require('fs')
     const path = require('path')

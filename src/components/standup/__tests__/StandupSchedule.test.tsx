@@ -224,7 +224,7 @@ describe('StandupSchedule', () => {
     expect(within(today).getByText('Resume')).toBeInTheDocument()
   })
 
-  it('UI-8: shows "View summary" on today’s row when completed', () => {
+  it('UI-8: shows "View stand-up record" on today’s row when completed', () => {
     render(
       <StandupSchedule
         schedule={schedule({
@@ -235,7 +235,7 @@ describe('StandupSchedule', () => {
     )
 
     const today = screen.getByTestId('schedule-today')
-    expect(within(today).getByText('View summary')).toBeInTheDocument()
+    expect(within(today).getByText('View stand-up record')).toBeInTheDocument()
   })
 
   it('shows no action label on a non-today row', () => {

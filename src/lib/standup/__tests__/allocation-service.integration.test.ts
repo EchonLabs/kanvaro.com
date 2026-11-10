@@ -200,6 +200,62 @@ describe('createAllocation', () => {
     expect(result.capacity.status).toBe('under')
   })
 
+  // Regression: a task re-assigned from the run screen on a later day started
+  // a fresh chain of one, so analytics' "Spill chains" never saw a spill the
+  // variance panel was reporting.
+  it('links a re-allocation on a later day into the task`s spill chain, rooted at the first day', async () => {
+    const dayOne = await create({ plannedMinutes: minutes(180) })
+    const dayOneId = String(dayOne.allocation._id)
+
+    const nextDay = async (date: string, dayNumber: number) => {
+      const standup = await Standup.create({
+        project,
+        sprint,
+        organization,
+        standupDate: date,
+        scheduledStartAt: new Date(`${date}T03:30:00.000Z`),
+        durationMinutes: 15,
+        sprintDayNumber: dayNumber,
+        totalSprintDays: 5,
+        shape: 'mid_sprint',
+        status: 'In_Progress',
+        facilitator: user,
+        expectedAttendees: [member, otherMember],
+        version: 0
+      })
+      const result = await createAllocation({
+        standupId: String(standup._id),
+        memberId: String(member),
+        taskId,
+        plannedMinutes: minutes(180),
+        expectedVersion: 0,
+        actor
+      } as any)
+      return Allocation.findById(result.allocation._id).lean()
+    }
+
+    const dayTwo = await nextDay('2026-08-18', 2)
+    expect(String(dayTwo!.carriedFromAllocation)).toBe(dayOneId)
+    expect(String(dayTwo!.carryChainRoot)).toBe(dayOneId)
+
+    const dayThree = await nextDay('2026-08-19', 3)
+    expect(String(dayThree!.carriedFromAllocation)).toBe(String(dayTwo!._id))
+    expect(String(dayThree!.carryChainRoot)).toBe(dayOneId)
+  })
+
+  it('does not chain a second row for the same task on the same day (a pairing, not a spill)', async () => {
+    await create({ plannedMinutes: minutes(120) })
+    const paired = await create({
+      memberId: String(otherMember),
+      plannedMinutes: minutes(120),
+      pairedDeliberately: true,
+      expectedVersion: 4
+    })
+    const stored = await Allocation.findById(paired.allocation._id).lean()
+    expect(stored!.carryChainRoot).toBeUndefined()
+    expect(stored!.carriedFromAllocation).toBeUndefined()
+  })
+
   it('stamps the task status the allocation was made against (Phase 8, V7 vs V12)', async () => {
     // The classifier has to tell "planned, untouched, status unchanged" (V7,
     // reason required) from "no time logged but the task moved anyway" (V12,

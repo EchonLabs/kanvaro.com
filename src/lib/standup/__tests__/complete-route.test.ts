@@ -189,6 +189,30 @@ describe('POST /api/standups/:id/complete', () => {
     expect(await StandupSummary.countDocuments({ standup: standup._id })).toBe(1)
   })
 
+  it("writes the previous day's outcome back onto its record when the next stand-up completes", async () => {
+    const day1 = await seedCleanStandup()
+    expect((await invoke(String(day1._id), 0)).status).toBe(200)
+    expect((await StandupSummary.findOne({ standup: day1._id }).lean())!.dayOutcome).toBeUndefined()
+
+    const day2 = await seedCleanStandup({
+      standupDate: '2026-08-18',
+      scheduledStartAt: new Date('2026-08-18T03:30:00.000Z'),
+      sprintDayNumber: 2,
+      shape: 'mid_sprint'
+    })
+    const response = await invoke(String(day2._id), 0)
+    expect(response.status).toBe(200)
+
+    const day1Record = await StandupSummary.findOne({ standup: day1._id }).lean()
+    expect(day1Record!.dayOutcome).toMatchObject({
+      recordedByStandup: String(day2._id),
+      recordedByStandupDate: '2026-08-18'
+    })
+    // Day 1's frozen fields are what day 1's completion wrote.
+    expect(day1Record!.headerFacts.standupDate).toBe('2026-08-17')
+    expect((await StandupSummary.findOne({ standup: day2._id }).lean())!.dayOutcome).toBeUndefined()
+  })
+
   it('refuses a Missed stand-up with STANDUP_NOT_STARTABLE and writes nothing, even when CC-7 would pass', async () => {
     // A failed backfill leaves attendance recorded on a Missed day. The live
     // path must not complete it: that skips the SCH-14 window and the stamps.
