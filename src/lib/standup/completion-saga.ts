@@ -59,7 +59,12 @@ import {
 import { filterOverriddenFailures } from './override'
 import { classifyAndPost } from './variance-service'
 import { buildCarryForwardSet } from './carry-forward-service'
-import { buildSummaryDocument, type BuildSummaryInput } from './summary'
+import {
+  buildDayOutcome,
+  buildSummaryDocument,
+  type BuildDayOutcomeInput,
+  type BuildSummaryInput
+} from './summary'
 import {
   evaluateFinalDayCarryForwardDisposition,
   type CarryForwardDispositionRow
@@ -130,6 +135,16 @@ export interface CompletionContext {
    * only consulted on `final_day` anyway.
    */
   carryForwardCloseItems?: CarryForwardDispositionRow[]
+  /**
+   * The outcome of the day the *previous* stand-up planned, which this
+   * stand-up's variance step has just classified. Written back onto that
+   * stand-up's summary as `dayOutcome`. Absent on day one, or when there is
+   * no previous stand-up to report on.
+   */
+  previousDayOutcome?: {
+    standupId: string
+    outcome: BuildDayOutcomeInput
+  }
 }
 
 export interface CompletionResult {
@@ -224,12 +239,42 @@ export async function runCompletionSaga(ctx: CompletionContext): Promise<Complet
         })
         // Upsert keyed on the unique `standup` index — a re-run overwrites
         // its own prior (possibly partial) write rather than duplicating it.
-        const saved = await StandupSummary.findOneAndUpdate(
-          { standup: ctx.standupId },
-          { $set: doc },
-          { upsert: true, new: true }
-        )
+        // `$set` names only the fields this stand-up owns, so a `dayOutcome`
+        // already written by the next stand-up survives a re-completion.
+        const upsert = () =>
+          StandupSummary.findOneAndUpdate(
+            { standup: ctx.standupId },
+            { $set: doc },
+            { upsert: true, new: true }
+          )
+        let saved
+        try {
+          saved = await upsert()
+        } catch (error) {
+          // Two upserts racing to insert the same `standup` both miss the
+          // filter and both try to insert; MongoDB lets one win and fails the
+          // other with E11000 on the unique index. The document now exists,
+          // so a retry takes the update path. Anything else is a real error.
+          if (!isDuplicateKeyError(error)) throw error
+          saved = await upsert()
+        }
         summaryId = String(saved._id)
+      }
+    },
+    {
+      name: 'record-previous-day-outcome',
+      async run() {
+        const previous = ctx.previousDayOutcome
+        if (!previous) return
+        // Never an upsert: a previous stand-up with no summary (Missed, never
+        // backfilled) must not gain a half-built one, which would also make
+        // it look completed to anything that reads summaries. `$set` on the
+        // one field keeps it idempotent and leaves the rest of that frozen
+        // document untouched.
+        await StandupSummary.updateOne(
+          { standup: previous.standupId },
+          { $set: { dayOutcome: buildDayOutcome(previous.outcome) } }
+        )
       }
     },
     {
@@ -344,5 +389,17 @@ export async function runCompletionSaga(ctx: CompletionContext): Promise<Complet
 
   await runSaga(steps, ctx, standupCheckpoint(ctx.standupId))
 
+  // A resumed run that was already past `persist-summary` skips it, leaving
+  // `summaryId` unset. The summary exists by now, so read its id back rather
+  // than returning an empty one.
+  if (!summaryId) {
+    const existing = await StandupSummary.findOne({ standup: ctx.standupId }, { _id: 1 }).lean()
+    if (existing) summaryId = String(existing._id)
+  }
+
   return { status: 'completed', summaryId }
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  return (error as { code?: number } | null)?.code === 11000
 }

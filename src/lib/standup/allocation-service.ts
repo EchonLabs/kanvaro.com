@@ -180,6 +180,16 @@ export async function createAllocation(
         })
       : assertPlannable(input.plannedMinutes)
 
+  // VAR-14 / analytics spill chains. The pre-fill path hands over the chain
+  // it carried from; a PM assigning the same task again from the run screen
+  // did not, so every re-allocation started a new chain of one and the
+  // analytics "Spill chains" widget reported nothing while the variance panel
+  // (which reads `Task.standupSpillCount`) said the task had spilled.
+  const chain =
+    input.carriedFromAllocationId || input.carryChainRootId
+      ? { carriedFrom: input.carriedFromAllocationId, root: input.carryChainRootId }
+      : await priorChainLink(context.sprintId, context.date, input.taskId)
+
   let allocation: IAllocation
   try {
     allocation = await Allocation.create({
@@ -195,8 +205,8 @@ export async function createAllocation(
       pairedDeliberately: input.pairedDeliberately ?? false,
       // Phase 8 reads this to separate V7 from V12; only this moment knows it.
       taskStatusAtAllocation: task.status,
-      carriedFromAllocation: input.carriedFromAllocationId,
-      carryChainRoot: input.carryChainRootId,
+      carriedFromAllocation: chain.carriedFrom,
+      carryChainRoot: chain.root,
       ...(topUpReason
         ? {
             addedAfterCompletion: true,
@@ -805,6 +815,38 @@ async function recompute(
 }
 
 export { unclaimedDetachedMinutes }
+
+/**
+ * The link to an earlier day's allocation of the same task in this sprint,
+ * if there is one. Every link stores the chain's root (never a pointer to the
+ * previous link — see `prefill.ts`), and a root has no root of its own.
+ * Only strictly earlier stand-ups count: a second row for the task on the
+ * same day is a pairing, not a spill.
+ */
+async function priorChainLink(
+  sprintId: string,
+  date: string,
+  taskId: string
+): Promise<{ carriedFrom?: string; root?: string }> {
+  const earlierStandups = (await Standup.find({ sprint: sprintId, standupDate: { $lt: date } })
+    .select('_id')
+    .lean()) as Array<{ _id: unknown }>
+  if (earlierStandups.length === 0) return {}
+
+  const previous = (await Allocation.findOne({
+    task: taskId,
+    standup: { $in: earlierStandups.map((standup) => standup._id) }
+  })
+    .sort({ createdAt: -1 })
+    .select('_id carryChainRoot')
+    .lean()) as { _id: unknown; carryChainRoot?: unknown } | null
+  if (!previous) return {}
+
+  return {
+    carriedFrom: String(previous._id),
+    root: String(previous.carryChainRoot ?? previous._id)
+  }
+}
 
 /**
  * Bumps the version and returns it.
