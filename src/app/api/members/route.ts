@@ -85,7 +85,9 @@ export async function GET(request: NextRequest) {
 
     // Fast-path for dropdowns and pickers: skip partner/role populates and return lean member summary
     if (minimal) {
-      let query = User.find(filters).select('_id firstName lastName email isActive')
+      let query = User.find(filters)
+        .select('_id firstName lastName email isActive')
+        .sort({ createdAt: -1 })
       if (!isAll) {
         query = query.skip((page - 1) * limit).limit(limit)
       }

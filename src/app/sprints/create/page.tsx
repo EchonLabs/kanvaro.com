@@ -99,7 +99,7 @@ export default function CreateSprintPage() {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch('/api/projects')
+      const response = await fetch('/api/projects?minimal=true')
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
@@ -143,7 +143,7 @@ export default function CreateSprintPage() {
       // Fetch both project data and all members
       const [projectResponse, membersResponse] = await Promise.all([
         fetch(`/api/projects/${projectId}`),
-        fetch('/api/members')
+        fetch('/api/members?limit=10000&page=1&minimal=true')
       ])
 
       if (projectResponse.ok && membersResponse.ok) {
