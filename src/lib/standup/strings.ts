@@ -437,7 +437,7 @@ export const standupStrings = {
     refreshed: () => 'Refreshed',
     refreshFailed: () => "Couldn't refresh. Check your connection.",
     complete: () => 'Complete stand-up',
-    viewSummary: () => 'View summary',
+    viewSummary: () => 'View stand-up record',
 
     /** The "Daily Standup Page Redesign" summary bar. */
     summaryEyebrow: () => 'Daily Stand-up',
@@ -1364,7 +1364,7 @@ export const standupStrings = {
         count === 1 ? '1 carry-fwd' : `${count} carry-fwds`,
       joinCall: () => 'Join call',
       startStandup: () => 'Start stand-up',
-      viewSummary: () => 'View summary',
+      viewSummary: () => 'View stand-up record',
       unallocated: () => 'Unallocated',
       scheduled: () => 'Planned'
     },
@@ -1769,11 +1769,20 @@ export const standupStrings = {
    * The read-only summary screen (§15.13, UI-10/UI-11).
    */
   summary: {
-    title: () => 'Stand-up summary',
-    loading: () => 'Loading the summary…',
+    /**
+     * "Record", not "summary": the document is frozen when the meeting
+     * completes, at the start of the working day, so it records the plan and
+     * yesterday's results. How *this* day went is the `dayOutcome*` section
+     * below, filled in by the next stand-up.
+     */
+    title: () => 'Stand-up record',
+    breadcrumb: () => 'Record',
+    loading: () => 'Loading the stand-up record…',
     notAvailable: () =>
-      'This stand-up has no summary yet. Summaries are generated when a stand-up completes.',
-    loadFailed: () => 'Could not load this summary.',
+      'This stand-up has not been completed yet. Its record is saved when the stand-up completes.',
+    summaryMissing: () =>
+      'This stand-up was completed, but its record could not be found. Ask an admin to check it.',
+    loadFailed: () => 'Could not load this stand-up record.',
 
     dayOf: ({ day, total }: { day: number; total: number }) => `Day ${day} of ${total}`,
     facilitator: ({ name }: { name: string }) => `Facilitator: ${name}`,
@@ -1789,6 +1798,7 @@ export const standupStrings = {
     sectionCarryForward: () => 'Carry forward',
     sectionOverrides: () => 'Overrides issued',
     sectionNotes: () => 'PM notes',
+    sectionDayOutcome: () => 'How the day went',
 
     emptyAttendance: () => 'Nothing recorded.',
     emptyCompletedYesterday: () => 'Nothing completed.',
@@ -1800,10 +1810,24 @@ export const standupStrings = {
     emptyCarryForward: () => 'Nothing carried forward.',
     emptyOverrides: () => 'None.',
 
+    /** The `dayOutcome` section: written back by the next stand-up's completion. */
+    dayOutcomePending: () =>
+      "Not known yet. The day's results are recorded when the next stand-up is completed.",
+    dayOutcomeFinalDay: () =>
+      "This was the sprint's last stand-up, so no later stand-up records how the day went.",
+    dayOutcomeRecorded: ({ date }: { date: string }) => `Recorded at the ${date} stand-up.`,
+    dayOutcomeMember: () => 'Member',
+    dayOutcomePlanned: () => 'Planned',
+    dayOutcomeLogged: () => 'Logged',
+    dayOutcomeVariance: () => 'Variance',
+    dayOutcomeCompleted: ({ count }: { count: number }) =>
+      count === 1 ? '1 task completed' : `${count} tasks completed`,
+    dayOutcomeNothingCompleted: () => 'No tasks completed.',
+
     /** UI-10's two export actions. */
     copyAsText: () => 'Copy as text',
     copied: () => 'Copied to clipboard',
-    copyFailed: () => 'Could not copy the summary.',
+    copyFailed: () => 'Could not copy the stand-up record.',
     printOrSave: () => 'Print / Save as PDF'
   },
 
