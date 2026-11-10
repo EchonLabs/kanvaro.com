@@ -125,9 +125,7 @@ export async function GET(request: NextRequest) {
 
     // Fast-path for dropdowns and pickers: skip aggregations, calculations, and heavy populates
     if (minimal) {
-      let query = Project.find(projectQuery)
-        .select('_id name')
-        .sort({ createdAt: -1 })
+      let query = Project.find(projectQuery).select('_id name')
       if (!isAll) {
         query = query.skip((page - 1) * limit).limit(limit)
       }
