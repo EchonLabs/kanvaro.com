@@ -755,7 +755,8 @@ These cost real time to discover:
 - **"Yesterday" means the last `Completed`, `Reopened` or `In_Progress` stand-up by day number.** If you backfill a missed day before the next live one, that day's variance is empty. Backfill afterwards.
 - **A failed backfill leaves its CC-1 override and attendance behind** on the `Missed` day.
 - **Carry-forward notes need `standup:carry_forward_note`.** PMs have it and team members do not.
-- **Spill chains need `carryChainRoot` and `carriedFromAllocation`** on allocations. Manual allocation does not write them.
+- **Spill chains need `carryChainRoot` and `carriedFromAllocation`** on allocations. Since 10 Nov 2026 `createAllocation` links a re-allocation to the task's most recent allocation on an earlier stand-up in the same sprint, so allocations made through the run screen chain. Rows seeded straight into Mongo still need both fields set by hand.
+- **A resolved carry-forward item cannot take a note** (since 10 Nov 2026), and it no longer counts towards CC-4.
 - **`descoped` variance needs `task.descopedAt`.** Cancelled status counts as done.
 - **When re-mapping timestamps for demo data,** compute the anchors once. Never re-derive them from fields you have already overwritten.
 - **Do not write scripts that emulate the environment.** Generate test data in the local database through the real APIs where you can, and fall back to Mongo only for the cases above.

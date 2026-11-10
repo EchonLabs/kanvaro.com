@@ -59,7 +59,7 @@ export function SummaryPrintDocument({
 
       <header className="sp-header">
         <div>
-          <p className="sp-eyebrow">Stand-up summary</p>
+          <p className="sp-eyebrow">Stand-up record</p>
           <h1>{heading}</h1>
           <p className="sp-meta">
             {s.dayOf({ day: facts.dayNumber, total: facts.totalDays })} · Facilitator:{' '}
@@ -264,7 +264,7 @@ export function SummaryPrintDocument({
       )}
 
       <footer className="sp-footer">
-        Kanvaro · Stand-up summary · {heading} · Printed {new Date().toLocaleString()}
+        Kanvaro · Stand-up record · {heading} · Printed {new Date().toLocaleString()}
       </footer>
     </div>,
     document.body

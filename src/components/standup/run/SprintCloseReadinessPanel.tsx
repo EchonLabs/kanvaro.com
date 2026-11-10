@@ -158,7 +158,9 @@ export function SprintCloseReadinessPanel({
           <p className="font-medium text-[var(--plan-text)]">{standupStrings.run.sprintCloseCarryForwardTitle()}</p>
           <ul className="list-disc pl-4 text-[var(--plan-text)]">
             {carryForwardOffenders.map((item) => (
-              <li key={item.itemId}>{item.taskKey ?? item.itemId}</li>
+              <li key={item.itemId}>
+                {item.label ?? item.taskKey ?? standupStrings.carryForward.itemTypeLabel('')}
+              </li>
             ))}
           </ul>
           <p className="mt-1 text-[var(--plan-secondary)]">
