@@ -317,7 +317,7 @@ export default function ActivityPage() {
     const loadProjects = async () => {
       try {
         setProjectsLoading(true)
-        const res = await fetch('/api/projects?limit=1000&page=1')
+        const res = await fetch('/api/projects?limit=1000&page=1&minimal=true')
         if (res.ok) {
           const data = await res.json()
           setProjects((data?.data || []).map((p: any) => ({ _id: p._id, name: p.name })))

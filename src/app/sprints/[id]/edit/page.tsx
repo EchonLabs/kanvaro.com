@@ -107,7 +107,7 @@ export default function EditSprintPage() {
 
   const fetchProjects = useCallback(async () => {
     try {
-      const response = await fetch('/api/projects?limit=1000&page=1')
+      const response = await fetch('/api/projects?limit=1000&page=1&minimal=true')
       if (response.ok) {
         const data = await response.json()
         if (data.success && Array.isArray(data.data)) {
@@ -131,7 +131,7 @@ export default function EditSprintPage() {
       setMembersError('')
       const [projectResponse, membersResponse] = await Promise.all([
         fetch(`/api/projects/${projectId}`),
-        fetch('/api/members?limit=10000&page=1')
+        fetch('/api/members?limit=10000&page=1&minimal=true')
       ])
 
       const projectData = await projectResponse.json()

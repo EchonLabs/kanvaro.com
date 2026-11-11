@@ -120,6 +120,32 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    const isAll = searchParams.get('all') === 'true'
+    const minimal = searchParams.get('minimal') === 'true'
+
+    // Fast-path for dropdowns and pickers: skip aggregations, calculations, and heavy populates
+    if (minimal) {
+      let query = Project.find(projectQuery).select('_id name')
+      if (!isAll) {
+        query = query.skip((page - 1) * limit).limit(limit)
+      }
+      const [projects, total] = await Promise.all([
+        query.lean(),
+        Project.countDocuments(projectQuery)
+      ])
+
+      return NextResponse.json({
+        success: true,
+        data: projects,
+        pagination: {
+          page: isAll ? 1 : page,
+          limit: isAll ? total : limit,
+          total,
+          totalPages: isAll ? 1 : (Math.ceil(total / limit) || 1)
+        }
+      })
+    }
+
     const [projects, total] = await Promise.all([
       Project.find(projectQuery)
         .select('name startDate endDate createdBy teamMembers client status priority settings')
