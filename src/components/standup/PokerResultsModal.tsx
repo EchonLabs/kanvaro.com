@@ -262,6 +262,7 @@ export function PokerResultsModal({
                   unit={unit}
                   participantCount={data?.participantCount ?? task.votedCount}
                   deckType={data?.deckType ?? 'fibonacci'}
+                  estimationUnit={estimationUnit}
                   expanded={expandedTaskId === task.taskId}
                   onToggle={() =>
                     setExpandedTaskId((current) => (current === task.taskId ? null : task.taskId))
@@ -295,6 +296,7 @@ function ResultRow({
   unit,
   participantCount,
   deckType,
+  estimationUnit,
   expanded,
   onToggle,
   conversionOf
@@ -303,6 +305,7 @@ function ResultRow({
   unit: string
   participantCount: number
   deckType: DeckType
+  estimationUnit: 'story_points' | 'hours'
   expanded: boolean
   onToggle: () => void
   conversionOf: (value: number) => string | null
@@ -314,7 +317,8 @@ function ResultRow({
   const agreement = describeAgreement(deckType, {
     min: task.min,
     max: task.max,
-    numericCount: task.votes.filter((vote) => vote.value !== null).length
+    numericCount: task.votes.filter((vote) => vote.value !== null).length,
+    estimationUnit
   })
 
   return (

@@ -50,10 +50,7 @@ const SAFETY_POLL_INTERVAL_MS = 30000
 
 const DECK_LABELS: Record<DeckType, string> = {
   fibonacci: 'Fibonacci',
-  modified_fibonacci: 'Modified Fibonacci',
-  tshirt: 'T-shirt',
-  hours: 'Hours',
-  powers_of_two: 'Powers of two'
+  hours: 'Hours'
 }
 
 interface QueueEntry {
@@ -661,7 +658,8 @@ export function PokerModal({
     .map((entry) => entry.voterName ?? 'Someone')
 
   /**
-   * What the votes actually say — measured in cards apart, not in arithmetic.
+   * What the votes actually say — in cards apart, and under hours also in the
+   * hours between the lowest and highest estimate.
    *
    * `numericCount` is the count of votes that carried a number; `votes.length`
    * would include the `?` and `coffee` abstentions and so could call a round
@@ -671,7 +669,8 @@ export function PokerModal({
     ? describeAgreement(deckType ?? 'fibonacci', {
         min: reveal.min,
         max: reveal.max,
-        numericCount: reveal.votes.filter((entry) => entry.value !== null).length
+        numericCount: reveal.votes.filter((entry) => entry.value !== null).length,
+        estimationUnit
       })
     : null
 
