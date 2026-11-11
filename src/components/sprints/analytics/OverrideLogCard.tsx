@@ -54,13 +54,13 @@ export function OverrideLogCard({ payload, link }: { payload: AnalyticsPayload; 
               cells: {
                 date: (
                   <Link className={planLinkClass} href={standupHref(link.projectId, link.sprintId, row.standupId, status)}>
-                    {row.standupDate ? shortDate(row.standupDate) : '—'}
+                    {row.standupDate ? shortDate(row.standupDate) : 'N/A'}
                   </Link>
                 ),
                 type: <span className={planPillClass('warning')}>{s.overrideType({ type: row.type })}</span>,
                 // Room for an ordinary name on one line; a very long one (or several
                 // members) wraps to a second row rather than stretching the table.
-                member: <span className="block min-w-[8rem]">{row.memberNames.join(', ') || '—'}</span>,
+                member: <span className="block min-w-[8rem]">{row.memberNames.join(', ') || 'N/A'}</span>,
                 reason: standupStrings.override.reasonLabel({ code: row.reasonCode }),
                 justification: <span className="block min-w-[14rem]">{row.justification}</span>
               }

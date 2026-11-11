@@ -872,7 +872,7 @@ export function PlanningWorkspace({
         >
           {history.length > 0
             ? `This sprint has already been planned ${history.length > 1 ? `${history.length} times` : 'once'}. Reopening starts a new round and re-evaluates every check.`
-            : 'No planning session is active. Start a session to scope, assign and estimate work — stand-ups cannot run until this sprint has been planned.'}
+            : 'No planning session is active. Start a session to scope, assign and estimate work. Stand-ups cannot run until this sprint has been planned.'}
         </PlanBanner>
       )}
 

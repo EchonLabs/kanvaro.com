@@ -47,6 +47,10 @@ export type HydratedSummary = Omit<
       }
   >
   debtMovements: Array<Record<string, unknown> & MemberIdentity>
+  dayOutcome?: Omit<NonNullable<IStandupSummary['dayOutcome']>, 'varianceTable' | 'memberTotals'> & {
+    varianceTable: Array<Record<string, unknown> & MemberIdentity>
+    memberTotals: Array<NonNullable<IStandupSummary['dayOutcome']>['memberTotals'][number] & MemberIdentity>
+  }
 }
 
 /**
@@ -61,7 +65,9 @@ async function hydrateMembers(summary: IStandupSummary): Promise<HydratedSummary
   const rowsWithMembers = [
     ...(summary.attendance ?? []),
     ...(summary.memberCommitments ?? []),
-    ...((summary.debtMovements ?? []) as unknown as Record<string, unknown>[])
+    ...((summary.debtMovements ?? []) as unknown as Record<string, unknown>[]),
+    ...((summary.dayOutcome?.varianceTable ?? []) as Record<string, unknown>[]),
+    ...((summary.dayOutcome?.memberTotals ?? []) as unknown as Record<string, unknown>[])
   ]
 
   const memberIds = Array.from(
@@ -140,7 +146,16 @@ async function hydrateMembers(summary: IStandupSummary): Promise<HydratedSummary
     ...summary,
     attendance: (summary.attendance ?? []).map(merge),
     memberCommitments: (summary.memberCommitments ?? []).map((member) => withTitles(merge(member))),
-    debtMovements: ((summary.debtMovements ?? []) as unknown as Record<string, unknown>[]).map(merge)
+    debtMovements: ((summary.debtMovements ?? []) as unknown as Record<string, unknown>[]).map(merge),
+    ...(summary.dayOutcome
+      ? {
+          dayOutcome: {
+            ...summary.dayOutcome,
+            varianceTable: (summary.dayOutcome.varianceTable ?? []).map(merge),
+            memberTotals: (summary.dayOutcome.memberTotals ?? []).map(merge)
+          }
+        }
+      : {})
   } as HydratedSummary
 }
 
@@ -201,7 +216,7 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
   const nameFor = (memberId: unknown) => nameById.get(String(memberId)) ?? String(memberId ?? '')
 
   lines.push(
-    `# Stand-up — ${summary.headerFacts.standupDate} (Day ${summary.headerFacts.dayNumber} of ${summary.headerFacts.totalDays})`
+    `# Stand-up: ${summary.headerFacts.standupDate} (Day ${summary.headerFacts.dayNumber} of ${summary.headerFacts.totalDays})`
   )
   lines.push(`Facilitator: ${summary.headerFacts.facilitatorName}`)
   lines.push(`Duration: ${summary.headerFacts.durationMinutes} minutes`)
@@ -261,7 +276,7 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
     const severity = field(row, 'severity')
     const status = field(row, 'status')
     const meta = [blockerType, severity].filter(Boolean).join(', ')
-    lines.push(`- ${description}${meta ? ` (${meta})` : ''}${status ? ` — ${status}` : ''}`)
+    lines.push(`- ${description}${meta ? ` (${meta})` : ''}${status ? ` (${status})` : ''}`)
   }
   lines.push('')
 
@@ -283,7 +298,7 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
       standupStrings.carryForward.itemTypeLabel(field(row, 'type') ?? '')
     const ageBand = field(row, 'ageBand')
     const status = field(row, 'status')
-    lines.push(`- ${label}${ageBand ? ` (${ageBand})` : ''}${status ? ` — ${status}` : ''}`)
+    lines.push(`- ${label}${ageBand ? ` (${ageBand})` : ''}${status ? ` (${status})` : ''}`)
   }
   lines.push('')
 
@@ -296,6 +311,36 @@ export function renderSummaryMarkdown(summary: SummaryDocument): string {
     lines.push(
       `- **${type}**${reasonCode ? ` (${reasonCode})` : ''}${justification ? `: ${justification}` : ''}`
     )
+  }
+
+  lines.push('')
+  lines.push('## How the day went')
+  if (!summary.dayOutcome) {
+    // Same rule as the screen's `DayOutcomeCard`: on the sprint's last day no
+    // later stand-up exists to record the outcome, so "pending" would be a
+    // promise nothing keeps.
+    const isFinalDay = summary.headerFacts.dayNumber >= summary.headerFacts.totalDays
+    lines.push(
+      isFinalDay
+        ? standupStrings.summary.dayOutcomeFinalDay()
+        : standupStrings.summary.dayOutcomePending()
+    )
+  } else {
+    lines.push(
+      standupStrings.summary.dayOutcomeRecorded({ date: summary.dayOutcome.recordedByStandupDate })
+    )
+    for (const row of summary.dayOutcome.memberTotals ?? []) {
+      const memberName = (row as MemberIdentity).name ?? nameFor(row.memberId)
+      lines.push(
+        `- ${memberName}: ${minutesToHours(row.loggedMinutesOnDay)}h logged of ${minutesToHours(row.plannedMinutes)}h planned`
+      )
+    }
+    if ((summary.dayOutcome.completedTasks ?? []).length === 0) {
+      lines.push('Nothing completed.')
+    }
+    for (const row of summary.dayOutcome.completedTasks ?? []) {
+      lines.push(`- Completed ${row.taskKey ?? row.taskId} ${row.title ?? ''}`.trimEnd())
+    }
   }
 
   if (summary.pmNotes) {

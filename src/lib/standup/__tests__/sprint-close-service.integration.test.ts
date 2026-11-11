@@ -10,6 +10,7 @@
 // fixture does not create either; `Standup.sprint`/`Standup.project` are bare
 // ObjectId references, matching the pattern `jobs.send-reminders.test.ts`
 // already uses for its own `Sprint`-light seeding.
+import { CarryForwardItem } from '@/models/CarryForwardItem'
 import { Task } from '@/models/Task'
 import { Standup } from '@/models/Standup'
 import { User } from '@/models/User'
@@ -86,6 +87,26 @@ describe('loadSprintCloseReadiness', () => {
     expect(view.shape).toBe('final_day')
     expect(view.openTasks.map((t) => t.taskId)).toContain(String(openTask._id))
     expect(view.taskFailures).toBe(1)
+  })
+
+  it('labels each carry-forward row by task key, or by item type when it has no task', async () => {
+    const { standup } = await seed()
+    await CarryForwardItem.create({
+      sprint,
+      project,
+      organization,
+      type: 'open_blocker',
+      originStandup: standup._id,
+      originDate: '2026-09-04',
+      currentStandup: standup._id,
+      ageInStandups: 2,
+      status: 'open'
+    })
+
+    const result = await loadSprintCloseReadiness(String(standup._id))
+
+    expect(result.carryForwardItems).toHaveLength(1)
+    expect(result.carryForwardItems[0].label).toBe('Open blocker')
   })
 
   it('excludes a task once it is dispositioned', async () => {

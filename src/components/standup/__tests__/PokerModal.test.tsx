@@ -318,7 +318,7 @@ describe('PokerModal — task detail from the server', () => {
     )
 
     await waitFor(() =>
-      expect(screen.getByText('KAN-142 — Add SSO to the workspace')).toBeInTheDocument()
+      expect(screen.getByText('KAN-142 - Add SSO to the workspace')).toBeInTheDocument()
     )
     expect(screen.queryByText('— Task')).not.toBeInTheDocument()
   })
@@ -725,7 +725,7 @@ describe('PokerModal — Back/Next task preview', () => {
     expect(screen.queryByText('Your card')).not.toBeInTheDocument()
     // Named twice while previewing: once in the nav strip, once in the
     // read-only panel that replaces the arc.
-    expect(screen.getAllByText('KAN-2 — Payment webhook').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('KAN-2 - Payment webhook').length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: /previous task/i }))
     expect(screen.getByText('Task 1 of 2')).toBeInTheDocument()

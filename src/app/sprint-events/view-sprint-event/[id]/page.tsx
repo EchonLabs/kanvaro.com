@@ -409,7 +409,7 @@ export default function SprintEventDetailsPage() {
                   <Target className="h-4 w-4 text-[var(--apple-system-blue)]" />
                   <span className="apple-section-label text-[var(--apple-tertiary-label)]">Sprint</span>
                 </div>
-                <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">{event.sprint.name || '—'}</p>
+                <p className="text-[14px] font-semibold text-[var(--apple-label)] truncate">{event.sprint.name || 'N/A'}</p>
                 {event.sprint.status && <p className="text-[12px] text-[var(--apple-secondary-label)] mt-0.5">{formatToTitleCase(event.sprint.status)}</p>}
               </div>
             )}
@@ -566,7 +566,7 @@ export default function SprintEventDetailsPage() {
                       ? `${formatTime(event.startTime)} – ${formatTime(event.endTime)}`
                       : event.startTime
                         ? formatTime(event.startTime)
-                        : '—'}
+                        : 'N/A'}
                   </span>
                 </div>
                 {/* Duration */}
@@ -599,7 +599,7 @@ export default function SprintEventDetailsPage() {
                 {/* Project */}
                 <div className="flex items-center justify-between py-3">
                   <span className="text-[13px] text-[var(--apple-secondary-label)]">Project</span>
-                  <span className="text-[13px] font-medium text-[var(--apple-label)] truncate max-w-[160px]" title={event.project?.name}>{event.project?.name || '—'}</span>
+                  <span className="text-[13px] font-medium text-[var(--apple-label)] truncate max-w-[160px]" title={event.project?.name}>{event.project?.name || 'N/A'}</span>
                 </div>
                 {/* Sprint */}
                 {event.sprint?.name && (
