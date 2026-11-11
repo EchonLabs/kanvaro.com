@@ -398,6 +398,36 @@ describe('Start stand-up (RUN-2/3, AC-5, Task 1)', () => {
     await waitFor(() => expect(api.start).toHaveBeenCalledWith({ expectedVersion: 8 }))
   })
 
+  // Regression: starting bumps the version, and the reload that follows takes
+  // several requests. Marking attendance in that window sent the pre-start
+  // version and was refused as "Someone else changed this stand-up".
+  it('edits made while the post-start reload is still loading carry the started version', async () => {
+    let finishReload: (value: RunScreenData) => void = () => {}
+    const api = {
+      ...okApi(),
+      start: jest.fn().mockResolvedValue({ standupVersion: 8 }),
+      setAttendance: jest.fn().mockResolvedValue({ standupVersion: 9, reassignPrompt: null }),
+      refresh: jest
+        .fn()
+        .mockImplementationOnce(() => new Promise<RunScreenData>((resolve) => (finishReload = resolve)))
+        .mockResolvedValue(data({ status: 'In_Progress', standupVersion: 9 }))
+    }
+    renderScreen({ status: 'Ready', standupVersion: 7 }, api)
+
+    fireEvent.click(screen.getByRole('button', { name: standupStrings.run.start() }))
+    await waitFor(() => expect(api.refresh).toHaveBeenCalledTimes(1))
+
+    fireEvent.change(
+      screen.getByLabelText(standupStrings.run.attendanceFor({ name: 'Kasun' })),
+      { target: { value: 'absent_planned' } }
+    )
+    await waitFor(() =>
+      expect(api.setAttendance).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 8 }))
+    )
+
+    finishReload(data({ status: 'In_Progress', standupVersion: 8 }))
+  })
+
   it('reloads rather than guessing when the version was stale', async () => {
     const api = { ...okApi(), start: jest.fn().mockRejectedValue({ code: 'STALE_STANDUP' }) }
     renderScreen({ status: 'Ready' }, api)

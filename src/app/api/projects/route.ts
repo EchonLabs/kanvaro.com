@@ -120,22 +120,24 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const projects = await Project.find(projectQuery)
-      .select('name startDate endDate createdBy teamMembers client status priority settings')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('client', 'firstName lastName email')
-      .populate('teamMembers.memberId', 'firstName lastName email avatar _id')
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-
-    const total = await Project.countDocuments(projectQuery)
+    const [projects, total] = await Promise.all([
+      Project.find(projectQuery)
+        .select('name startDate endDate createdBy teamMembers client status priority settings')
+        .populate('createdBy', 'firstName lastName email')
+        .populate('client', 'firstName lastName email')
+        .populate('teamMembers.memberId', 'firstName lastName email avatar _id')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Project.countDocuments(projectQuery)
+    ])
 
     console.log('Projects API - Query results:', {
       query: projectQuery,
       totalProjectsFound: total,
       projectsReturned: projects.length,
-      projects: projects.map(p => ({
+      projects: projects.map((p: any) => ({
         _id: p._id,
         name: p.name,
         createdBy: p.createdBy?._id,
@@ -145,33 +147,52 @@ export async function GET(request: NextRequest) {
       }))
     })
 
-    // Calculate progress for each project
-    const projectsWithProgress = await Promise.all(
-      projects.map(async (project) => {
-        const tasks = await Task.find({ 
-          project: project._id,
-          organization: organizationId
-        })
-        
-        const totalTasks = tasks.length
-        // Consider tasks with status 'done' or 'completed' as completed
-        const tasksCompleted = tasks.filter(
-          task => task.status === 'done' || task.status === 'completed'
-        ).length
-        const completionPercentage = totalTasks > 0 
-          ? Math.round((tasksCompleted / totalTasks) * 100) 
-          : 0
-
-        return {
-          ...project.toObject(),
-          progress: {
-            completionPercentage,
-            tasksCompleted,
-            totalTasks
+    // Calculate progress for each project in a single aggregation
+    const projectIds = (projects as any[]).map((p: any) => p._id)
+    const taskStats = projectIds.length > 0 ? await Task.aggregate([
+      {
+        $match: {
+          project: { $in: projectIds },
+          organization: new mongoose.Types.ObjectId(String(organizationId))
+        }
+      },
+      {
+        $group: {
+          _id: '$project',
+          totalTasks: { $sum: 1 },
+          tasksCompleted: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['done', 'completed']] },
+                1,
+                0
+              ]
+            }
           }
         }
-      })
-    )
+      }
+    ]) : []
+
+    const statsMap = new Map(taskStats.map(s => [s._id.toString(), s]))
+
+    const projectsWithProgress = (projects as any[]).map((project: any) => {
+      const stats = statsMap.get(project._id.toString())
+      const totalTasks = stats?.totalTasks || 0
+      const tasksCompleted = stats?.tasksCompleted || 0
+      const completionPercentage = totalTasks > 0
+        ? Math.round((tasksCompleted / totalTasks) * 100)
+        : 0
+
+      const projectData = (project as any).toObject ? (project as any).toObject() : project
+      return {
+        ...projectData,
+        progress: {
+          completionPercentage,
+          tasksCompleted,
+          totalTasks
+        }
+      }
+    })
 
     return NextResponse.json({
       success: true,

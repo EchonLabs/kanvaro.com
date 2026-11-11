@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 import { detectClientTimezone } from '@/lib/timezone'
+import { fetchActiveTimer } from '@/lib/timer-client'
 import {
   Clock,
   Play,
@@ -58,11 +59,8 @@ export default function TimeTrackingPage() {
     if (!currentUser?.id || !currentUser?.organization) return
     try {
       const tz = detectClientTimezone()
-      const response = await fetch(
-        `/api/time-tracking/timer?userId=${currentUser.id}&organizationId=${currentUser.organization}&timezone=${encodeURIComponent(tz)}`
-      )
-      if (response.ok) {
-        const data = await response.json()
+      const { ok, data } = await fetchActiveTimer(currentUser.id, currentUser.organization, tz)
+      if (ok) {
         setActiveTimer(data.activeTimer ?? null)
       }
     } catch (err) {

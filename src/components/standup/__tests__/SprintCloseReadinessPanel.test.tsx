@@ -71,6 +71,36 @@ describe('SprintCloseReadinessPanel', () => {
     expect(screen.getByText('KAN-2')).toBeInTheDocument()
   })
 
+  // Regression: a blocker has no task key, and the banner printed its raw
+  // database id instead.
+  it('names a carry-forward item with no task key by its label, never its id', () => {
+    render(
+      <SprintCloseReadinessPanel
+        openTasks={[]}
+        carryForwardOffenders={[
+          { itemId: '6af2a4878a5c490b3bb93cfc', label: 'Open blocker', status: 'open', hasResolution: false }
+        ]}
+        onSetDisposition={jest.fn()}
+        disabled={false}
+      />
+    )
+    expect(screen.getByText('Open blocker')).toBeInTheDocument()
+    expect(screen.queryByText('6af2a4878a5c490b3bb93cfc')).not.toBeInTheDocument()
+  })
+
+  it('falls back to a generic name, not the id, when a row carries no label', () => {
+    render(
+      <SprintCloseReadinessPanel
+        openTasks={[]}
+        carryForwardOffenders={[{ itemId: 'c9', status: 'open', hasResolution: false }]}
+        onSetDisposition={jest.fn()}
+        disabled={false}
+      />
+    )
+    expect(screen.getByText('Carried forward')).toBeInTheDocument()
+    expect(screen.queryByText('c9')).not.toBeInTheDocument()
+  })
+
   it('disables every select when disabled is true', () => {
     render(
       <SprintCloseReadinessPanel

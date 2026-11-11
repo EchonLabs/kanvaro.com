@@ -109,7 +109,7 @@ export function SprintCloseReadinessPanel({
                     {task.taskKey ?? task.taskId}
                   </td>
                   <td className="py-2 pr-2 apple-type-subheadline text-[var(--plan-secondary)]">
-                    {task.ownerName ?? '—'}
+                    {task.ownerName ?? 'N/A'}
                   </td>
                   <td className="py-2 pr-2 font-apple-mono apple-type-subheadline tabular-nums text-[var(--plan-secondary)]">
                     {formatMinutesAsHours(task.remainingEstimateMinutes, { locale })}
@@ -158,7 +158,9 @@ export function SprintCloseReadinessPanel({
           <p className="font-medium text-[var(--plan-text)]">{standupStrings.run.sprintCloseCarryForwardTitle()}</p>
           <ul className="list-disc pl-4 text-[var(--plan-text)]">
             {carryForwardOffenders.map((item) => (
-              <li key={item.itemId}>{item.taskKey ?? item.itemId}</li>
+              <li key={item.itemId}>
+                {item.label ?? item.taskKey ?? standupStrings.carryForward.itemTypeLabel('')}
+              </li>
             ))}
           </ul>
           <p className="mt-1 text-[var(--plan-secondary)]">

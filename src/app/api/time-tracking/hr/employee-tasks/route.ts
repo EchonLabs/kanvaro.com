@@ -36,13 +36,13 @@ export async function GET(request: NextRequest) {
     try {
       if (accessToken) {
         const decoded: any = jwt.verify(accessToken, JWT_SECRET)
-        requester = await User.findById(decoded.userId)
+        requester = await User.findById(decoded.userId).select('organization role isActive').lean()
       }
     } catch { }
     if (!requester && refreshToken) {
       try {
         const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
-        requester = await User.findById(decoded.userId)
+        requester = await User.findById(decoded.userId).select('organization role isActive').lean()
       } catch { }
     }
     if (!requester || !requester.isActive) {
@@ -58,8 +58,10 @@ export async function GET(request: NextRequest) {
 
     const orgId = requester.organization.toString()
 
-    // Verify the employee belongs to the same organization
-    const employee = await User.findById(employeeId).select('organization isActive')
+    // Verify the employee belongs to the same organization (reuse requester if self-request)
+    const employee = isSelfRequest
+      ? requester
+      : await User.findById(employeeId).select('organization isActive').lean()
     if (!employee || !employee.isActive || employee.organization.toString() !== orgId) {
       return NextResponse.json({ error: 'Employee not found or not in your organization' }, { status: 404 })
     }

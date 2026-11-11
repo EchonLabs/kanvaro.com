@@ -26,6 +26,8 @@ import {
   rollForwardMissedStandup
 } from '../carry-forward-service'
 import { CARRY_FORWARD_NOTE_MIN_LENGTH } from '../carry-forward'
+import { evaluateCompletionChecks } from '../completion-checks'
+import { minutes } from '../minutes'
 import { ids, syncIndexes, useMongo } from './helpers/mongo'
 
 const { organization, project, member, otherMember, user } = ids
@@ -472,6 +474,68 @@ describe('resolveCarryForwardItem', () => {
     const persisted = (await CarryForwardItem.findById(itemId).lean()) as any
     expect(persisted.status).toBe('resolved')
     expect(persisted.resolution.resolutionType).toBe('done')
+  })
+
+  // Regression: on a final day, resolving an aged item without noting it
+  // first left CC-4 (hard, not overridable) failing, and the register offers
+  // no note box on a resolved row, so the stand-up could never complete.
+  it('a resolved aged item no longer owes today`s note, so CC-4 stops counting it', async () => {
+    const before = await loadCarryForwardPanel(standupId)
+    expect(before.items.find((item) => item.itemId === itemId)?.requiresNoteToday).toBe(true)
+
+    await resolveCarryForwardItem({
+      itemId,
+      standupId,
+      resolutionType: 'other',
+      comment: 'Moving to the next sprint at close.',
+      actor: { userId: String(user) }
+    })
+
+    const after = await loadCarryForwardPanel(standupId)
+    const row = after.items.find((item) => item.itemId === itemId)!
+    expect(row.status).toBe('resolved')
+    expect(row.requiresNoteToday).toBe(false)
+
+    const cc4 = evaluateCompletionChecks({
+      shape: 'mid_sprint',
+      members: [],
+      variance: [],
+      carryForward: after.items.map((item) => ({
+        itemId: item.itemId,
+        taskKey: item.taskKey,
+        memberId: item.memberId,
+        requiresNoteToday: item.requiresNoteToday,
+        notedToday: item.notedToday
+      })),
+      blockers: [],
+      sprintHealth: { remainingEstimateMinutes: minutes(0), remainingCapacityMinutes: minutes(100) }
+    }).find((result) => result.checkId === 'CC-4')
+    expect(cc4?.status).toBe('pass')
+  })
+
+  // Regression: a note set the status to `noted` (an open status), which
+  // reopened the resolved item; the next completion then aged it back onto
+  // the register.
+  it('refuses a note on a resolved item and leaves it resolved', async () => {
+    await resolveCarryForwardItem({
+      itemId,
+      standupId,
+      resolutionType: 'done',
+      actor: { userId: String(user) }
+    })
+
+    await expect(
+      addCarryForwardNote({
+        itemId,
+        standupId,
+        text: 'A note after the item was already resolved.',
+        actor: { userId: String(user) }
+      })
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+
+    const persisted = (await CarryForwardItem.findById(itemId).lean()) as any
+    expect(persisted.status).toBe('resolved')
+    expect(persisted.notes).toHaveLength(0)
   })
 })
 

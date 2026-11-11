@@ -137,7 +137,7 @@ describe('StandupOversightScreen', () => {
     render(<StandupOversightScreen />)
 
     expect(
-      await screen.findByText(verdictLine(/open sprint 2 · kanvaro first — 20\.0h more work than capacity left/i))
+      await screen.findByText(verdictLine(/open sprint 2 · kanvaro first: 20\.0h more work than capacity left/i))
     ).toBeInTheDocument()
   })
 
@@ -357,7 +357,7 @@ describe('StandupOversightScreen', () => {
     render(<StandupOversightScreen />)
 
     expect(
-      await screen.findByText(verdictLine(/open sprint 2 · kanvaro first — 2 members chronically under-allocated/i))
+      await screen.findByText(verdictLine(/open sprint 2 · kanvaro first: 2 members chronically under-allocated/i))
     ).toBeInTheDocument()
 
     const board = await screen.findByRole('region', { name: /active sprints/i })

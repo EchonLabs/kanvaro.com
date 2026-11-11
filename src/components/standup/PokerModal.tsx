@@ -249,7 +249,7 @@ export function PokerModal({
       key,
       title: title ?? 'Untitled task',
       description: server?.description?.trim() || null,
-      label: [key, title].filter(Boolean).join(' — ') || 'Untitled task'
+      label: [key, title].filter(Boolean).join(' - ') || 'Untitled task'
     }
   }
 
@@ -618,7 +618,7 @@ export function PokerModal({
     // '?' and coffee are choices too. Reporting them as "Not chosen yet" told a
     // voter who had picked one that nothing had happened.
     const abstention = abstentionOf(effectiveCandidate)
-    if (abstention === 'unsure') return 'Unsure — no number from you this round'
+    if (abstention === 'unsure') return 'Unsure - no number from you this round'
     if (abstention === 'break') return 'Asking the room for a break'
     return String(effectiveCandidate)
   })()
@@ -792,13 +792,13 @@ export function PokerModal({
             )}
           >
             <p className="apple-type-body font-semibold text-[var(--plan-text)]">
-              {displayTask ? `${displayTask.key} — ${displayTask.title}` : 'Task not found'}
+              {displayTask ? `${displayTask.key} - ${displayTask.title}` : 'Task not found'}
             </p>
             <p className="apple-type-footnote text-[var(--plan-muted)]">
               Status: {displayTask?.status ?? 'unknown'}
             </p>
             <p className="apple-type-footnote text-[var(--plan-muted)]">
-              This is a preview — voting happens on the current task.
+              This is a preview - voting happens on the current task.
             </p>
           </div>
         ) : reveal ? (
@@ -854,7 +854,7 @@ export function PokerModal({
                             : 'border-[var(--plan-border)] bg-[var(--plan-raised)] text-[var(--plan-muted)]'
                         )}
                       >
-                        {effectiveCandidate != null ? String(effectiveCandidate) : '—'}
+                        {effectiveCandidate != null ? String(effectiveCandidate) : 'N/A'}
                       </span>
                       <div className="flex flex-col gap-0.5">
                         <span className="apple-type-footnote text-[var(--plan-muted)]">
@@ -1241,9 +1241,9 @@ function RevealScreen({
         </div>
 
         <div className="flex gap-2">
-          <PokerStat testId="poker-stat-min" label="Min" value={reveal.min ?? '—'} />
-          <PokerStat testId="poker-stat-median" label="Median" value={reveal.median ?? '—'} emphasis />
-          <PokerStat testId="poker-stat-max" label="Max" value={reveal.max ?? '—'} />
+          <PokerStat testId="poker-stat-min" label="Min" value={reveal.min ?? 'N/A'} />
+          <PokerStat testId="poker-stat-median" label="Median" value={reveal.median ?? 'N/A'} emphasis />
+          <PokerStat testId="poker-stat-max" label="Max" value={reveal.max ?? 'N/A'} />
         </div>
 
         <div
@@ -1269,9 +1269,9 @@ function RevealScreen({
           </span>
           <span className="apple-type-caption leading-[1.45] text-[var(--plan-muted)]">
             {agreement?.key === 'consensus'
-              ? 'No discussion needed — lock it in.'
+              ? 'No discussion needed - lock it in.'
               : agreement?.key === 'near'
-                ? 'Neighbouring cards — close enough to lock without a debate.'
+                ? 'Neighbouring cards - close enough to lock without a debate.'
                 : agreement?.key === 'single'
                   ? 'Only one person sized this, so there is nothing to compare it against.'
                   : agreement?.key === 'none'
@@ -1337,7 +1337,7 @@ function RevealScreen({
                 value={finalValue}
                 disabled={!isFacilitator}
                 onChange={(event) => onPickFinal(event.target.value)}
-                placeholder="—"
+                placeholder="N/A"
                 className="apple-type-callout disabled:cursor-not-allowed h-[34px] w-[72px] rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-2 text-center font-bold tabular-nums text-[var(--plan-text)] placeholder:font-normal placeholder:text-[var(--plan-muted)] focus:border-[var(--plan-accent)] focus:outline-none"
               />
               <span className="apple-type-footnote truncate text-[var(--plan-muted)]">{unit}</span>

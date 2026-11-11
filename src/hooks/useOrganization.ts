@@ -77,6 +77,8 @@ const CACHE_KEY = 'kanvaro_organization_cache'
 const CACHE_TIMESTAMP_KEY = 'kanvaro_organization_timestamp'
 const CACHE_DURATION = 30 * 1000 // 30 seconds
 
+let inFlightOrganizationPromise: Promise<Organization> | null = null
+
 export function useOrganization() {
   // Try to get cached data from sessionStorage
   const getCachedData = () => {
@@ -124,25 +126,36 @@ export function useOrganization() {
     }
 
     try {
-      const response = await fetch('/api/organization')
-      if (response.ok) {
-        const data = await response.json()
-        setOrganization(data)
-        // Cache the data in sessionStorage
-        setCachedData(data)
-      } else {
-        // Fallback to mock data if API fails
-        const mockOrganization: Organization = {
-          id: '1',
-          name: 'Kanvaro',
-          logo: undefined,
-          darkLogo: undefined,
-          logoMode: 'auto',
-          currency: 'USD'
-        }
-        setOrganization(mockOrganization)
-        setCachedData(mockOrganization)
+      if (force) {
+        inFlightOrganizationPromise = null
       }
+
+      if (!inFlightOrganizationPromise) {
+        inFlightOrganizationPromise = (async () => {
+          const response = await fetch('/api/organization')
+          if (response.ok) {
+            const data = await response.json()
+            setCachedData(data)
+            return data
+          } else {
+            const mockOrganization: Organization = {
+              id: '1',
+              name: 'Kanvaro',
+              logo: undefined,
+              darkLogo: undefined,
+              logoMode: 'auto',
+              currency: 'USD'
+            }
+            setCachedData(mockOrganization)
+            return mockOrganization
+          }
+        })().finally(() => {
+          inFlightOrganizationPromise = null
+        })
+      }
+
+      const data = await inFlightOrganizationPromise
+      setOrganization(data)
     } catch (error) {
       console.error('Failed to fetch organization:', error)
       // Fallback to mock data on error

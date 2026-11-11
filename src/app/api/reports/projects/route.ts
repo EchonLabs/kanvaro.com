@@ -67,61 +67,102 @@ export async function GET(req: NextRequest) {
       .sort(dbSort)
       .lean()
 
-    // Get additional data for each project
-    const projectsWithStats = await Promise.all(
-      projects.map(async (project) => {
-        // Get task statistics
-        const totalTasks = await Task.countDocuments({ project: project._id })
-        const completedTasks = await Task.countDocuments({
-          project: project._id,
-          status: 'done'
-        })
-        const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
+    // Batch aggregate task, sprint, and time tracking data for all projects
+    const projectIds = projects.map(p => p._id)
 
-        // Get sprint statistics
-        const totalSprints = await Sprint.countDocuments({ project: project._id })
-        const activeSprints = await Sprint.countDocuments({ 
-          project: project._id, 
-          status: 'active' 
-        })
-
-        // Get time tracking statistics (duration is stored in minutes)
-        const timeEntries = await TimeEntry.find({ project: project._id })
-        const totalTimeLogged = timeEntries.reduce((sum, entry) => sum + entry.duration, 0)
-
-        // Get budget statistics — use project.budget for both total and spent for consistency
-        const totalBudget = project.budget?.total || 0
-        const spent = project.budget?.spent || 0
-        const remaining = totalBudget - spent
-        const utilizationRate = totalBudget > 0 ? (spent / totalBudget) * 100 : 0
-
-        return {
-          ...project,
-          status: project.status,
-          stats: {
-            tasks: {
-              total: totalTasks,
-              completed: completedTasks,
-              completionRate
-            },
-            sprints: {
-              total: totalSprints,
-              active: activeSprints
-            },
-            timeTracking: {
-              totalHours: totalTimeLogged / 60,
-              entries: timeEntries.length
-            },
-            budget: {
-              total: totalBudget,
-              spent,
-              remaining,
-              utilizationRate
+    const [taskStatsAgg, sprintStatsAgg, timeStatsAgg] = await Promise.all([
+      projectIds.length > 0 ? Task.aggregate([
+        { $match: { project: { $in: projectIds } } },
+        {
+          $group: {
+            _id: '$project',
+            totalTasks: { $sum: 1 },
+            completedTasks: {
+              $sum: {
+                $cond: [{ $in: ['$status', ['done', 'completed']] }, 1, 0]
+              }
             }
           }
         }
-      })
-    )
+      ]) : [],
+      projectIds.length > 0 ? Sprint.aggregate([
+        { $match: { project: { $in: projectIds } } },
+        {
+          $group: {
+            _id: '$project',
+            totalSprints: { $sum: 1 },
+            activeSprints: {
+              $sum: {
+                $cond: [{ $eq: ['$status', 'active'] }, 1, 0]
+              }
+            }
+          }
+        }
+      ]) : [],
+      projectIds.length > 0 ? TimeEntry.aggregate([
+        { $match: { project: { $in: projectIds } } },
+        {
+          $group: {
+            _id: '$project',
+            totalTimeLogged: { $sum: '$duration' },
+            entries: { $sum: 1 }
+          }
+        }
+      ]) : []
+    ])
+
+    const taskStatsMap = new Map(taskStatsAgg.map((s: any) => [s._id.toString(), s]))
+    const sprintStatsMap = new Map(sprintStatsAgg.map((s: any) => [s._id.toString(), s]))
+    const timeStatsMap = new Map(timeStatsAgg.map((s: any) => [s._id.toString(), s]))
+
+    // Assemble statistics for each project
+    const projectsWithStats = projects.map((project: any) => {
+      const pid = String(project._id)
+      const tStats = taskStatsMap.get(pid)
+      const totalTasks = tStats?.totalTasks || 0
+      const completedTasks = tStats?.completedTasks || 0
+      const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
+
+      const sStats = sprintStatsMap.get(pid)
+      const totalSprints = sStats?.totalSprints || 0
+      const activeSprints = sStats?.activeSprints || 0
+
+      const timeData = timeStatsMap.get(pid)
+      const totalTimeLogged = timeData?.totalTimeLogged || 0
+      const timeEntriesCount = timeData?.entries || 0
+
+      // Get budget statistics — use project.budget for both total and spent for consistency
+      const totalBudget = project.budget?.total || 0
+      const spent = project.budget?.spent || 0
+      const remaining = totalBudget - spent
+      const utilizationRate = totalBudget > 0 ? (spent / totalBudget) * 100 : 0
+
+      return {
+        ...project,
+        status: project.status,
+        stats: {
+          tasks: {
+            total: totalTasks,
+            completed: completedTasks,
+            completionRate
+          },
+          sprints: {
+            total: totalSprints,
+            active: activeSprints
+          },
+          timeTracking: {
+            totalHours: totalTimeLogged / 60,
+            entries: timeEntriesCount
+          },
+          budget: {
+            total: totalBudget,
+            spent,
+            remaining,
+            utilizationRate
+          }
+        }
+      }
+    })
 
     // Sort in memory for computed fields that can't be sorted in the DB query
     if (sortBy === 'completion') {

@@ -349,7 +349,7 @@ function ResultRow({
               {task.displayId}
             </span>
           )}
-          <span className="apple-type-subheadline truncate font-medium text-[var(--plan-text)]">
+          <span className="apple-type-subheadline min-w-0 break-words line-clamp-2 text-left font-medium text-[var(--plan-text)]">
             {task.title}
           </span>
         </span>
@@ -382,7 +382,7 @@ function ResultRow({
               Per-voter breakdown
             </span>
             <span className="apple-type-caption tabular-nums text-[var(--plan-muted)]">
-              MIN {task.min ?? '—'} · MEDIAN {task.median ?? '—'} · MAX {task.max ?? '—'}
+              MIN {task.min ?? 'N/A'} · MEDIAN {task.median ?? 'N/A'} · MAX {task.max ?? 'N/A'}
               {task.roundCount > 1 && ` · ROUND ${task.roundCount}`}
             </span>
           </div>

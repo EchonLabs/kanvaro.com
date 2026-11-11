@@ -292,7 +292,7 @@ export function PlanDragOverlay({
 }
 
 /** Says out loud that picking one of these people changes the sprint roster. */
-export const QA_GROUP_LABEL = 'QA — will be added to the sprint team'
+export const QA_GROUP_LABEL = 'QA - will be added to the sprint team'
 
 /**
  * The card's move button is a native select dressed as an icon button, so the

@@ -75,13 +75,29 @@ export async function GET(
       )
     }
 
-    // Calculate progress from tasks
-    const tasks = await Task.find({ project: projectId })
-    const totalTasks = tasks.length
-    // Consider tasks with status 'done' or 'completed' as completed
-    const tasksCompleted = tasks.filter(
-      task => task.status === 'done' || task.status === 'completed'
-    ).length
+    // Calculate progress from tasks and time stats in parallel
+    const [taskStats, timeEntries] = await Promise.all([
+      Task.aggregate([
+        { $match: { project: new Types.ObjectId(projectId) } },
+        {
+          $group: {
+            _id: null,
+            totalTasks: { $sum: 1 },
+            tasksCompleted: {
+              $sum: {
+                $cond: [{ $in: ['$status', ['done', 'completed']] }, 1, 0]
+              }
+            }
+          }
+        }
+      ]),
+      TimeEntry.find({ project: projectId })
+        .select('duration user hourlyRate')
+        .lean()
+    ])
+
+    const totalTasks = taskStats[0]?.totalTasks || 0
+    const tasksCompleted = taskStats[0]?.tasksCompleted || 0
     const completionPercentage = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0
 
     const progress = {
@@ -91,7 +107,6 @@ export async function GET(
     }
 
     // Calculate stats for reports tab and budget consumption
-    const timeEntries = await TimeEntry.find({ project: projectId })
     const totalMinutes = timeEntries.reduce((sum: number, entry: any) => sum + (entry.duration || 0), 0)
 
     // Build rate map for project team members to resolve individual member hourly rates

@@ -1,3 +1,61 @@
+# [1.50.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.49.2...v1.50.0) (2026-11-11)
+
+
+### Bug Fixes
+
+* **standup:** enhance clarity in standup messages by replacing em dashes with periods ([f5b2d60](https://github.com/EchonLabs/kanvaro.com/commit/f5b2d60d9e165b084c8b8d11a735b29e634aedfc))
+* **standup:** improve clarity in planning session message by removing em dash ([3b60b4a](https://github.com/EchonLabs/kanvaro.com/commit/3b60b4a85589a3172621cf71add85afdd3372b42))
+* **standup:** replace dashes with 'N/A' for improved clarity in analytics components ([1b0a4a2](https://github.com/EchonLabs/kanvaro.com/commit/1b0a4a2359fa6fad4e9aa2012a2c1e90bce5fb3f))
+* **standup:** replace em dashes with 'N/A' for better clarity in various components ([38b893f](https://github.com/EchonLabs/kanvaro.com/commit/38b893f231ce94de7c1a57f756c16a187650b79e))
+* **standup:** replace em dashes with 'N/A' for improved clarity in sprint and task details ([118ac2c](https://github.com/EchonLabs/kanvaro.com/commit/118ac2cff366fc9dbafd1f89801dd96b026ed08e))
+* **standup:** replace em dashes with colons for consistency in standup headers and messages ([056da1c](https://github.com/EchonLabs/kanvaro.com/commit/056da1cf0a6b6a47c4b848b06335ce853ce1be54))
+* **standup:** replace em dashes with colons for consistency in various components ([d35570a](https://github.com/EchonLabs/kanvaro.com/commit/d35570a3088704b80186fa9228301fc499b6ca4c))
+* **standup:** replace em dashes with en dashes for consistency in labels and messages ([2948683](https://github.com/EchonLabs/kanvaro.com/commit/2948683bc6433dc6a3fbd9c4b2743654d71fef03))
+
+
+### Features
+
+* enhance stand-up summary and day outcome handling ([e99c767](https://github.com/EchonLabs/kanvaro.com/commit/e99c76722d1e134d0ca20853b7833ad90a1628d8))
+* implement Day Outcome Card and enhance stand-up summary components ([0c46039](https://github.com/EchonLabs/kanvaro.com/commit/0c460393746b76b8e900490af5539dfb6a6a0440))
+* implement Day Outcome interface and enhance summary handling in stand-up components ([013a3cf](https://github.com/EchonLabs/kanvaro.com/commit/013a3cf1cb30e95a2a2c21eedcbf1b7ff282bad9))
+* implement day outcome tracking and enhance summary handling ([d8842e3](https://github.com/EchonLabs/kanvaro.com/commit/d8842e3d5e4de34d93b82e89cb21da8f97c9634d))
+
+## [1.49.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.49.1...v1.49.2) (2026-11-09)
+
+
+### Bug Fixes
+
+* enforce active timer maxSessionHours cap on manual stops and cron cleanup ([7e51e2d](https://github.com/EchonLabs/kanvaro.com/commit/7e51e2d330e4e65b08f9683be7861d50faf03deb))
+* validate task status against project columns on drag and drop ([4da52ba](https://github.com/EchonLabs/kanvaro.com/commit/4da52ba40627fe3357bfb17837b6f8b7e7630c13))
+
+## [1.49.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.49.0...v1.49.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* deduplicate active timer requests across task and time tracking pages ([be00496](https://github.com/EchonLabs/kanvaro.com/commit/be004961751043ac2bd4a86f4a39283211747751))
+* deduplicate concurrent API requests on mount and optimize dashboard queries ([3f78312](https://github.com/EchonLabs/kanvaro.com/commit/3f78312856d0cfe87d4e5be8f6692a8de30e1738))
+* optimize compound indexes for tasks, time entries, and projects ([f44f58a](https://github.com/EchonLabs/kanvaro.com/commit/f44f58aa32c98cab6679cf619caf16c5c486822e))
+* optimize project listing and dashboard time aggregations ([8696264](https://github.com/EchonLabs/kanvaro.com/commit/869626428c388b260a752a1bc233031e69e0954d))
+* optimize time tracking queries, background sync, and UI triggers ([a5af925](https://github.com/EchonLabs/kanvaro.com/commit/a5af9253c3df7e9e62eece97584c876e69e25ade))
+* replace sequential loops with batch MongoDB aggregations ([2b15a83](https://github.com/EchonLabs/kanvaro.com/commit/2b15a839184496c5c61688aab32cfafc48272aeb))
+
+# [1.49.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.48.0...v1.49.0) (2026-11-02)
+
+
+### Bug Fixes
+
+* address review feedback on dependency permission checks and assignees ([aede5c1](https://github.com/EchonLabs/kanvaro.com/commit/aede5c13b685a8026d03e875a488d0df1b13515a))
+* enforce permission checks in task dependencies endpoints ([7c68538](https://github.com/EchonLabs/kanvaro.com/commit/7c685387cb7acc6f5ae17bed370dd6d310a03e0d))
+
+
+### Features
+
+* add TaskDependencies component and integrate into view/edit views ([74cc7b4](https://github.com/EchonLabs/kanvaro.com/commit/74cc7b4f595b7b610748eb96afe5775d8a9328dd))
+* implement task dependencies API, cycle detection, and completion validation ([0be31ad](https://github.com/EchonLabs/kanvaro.com/commit/0be31ad11eca787b26a888b69244adee8d899f9f))
+* implement task dependencies API, cycle detection, and completion validation ([dd34723](https://github.com/EchonLabs/kanvaro.com/commit/dd347237fc448a3a6c0fa283ca0ffe8d0e012d74))
+* integrate task dependencies into task creation views ([af0fe10](https://github.com/EchonLabs/kanvaro.com/commit/af0fe10f871d65cc9a88d917714b19a4f0ab8c8e))
+
 # [1.48.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.47.0...v1.48.0) (2026-10-27)
 
 

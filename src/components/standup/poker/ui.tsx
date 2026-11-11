@@ -211,7 +211,7 @@ export function PokerTaskNav({
           Task {position} of {total}
           {previewing && ' (preview)'}
         </span>
-        <span className="apple-type-subheadline min-w-0 max-w-[46ch] truncate font-semibold text-[var(--plan-text)]">
+        <span className="apple-type-subheadline min-w-0 max-w-[min(90ch,62vw)] break-words line-clamp-2 font-semibold text-[var(--plan-text)]">
           {label}
         </span>
       </div>

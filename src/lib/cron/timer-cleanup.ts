@@ -36,7 +36,8 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
     }
 
     // Determine if we should enforce limits
-    const hasSessionLimit = !!settings.maxSessionHours
+    const effectiveSessionHours = activeTimer.maxSessionHours || settings.maxSessionHours
+    const hasSessionLimit = !!effectiveSessionHours
     const hasDailyLimit = !!settings.maxDailyHours && settings.allowOvertime === false
 
     if (!hasSessionLimit && !hasDailyLimit) {
@@ -44,7 +45,7 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
     }
 
     // Need at least one limit to enforce
-    if (!settings.maxSessionHours && !settings.maxDailyHours) {
+    if (!effectiveSessionHours && !settings.maxDailyHours) {
       return { success: false, timerId, error: 'No limits configured' }
     }
 
@@ -62,8 +63,8 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
     let reason = 'session'
 
     // Check max session hours
-    if (settings.maxSessionHours) {
-      if (currentDuration >= settings.maxSessionHours * MINUTES_PER_HOUR) {
+    if (effectiveSessionHours) {
+      if (currentDuration >= effectiveSessionHours * MINUTES_PER_HOUR) {
         shouldStop = true
         reason = 'session'
       }
@@ -86,8 +87,8 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
 
     // Calculate the effective limit (min of session limit and remaining daily hours)
     let effectiveLimitMinutes: number | null = null
-    if (settings.maxSessionHours) {
-      effectiveLimitMinutes = settings.maxSessionHours * MINUTES_PER_HOUR
+    if (effectiveSessionHours) {
+      effectiveLimitMinutes = effectiveSessionHours * MINUTES_PER_HOUR
     }
     if (settings.maxDailyHours && userId) {
       const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
@@ -216,7 +217,8 @@ export async function processTimerCleanup() {
         continue
       }
 
-      const hasSessionLimit = !!settings.maxSessionHours
+      const effectiveSessionHours = timer.maxSessionHours || settings.maxSessionHours
+      const hasSessionLimit = !!effectiveSessionHours
       const hasDailyLimit = !!settings.maxDailyHours && settings.allowOvertime === false
 
       if (!hasSessionLimit && !hasDailyLimit) {
@@ -229,8 +231,8 @@ export async function processTimerCleanup() {
       let exceeded = false
 
       // Check session limit
-      if (settings.maxSessionHours) {
-        const maxDurationMinutes = settings.maxSessionHours * MINUTES_PER_HOUR
+      if (effectiveSessionHours) {
+        const maxDurationMinutes = effectiveSessionHours * MINUTES_PER_HOUR
         if (currentDuration >= maxDurationMinutes) {
           exceeded = true
         }

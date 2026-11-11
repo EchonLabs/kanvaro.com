@@ -39,7 +39,7 @@ export function AgeingCard({ payload }: { payload: AnalyticsPayload; link: Sprin
           {buckets.map((bucket) => (
             <div key={bucket.label} className="flex flex-1 flex-col items-center gap-1.5">
               <span className="apple-type-caption font-apple-mono tabular-nums text-[var(--plan-text)]" aria-hidden="true">
-                {bucket.count === 0 ? '—' : bucket.count}
+                {bucket.count === 0 ? 'N/A' : bucket.count}
               </span>
               <div className="flex h-24 w-full items-end">
                 <span
@@ -79,10 +79,10 @@ export function AgeingCard({ payload }: { payload: AnalyticsPayload; link: Sprin
             rows={items.map((item) => ({
               key: item.itemId,
               cells: {
-                task: item.taskKey ? `${item.taskKey} ${item.title ?? ''}`.trim() : (item.title ?? '—'),
+                task: item.taskKey ? `${item.taskKey} ${item.title ?? ''}`.trim() : (item.title ?? 'N/A'),
                 age: <Figure value={s.ageInStandups({ age: item.ageInStandups })} />,
                 status: <span className="capitalize">{item.status}</span>,
-                owner: 'memberName' in item ? (item.memberName ?? '—') : undefined
+                owner: 'memberName' in item ? (item.memberName ?? 'N/A') : undefined
               }
             }))}
           />

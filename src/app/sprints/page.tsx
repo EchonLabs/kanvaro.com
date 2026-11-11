@@ -1020,7 +1020,7 @@ const [searchQuery, setSearchQuery] = useState('')
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <h3 className="text-[17px] font-semibold text-[var(--apple-label)] truncate">{sprint.name}</h3>
-                          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{sprint.project?.name || '—'}</p>
+                          <p className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">{sprint.project?.name || 'N/A'}</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <StatusBadge status={sprint.status} />

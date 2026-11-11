@@ -120,7 +120,7 @@ describe('AssignmentBoard — the keyboard path', () => {
     const picker = screen.getByLabelText('Assign Task 1 to')
     const group = picker.querySelector('optgroup')
 
-    expect(group).toHaveAttribute('label', 'QA — will be added to the sprint team')
+    expect(group).toHaveAttribute('label', 'QA - will be added to the sprint team')
     expect(group).toHaveTextContent('Nimal QA')
     // The sprint team itself is offered plainly, not inside that group.
     expect(picker.querySelector('option[value="kasun"]')?.closest('optgroup')).toBeNull()

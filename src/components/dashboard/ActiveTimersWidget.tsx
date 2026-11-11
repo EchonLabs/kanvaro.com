@@ -60,6 +60,8 @@ interface TimerBaseline {
   isPaused: boolean
 }
 
+const inFlightAllTimersPromises = new Map<string, Promise<{ ok: boolean; status: number; data: any }>>()
+
 export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) {
   const { hasPermission, loading: permissionsLoading } = usePermissions()
   const { showToast } = useToast()
@@ -207,18 +209,26 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
       if (selectedProjectId) params.append('projectId', selectedProjectId)
       if (params.toString()) url += `?${params.toString()}`
 
-      const response = await fetch(url, {
-        credentials: 'include'
-      })
-      const data = await response.json()
+      let promise = inFlightAllTimersPromises.get(url)
+      if (!promise) {
+        promise = (async () => {
+          const response = await fetch(url, { credentials: 'include' })
+          const data = await response.json()
+          return { ok: response.ok, status: response.status, data }
+        })().finally(() => {
+          inFlightAllTimersPromises.delete(url)
+        })
+        inFlightAllTimersPromises.set(url, promise)
+      }
+      const { ok, status, data } = await promise
 
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         const timersList = data.data?.timers || []
         setTimers(timersList)
         syncTimerBaselines(timersList)
       } else {
         // Silently handle errors - don't show toast if permission denied
-        if (response.status !== 403) {
+        if (status !== 403) {
           console.error('ActiveTimersWidget: Failed to fetch active timers:', data.error)
         }
       }

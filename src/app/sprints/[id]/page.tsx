@@ -601,9 +601,9 @@ export default function SprintDetailPage() {
   }
 
   const formatShortDate = (dateVal?: string | Date) => {
-    if (!dateVal) return '—'
+    if (!dateVal) return 'N/A'
     const d = new Date(dateVal)
-    if (isNaN(d.getTime())) return '—'
+    if (isNaN(d.getTime())) return 'N/A'
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
@@ -3429,9 +3429,9 @@ export default function SprintDetailPage() {
                                       <td className="py-3 px-3 whitespace-nowrap">
                                         <span
                                           className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate max-w-[120px] block"
-                                          title={task.module || task.story?.title || task.epic?.title || '—'}
+                                          title={task.module || task.story?.title || task.epic?.title || 'N/A'}
                                         >
-                                          {task.module || task.story?.title || task.epic?.title || '—'}
+                                          {task.module || task.story?.title || task.epic?.title || 'N/A'}
                                         </span>
                                       </td>
 
@@ -3673,12 +3673,12 @@ export default function SprintDetailPage() {
 
                                       {/* Estimated Hours */}
                                       <td className="py-3 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-600 dark:text-gray-400">
-                                        {task.estimatedHours ? `${task.estimatedHours}h` : '—'}
+                                        {task.estimatedHours ? `${task.estimatedHours}h` : 'N/A'}
                                       </td>
 
                                       {/* Actual Hours */}
                                       <td className="py-3 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-600 dark:text-gray-400">
-                                        {task.actualHours ? `${task.actualHours}h` : (task.loggedHours ? `${task.loggedHours}h` : '—')}
+                                        {task.actualHours ? `${task.actualHours}h` : (task.loggedHours ? `${task.loggedHours}h` : 'N/A')}
                                       </td>
 
                                       {/* Action Buttons */}
@@ -3742,8 +3742,8 @@ export default function SprintDetailPage() {
 
                                           {/* Module */}
                                           <td className="py-2.5 px-3 whitespace-nowrap">
-                                            <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[120px] block" title={task.module || '—'}>
-                                              {task.module || '—'}
+                                            <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[120px] block" title={task.module || 'N/A'}>
+                                              {task.module || 'N/A'}
                                             </span>
                                           </td>
 
@@ -3976,12 +3976,12 @@ export default function SprintDetailPage() {
 
                                           {/* Estimated Hours */}
                                           <td className="py-2.5 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-500 dark:text-gray-400">
-                                            {st.estimatedHours ? `${st.estimatedHours}h` : '—'}
+                                            {st.estimatedHours ? `${st.estimatedHours}h` : 'N/A'}
                                           </td>
 
                                           {/* Actual Hours */}
                                           <td className="py-2.5 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-500 dark:text-gray-400">
-                                            {st.actualHours ? `${st.actualHours}h` : '—'}
+                                            {st.actualHours ? `${st.actualHours}h` : 'N/A'}
                                           </td>
 
                                           {/* Action Buttons (Edit / Delete) */}
@@ -4056,7 +4056,7 @@ export default function SprintDetailPage() {
 
                                               {/* Module */}
                                               <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400 dark:text-gray-600">
-                                                —
+                                                N/A
                                               </td>
 
                                               {/* Nested Subtask Title */}
@@ -4092,12 +4092,12 @@ export default function SprintDetailPage() {
 
                                               {/* Assignee */}
                                               <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
-                                                —
+                                                N/A
                                               </td>
 
                                               {/* Priority */}
                                               <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
-                                                —
+                                                N/A
                                               </td>
 
                                               {/* Status (Interactive dropdown) */}
@@ -4153,22 +4153,22 @@ export default function SprintDetailPage() {
 
                                               {/* Start Date */}
                                               <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
-                                                —
+                                                N/A
                                               </td>
 
                                               {/* Due Date */}
                                               <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
-                                                —
+                                                N/A
                                               </td>
 
                                               {/* Est Hours */}
                                               <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
-                                                —
+                                                N/A
                                               </td>
 
                                               {/* Act Hours */}
                                               <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
-                                                —
+                                                N/A
                                               </td>
 
                                               {/* Action Buttons */}

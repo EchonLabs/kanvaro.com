@@ -74,6 +74,28 @@ describe('StandupSummaryPage', () => {
     expect(await screen.findByText(s.notAvailable())).toBeInTheDocument()
   })
 
+  it('reports a completed stand-up with a missing record as an error, not as "not completed"', async () => {
+    mockSummaryResponse({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: { code: 'NOT_FOUND', details: { reason: 'summary_missing' } } })
+    })
+
+    render(<StandupSummaryPage params={params} />)
+
+    expect(await screen.findByText(s.summaryMissing())).toBeInTheDocument()
+    expect(screen.queryByText(s.notAvailable())).not.toBeInTheDocument()
+  })
+
+  it('shows the day outcome section as pending until the next stand-up records it', async () => {
+    mockSummaryResponse({})
+
+    render(<StandupSummaryPage params={params} />)
+
+    expect(await screen.findByText(s.sectionDayOutcome())).toBeInTheDocument()
+    expect(screen.getByText(s.dayOutcomePending())).toBeInTheDocument()
+  })
+
   it('reports a failed load rather than showing a blank page', async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('network')) as unknown as typeof fetch
 
