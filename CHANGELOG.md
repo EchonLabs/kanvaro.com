@@ -1,3 +1,25 @@
+# [1.50.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.49.2...v1.50.0) (2026-11-11)
+
+
+### Bug Fixes
+
+* **standup:** enhance clarity in standup messages by replacing em dashes with periods ([f5b2d60](https://github.com/EchonLabs/kanvaro.com/commit/f5b2d60d9e165b084c8b8d11a735b29e634aedfc))
+* **standup:** improve clarity in planning session message by removing em dash ([3b60b4a](https://github.com/EchonLabs/kanvaro.com/commit/3b60b4a85589a3172621cf71add85afdd3372b42))
+* **standup:** replace dashes with 'N/A' for improved clarity in analytics components ([1b0a4a2](https://github.com/EchonLabs/kanvaro.com/commit/1b0a4a2359fa6fad4e9aa2012a2c1e90bce5fb3f))
+* **standup:** replace em dashes with 'N/A' for better clarity in various components ([38b893f](https://github.com/EchonLabs/kanvaro.com/commit/38b893f231ce94de7c1a57f756c16a187650b79e))
+* **standup:** replace em dashes with 'N/A' for improved clarity in sprint and task details ([118ac2c](https://github.com/EchonLabs/kanvaro.com/commit/118ac2cff366fc9dbafd1f89801dd96b026ed08e))
+* **standup:** replace em dashes with colons for consistency in standup headers and messages ([056da1c](https://github.com/EchonLabs/kanvaro.com/commit/056da1cf0a6b6a47c4b848b06335ce853ce1be54))
+* **standup:** replace em dashes with colons for consistency in various components ([d35570a](https://github.com/EchonLabs/kanvaro.com/commit/d35570a3088704b80186fa9228301fc499b6ca4c))
+* **standup:** replace em dashes with en dashes for consistency in labels and messages ([2948683](https://github.com/EchonLabs/kanvaro.com/commit/2948683bc6433dc6a3fbd9c4b2743654d71fef03))
+
+
+### Features
+
+* enhance stand-up summary and day outcome handling ([e99c767](https://github.com/EchonLabs/kanvaro.com/commit/e99c76722d1e134d0ca20853b7833ad90a1628d8))
+* implement Day Outcome Card and enhance stand-up summary components ([0c46039](https://github.com/EchonLabs/kanvaro.com/commit/0c460393746b76b8e900490af5539dfb6a6a0440))
+* implement Day Outcome interface and enhance summary handling in stand-up components ([013a3cf](https://github.com/EchonLabs/kanvaro.com/commit/013a3cf1cb30e95a2a2c21eedcbf1b7ff282bad9))
+* implement day outcome tracking and enhance summary handling ([d8842e3](https://github.com/EchonLabs/kanvaro.com/commit/d8842e3d5e4de34d93b82e89cb21da8f97c9634d))
+
 ## [1.49.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.49.1...v1.49.2) (2026-11-09)
 
 
