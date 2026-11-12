@@ -1893,6 +1893,7 @@ export const standupStrings = {
     dayHealthLabel: ({ day, full, under, over }: { day: number; full: string; under: string; over: string }) =>
       `Day ${day}: ${full} allocated within capacity, ${under} unallocated, ${over} over capacity`,
     debtPointLabel: ({ date, debt }: { date: string; debt: string }) => `${date}: ${debt} outstanding`,
+    debtPeak: () => 'Peak',
 
     showRows: () => 'Show rows',
     hideRows: () => 'Hide rows',
@@ -1927,6 +1928,12 @@ export const standupStrings = {
     ageBucketLabel: ({ label, count, chronic }: { label: string; count: number; chronic: boolean }) =>
       `Age ${label} stand-ups: ${count} ${count === 1 ? 'item' : 'items'}${chronic ? ', chronic' : ''}`,
     chronicBand: ({ count }: { count: number }) => `${count} chronic`,
+    ageingKeyOpen: () => 'Open items',
+    ageingKeyChronic: () => 'Chronic',
+    ageingZoneChronic: () => 'Chronic',
+    ageingTotal: ({ count }: { count: number }) => `${count} open`,
+    ageingTooltipTitle: ({ label }: { label: string }) => `${label} stand-ups old`,
+    ageingItems: () => 'Items',
     ageInStandups: ({ age }: { age: number }) => (age === 1 ? '1 stand-up' : `${age} stand-ups`),
     chainLength: ({ length }: { length: number }) => `${length} stand-ups`,
     loggedAgainst: ({ logged, estimate }: { logged: string; estimate: string }) => `${logged} logged of ${estimate}`,
