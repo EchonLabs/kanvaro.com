@@ -277,7 +277,9 @@ describe('generateStandupsForSprint', () => {
 
     await expect(generateStandupsForSprint(String(sprint._id))).rejects.toMatchObject({
       code: 'STANDUPS_DISABLED',
-      status: 409
+      status: 409,
+      // An API sentence, not on-screen navigation copy.
+      message: 'Stand-ups are turned off for this project, so no schedule can be generated.'
     })
     expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(0)
   })

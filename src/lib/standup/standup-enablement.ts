@@ -7,24 +7,13 @@
  * read as enabled, or every unconfigured project would silently stop getting
  * stand-ups.
  *
- * Callers that already hold the settings document use the pure
- * {@link isStandupsEnabled} and pay nothing extra; only callers without it use
- * {@link areStandupsEnabledForProject}, which is one read on the unique
- * `project` index selecting a single field.
+ * Pure on purpose: every caller already loads the settings document for other
+ * fields, so interpreting the switch costs no extra read.
  */
-import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
-
 export const STANDUPS_ENABLED_DEFAULT = true
 
 export function isStandupsEnabled(
   settings: { enabled?: boolean | null } | null | undefined
 ): boolean {
   return settings?.enabled ?? STANDUPS_ENABLED_DEFAULT
-}
-
-export async function areStandupsEnabledForProject(projectId: string): Promise<boolean> {
-  const settings = (await ProjectStandupSettings.findOne({ project: projectId })
-    .select('enabled')
-    .lean()) as { enabled?: boolean } | null
-  return isStandupsEnabled(settings)
 }

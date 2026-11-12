@@ -15,11 +15,23 @@ import { Standup } from '@/models/Standup'
 import { Task } from '@/models/Task'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
 
+import { generateStandupsForSprint } from '../generation'
 import { completePlanning } from '../planning-service'
 import { ids, syncIndexes, useMongo } from './helpers/mongo'
 import { coverSprintTasks } from './helpers/poker-coverage'
 
 const { organization, project, member, otherMember, user } = ids
+
+// A pass-through wrapper, so one test can act in the window between planning
+// deciding to generate and generation reading the switch.
+jest.mock('../generation', () => {
+  const actual = jest.requireActual('../generation')
+  return { ...actual, generateStandupsForSprint: jest.fn(actual.generateStandupsForSprint) }
+})
+const actualGeneration = jest.requireActual('../generation')
+const generateSpy = generateStandupsForSprint as jest.MockedFunction<
+  typeof generateStandupsForSprint
+>
 
 async function seedProject() {
   await WorkingCalendar.create({
@@ -204,5 +216,26 @@ describe('completePlanning generates the schedule (SCH-1)', () => {
     expect((await SprintPlanningSession.findById(session._id).lean() as any).status).toBe('completed')
     const task = (await Task.findOne({ sprint: sprint._id }).lean()) as any
     expect(task.estimateLockedAt).toBeInstanceOf(Date)
+  })
+
+  it('completes planning without stand-ups when the switch flips off just before generation', async () => {
+    // A PM turns stand-ups off while planning completes. Whatever planning read
+    // earlier, generation sees off — and planning must still finish.
+    await seedProject() // enabled: true
+    const { sprint, session } = await seedPlannableSprint()
+    generateSpy.mockImplementationOnce(async (...args: any[]) => {
+      await ProjectStandupSettings.updateOne({ project }, { $set: { enabled: false } })
+      return actualGeneration.generateStandupsForSprint(...(args as [string]))
+    })
+
+    const result = await completePlanning({
+      sprintId: String(sprint._id),
+      sessionId: String(session._id),
+      userId: String(user)
+    })
+
+    expect(result.generatedStandups).toBeNull()
+    expect(result.sprint.status).toBe('planned')
+    expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(0)
   })
 })

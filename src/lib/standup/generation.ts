@@ -74,7 +74,7 @@ export async function generateStandupsForSprint(
   // §15.3 — checked before the range and SCH-5, so a project with stand-ups off
   // never sees an error about a schedule it did not ask for.
   if (!isStandupsEnabled(settings)) {
-    throw new StandupError('STANDUPS_DISABLED', standupStrings.schedule.disabled(), {
+    throw new StandupError('STANDUPS_DISABLED', standupStrings.schedule.disabledError(), {
       projectId
     })
   }
