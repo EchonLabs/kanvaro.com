@@ -829,7 +829,15 @@ export async function PUT(
     }
 
     // When changing status to 'backlog', remove task from any sprint, unarchive, and move to backlog
-    if (updateData.status === 'backlog') {
+    // Tasks added to a sprint keep status 'backlog', so an edit that merely re-sends
+    // that unchanged status (e.g. the Edit Task form) must not evict the task.
+    // Evict only on a real transition to backlog or an explicit `sprint: null`.
+    const explicitlyClearsSprint =
+      Object.prototype.hasOwnProperty.call(updateData, 'sprint') && !updateData.sprint
+    if (
+      updateData.status === 'backlog' &&
+      (currentTask.status !== 'backlog' || explicitlyClearsSprint)
+    ) {
       updateData.sprint = null
       updateData.archived = false
       updateData.completedAt = null
