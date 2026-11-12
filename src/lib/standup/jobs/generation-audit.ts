@@ -48,12 +48,23 @@ export async function generationAudit(now: Date = new Date()): Promise<JobResult
       const to = isoOfStoredDate(sprint.endDate)
       if (from > to) continue
 
-      const context = await loadCalendarContext(projectId, from, to)
-      const workingDates = workingDatesFrom(resolveWorkingDaysFrom(from, to, context))
-
       const existing = (await Standup.find({ sprint: sprint._id })
         .select('standupDate status')
         .lean()) as any[]
+
+      // This job repairs schedules; it never creates one from nothing. Against
+      // a sprint with no stand-ups every working date would look "missing" and
+      // the reconcile would create them all — past days included, which
+      // mark-missed then flips to Missed. That covers a project with stand-ups
+      // off (§15.3) and one turned back on mid-sprint. Generation proper
+      // belongs to planning completion and the manual route.
+      if (existing.length === 0) {
+        result.skipped += 1
+        continue
+      }
+
+      const context = await loadCalendarContext(projectId, from, to)
+      const workingDates = workingDatesFrom(resolveWorkingDaysFrom(from, to, context))
 
       const liveByDate = new Map<string, string>()
       for (const doc of existing) {

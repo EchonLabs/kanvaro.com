@@ -357,6 +357,33 @@ describe('reconcileSprintSchedule', () => {
     // record that 18 August was scheduled and then became a holiday.
     expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(10)
   })
+
+  it('§15.3: is a no-op for a sprint with no stand-ups when the project has stand-ups off', async () => {
+    await seedProject()
+    await ProjectStandupSettings.updateOne({ project }, { $set: { enabled: false } })
+    const sprint = await seedSprint()
+
+    const result = await reconcileSprintSchedule(String(sprint._id), 'sprint_end_later')
+
+    expect(result).toMatchObject({ created: 0, skipped: 0, cancelled: 0, renumbered: 0 })
+    expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(0)
+  })
+
+  it('§15.3: keeps maintaining an existing schedule after stand-ups are turned off', async () => {
+    await seedProject()
+    const sprint = await seedSprint()
+    await generateStandupsForSprint(String(sprint._id))
+    await ProjectStandupSettings.updateOne({ project }, { $set: { enabled: false } })
+
+    await declareHoliday('2026-08-18', 'Nikini Full Moon Poya Day')
+    const result = await reconcileSprintSchedule(String(sprint._id), 'date_became_non_working')
+
+    expect(result.skipped).toBe(1)
+    const skipped = await Standup.findOne({ sprint: sprint._id, standupDate: '2026-08-18' })
+    expect(skipped?.status).toBe('Skipped_Holiday')
+    const next = await Standup.findOne({ sprint: sprint._id, standupDate: '2026-08-19' })
+    expect(next?.sprintDayNumber).toBe(7)
+  })
 })
 
 /**
