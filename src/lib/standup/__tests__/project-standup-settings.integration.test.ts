@@ -15,6 +15,8 @@ import {
   type IProjectStandupSettings
 } from '@/models/ProjectStandupSettings'
 
+import { areStandupsEnabledForProject } from '../standup-enablement'
+
 import { ids, useMongo } from './helpers/mongo'
 
 const base = () => ({
@@ -133,5 +135,23 @@ describe('ProjectStandupSettings — estimation unit', () => {
         { new: true, upsert: true, runValidators: true }
       )
     ).rejects.toThrow(/estimationUnit/)
+  })
+})
+
+describe('ProjectStandupSettings — stand-ups enabled switch', () => {
+  useMongo()
+
+  it('a new settings document defaults enabled to true (spec §16.2)', async () => {
+    const doc = await ProjectStandupSettings.create(base())
+    expect(doc.enabled).toBe(true)
+  })
+
+  it('areStandupsEnabledForProject defaults on when no settings document exists', async () => {
+    expect(await areStandupsEnabledForProject(String(ids.project))).toBe(true)
+  })
+
+  it('areStandupsEnabledForProject reads a stored false', async () => {
+    await ProjectStandupSettings.create({ ...base(), enabled: false })
+    expect(await areStandupsEnabledForProject(String(ids.project))).toBe(false)
   })
 })
