@@ -48,7 +48,9 @@ const ADDITIONS: Record<string, number> = {
   VALIDATION_FAILED: 422,
   NOT_FOUND: 404,
   EXTERNAL_SERVICE_ERROR: 502,
-  FORBIDDEN: 403
+  FORBIDDEN: 403,
+  /** §15.3 "Stand-ups enabled" off — generation refused for that project. */
+  STANDUPS_DISABLED: 409
 }
 
 describe('§17.2 catalogue', () => {

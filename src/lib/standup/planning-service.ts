@@ -25,6 +25,7 @@ import {
   type ChecklistTaskInput
 } from './planning-checklist'
 import { type PlanningWaiver } from './planning-gate'
+import { areStandupsEnabledForProject } from './standup-enablement'
 import { assertTransition, type SprintState } from './sprint-states'
 
 const isoOf = (date: Date) => new Date(date).toISOString().slice(0, 10)
@@ -162,8 +163,12 @@ export interface CompletePlanningResult {
   checklist: ChecklistResult
   sprint: any
   session: any
-  /** UI-7 shows the generated schedule on the confirmation screen. */
-  generatedStandups: GenerateResult
+  /**
+   * UI-7 shows the generated schedule on the confirmation screen. `null` when
+   * the project has stand-ups turned off (§15.3): planning still completes,
+   * generation is simply skipped.
+   */
+  generatedStandups: GenerateResult | null
 }
 
 /**
@@ -261,7 +266,12 @@ export async function completePlanning(
 
   // SCH-1/SCH-5. Throws before anything is written when the sprint contains no
   // working days, which leaves the session open and the sprint in Planning.
-  const generatedStandups = await generateStandupsForSprint(sprintId, { actorId: userId })
+  // §15.3 — a project with stand-ups off completes planning without a schedule;
+  // asked up front so generation's STANDUPS_DISABLED refusal is never hit here.
+  const standupsOn = await areStandupsEnabledForProject(String((sprint as any).project))
+  const generatedStandups = standupsOn
+    ? await generateStandupsForSprint(sprintId, { actorId: userId })
+    : null
 
   await session.save()
 

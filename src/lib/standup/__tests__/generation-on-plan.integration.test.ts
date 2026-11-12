@@ -185,4 +185,24 @@ describe('completePlanning generates the schedule (SCH-1)', () => {
     // Re-running generation through the audit path must not duplicate.
     expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(5)
   })
+
+  it('completes planning without stand-ups when the project has them turned off', async () => {
+    await seedProject()
+    await ProjectStandupSettings.updateOne({ project }, { $set: { enabled: false } })
+    const { sprint, session } = await seedPlannableSprint()
+
+    const result = await completePlanning({
+      sprintId: String(sprint._id),
+      sessionId: String(session._id),
+      userId: String(user)
+    })
+
+    expect(result.generatedStandups).toBeNull()
+    expect(result.sprint.status).toBe('planned')
+    expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(0)
+    // Planning itself still finished: the session closed and estimates froze.
+    expect((await SprintPlanningSession.findById(session._id).lean() as any).status).toBe('completed')
+    const task = (await Task.findOne({ sprint: sprint._id }).lean()) as any
+    expect(task.estimateLockedAt).toBeInstanceOf(Date)
+  })
 })

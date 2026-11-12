@@ -142,6 +142,8 @@ export const standupStrings = {
     pokerReady: () => 'Every task has an assignee. Ready to estimate.',
     pokerNothingToEstimate: () => 'Every task has already been through planning poker.',
     completeReady: () => 'Every check passed. Completing takes this sprint to Planned.',
+    completedWithoutStandups: () =>
+      'Planning complete. This sprint is now Planned and its estimates are frozen. Stand-ups are turned off for this project, so none were scheduled.',
     completeNeedsAcknowledgement: ({ count }: { count: number }) =>
       count === 1
         ? 'Acknowledge or fix the remaining advisory before completing.'
@@ -1307,6 +1309,8 @@ export const standupStrings = {
     title: () => 'Stand-up schedule',
     empty: () =>
       'No stand-ups have been generated for this sprint yet. They are created when the planning session completes.',
+    disabled: () =>
+      'Stand-ups are turned off for this project. Turn them on in Project settings → Stand-ups to schedule them for future sprints.',
     today: () => 'Today',
     sprintDays: () => 'This sprint',
     dayLabel: ({ number, total }: { number: number; total: number }) =>

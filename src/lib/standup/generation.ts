@@ -24,6 +24,8 @@ import { checkHolidayCoverage, loadCalendarContext } from './calendar-service'
 import { isoOfStoredDate, toInstant, type IsoDate } from './calendar-dates'
 import { numberSprintDays } from './day-numbering'
 import { StandupError } from './errors'
+import { isStandupsEnabled } from './standup-enablement'
+import { standupStrings } from './strings'
 import { resolveWorkingDaysFrom, workingDatesFrom } from './working-day'
 
 export interface GenerateResult {
@@ -40,8 +42,9 @@ export interface GenerateResult {
  * Settings a project has not configured yet.
  *
  * Mirrors the schema defaults rather than reading them off the model: a sprint
- * whose project never opened the configuration screen must still generate, and
- * silently generating nothing would be the worst of the available behaviours.
+ * whose project never opened the configuration screen must still generate —
+ * the spec defaults "Stand-ups enabled" on, and `isStandupsEnabled()` reads a
+ * missing document that way.
  */
 const SETTINGS_DEFAULTS = {
   standupLocalTime: '09:15',
@@ -64,6 +67,18 @@ export async function generateStandupsForSprint(
   }
 
   const projectId = sprint.project.toString()
+
+  const settings = ((await ProjectStandupSettings.findOne({ project: projectId }).lean()) ??
+    {}) as any
+
+  // §15.3 — checked before the range and SCH-5, so a project with stand-ups off
+  // never sees an error about a schedule it did not ask for.
+  if (!isStandupsEnabled(settings)) {
+    throw new StandupError('STANDUPS_DISABLED', standupStrings.schedule.disabled(), {
+      projectId
+    })
+  }
+
   const from = isoOfStoredDate(sprint.startDate)
   const to = isoOfStoredDate(sprint.endDate)
 
@@ -74,9 +89,6 @@ export async function generateStandupsForSprint(
       { from, to }
     )
   }
-
-  const settings = ((await ProjectStandupSettings.findOne({ project: projectId }).lean()) ??
-    {}) as any
 
   // One context load for the whole range, then a pure resolution per date — the
   // batched path exists precisely so a 60-day sprint is not 60 round trips.

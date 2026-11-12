@@ -269,4 +269,38 @@ describe('generateStandupsForSprint', () => {
       generateStandupsForSprint(String(new mongoose.Types.ObjectId()))
     ).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
+
+  it('STANDUPS_DISABLED: refuses and creates nothing when the project has stand-ups off', async () => {
+    await seedCalendar()
+    await seedSettings({ enabled: false })
+    const sprint = await seedSprint()
+
+    await expect(generateStandupsForSprint(String(sprint._id))).rejects.toMatchObject({
+      code: 'STANDUPS_DISABLED',
+      status: 409
+    })
+    expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(0)
+  })
+
+  it('STANDUPS_DISABLED wins over SCH-5: a disabled project never sees the no-working-days refusal', async () => {
+    await seedCalendar()
+    await seedSettings({ enabled: false })
+    const sprint = await seedSprint({
+      startDate: new Date('2026-08-15T00:00:00.000Z'), // Saturday
+      endDate: new Date('2026-08-16T00:00:00.000Z') // Sunday
+    })
+
+    await expect(generateStandupsForSprint(String(sprint._id))).rejects.toMatchObject({
+      code: 'STANDUPS_DISABLED'
+    })
+  })
+
+  it('generates with defaults when the project has no settings document (spec default on)', async () => {
+    await seedCalendar()
+    const sprint = await seedSprint()
+
+    const result = await generateStandupsForSprint(String(sprint._id))
+
+    expect(result.created).toBe(9)
+  })
 })

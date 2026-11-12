@@ -50,6 +50,8 @@ export const STANDUP_ERROR_CODES = {
   NOT_FOUND: 404,
   /** A third-party integration (e.g. the holiday API) failed or was unreachable. */
   EXTERNAL_SERVICE_ERROR: 502,
+  /** The project has stand-ups turned off, so no schedule may be generated (§15.3). */
+  STANDUPS_DISABLED: 409,
   /**
    * The caller is authenticated but not allowed to do this.
    *
