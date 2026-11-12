@@ -1311,6 +1311,9 @@ export const standupStrings = {
       'No stand-ups have been generated for this sprint yet. They are created when the planning session completes.',
     disabled: () =>
       'Stand-ups are turned off for this project. Turn them on in Project settings → Stand-ups to schedule them for future sprints.',
+    /** An empty schedule on a sprint that has already left planning. */
+    noneScheduled: () =>
+      'This sprint was planned without stand-ups, so none were scheduled. They start with the next sprint that completes planning.',
     /** The STANDUPS_DISABLED API message — no on-screen navigation in it. */
     disabledError: () =>
       'Stand-ups are turned off for this project, so no schedule can be generated.',

@@ -14,7 +14,7 @@
  */
 import { render, screen, within } from '@testing-library/react'
 
-import { StandupSchedule } from '@/components/standup/StandupSchedule'
+import { canRegenerate, StandupSchedule } from '@/components/standup/StandupSchedule'
 import type { ScheduleDay, SprintSchedule } from '@/lib/standup/schedule'
 
 const day = (over: Partial<ScheduleDay> = {}): ScheduleDay => ({
@@ -43,6 +43,7 @@ const schedule = (over: Partial<SprintSchedule> = {}): SprintSchedule => ({
   dateRange: { from: '2026-08-10', to: '2026-08-14' },
   totalSprintDays: 5,
   standupsEnabled: true,
+  sprintStatus: 'planning',
   days: [
     day({ date: '2026-08-10', sprintDayNumber: 1, shape: 'day_one', status: 'Completed' }),
     day({ date: '2026-08-11', sprintDayNumber: 2, status: 'Ready' }),
@@ -143,6 +144,34 @@ describe('StandupSchedule', () => {
 
     expect(screen.getByText(/turned off for this project/i)).toBeInTheDocument()
     expect(screen.queryByText(/planning session completes/i)).not.toBeInTheDocument()
+  })
+
+  it('does not promise planning will fill a sprint that is already past planning', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({ days: [], totalSprintDays: 0, sprintStatus: 'active' })}
+      />
+    )
+
+    expect(screen.getByText(/planned without stand-ups/i)).toBeInTheDocument()
+    expect(screen.queryByText(/planning session completes/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps the "created when planning completes" copy for a sprint still in planning', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({ days: [], totalSprintDays: 0, sprintStatus: 'planning' })}
+      />
+    )
+
+    expect(screen.getByText(/planning session completes/i)).toBeInTheDocument()
+  })
+
+  it('canRegenerate: only once a schedule has loaded and has days', () => {
+    expect(canRegenerate(null)).toBe(false)
+    expect(canRegenerate(schedule({ days: [], totalSprintDays: 0 }))).toBe(false)
+    expect(canRegenerate(schedule())).toBe(true)
+    expect(canRegenerate(schedule({ standupsEnabled: false }))).toBe(true)
   })
 
   it('§15.3: still lists an existing schedule after stand-ups are turned off', () => {

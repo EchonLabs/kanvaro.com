@@ -108,6 +108,11 @@ export interface SprintSchedule {
    * say why it is empty rather than promise planning will fill it.
    */
   standupsEnabled: boolean
+  /**
+   * The sprint's lifecycle status. An empty schedule on a sprint already past
+   * planning will not be filled by planning, and the screen must not say so.
+   */
+  sprintStatus: string
 }
 
 export interface ScheduleOptions {
@@ -351,6 +356,7 @@ export async function getSprintSchedule(
     totalSprintDays: totalWorkingDays,
     days,
     health,
-    standupsEnabled: isStandupsEnabled(standupSettings)
+    standupsEnabled: isStandupsEnabled(standupSettings),
+    sprintStatus: sprint.status
   }
 }

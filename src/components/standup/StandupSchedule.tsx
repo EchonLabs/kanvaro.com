@@ -22,11 +22,28 @@ const { schedule: strings } = standupStrings
 /** Days that cannot be opened: there is no meeting behind them. */
 const UNOPENABLE = ['Skipped_Holiday', 'Cancelled']
 
+/**
+ * Whether Regenerate has anything to repair. False until the schedule has
+ * loaded (no flash of the button), and on an empty schedule — the reconciler
+ * never builds a schedule from nothing.
+ */
+export function canRegenerate(schedule: SprintSchedule | null): boolean {
+  return !!schedule && schedule.days.length > 0
+}
+
+/** Why a schedule is empty, in the order that decides it. */
+function emptyMessage(schedule: SprintSchedule): string {
+  if (!schedule.standupsEnabled) return strings.disabled()
+  // Only a sprint still in planning will get stand-ups from planning completion.
+  if (schedule.sprintStatus !== 'planning') return strings.noneScheduled()
+  return strings.empty()
+}
+
 export function StandupSchedule({ schedule }: { schedule: SprintSchedule }) {
   if (schedule.days.length === 0) {
     return (
       <p className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card px-4 py-6 text-sm text-[var(--apple-secondary-label)]">
-        {schedule.standupsEnabled ? strings.empty() : strings.disabled()}
+        {emptyMessage(schedule)}
       </p>
     )
   }

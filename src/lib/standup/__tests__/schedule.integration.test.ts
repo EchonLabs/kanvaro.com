@@ -162,6 +162,13 @@ describe('getSprintSchedule', () => {
     expect((await getSprintSchedule(String(sprint._id))).standupsEnabled).toBe(false)
   })
 
+  it('reports the sprint status so an empty schedule can explain itself', async () => {
+    await seedProject()
+    const sprint = await seedSprint() // status: active
+
+    expect((await getSprintSchedule(String(sprint._id))).sprintStatus).toBe('active')
+  })
+
   it('§15.3: reports standupsEnabled as true when the project has no settings document', async () => {
     await seedProject()
     const sprint = await seedSprint()
