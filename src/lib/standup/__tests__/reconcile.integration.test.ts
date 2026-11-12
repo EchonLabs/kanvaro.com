@@ -369,6 +369,21 @@ describe('reconcileSprintSchedule', () => {
     expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(0)
   })
 
+  it('never builds a schedule from nothing, even with stand-ups on (no past-day backfill)', async () => {
+    // A sprint that completed planning while stand-ups were off, then had them
+    // turned back on mid-sprint: extending its end date (or Regenerate) must not
+    // create every working day — past ones would be flipped to Missed.
+    await seedProject() // enabled: true
+    const sprint = await seedSprint()
+
+    const extended = await reconcileSprintSchedule(String(sprint._id), 'sprint_end_later')
+    const regenerated = await reconcileSprintSchedule(String(sprint._id), 'date_became_non_working')
+
+    expect(extended.created).toBe(0)
+    expect(regenerated.created).toBe(0)
+    expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(0)
+  })
+
   it('§15.3: keeps maintaining an existing schedule after stand-ups are turned off', async () => {
     await seedProject()
     const sprint = await seedSprint()

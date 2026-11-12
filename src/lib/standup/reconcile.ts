@@ -32,7 +32,6 @@ import {
   type ExistingStandupRow,
   type ReconcileTrigger
 } from './reconcile-rules'
-import { isStandupsEnabled } from './standup-enablement'
 import { resolveWorkingDaysFrom, workingDatesFrom } from './working-day'
 
 export type { ReconcileTrigger }
@@ -112,10 +111,14 @@ export async function reconcileSprintSchedule(
   const settings = ((await ProjectStandupSettings.findOne({ project: projectId }).lean()) ??
     {}) as any
 
-  // §15.3 — with stand-ups off, a sprint that has no schedule must not get one
-  // through the back door (several triggers create). A schedule that already
-  // exists keeps being maintained: "off" only stops new schedules.
-  if (existingDocs.length === 0 && !isStandupsEnabled(settings)) {
+  // Reconciling repairs a schedule; it never builds one from nothing. With zero
+  // stand-ups every working date would plan as a `create` — past days included,
+  // which mark-missed then flips to Missed — so a sprint planned while stand-ups
+  // were off (§15.3) and then turned back on, or a Planning sprint whose dates
+  // are edited, would get a back-filled schedule. Schedules are created only by
+  // planning completion and the explicit generate route. An existing schedule
+  // keeps being maintained whatever the switch says.
+  if (existingDocs.length === 0) {
     return emptyReconcileResult()
   }
 
