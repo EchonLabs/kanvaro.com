@@ -201,7 +201,10 @@ export default function ProjectStandupSchedulePage({
           </div>
 
           <div className="flex items-center gap-2.5">
-            {sprintId ? (
+            {/* §15.3 — nothing to regenerate when stand-ups are off and this
+                sprint never got a schedule; an existing one can still be repaired. */}
+            {sprintId &&
+            !(schedule && !schedule.standupsEnabled && schedule.days.length === 0) ? (
               <RegenerateScheduleModal sprintId={sprintId} onReconciled={loadSchedule} />
             ) : null}
 

@@ -152,6 +152,24 @@ describe('getSprintSchedule', () => {
     expect(schedule.totalSprintDays).toBe(0)
   })
 
+  it('§15.3: reports standupsEnabled from the project settings', async () => {
+    await seedProject()
+    const sprint = await seedSprint()
+
+    expect((await getSprintSchedule(String(sprint._id))).standupsEnabled).toBe(true)
+
+    await ProjectStandupSettings.updateOne({ project }, { $set: { enabled: false } })
+    expect((await getSprintSchedule(String(sprint._id))).standupsEnabled).toBe(false)
+  })
+
+  it('§15.3: reports standupsEnabled as true when the project has no settings document', async () => {
+    await seedProject()
+    const sprint = await seedSprint()
+    await ProjectStandupSettings.deleteMany({ project })
+
+    expect((await getSprintSchedule(String(sprint._id))).standupsEnabled).toBe(true)
+  })
+
   it('refuses a sprint that does not exist', async () => {
     await expect(
       getSprintSchedule(String(new mongoose.Types.ObjectId()))

@@ -26,7 +26,7 @@ export function StandupSchedule({ schedule }: { schedule: SprintSchedule }) {
   if (schedule.days.length === 0) {
     return (
       <p className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card px-4 py-6 text-sm text-[var(--apple-secondary-label)]">
-        {strings.empty()}
+        {schedule.standupsEnabled ? strings.empty() : strings.disabled()}
       </p>
     )
   }

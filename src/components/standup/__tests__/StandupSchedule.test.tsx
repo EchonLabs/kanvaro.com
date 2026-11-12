@@ -42,6 +42,7 @@ const schedule = (over: Partial<SprintSchedule> = {}): SprintSchedule => ({
   today: '2026-08-11',
   dateRange: { from: '2026-08-10', to: '2026-08-14' },
   totalSprintDays: 5,
+  standupsEnabled: true,
   days: [
     day({ date: '2026-08-10', sprintDayNumber: 1, shape: 'day_one', status: 'Completed' }),
     day({ date: '2026-08-11', sprintDayNumber: 2, status: 'Ready' }),
@@ -131,6 +132,24 @@ describe('StandupSchedule', () => {
     render(<StandupSchedule schedule={schedule({ days: [], totalSprintDays: 0 })} />)
 
     expect(screen.getByText(/no stand-ups have been generated/i)).toBeInTheDocument()
+  })
+
+  it('§15.3: explains that stand-ups are off instead of promising planning will create them', () => {
+    render(
+      <StandupSchedule
+        schedule={schedule({ days: [], totalSprintDays: 0, standupsEnabled: false })}
+      />
+    )
+
+    expect(screen.getByText(/turned off for this project/i)).toBeInTheDocument()
+    expect(screen.queryByText(/planning session completes/i)).not.toBeInTheDocument()
+  })
+
+  it('§15.3: still lists an existing schedule after stand-ups are turned off', () => {
+    render(<StandupSchedule schedule={schedule({ standupsEnabled: false })} />)
+
+    expect(screen.queryByText(/turned off for this project/i)).not.toBeInTheDocument()
+    expect(screen.getAllByTestId(/^schedule-(day|today)$/)).toHaveLength(5)
   })
 
   it('shows the facilitator’s name, not their id', () => {
