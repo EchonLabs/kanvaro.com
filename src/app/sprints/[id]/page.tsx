@@ -635,6 +635,28 @@ export default function SprintDetailPage() {
     return Array.from(map.values())
   }, [sprint?.teamMembers, uniqueAssignees, editingTask])
 
+  // Bulk selected tasks helper & member selection status
+  const bulkSelectedTasks = useMemo(() => {
+    if (tableSelectedTasks.size === 0 || !sprintTasks) return []
+    return sprintTasks.filter(t => tableSelectedTasks.has(t._id))
+  }, [tableSelectedTasks, sprintTasks])
+
+  const getMemberBulkSelectionStatus = useCallback((memberId: string) => {
+    if (bulkSelectedTasks.length === 0) return { count: 0, isAll: false, isSome: false }
+    const count = bulkSelectedTasks.filter(t => {
+      if (!Array.isArray(t.assignedTo)) return false
+      return t.assignedTo.some(a => {
+        const uId = typeof a === 'string' ? a : (a?.user?._id || (typeof a?.user === 'string' ? a.user : null) || (a as any)?._id)
+        return uId === memberId
+      })
+    }).length
+    return {
+      count,
+      isAll: count === bulkSelectedTasks.length && count > 0,
+      isSome: count > 0 && count < bulkSelectedTasks.length
+    }
+  }, [bulkSelectedTasks])
+
   // Subtask expansion & table handlers
   const toggleTableTaskExpanded = (taskId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
@@ -1247,6 +1269,13 @@ export default function SprintDetailPage() {
       setBulkActionLoading(true)
       const selectedIds = Array.from(tableSelectedTasks)
 
+      // Determine if member is already assigned to ALL selected tasks
+      let isAlreadyOnAll = false
+      if (member) {
+        const { isAll } = getMemberBulkSelectionStatus(member.id)
+        isAlreadyOnAll = isAll
+      }
+
       await Promise.all(
         selectedIds.map(taskId => {
           const task = sprint?.tasks?.find(t => t._id === taskId)
@@ -1266,18 +1295,24 @@ export default function SprintDetailPage() {
                 }).filter(a => Boolean(a.user))
               : []
 
-            const alreadyAssigned = existingAssignees.some(a => a.user === member.id)
-            assignedToVal = alreadyAssigned
-              ? existingAssignees
-              : [
-                  ...existingAssignees,
-                  {
-                    user: member.id,
-                    firstName: member.name.split(' ')[0] || '',
-                    lastName: member.name.split(' ').slice(1).join(' ') || '',
-                    email: member.email || ''
-                  }
-                ]
+            if (isAlreadyOnAll) {
+              // Toggle OFF: remove this member from the selected task
+              assignedToVal = existingAssignees.filter(a => a.user !== member.id)
+            } else {
+              // Add this member if not already on this task
+              const alreadyAssigned = existingAssignees.some(a => a.user === member.id)
+              assignedToVal = alreadyAssigned
+                ? existingAssignees
+                : [
+                    ...existingAssignees,
+                    {
+                      user: member.id,
+                      firstName: member.name.split(' ')[0] || '',
+                      lastName: member.name.split(' ').slice(1).join(' ') || '',
+                      email: member.email || ''
+                    }
+                  ]
+            }
           } else {
             assignedToVal = []
           }
@@ -1294,19 +1329,27 @@ export default function SprintDetailPage() {
         setEditFormData(prev => ({
           ...prev,
           assigneeIds: member
-            ? (prev.assigneeIds.includes(member.id) ? prev.assigneeIds : [...prev.assigneeIds, member.id])
+            ? (isAlreadyOnAll
+                ? prev.assigneeIds.filter(id => id !== member.id)
+                : (prev.assigneeIds.includes(member.id) ? prev.assigneeIds : [...prev.assigneeIds, member.id]))
             : []
         }))
         setInitialEditFormData(prev => ({
           ...prev,
           assigneeIds: member
-            ? (prev.assigneeIds.includes(member.id) ? prev.assigneeIds : [...prev.assigneeIds, member.id])
+            ? (isAlreadyOnAll
+                ? prev.assigneeIds.filter(id => id !== member.id)
+                : (prev.assigneeIds.includes(member.id) ? prev.assigneeIds : [...prev.assigneeIds, member.id]))
             : []
         }))
       }
 
       notifySuccess({
-        title: member ? `Assigned ${selectedIds.length} tasks to ${member.name}` : `Unassigned ${selectedIds.length} tasks`
+        title: member
+          ? (isAlreadyOnAll
+              ? `Removed ${member.name} from ${selectedIds.length} task${selectedIds.length > 1 ? 's' : ''}`
+              : `Assigned ${member.name} to ${selectedIds.length} task${selectedIds.length > 1 ? 's' : ''}`)
+          : `Unassigned ${selectedIds.length} task${selectedIds.length > 1 ? 's' : ''}`
       })
       setTableSelectedTasks(new Set())
       fetchSprint({ silent: true })
@@ -3199,37 +3242,69 @@ export default function SprintDetailPage() {
                         side="bottom"
                         sideOffset={6}
                         onCloseAutoFocus={(e) => e.preventDefault()}
-                        className="z-[10050] w-64 max-h-64 overflow-y-auto thin-scrollbar rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1.5 shadow-2xl text-gray-900 dark:text-white"
+                        className="z-[10050] w-72 max-h-72 overflow-y-auto thin-scrollbar rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1.5 shadow-2xl text-gray-900 dark:text-white"
                       >
                         <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                           Assign selected tasks to
                         </div>
-                        <DropdownMenuItem
-                          onClick={() => handleBulkAssign(null)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors text-gray-700 dark:text-gray-300"
-                        >
-                          <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
-                            <User className="w-3.5 h-3.5" />
-                          </div>
-                          <span>Unassign</span>
-                        </DropdownMenuItem>
-                        {assignableMembers.map(member => (
-                          <DropdownMenuItem
-                            key={member.id}
-                            onClick={() => handleBulkAssign(member)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors text-gray-700 dark:text-gray-300"
-                          >
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-semibold">
-                              {member.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium truncate">{member.name}</p>
-                              {member.email && (
-                                <p className="text-[10px] text-gray-400 truncate">{member.email}</p>
+                        {(() => {
+                          const allSelectedUnassigned = bulkSelectedTasks.length > 0 && bulkSelectedTasks.every(t => !Array.isArray(t.assignedTo) || t.assignedTo.length === 0)
+                          return (
+                            <DropdownMenuItem
+                              onClick={() => handleBulkAssign(null)}
+                              className="w-full flex items-center justify-between gap-2.5 px-3 py-2 text-xs text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors text-gray-700 dark:text-gray-300"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 shrink-0">
+                                  <User className="w-3.5 h-3.5" />
+                                </div>
+                                <span>Unassign all</span>
+                              </div>
+                              {allSelectedUnassigned && (
+                                <span className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 shrink-0">
+                                  <Check className="w-3.5 h-3.5" />
+                                </span>
                               )}
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
+                            </DropdownMenuItem>
+                          )
+                        })()}
+                        {assignableMembers.map(member => {
+                          const { count, isAll, isSome } = getMemberBulkSelectionStatus(member.id)
+                          return (
+                            <DropdownMenuItem
+                              key={member.id}
+                              onClick={() => handleBulkAssign(member)}
+                              className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 text-xs text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors ${
+                                isAll
+                                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50/40 dark:bg-blue-950/20 font-medium'
+                                  : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-semibold shrink-0">
+                                  {member.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium truncate">{member.name}</p>
+                                  {member.email && (
+                                    <p className="text-[10px] text-gray-400 truncate">{member.email}</p>
+                                  )}
+                                </div>
+                              </div>
+                              {isAll && (
+                                <span className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 shrink-0">
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>{bulkSelectedTasks.length > 1 ? 'On all' : 'Assigned'}</span>
+                                </span>
+                              )}
+                              {isSome && (
+                                <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 shrink-0">
+                                  On {count}/{bulkSelectedTasks.length}
+                                </span>
+                              )}
+                            </DropdownMenuItem>
+                          )
+                        })}
                       </DropdownMenuContent>
                     </DropdownMenu>
 
