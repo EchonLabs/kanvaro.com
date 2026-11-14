@@ -27,7 +27,7 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { recordAudit } from '@/lib/standup/audit'
 import { StandupError, toErrorResponse } from '@/lib/standup/errors'
 import { deriveEstimateMinutes, type EstimateUnit } from '@/lib/standup/estimates'
-import { hasStandups, type SprintState } from '@/lib/standup/sprint-states'
+import { assertLateAdditionReason, isPastPlanning } from '@/lib/standup/late-addition'
 import { NextRequest, NextResponse } from 'next/server'
 
 interface EstimateBody {
@@ -80,18 +80,11 @@ export async function POST(
     }
 
     const sprint = task.sprint ? await Sprint.findById(task.sprint).lean() : null
-    const sprintState = (sprint as any)?.status as SprintState | undefined
     // A sprint that already has stand-ups has left planning, so anything
     // estimated now is an E14 late addition.
-    const isLateAddition = !!sprintState && hasStandups(sprintState)
+    const isLateAddition = isPastPlanning((sprint as any)?.status)
 
-    if (isLateAddition && (body.reason ?? '').trim().length < 10) {
-      throw new StandupError(
-        'VALIDATION_FAILED',
-        'This sprint has already been planned. Say why this task is being added and estimated now (at least 10 characters).',
-        { taskId: params.id }
-      )
-    }
+    if (isLateAddition) assertLateAdditionReason(body.reason)
 
     const settings = projectId
       ? await ProjectStandupSettings.findOne({ project: projectId }).select('pointsToHours').lean()

@@ -40,7 +40,7 @@ export async function GET() {
       facilitator: { $ne: userId }
     })
       .sort({ createdAt: -1 })
-      .select('sprint project createdAt')
+      .select('sprint project createdAt lateAdditionReason')
       .lean()
 
     const visible: any[] = []
@@ -74,7 +74,8 @@ export async function GET() {
         sprintId: session.sprint?.toString(),
         sprintName: sprintName.get(session.sprint?.toString()) ?? null,
         projectName: projectName.get(session.project?.toString()) ?? null,
-        createdAt: session.createdAt
+        createdAt: session.createdAt,
+        lateAddition: !!session.lateAdditionReason
       }))
     })
   } catch (error) {

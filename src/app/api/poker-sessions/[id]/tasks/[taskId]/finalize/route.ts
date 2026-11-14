@@ -18,6 +18,7 @@ import { broadcastPokerChange, closePokerSession } from '@/lib/poker-broadcaster
 import { recordAudit } from '@/lib/standup/audit'
 import { StandupError } from '@/lib/standup/errors'
 import { deriveEstimateMinutes } from '@/lib/standup/estimates'
+import { isUnestimated } from '@/lib/standup/late-addition'
 import { finalizeVote } from '@/lib/standup/poker'
 import { ok, readJson, withPokerPermission } from '@/lib/standup/route-helpers'
 
@@ -80,6 +81,18 @@ export const POST = withPokerPermission(
       )
     }
 
+    // A late-addition round only ever estimates tasks nobody has estimated. A
+    // manual estimate may have landed since the session opened; poker must not
+    // overwrite it — that task goes through the revision path.
+    const lateAdditionReason: string | undefined = pokerSession.lateAdditionReason || undefined
+    if (lateAdditionReason && !isUnestimated(task)) {
+      throw new StandupError(
+        'ESTIMATE_IMMUTABLE',
+        'This task has been estimated since the round opened. Revise the remaining estimate instead.',
+        { taskId }
+      )
+    }
+
     const votes = await PokerVote.find({ pokerSession: pokerSession._id, task: taskId, round })
       .select('voter card')
       .lean()
@@ -115,6 +128,9 @@ export const POST = withPokerPermission(
     task.consensusReached = result.consensusReached
     task.estimatedAt = new Date()
     task.estimatedBy = new mongoose.Types.ObjectId(userId)
+    // The sprint is already past the point where DAT-6 applies, so a late
+    // addition is frozen in the same write as its estimate.
+    if (lateAdditionReason) task.estimateLockedAt = new Date()
     await task.save()
 
     entry.status = 'estimated'
@@ -148,7 +164,11 @@ export const POST = withPokerPermission(
         estimateMethod: 'poker',
         consensusReached: result.consensusReached
       },
-      context: { voteSpread: result.voteSpread, roundCount: round }
+      context: {
+        voteSpread: result.voteSpread,
+        roundCount: round,
+        ...(lateAdditionReason ? { lateAddition: true, reason: lateAdditionReason } : {})
+      }
     })
 
     const sessionId = pokerSession._id.toString()
