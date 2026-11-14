@@ -1,143 +1,153 @@
-import { useState } from 'react'
+import { useId } from 'react'
 import { TrendingDown } from 'lucide-react'
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ReferenceDot,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  type TooltipProps
+} from 'recharts'
 
 import { planPillClass } from '@/components/standup/planning/ui'
 import { SummarySection } from '@/components/standup/summary/SummarySection'
 import { standupStrings } from '@/lib/standup/strings'
 import { cn } from '@/lib/utils'
 
+import {
+  CHART_HEIGHT_CLASS,
+  CHART_INITIAL_DIMENSION,
+  CHART_MARGIN,
+  ChartTooltipCard,
+  ChartTooltipRow,
+  gridProps,
+  hourTick,
+  xAxisProps,
+  yAxisProps
+} from './chart-theme'
 import { Figure, hours, hoursOrDash, shortDate } from './format'
 import { RowsTable, ShowRows } from './RowsTable'
 import type { AnalyticsPayload, SprintLinkContext } from './types'
 
 const s = standupStrings.analytics
 
-/** Keeps the line and its points off the chart's edges, so a dot is never clipped. */
-const X_MARGIN = 4
-const Y_TOP = 8
-const Y_BOTTOM = 92
+const INK = 'var(--plan-accent-ink)'
+
+interface DebtDatum {
+  date: string
+  label: string
+  minutes: number
+  hours: number
+}
+
+/** The hover / keyboard-focus card: the day and the debt outstanding on it. */
+export function DebtTooltip({ active, payload }: TooltipProps<number, string>) {
+  const datum = active ? (payload?.[0]?.payload as DebtDatum | undefined) : undefined
+  if (!datum) return null
+  return (
+    <ChartTooltipCard title={datum.label}>
+      <ChartTooltipRow
+        swatch={<span className="h-2 w-2 rounded-full bg-[var(--plan-accent-ink)]" aria-hidden="true" />}
+        label={s.columnDebt()}
+        value={hours(datum.minutes)}
+        emphasis
+      />
+    </ChartTooltipCard>
+  )
+}
 
 /**
  * §15.15 "Estimate debt trend": total outstanding debt per sprint day.
  *
- * The line is a stretched SVG (so it fills the card at any width without
- * letterboxing); the points are real buttons laid over it by percentage, so
- * they stay round, are easy to hit, and can take keyboard focus. Hover *and*
- * focus show the date and the debt in a tooltip — the figure is never
- * reachable by hovering alone (NFR-A1) — and the latest figure is written in
- * the badge, so the headline never depends on reading the line's height.
- *
- * Height: the two cards share a stretched grid row, so they always end level.
- * The chart is sized so their contents line up too — Allocation health is a
- * 10rem bar area plus a legend row; this is a 10.75rem chart plus a date row.
+ * A single series, so no legend: the card title names it and the badge carries
+ * the latest figure, so the headline never depends on reading the line. The
+ * chart has recharts' accessibility layer on, so it takes keyboard focus and
+ * the arrow keys walk the tooltip point by point (NFR-A1); every value is also
+ * in the rows table (UI-13).
  */
 export function DebtTrendCard({ payload }: { payload: AnalyticsPayload; link: SprintLinkContext }) {
-  const points = payload.debtTrend
-  const [active, setActive] = useState<number | null>(null)
-
-  const peak = Math.max(1, ...points.map((point) => point.outstandingMinutes))
-  const xPercent = (index: number) =>
-    points.length > 1 ? X_MARGIN + (index * (100 - X_MARGIN * 2)) / (points.length - 1) : 50
-  const yPercent = (value: number) => Y_BOTTOM - (value / peak) * (Y_BOTTOM - Y_TOP)
-  const latest = points[points.length - 1]
-  const hovered = active === null ? null : points[active]
+  const gradientId = `debt-fill-${useId().replace(/:/g, '')}`
+  const data: DebtDatum[] = payload.debtTrend.map((point) => ({
+    date: point.date,
+    label: shortDate(point.date),
+    minutes: point.outstandingMinutes,
+    hours: point.outstandingMinutes / 60
+  }))
+  const latest = data[data.length - 1]
+  const peak = Math.max(0, ...data.map((point) => point.minutes))
 
   return (
     <SummarySection
       id="analytics-debt-trend"
       title={s.sectionDebtTrend()}
       icon={TrendingDown}
-      isEmpty={points.length === 0}
+      isEmpty={data.length === 0}
       emptyText={s.emptyDebtTrend()}
-      badge={latest ? <span className={planPillClass('accent')}>{hoursOrDash(latest.outstandingMinutes)}</span> : undefined}
+      badge={latest ? <span className={planPillClass('accent')}>{hoursOrDash(latest.minutes)}</span> : undefined}
     >
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <div
-            data-testid="debt-trend-chart"
-            className="relative h-[10.75rem] w-full"
-            onMouseLeave={() => setActive(null)}
-          >
-            <svg
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              className="absolute inset-0 h-full w-full"
-              aria-hidden="true"
-            >
-              <line
-                x1={0}
-                x2={100}
-                y1={Y_BOTTOM}
-                y2={Y_BOTTOM}
-                stroke="var(--plan-border)"
-                strokeWidth={1}
-                vectorEffect="non-scaling-stroke"
+        {/* The series key and its peak, one line, level with the allocation chart's legend. */}
+        <div className="apple-type-footnote flex h-5 items-center justify-between text-[var(--plan-muted)]">
+          <span className="flex items-center gap-1.5 whitespace-nowrap">
+            <span className="h-0.5 w-3 rounded-full bg-[var(--plan-accent-ink)]" aria-hidden="true" />
+            {s.columnDebt()}
+          </span>
+          <span className="whitespace-nowrap">
+            {s.debtPeak()}{' '}
+            <span className="font-apple-mono font-semibold tabular-nums text-[var(--plan-text)]">{hoursOrDash(peak)}</span>
+          </span>
+        </div>
+        <div
+          data-testid="debt-trend-chart"
+          className={cn('w-full', CHART_HEIGHT_CLASS)}
+          role="figure"
+          aria-label={s.sectionDebtTrend()}
+        >
+          <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_DIMENSION}>
+            <AreaChart data={data} margin={CHART_MARGIN} accessibilityLayer>
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" style={{ stopColor: INK, stopOpacity: 0.22 }} />
+                  <stop offset="100%" style={{ stopColor: INK, stopOpacity: 0 }} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="label" {...xAxisProps} interval="preserveStartEnd" padding={{ left: 8, right: 8 }} />
+              <YAxis {...yAxisProps} tickFormatter={hourTick} domain={[0, 'auto']} />
+              <Tooltip
+                content={<DebtTooltip />}
+                cursor={{ stroke: 'var(--plan-border)', strokeWidth: 1 }}
+                isAnimationActive={false}
               />
-              {points.length > 1 && (
-                <polyline
-                  fill="none"
-                  stroke="var(--plan-accent-ink)"
+              <Area
+                type="monotone"
+                dataKey="hours"
+                name={s.columnDebt()}
+                stroke={INK}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill={`url(#${gradientId})`}
+                dot={false}
+                activeDot={{ r: 5, fill: INK, stroke: 'var(--plan-surface)', strokeWidth: 2 }}
+                animationDuration={600}
+              />
+              {latest && (
+                <ReferenceDot
+                  x={latest.label}
+                  y={latest.hours}
+                  r={4}
+                  fill={INK}
+                  stroke="var(--plan-surface)"
                   strokeWidth={2}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  vectorEffect="non-scaling-stroke"
-                  points={points
-                    .map((point, index) => `${xPercent(index)},${yPercent(point.outstandingMinutes)}`)
-                    .join(' ')}
+                  ifOverflow="extendDomain"
                 />
               )}
-            </svg>
-
-            {points.map((point, index) => {
-              const label = s.debtPointLabel({ date: shortDate(point.date), debt: hours(point.outstandingMinutes) })
-              return (
-                <button
-                  key={point.date}
-                  type="button"
-                  aria-label={label}
-                  onMouseEnter={() => setActive(index)}
-                  onFocus={() => setActive(index)}
-                  onBlur={() => setActive(null)}
-                  className="group absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus-visible:outline-none"
-                  style={{ left: `${xPercent(index)}%`, top: `${yPercent(point.outstandingMinutes)}%` }}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      'apple-transition block rounded-full bg-[var(--plan-accent-ink)] ring-2 ring-[var(--plan-surface)]',
-                      active === index ? 'h-3.5 w-3.5' : 'h-2.5 w-2.5'
-                    )}
-                  />
-                </button>
-              )
-            })}
-
-            {hovered && active !== null && (
-              <div
-                role="tooltip"
-                className={cn(
-                  'pointer-events-none absolute z-10 flex -translate-x-1/2 flex-col items-center whitespace-nowrap rounded-[var(--apple-radius-sm)] border border-[var(--plan-border)] bg-[var(--plan-surface)] px-2.5 py-1.5 shadow-[var(--plan-shadow)]',
-                  // Below the point when it is near the top, so the tip is never clipped by the card.
-                  yPercent(hovered.outstandingMinutes) < 30 ? 'translate-y-4' : '-translate-y-[calc(100%+0.75rem)]'
-                )}
-                style={{
-                  // Held inside the chart so the first and last tips do not hang off its edges.
-                  left: `${Math.min(88, Math.max(12, xPercent(active)))}%`,
-                  top: `${yPercent(hovered.outstandingMinutes)}%`
-                }}
-              >
-                <span className="apple-type-caption text-[var(--plan-muted)]">{shortDate(hovered.date)}</span>
-                <span className="font-apple-mono apple-type-footnote font-semibold tabular-nums text-[var(--plan-text)]">
-                  {hours(hovered.outstandingMinutes)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="apple-type-caption flex justify-between text-[var(--plan-muted)]" aria-hidden="true">
-            <span>{shortDate(points[0]?.date ?? '')}</span>
-            {points.length > 1 && <span>{shortDate(latest.date)}</span>}
-          </div>
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
 
         <ShowRows>
@@ -147,11 +157,11 @@ export function DebtTrendCard({ payload }: { payload: AnalyticsPayload; link: Sp
               { key: 'date', label: s.columnDate() },
               { key: 'debt', label: s.columnDebt(), align: 'right' }
             ]}
-            rows={points.map((point) => ({
+            rows={data.map((point) => ({
               key: point.date,
               cells: {
-                date: shortDate(point.date),
-                debt: <Figure value={hoursOrDash(point.outstandingMinutes)} />
+                date: point.label,
+                debt: <Figure value={hoursOrDash(point.minutes)} />
               }
             }))}
           />

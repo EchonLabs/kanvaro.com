@@ -13,6 +13,8 @@ export interface PokerInviteEvent {
     sprintId?: string
     sprintName?: string | null
     facilitatorId?: string
+    /** A round on a sprint already past planning (E14), joined from the sprint page. */
+    lateAddition?: boolean
   }
 }
 

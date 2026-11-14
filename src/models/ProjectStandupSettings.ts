@@ -57,9 +57,10 @@ export interface IProjectStandupSettings extends Document {
   organization: mongoose.Types.ObjectId
 
   /**
-   * Master switch. The module is opt-in per project: generation only applies to
-   * sprints that reach Planned after this is turned on, so sprints already
-   * running when the module ships are untouched.
+   * Master switch (spec §15.3, §16.2 — default on). Off stops new stand-up
+   * schedules being generated for this project's sprints; stand-ups that
+   * already exist are kept. Read through `isStandupsEnabled()` in
+   * `lib/standup/standup-enablement.ts`, which also covers the no-document case.
    */
   enabled: boolean
 
@@ -150,7 +151,7 @@ const ProjectStandupSettingsSchema = new Schema<IProjectStandupSettings>(
     project: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
     organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
 
-    enabled: { type: Boolean, default: false },
+    enabled: { type: Boolean, default: true },
 
     standupLocalTime: {
       type: String,

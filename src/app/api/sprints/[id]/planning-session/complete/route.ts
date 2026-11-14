@@ -14,6 +14,7 @@ import { recordAudit } from '@/lib/standup/audit'
 import { StandupError } from '@/lib/standup/errors'
 import { completePlanning } from '@/lib/standup/planning-service'
 import { ok, readJson, withSprintPermission } from '@/lib/standup/route-helpers'
+import { standupStrings } from '@/lib/standup/strings'
 
 interface CompleteBody {
   acknowledgedCheckIds?: string[]
@@ -49,8 +50,9 @@ export const POST = withSprintPermission(
       before: { sprintStatus: sprint.status },
       after: { sprintStatus: 'planned' },
       context: {
-        standupsCreated: result.generatedStandups.created,
-        totalSprintDays: result.generatedStandups.totalSprintDays,
+        standupsCreated: result.generatedStandups?.created ?? 0,
+        totalSprintDays: result.generatedStandups?.totalSprintDays ?? 0,
+        standupsDisabled: result.generatedStandups === null,
         taskCount: result.checklist.totals.taskCount,
         totalEstimatedMinutes: result.checklist.totals.totalEstimatedMinutes,
         acknowledged: body.acknowledgedCheckIds ?? []
@@ -64,7 +66,9 @@ export const POST = withSprintPermission(
       // UI-7 shows the generated schedule on the confirmation screen (SCH-1).
       generatedStandups: result.generatedStandups,
       message:
-        'Planning complete. This sprint is now Planned and its estimates are frozen.'
+        result.generatedStandups === null
+          ? standupStrings.planning.completedWithoutStandups()
+          : 'Planning complete. This sprint is now Planned and its estimates are frozen.'
     })
   }
 )

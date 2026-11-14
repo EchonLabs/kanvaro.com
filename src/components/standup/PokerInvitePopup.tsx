@@ -29,7 +29,13 @@ interface OpenInvite {
   sprintId: string
   sprintName: string | null
   projectName?: string | null
+  /** Opened after the sprint left planning: joined from the sprint page, not the planning page. */
+  lateAddition?: boolean
 }
+
+/** Where the invitee votes: the sprint page for a late-addition round, else planning. */
+const inviteHref = (invite: OpenInvite) =>
+  invite.lateAddition ? `/sprints/${invite.sprintId}` : `/sprints/${invite.sprintId}/planning`
 
 const FALLBACK_POLL_MS = 30000
 const DISMISSED_KEY = 'kanvaro:poker-invite-dismissed'
@@ -126,7 +132,7 @@ export function PokerInvitePopup() {
   useEffect(
     () =>
       subscribePokerInviteEvents((event) => {
-        const { sessionId, sprintId, sprintName } = event.data
+        const { sessionId, sprintId, sprintName, lateAddition } = event.data
         if (event.type === 'poker_closed') {
           setInvites((current) => current.filter((invite) => invite.sessionId !== sessionId))
           return
@@ -135,7 +141,7 @@ export function PokerInvitePopup() {
         setInvites((current) =>
           current.some((invite) => invite.sessionId === sessionId)
             ? current
-            : [{ sessionId, sprintId, sprintName: sprintName ?? null }, ...current]
+            : [{ sessionId, sprintId, sprintName: sprintName ?? null, lateAddition }, ...current]
         )
       }),
     []
@@ -150,7 +156,12 @@ export function PokerInvitePopup() {
   useEffect(() => {
     if (!pathname) return
     for (const invite of invites) {
-      if (pathname.startsWith(`/sprints/${invite.sprintId}/planning`) && !dismissed.has(invite.sessionId)) {
+      // A late-addition round is joined on the sprint page itself, so visiting
+      // exactly that page is the acknowledgement.
+      const arrived = invite.lateAddition
+        ? pathname === `/sprints/${invite.sprintId}`
+        : pathname.startsWith(`/sprints/${invite.sprintId}/planning`)
+      if (arrived && !dismissed.has(invite.sessionId)) {
         dismiss(invite.sessionId)
       }
     }
@@ -220,10 +231,10 @@ function InviteCard({
       </p>
 
       <Link
-        href={`/sprints/${invite.sprintId}/planning`}
+        href={inviteHref(invite)}
         className="apple-transition apple-type-footnote mt-3 inline-flex items-center gap-1.5 font-semibold text-[var(--apple-label)] hover:opacity-70"
       >
-        Go to planning
+        {invite.lateAddition ? 'Go to sprint' : 'Go to planning'}
         <ArrowRight className="h-3.5 w-3.5" />
       </Link>
     </div>

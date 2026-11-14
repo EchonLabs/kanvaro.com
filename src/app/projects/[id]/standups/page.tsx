@@ -17,7 +17,7 @@ import { AlertTriangle, CalendarDays } from 'lucide-react'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DegradationBanner } from '@/components/standup/DegradationBanner'
-import { StandupSchedule } from '@/components/standup/StandupSchedule'
+import { canRegenerate, StandupSchedule } from '@/components/standup/StandupSchedule'
 import { SprintHealthBar } from '@/components/standup/schedule/SprintHealthBar'
 import { RegenerateScheduleModal } from '@/components/standup/schedule/RegenerateScheduleModal'
 import type { Degradation } from '@/lib/standup/degradation'
@@ -201,7 +201,7 @@ export default function ProjectStandupSchedulePage({
           </div>
 
           <div className="flex items-center gap-2.5">
-            {sprintId ? (
+            {sprintId && canRegenerate(schedule) ? (
               <RegenerateScheduleModal sprintId={sprintId} onReconciled={loadSchedule} />
             ) : null}
 

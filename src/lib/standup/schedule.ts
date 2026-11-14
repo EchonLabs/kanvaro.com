@@ -16,6 +16,7 @@ import mongoose from 'mongoose'
 import { Allocation } from '@/models/Allocation'
 import { CarryForwardItem, OPEN_CARRY_FORWARD_STATUSES } from '@/models/CarryForwardItem'
 import { MemberSprintDebtSummary } from '@/models/MemberSprintDebtSummary'
+import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
 import { Sprint } from '@/models/Sprint'
 import { Standup, type StandupShape, type StandupStatus } from '@/models/Standup'
 import { StandupOverride } from '@/models/StandupOverride'
@@ -26,6 +27,7 @@ import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { isoOfStoredDate, todayInTimezone, type IsoDate } from './calendar-dates'
 import { StandupError } from './errors'
 import { loadSprintHealthTotals } from './jobs/sprint-health'
+import { isStandupsEnabled } from './standup-enablement'
 import { minutes, type Minutes } from './minutes'
 import { computeSprintHealth } from './sprint-health'
 
@@ -101,6 +103,16 @@ export interface SprintSchedule {
   totalSprintDays: number
   days: ScheduleDay[]
   health?: SprintHealthSummary
+  /**
+   * The project's "Stand-ups enabled" switch (§15.3), so an empty schedule can
+   * say why it is empty rather than promise planning will fill it.
+   */
+  standupsEnabled: boolean
+  /**
+   * The sprint's lifecycle status. An empty schedule on a sprint already past
+   * planning will not be filled by planning, and the screen must not say so.
+   */
+  sprintStatus: string
 }
 
 export interface ScheduleOptions {
@@ -132,7 +144,8 @@ export async function getSprintSchedule(
     allocationAgg,
     overrideAgg,
     cfwItems,
-    debtSummaries
+    debtSummaries,
+    standupSettings
   ] = await Promise.all([
     WorkingCalendar.findOne({ project: projectId, scope: 'project' })
       .select('timezone standardMinutesPerDay')
@@ -161,7 +174,10 @@ export async function getSprintSchedule(
     }).select('currentStandup ageInStandups tags').lean() as Promise<any[]>,
     MemberSprintDebtSummary.find({ sprint: sprintObjectId })
       .select('outstandingMinutes member')
-      .lean() as Promise<any[]>
+      .lean() as Promise<any[]>,
+    ProjectStandupSettings.findOne({ project: projectId })
+      .select('enabled')
+      .lean() as Promise<{ enabled?: boolean } | null>
   ])
 
   const timezone = calendar?.timezone ?? 'UTC'
@@ -339,6 +355,8 @@ export async function getSprintSchedule(
     },
     totalSprintDays: totalWorkingDays,
     days,
-    health
+    health,
+    standupsEnabled: isStandupsEnabled(standupSettings),
+    sprintStatus: sprint.status
   }
 }

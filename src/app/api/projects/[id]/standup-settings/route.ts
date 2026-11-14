@@ -38,8 +38,8 @@ export const GET = withStandupPermission(
     let settings = (await ProjectStandupSettings.findOne({ project: projectId }).lean()) as any
 
     if (!settings) {
-      // Return schema defaults without writing — the module is opt-in, and a
-      // GET should not silently enable it.
+      // Return schema defaults without writing — a GET must not create the
+      // document; the absent case already reads as the spec defaults.
       settings = new ProjectStandupSettings({
         project: projectId,
         organization: organizationId

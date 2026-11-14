@@ -14,7 +14,7 @@ import { SprintPlanningSession } from '@/models/SprintPlanningSession'
 import { Task } from '@/models/Task'
 
 import { resolveWorkingDays } from './calendar-service'
-import { StandupError } from './errors'
+import { isStandupError, StandupError } from './errors'
 import { generateStandupsForSprint, type GenerateResult } from './generation'
 import {
   evaluatePlanningChecklist,
@@ -162,8 +162,12 @@ export interface CompletePlanningResult {
   checklist: ChecklistResult
   sprint: any
   session: any
-  /** UI-7 shows the generated schedule on the confirmation screen. */
-  generatedStandups: GenerateResult
+  /**
+   * UI-7 shows the generated schedule on the confirmation screen. `null` when
+   * the project has stand-ups turned off (§15.3): planning still completes,
+   * generation is simply skipped.
+   */
+  generatedStandups: GenerateResult | null
 }
 
 /**
@@ -261,7 +265,16 @@ export async function completePlanning(
 
   // SCH-1/SCH-5. Throws before anything is written when the sprint contains no
   // working days, which leaves the session open and the sprint in Planning.
-  const generatedStandups = await generateStandupsForSprint(sprintId, { actorId: userId })
+  // §15.3 — a project with stand-ups off completes planning without a schedule.
+  // Generation reads the switch itself, once, before writing anything; taking
+  // its refusal as "skip" (rather than asking separately first) leaves no window
+  // for the switch to change between two reads.
+  const generatedStandups = await generateStandupsForSprint(sprintId, { actorId: userId }).catch(
+    (error: unknown) => {
+      if (isStandupError(error) && error.code === 'STANDUPS_DISABLED') return null
+      throw error
+    }
+  )
 
   await session.save()
 

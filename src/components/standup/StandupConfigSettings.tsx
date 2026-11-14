@@ -158,7 +158,7 @@ export function StandupConfigSettings({
       <Section title="Stand-ups">
         <ToggleRow
           label="Stand-ups enabled"
-          hint="Off means no stand-ups are generated for future sprints on this project."
+          hint="Off stops stand-ups being generated for sprints planned from now on. Stand-ups already scheduled are kept."
           checked={settings.enabled}
           onChange={(value) => update('enabled', value)}
         />
