@@ -88,6 +88,23 @@ export const standupStrings = {
     loadFailed: () => 'Could not load the calendar'
   },
 
+  /** Planning poker for tasks added after the sprint left planning (E14). */
+  lateAddition: {
+    button: () => 'Estimate with poker',
+    join: () => 'Join planning poker',
+    dialogTitle: () => 'Estimate new tasks with poker',
+    dialogDescription: () =>
+      'These tasks were added after planning and have no estimate. Their estimates are frozen as soon as the team agrees.',
+    tasksHeading: ({ count }: { count: number }) =>
+      count === 1 ? '1 task to estimate' : `${count} tasks to estimate`,
+    reasonLabel: () => 'Why are these tasks being added and estimated now?',
+    reasonHint: ({ min }: { min: number }) => `At least ${min} characters.`,
+    votersHeading: () => 'Who is estimating?',
+    start: () => 'Start round',
+    nothingSelected: () => 'Select at least one task.',
+    openFailed: () => 'Could not open a poker session'
+  },
+
   /**
    * Planning gate messages (spec §8.3).
    *
