@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { Search, Loader2, Calendar as CalendarIcon, X } from 'lucide-react'
+import { Search, Loader2, X } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
@@ -84,17 +84,23 @@ function getInitials(name: string, fallback?: string): string {
   return 'U'
 }
 
+function getBurnRateColor(burnRate: number): string {
+  if (burnRate > 100) return 'text-red-500 dark:text-red-400 font-bold'
+  if (burnRate >= 80) return 'text-amber-500 dark:text-amber-400'
+  return 'text-slate-900 dark:text-slate-100'
+}
+
 function MemberAvatar({
   name,
   initials,
   avatar,
   size = 32
-}: {
+}: Readonly<{
   name: string
   initials?: string
   avatar?: string
   size?: number
-}) {
+}>) {
   const [hasError, setHasError] = useState(false)
   const showImage = Boolean(avatar && !hasError)
   const resolvedInitials = initials || getInitials(name)
@@ -126,7 +132,7 @@ export function ProjectInsightsTab({
   formatCurrency,
   currency = 'USD',
   canViewFinancials: canViewFinancialsProp = false
-}: ProjectInsightsTabProps) {
+}: Readonly<ProjectInsightsTabProps>) {
   const [roster, setRoster] = useState<RosterMember[]>([])
   const [timeLogs, setTimeLogs] = useState<TimeLogItem[]>([])
   const [canViewFinancials, setCanViewFinancials] = useState<boolean>(canViewFinancialsProp)
@@ -151,6 +157,14 @@ export function ProjectInsightsTab({
     const corrected = validateAndCorrectDateRange(range.from, range.to)
     setDateRange(corrected as DateRange)
   }, [])
+
+  const dateRangeLabel = useMemo(() => {
+    if (!dateRange?.from) return 'Date Range'
+    if (dateRange.to) {
+      return `${format(dateRange.from, 'MMM d')} – ${format(dateRange.to, 'MMM d')}`
+    }
+    return `${format(dateRange.from, 'MMM d')} – …`
+  }, [dateRange])
 
   const fetchInsights = useCallback(async () => {
     try {
@@ -232,7 +246,7 @@ export function ProjectInsightsTab({
       result = result.filter(log => {
         const itemDate = new Date(log.rawDate || log.date)
         const time = itemDate.getTime()
-        if (isNaN(time)) return false
+        if (Number.isNaN(time)) return false
         return time >= fromTime && time <= toTime
       })
     }
@@ -276,7 +290,7 @@ export function ProjectInsightsTab({
               Individual contractor burn rate, billing velocity, and direct budget impact
             </p>
           </div>
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-[256px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
             <Input
               type="text"
@@ -368,13 +382,7 @@ export function ProjectInsightsTab({
                     {/* Burn Rate % (HR/Admin only) */}
                     {canViewFinancials && (
                       <td className="py-3.5 px-4 text-right text-sm font-semibold">
-                        <span className={cn(
-                          member.burnRate > 100
-                            ? "text-red-500 dark:text-red-400 font-bold"
-                            : member.burnRate >= 80
-                              ? "text-amber-500 dark:text-amber-400"
-                              : "text-slate-900 dark:text-slate-100"
-                        )}>
+                        <span className={getBurnRateColor(member.burnRate)}>
                           {member.burnRate}%
                         </span>
                       </td>
@@ -418,7 +426,7 @@ export function ProjectInsightsTab({
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            <div className="relative w-full sm:w-56">
+            <div className="relative w-full sm:w-[256px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <Input
                 type="text"
@@ -447,13 +455,7 @@ export function ProjectInsightsTab({
 
                   {/* Label / Range */}
                   <span className="truncate">
-                    {dateRange?.from ? (
-                      dateRange.to
-                        ? `${format(dateRange.from, 'MMM d')} – ${format(dateRange.to, 'MMM d')}`
-                        : `${format(dateRange.from, 'MMM d')} – …`
-                    ) : (
-                      'Date Range'
-                    )}
+                    {dateRangeLabel}
                   </span>
 
                   {/* Right Calendar Icon / Clear button */}
@@ -470,7 +472,24 @@ export function ProjectInsightsTab({
                       <X className="h-3.5 w-3.5" />
                     </span>
                   ) : (
-                    <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"
+                    >
+                      <path d="M16 2v3" />
+                      <path d="m18 21 3-3h-6" />
+                      <path d="M21 12.34V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7.35" />
+                      <path d="m21 18-3-3" />
+                      <path d="M3 9h18" />
+                      <path d="M8 2v3" />
+                    </svg>
                   )}
                 </button>
               </PopoverTrigger>
