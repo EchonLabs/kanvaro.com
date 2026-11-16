@@ -187,4 +187,40 @@ describe('generation-audit', () => {
     expect(second.repaired).toBe(0)
     expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(5)
   })
+
+  /**
+   * The job repairs schedules that drifted; it never creates one from nothing.
+   * A sprint with zero stand-ups would otherwise get every working date —
+   * past days included, which mark-missed then turns into Missed — whether the
+   * project has stand-ups off, or turned them back on mid-sprint.
+   */
+  it('does not create a schedule for a running sprint that has none (project off)', async () => {
+    await seedProject()
+    await ProjectStandupSettings.updateOne({ project }, { $set: { enabled: false } })
+    const sprint = await Sprint.create({
+      name: 'Sprint 15', organization, project, createdBy: user, status: 'active',
+      startDate: new Date('2026-08-10T00:00:00.000Z'), endDate: new Date('2026-08-14T00:00:00.000Z'),
+      capacity: 0, teamMembers: [member, otherMember]
+    })
+
+    const result = await generationAudit(new Date('2026-08-11T04:00:00.000Z'))
+
+    expect(result.repaired).toBe(0)
+    expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(0)
+  })
+
+  it('does not backfill a running sprint with no stand-ups after stand-ups are turned back on', async () => {
+    await seedProject() // enabled: true
+    const sprint = await Sprint.create({
+      name: 'Sprint 15', organization, project, createdBy: user, status: 'active',
+      startDate: new Date('2026-08-10T00:00:00.000Z'), endDate: new Date('2026-08-14T00:00:00.000Z'),
+      capacity: 0, teamMembers: [member, otherMember]
+    })
+
+    const result = await generationAudit(new Date('2026-08-11T04:00:00.000Z'))
+
+    expect(result.repaired).toBe(0)
+    expect(result.errors).toEqual([])
+    expect(await Standup.countDocuments({ sprint: sprint._id })).toBe(0)
+  })
 })

@@ -58,6 +58,7 @@ import {
 import { PokerModal } from './PokerModal'
 import { PokerResultsModal } from './PokerResultsModal'
 import { AssignmentBoard, estimateLabel } from './planning/AssignmentBoard'
+import { completionDetail } from './planning/completion-detail'
 import { completeGate, pokerGate, stepStates, type GateInput } from './planning/gates'
 import { GateButton, PlanningStepRail } from './planning/PlanningSteps'
 import {
@@ -202,7 +203,9 @@ export function PlanningWorkspace({
   const [acknowledged, setAcknowledged] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [completed, setCompleted] = useState<{ message: string } | null>(null)
+  const [completed, setCompleted] = useState<{ message: string; detail: string | null } | null>(
+    null
+  )
   const [poker, setPoker] = useState<any>(null)
   const [backlog, setBacklog] = useState<BacklogTask[]>([])
   const [scope, setScope] = useState<BacklogTask[]>([])
@@ -695,7 +698,10 @@ export function PlanningWorkspace({
         throw new Error(payload?.error?.message ?? 'Planning could not be completed')
       }
 
-      setCompleted({ message: payload.data.message })
+      setCompleted({
+        message: payload.data.message,
+        detail: completionDetail(payload.data.generatedStandups)
+      })
       onCompleted?.()
     } catch (error) {
       notify.error({
@@ -760,9 +766,9 @@ export function PlanningWorkspace({
           </span>
           <h2 className="apple-type-headline font-semibold text-[var(--plan-text)]">Planning complete</h2>
           <p className="apple-type-body text-[var(--plan-text)]">{completed.message}</p>
-          <p className="apple-type-subheadline text-[var(--plan-muted)]">
-            Stand-ups are generated when the scheduler runs for this sprint.
-          </p>
+          {completed.detail ? (
+            <p className="apple-type-subheadline text-[var(--plan-muted)]">{completed.detail}</p>
+          ) : null}
         </div>
       </div>
     )

@@ -88,6 +88,23 @@ export const standupStrings = {
     loadFailed: () => 'Could not load the calendar'
   },
 
+  /** Planning poker for tasks added after the sprint left planning (E14). */
+  lateAddition: {
+    button: () => 'Estimate with poker',
+    join: () => 'Join planning poker',
+    dialogTitle: () => 'Estimate new tasks with poker',
+    dialogDescription: () =>
+      'These tasks were added after planning and have no estimate. Their estimates are frozen as soon as the team agrees.',
+    tasksHeading: ({ count }: { count: number }) =>
+      count === 1 ? '1 task to estimate' : `${count} tasks to estimate`,
+    reasonLabel: () => 'Why are these tasks being added and estimated now?',
+    reasonHint: ({ min }: { min: number }) => `At least ${min} characters.`,
+    votersHeading: () => 'Who is estimating?',
+    start: () => 'Start round',
+    nothingSelected: () => 'Select at least one task.',
+    openFailed: () => 'Could not open a poker session'
+  },
+
   /**
    * Planning gate messages (spec §8.3).
    *
@@ -142,6 +159,8 @@ export const standupStrings = {
     pokerReady: () => 'Every task has an assignee. Ready to estimate.',
     pokerNothingToEstimate: () => 'Every task has already been through planning poker.',
     completeReady: () => 'Every check passed. Completing takes this sprint to Planned.',
+    completedWithoutStandups: () =>
+      'Planning complete. This sprint is now Planned and its estimates are frozen. Stand-ups are turned off for this project, so none were scheduled.',
     completeNeedsAcknowledgement: ({ count }: { count: number }) =>
       count === 1
         ? 'Acknowledge or fix the remaining advisory before completing.'
@@ -1307,6 +1326,14 @@ export const standupStrings = {
     title: () => 'Stand-up schedule',
     empty: () =>
       'No stand-ups have been generated for this sprint yet. They are created when the planning session completes.',
+    disabled: () =>
+      'Stand-ups are turned off for this project. Turn them on in Project settings → Stand-ups to schedule them for future sprints.',
+    /** An empty schedule on a sprint that has already left planning. */
+    noneScheduled: () =>
+      'This sprint was planned without stand-ups, so none were scheduled. They start with the next sprint that completes planning.',
+    /** The STANDUPS_DISABLED API message — no on-screen navigation in it. */
+    disabledError: () =>
+      'Stand-ups are turned off for this project, so no schedule can be generated.',
     today: () => 'Today',
     sprintDays: () => 'This sprint',
     dayLabel: ({ number, total }: { number: number; total: number }) =>
@@ -1883,6 +1910,7 @@ export const standupStrings = {
     dayHealthLabel: ({ day, full, under, over }: { day: number; full: string; under: string; over: string }) =>
       `Day ${day}: ${full} allocated within capacity, ${under} unallocated, ${over} over capacity`,
     debtPointLabel: ({ date, debt }: { date: string; debt: string }) => `${date}: ${debt} outstanding`,
+    debtPeak: () => 'Peak',
 
     showRows: () => 'Show rows',
     hideRows: () => 'Hide rows',
@@ -1917,6 +1945,12 @@ export const standupStrings = {
     ageBucketLabel: ({ label, count, chronic }: { label: string; count: number; chronic: boolean }) =>
       `Age ${label} stand-ups: ${count} ${count === 1 ? 'item' : 'items'}${chronic ? ', chronic' : ''}`,
     chronicBand: ({ count }: { count: number }) => `${count} chronic`,
+    ageingKeyOpen: () => 'Open items',
+    ageingKeyChronic: () => 'Chronic',
+    ageingZoneChronic: () => 'Chronic',
+    ageingTotal: ({ count }: { count: number }) => `${count} open`,
+    ageingTooltipTitle: ({ label }: { label: string }) => `${label} stand-ups old`,
+    ageingItems: () => 'Items',
     ageInStandups: ({ age }: { age: number }) => (age === 1 ? '1 stand-up' : `${age} stand-ups`),
     chainLength: ({ length }: { length: number }) => `${length} stand-ups`,
     loggedAgainst: ({ logged, estimate }: { logged: string; estimate: string }) => `${logged} logged of ${estimate}`,

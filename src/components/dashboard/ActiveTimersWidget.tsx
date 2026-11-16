@@ -167,7 +167,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
   // Fetch members for filter
   const fetchMembers = useCallback(async () => {
     try {
-      const response = await fetch('/api/members?limit=1000&status=active')
+      const response = await fetch('/api/members?limit=1000&status=active&minimal=true')
       const data = await response.json()
       if (data.success && Array.isArray(data.data?.members)) {
         setMembers(data.data.members)
@@ -180,7 +180,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
   // Fetch projects for filter
   const fetchProjects = useCallback(async () => {
     try {
-      const response = await fetch('/api/projects?limit=1000')
+      const response = await fetch('/api/projects?limit=1000&minimal=true')
       const data = await response.json()
       if (data.success && Array.isArray(data.data)) {
         setProjects(data.data)
