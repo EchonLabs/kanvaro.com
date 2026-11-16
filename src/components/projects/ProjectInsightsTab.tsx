@@ -192,6 +192,15 @@ export function ProjectInsightsTab({
     return 'bg-amber-500'
   }
 
+  // Map resource ID to remaining hours from the roster
+  const remainingHoursMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const member of roster) {
+      map.set(member.id, member.remainingHours)
+    }
+    return map
+  }, [roster])
+
   // Filtered Roster
   const filteredRoster = useMemo(() => {
     if (!rosterSearch.trim()) return roster
@@ -498,56 +507,70 @@ export function ProjectInsightsTab({
         {/* Time Tracking Table Box */}
         <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[550px]">
+            <table className="w-full text-left border-collapse min-w-[650px]">
               <thead>
                 <tr className="bg-[#f8fafc] dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-semibold tracking-wider text-slate-400 dark:text-slate-400 uppercase">
                   <th className="py-3.5 px-5">RESOURCE</th>
                   <th className="py-3.5 px-4">ROLE</th>
                   <th className="py-3.5 px-4 text-right">Logged HOURS</th>
+                  <th className="py-3.5 px-4 text-right">REMAINING HRS</th>
                   {canViewFinancials && <th className="py-3.5 px-4 text-right">RATE</th>}
                   {canViewFinancials && <th className="py-3.5 px-5 text-right">COST</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
-                {filteredTimeLogs.map(log => (
-                  <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                    {/* Resource (plain text format matching design) */}
-                    <td className="py-3.5 px-5 font-semibold text-slate-900 dark:text-slate-100 text-sm">
-                      {log.resourceName}
-                    </td>
+                {filteredTimeLogs.map(log => {
+                  const remainingHrs = remainingHoursMap.get(log.resourceId) ?? 0
+                  return (
+                    <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                      {/* Resource (plain text format matching design) */}
+                      <td className="py-3.5 px-5 font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                        {log.resourceName}
+                      </td>
 
-                    {/* Role with dot */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-2 w-2 rounded-full shrink-0 ${getRoleDot(log.role)}`} />
-                        <span className="text-sm font-normal text-slate-600 dark:text-slate-300">{log.role}</span>
-                      </div>
-                    </td>
+                      {/* Role with dot */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`h-2 w-2 rounded-full shrink-0 ${getRoleDot(log.role)}`} />
+                          <span className="text-sm font-normal text-slate-600 dark:text-slate-300">{log.role}</span>
+                        </div>
+                      </td>
 
-                    {/* Hours */}
-                    <td className="py-3.5 px-4 text-right text-sm font-normal text-slate-600 dark:text-slate-300">
-                      {log.hours}h
-                    </td>
-
-                    {/* Rate (HR/Admin only) */}
-                    {canViewFinancials && (
+                      {/* Hours */}
                       <td className="py-3.5 px-4 text-right text-sm font-normal text-slate-600 dark:text-slate-300">
-                        {formatCurrency(log.rate, currency)}/hr
+                        {log.hours}h
                       </td>
-                    )}
 
-                    {/* Cost (HR/Admin only) */}
-                    {canViewFinancials && (
-                      <td className="py-3.5 px-5 text-right text-sm font-bold text-slate-900 dark:text-slate-100">
-                        {formatCurrency(log.cost, currency)}
+                      {/* Remaining Hrs */}
+                      <td className={cn(
+                        "py-3.5 px-4 text-right text-sm",
+                        remainingHrs <= 8
+                          ? "text-red-500 dark:text-red-400 font-semibold"
+                          : "font-normal text-slate-600 dark:text-slate-300"
+                      )}>
+                        {remainingHrs}h
                       </td>
-                    )}
-                  </tr>
-                ))}
+
+                      {/* Rate (HR/Admin only) */}
+                      {canViewFinancials && (
+                        <td className="py-3.5 px-4 text-right text-sm font-normal text-slate-600 dark:text-slate-300">
+                          {formatCurrency(log.rate, currency)}/hr
+                        </td>
+                      )}
+
+                      {/* Cost (HR/Admin only) */}
+                      {canViewFinancials && (
+                        <td className="py-3.5 px-5 text-right text-sm font-bold text-slate-900 dark:text-slate-100">
+                          {formatCurrency(log.cost, currency)}
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
 
                 {filteredTimeLogs.length === 0 && (
                   <tr>
-                    <td colSpan={canViewFinancials ? 5 : 3} className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+                    <td colSpan={canViewFinancials ? 6 : 4} className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
                       {logsSearch.trim() || dateRange?.from
                         ? 'No time tracking entries match your filters'
                         : 'No time tracking entries found'}
