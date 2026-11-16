@@ -544,6 +544,7 @@ export async function GET(request: NextRequest) {
             .populate('createdBy', 'firstName lastName email')
             .populate('story', 'title')
             .populate('sprint', 'name status')
+            .lean()
         : Promise.resolve([]),
 
       includeStories
@@ -552,6 +553,7 @@ export async function GET(request: NextRequest) {
             .populate('createdBy', 'firstName lastName email')
             .populate('epic', 'title')
             .populate('sprint', 'name status')
+            .lean()
         : Promise.resolve([]),
 
       includeEpics
@@ -559,39 +561,28 @@ export async function GET(request: NextRequest) {
             .populate('project', 'name')
             .populate('assignedTo', 'firstName lastName email')
             .populate('createdBy', 'firstName lastName email')
+            .lean()
         : Promise.resolve([])
     ])
 
     const allItems = [
-      ...tasks.map(task => {
-        const taskObj = task.toObject()
-        // assignedTo is already an array of populated user objects
-        return {
-          ...taskObj,
-          taskType: taskObj.type,
-          type: 'task'
-        }
-      }),
-      ...stories.map(story => {
-        const storyObj = story.toObject()
+      ...tasks.map(task => ({
+        ...task,
+        taskType: (task as any).type,
+        type: 'task'
+      })),
+      ...stories.map(story => ({
+        ...story,
         // Normalize assignedTo for stories: convert single user to array
-        const normalizedAssignedTo = storyObj.assignedTo ? [storyObj.assignedTo] : []
-        return {
-          ...storyObj,
-          assignedTo: normalizedAssignedTo,
-          type: 'story'
-        }
-      }),
-      ...epics.map(epic => {
-        const epicObj = epic.toObject()
+        assignedTo: (story as any).assignedTo ? [(story as any).assignedTo] : [],
+        type: 'story'
+      })),
+      ...epics.map(epic => ({
+        ...epic,
         // Normalize assignedTo for epics: convert single user to array
-        const normalizedAssignedTo = epicObj.assignedTo ? [epicObj.assignedTo] : []
-        return {
-          ...epicObj,
-          assignedTo: normalizedAssignedTo,
-          type: 'epic'
-        }
-      })
+        assignedTo: (epic as any).assignedTo ? [(epic as any).assignedTo] : [],
+        type: 'epic'
+      }))
     ]
 
     const compareItems = (a: any, b: any) => {

@@ -79,6 +79,17 @@ export interface ReconcileOptions {
   carryForwardCountByStandupId?: CarryForwardCounter
 }
 
+const emptyReconcileResult = (): ReconcileResult => ({
+  created: 0,
+  skipped: 0,
+  cancelled: 0,
+  renumbered: 0,
+  rescheduled: 0,
+  anomalies: [],
+  warnings: [],
+  notificationsSent: 0
+})
+
 export async function reconcileSprintSchedule(
   sprintId: string,
   trigger: ReconcileTrigger,
@@ -96,6 +107,20 @@ export async function reconcileSprintSchedule(
   const existingDocs = (await Standup.find({ sprint: sprintId })
     .sort({ standupDate: 1 })
     .lean()) as any[]
+
+  const settings = ((await ProjectStandupSettings.findOne({ project: projectId }).lean()) ??
+    {}) as any
+
+  // Reconciling repairs a schedule; it never builds one from nothing. With zero
+  // stand-ups every working date would plan as a `create` — past days included,
+  // which mark-missed then flips to Missed — so a sprint planned while stand-ups
+  // were off (§15.3) and then turned back on, or a Planning sprint whose dates
+  // are edited, would get a back-filled schedule. Schedules are created only by
+  // planning completion and the explicit generate route. An existing schedule
+  // keeps being maintained whatever the switch says.
+  if (existingDocs.length === 0) {
+    return emptyReconcileResult()
+  }
 
   const countCarryForward =
     options.carryForwardCountByStandupId ?? countOpenCarryForwardItems
@@ -135,21 +160,10 @@ export async function reconcileSprintSchedule(
     reasonByDate
   })
 
-  const settings = ((await ProjectStandupSettings.findOne({ project: projectId }).lean()) ??
-    {}) as any
   const localTime = settings.standupLocalTime ?? '09:15'
   const durationMinutes = settings.durationMinutes ?? 15
 
-  const result: ReconcileResult = {
-    created: 0,
-    skipped: 0,
-    cancelled: 0,
-    renumbered: 0,
-    rescheduled: 0,
-    anomalies: [],
-    warnings: [],
-    notificationsSent: 0
-  }
+  const result = emptyReconcileResult()
 
   const moveCarryForward = options.moveCarryForward ?? moveCarryForwardOnSkip
   const nextWorkingDate = (after: IsoDate) =>

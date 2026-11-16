@@ -4,7 +4,6 @@
 import {
   CONSENSUS_RULES,
   DECK_TYPES,
-  TSHIRT_POINTS,
   assertValidVote,
   cardValue,
   deckCards,
@@ -20,22 +19,12 @@ const votes = (...pairs: Array<[string, string | number]>): PokerVoteInput[] =>
   pairs.map(([voterId, card]) => ({ voterId, card }))
 
 describe('decks — PLN-10', () => {
-  it('offers all five deck types', () => {
-    expect(DECK_TYPES).toEqual([
-      'fibonacci',
-      'modified_fibonacci',
-      'tshirt',
-      'hours',
-      'powers_of_two'
-    ])
+  it('offers the fibonacci and hours decks only', () => {
+    expect(DECK_TYPES).toEqual(['fibonacci', 'hours'])
   })
 
   it('deals the fibonacci deck the spec names', () => {
     expect(deckCards('fibonacci')).toEqual([1, 2, 3, 5, 8, 13, 21, '?', 'coffee'])
-  })
-
-  it('deals t-shirt sizes from XS to XL', () => {
-    expect(deckCards('tshirt')).toEqual(['XS', 'S', 'M', 'L', 'XL'])
   })
 
   it('validates cards against their own deck', () => {
@@ -43,8 +32,8 @@ describe('decks — PLN-10', () => {
     expect(isValidCard('fibonacci', 4)).toBe(false)
     expect(isValidCard('fibonacci', '?')).toBe(true)
     expect(isValidCard('fibonacci', 'coffee')).toBe(true)
-    expect(isValidCard('tshirt', 'M')).toBe(true)
-    expect(isValidCard('tshirt', 3)).toBe(false)
+    expect(isValidCard('hours', 6)).toBe(true)
+    expect(isValidCard('hours', 5)).toBe(false)
   })
 
   it('rejects an off-deck vote by name', () => {
@@ -62,11 +51,6 @@ describe('cardValue', () => {
   it('reads numeric cards at face value', () => {
     expect(cardValue('fibonacci', 8)).toBe(8)
     expect(cardValue('hours', 0.5)).toBe(0.5)
-  })
-
-  it('maps t-shirt sizes to points', () => {
-    expect(cardValue('tshirt', 'M')).toBe(TSHIRT_POINTS.M)
-    expect(cardValue('tshirt', 'XL')).toBe(8)
   })
 
   it('returns null for a card outside the deck, never zero', () => {
