@@ -1,3 +1,18 @@
+# [1.52.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.51.0...v1.52.0) (2026-11-16)
+
+
+### Bug Fixes
+
+* add multi-assignee support in edit panel and fix table scrolling ([b6d6aad](https://github.com/EchonLabs/kanvaro.com/commit/b6d6aad332f95435b40ff92e767f4ef12f555fed))
+* enhance assignee multi-selection and bulk assignment indicators ([a96ecc1](https://github.com/EchonLabs/kanvaro.com/commit/a96ecc1efed2c0d0f0dfe951ce9d5b4e356bef70))
+* update search bar styling, calendar icon, and code quality in project insights ([7f57588](https://github.com/EchonLabs/kanvaro.com/commit/7f575882a26b723a18e9ac6b1cfc2b8db15f5587))
+
+
+### Features
+
+* add remaining budget, burn rate columns, and date range filter ([26ac27f](https://github.com/EchonLabs/kanvaro.com/commit/26ac27fd341b5294c04ef0de7c658c8ff5bff375))
+* add remaining hours column with low-hours alert to time tracking table ([180874c](https://github.com/EchonLabs/kanvaro.com/commit/180874c4981aa0c5d32b15e68238f47ccef8edf4))
+
 # [1.51.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.50.0...v1.51.0) (2026-11-16)
 
 
