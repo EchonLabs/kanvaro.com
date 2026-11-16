@@ -93,7 +93,7 @@ export default function FinancialReportsPage() {
   useEffect(() => { fetchFinancialReports() }, [filters])
 
   useEffect(() => {
-    fetch('/api/projects?limit=1000&page=1')
+    fetch('/api/projects?limit=1000&page=1&minimal=true')
       .then(r => r.ok ? r.json() : null)
       .then(d => d && setProjects((d?.data || []).map((p: any) => ({ _id: p._id, name: p.name })).sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }))))
       .catch(() => {})
