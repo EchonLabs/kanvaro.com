@@ -33,17 +33,14 @@ import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import {
   ArrowLeft,
   Calendar,
-  Clock,
   CheckCircle,
   CheckCircle2,
   AlertTriangle,
   Play,
   XCircle,
-  BarChart3,
   User,
   Users,
   Loader2,
-  Edit,
   Pencil,
   Trash2,
   List,
@@ -52,14 +49,12 @@ import {
   Zap,
   ChevronDown,
   ChevronRight,
-  CheckSquare,
   ClipboardCheck,
   Plus,
   Briefcase,
   Target,
   ClipboardList,
   Search,
-  Save,
   Flag,
   ArrowUp,
   ArrowRight,
@@ -68,7 +63,6 @@ import {
   Link2,
   X,
   CornerDownRight,
-  RotateCcw,
   FileText
 } from 'lucide-react'
 
@@ -389,7 +383,7 @@ export default function SprintDetailPage() {
     type: 'task',
     priority: 'medium',
     status: 'todo',
-    assigneeId: '',
+    assigneeIds: [] as string[],
     estimatedHours: '',
     actualHours: '0'
   })
@@ -399,20 +393,23 @@ export default function SprintDetailPage() {
     type: 'task',
     priority: 'medium',
     status: 'todo',
-    assigneeId: '',
+    assigneeIds: [] as string[],
     estimatedHours: '',
     actualHours: '0'
   })
 
   const hasEditFormChanges = useMemo(() => {
     if (!editingTask) return false
+    const assigneesChanged =
+      editFormData.assigneeIds.length !== initialEditFormData.assigneeIds.length ||
+      editFormData.assigneeIds.some((id, idx) => id !== initialEditFormData.assigneeIds[idx])
     return (
       editFormData.module.trim() !== initialEditFormData.module.trim() ||
       editFormData.title.trim() !== initialEditFormData.title.trim() ||
       editFormData.type !== initialEditFormData.type ||
       editFormData.priority !== initialEditFormData.priority ||
       editFormData.status !== initialEditFormData.status ||
-      editFormData.assigneeId !== initialEditFormData.assigneeId ||
+      assigneesChanged ||
       editFormData.estimatedHours.trim() !== initialEditFormData.estimatedHours.trim()
     )
   }, [editFormData, initialEditFormData, editingTask])
@@ -627,7 +624,7 @@ export default function SprintDetailPage() {
     })
     if (editingTask && Array.isArray(editingTask.assignedTo)) {
       editingTask.assignedTo.forEach(a => {
-        const id = typeof a === 'string' ? a : a?.user?._id || (a as any)?._id
+        const id = typeof a === 'string' ? a : (a?.user?._id || (typeof a?.user === 'string' ? a.user : null) || (a as any)?._id)
         const name = typeof a === 'object'
           ? `${a?.user?.firstName || a?.firstName || ''} ${a?.user?.lastName || a?.lastName || ''}`.trim()
           : ''
@@ -638,6 +635,28 @@ export default function SprintDetailPage() {
     }
     return Array.from(map.values())
   }, [sprint?.teamMembers, uniqueAssignees, editingTask])
+
+  // Bulk selected tasks helper & member selection status
+  const bulkSelectedTasks = useMemo(() => {
+    if (tableSelectedTasks.size === 0 || !sprintTasks) return []
+    return sprintTasks.filter(t => tableSelectedTasks.has(t._id))
+  }, [tableSelectedTasks, sprintTasks])
+
+  const getMemberBulkSelectionStatus = useCallback((memberId: string) => {
+    if (bulkSelectedTasks.length === 0) return { count: 0, isAll: false, isSome: false }
+    const count = bulkSelectedTasks.filter(t => {
+      if (!Array.isArray(t.assignedTo)) return false
+      return t.assignedTo.some(a => {
+        const uId = typeof a === 'string' ? a : (a?.user?._id || (typeof a?.user === 'string' ? a.user : null) || (a as any)?._id)
+        return uId === memberId
+      })
+    }).length
+    return {
+      count,
+      isAll: count === bulkSelectedTasks.length && count > 0,
+      isSome: count > 0 && count < bulkSelectedTasks.length
+    }
+  }, [bulkSelectedTasks])
 
   // Subtask expansion & table handlers
   const toggleTableTaskExpanded = (taskId: string, e?: React.MouseEvent) => {
@@ -1250,25 +1269,88 @@ export default function SprintDetailPage() {
     try {
       setBulkActionLoading(true)
       const selectedIds = Array.from(tableSelectedTasks)
-      const assignedToVal = member ? [{
-        user: member.id,
-        firstName: member.name.split(' ')[0] || '',
-        lastName: member.name.split(' ').slice(1).join(' ') || '',
-        email: member.email || ''
-      }] : []
+
+      // Determine if member is already assigned to ALL selected tasks
+      let isAlreadyOnAll = false
+      if (member) {
+        const { isAll } = getMemberBulkSelectionStatus(member.id)
+        isAlreadyOnAll = isAll
+      }
 
       await Promise.all(
-        selectedIds.map(taskId =>
-          fetch(`/api/tasks/${taskId}`, {
+        selectedIds.map(taskId => {
+          const task = sprint?.tasks?.find(t => t._id === taskId)
+          let assignedToVal: any[] = []
+
+          if (member) {
+            const existingAssignees: any[] = Array.isArray(task?.assignedTo)
+              ? task.assignedTo.map(a => {
+                  const uId = typeof a === 'string' ? a : (a?.user?._id || (typeof a?.user === 'string' ? a.user : null) || (a as any)?._id)
+                  const m = assignableMembers.find(mem => mem.id === uId)
+                  return {
+                    user: uId,
+                    firstName: (typeof a === 'object' && (a?.user?.firstName || a?.firstName)) || m?.name?.split(' ')[0] || '',
+                    lastName: (typeof a === 'object' && (a?.user?.lastName || a?.lastName)) || m?.name?.split(' ').slice(1).join(' ') || '',
+                    email: (typeof a === 'object' && (a?.user?.email || a?.email)) || m?.email || ''
+                  }
+                }).filter(a => Boolean(a.user))
+              : []
+
+            if (isAlreadyOnAll) {
+              // Toggle OFF: remove this member from the selected task
+              assignedToVal = existingAssignees.filter(a => a.user !== member.id)
+            } else {
+              // Add this member if not already on this task
+              const alreadyAssigned = existingAssignees.some(a => a.user === member.id)
+              assignedToVal = alreadyAssigned
+                ? existingAssignees
+                : [
+                    ...existingAssignees,
+                    {
+                      user: member.id,
+                      firstName: member.name.split(' ')[0] || '',
+                      lastName: member.name.split(' ').slice(1).join(' ') || '',
+                      email: member.email || ''
+                    }
+                  ]
+            }
+          } else {
+            assignedToVal = []
+          }
+
+          return fetch(`/api/tasks/${taskId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ assignedTo: assignedToVal })
           })
-        )
+        })
       )
 
+      if (editingTask && selectedIds.includes(editingTask._id)) {
+        setEditFormData(prev => ({
+          ...prev,
+          assigneeIds: member
+            ? (isAlreadyOnAll
+                ? prev.assigneeIds.filter(id => id !== member.id)
+                : (prev.assigneeIds.includes(member.id) ? prev.assigneeIds : [...prev.assigneeIds, member.id]))
+            : []
+        }))
+        setInitialEditFormData(prev => ({
+          ...prev,
+          assigneeIds: member
+            ? (isAlreadyOnAll
+                ? prev.assigneeIds.filter(id => id !== member.id)
+                : (prev.assigneeIds.includes(member.id) ? prev.assigneeIds : [...prev.assigneeIds, member.id]))
+            : []
+        }))
+      }
+
       notifySuccess({
-        title: member ? `Assigned ${selectedIds.length} tasks to ${member.name}` : `Unassigned ${selectedIds.length} tasks`
+        title: member
+          ? (isAlreadyOnAll
+              ? `Removed ${member.name} from ${selectedIds.length} task${selectedIds.length > 1 ? 's' : ''}`
+              : `Assigned ${member.name} to ${selectedIds.length} task${selectedIds.length > 1 ? 's' : ''}`)
+          : `Unassigned ${selectedIds.length} task${selectedIds.length > 1 ? 's' : ''}`
       })
       setTableSelectedTasks(new Set())
       fetchSprint({ silent: true })
@@ -1471,11 +1553,13 @@ export default function SprintDetailPage() {
   const handleOpenEditTask = (task: NonNullable<Sprint['tasks']>[number]) => {
     setEditingTask(task)
 
-    let assigneeId = ''
-    if (Array.isArray(task.assignedTo) && task.assignedTo.length > 0) {
-      const first = task.assignedTo[0]
-      assigneeId = typeof first === 'string' ? first : first?.user?._id || (first as any)?._id || ''
-    }
+    const assigneeIds = Array.isArray(task.assignedTo)
+      ? Array.from(new Set(
+          task.assignedTo
+            .map(a => typeof a === 'string' ? a : (a?.user?._id || (typeof a?.user === 'string' ? a.user : null) || (a as any)?._id || ''))
+            .filter(Boolean)
+        ))
+      : []
 
     const data = {
       module: task.module || task.story?.title || task.epic?.title || '',
@@ -1483,7 +1567,7 @@ export default function SprintDetailPage() {
       type: (task.type || 'task').toLowerCase(),
       priority: (task.priority || 'medium').toLowerCase(),
       status: task.status || 'todo',
-      assigneeId: assigneeId,
+      assigneeIds: assigneeIds,
       estimatedHours: task.estimatedHours ? String(task.estimatedHours) : '',
       actualHours: task.actualHours ? String(task.actualHours) : (task.loggedHours ? String(task.loggedHours) : '0')
     }
@@ -1500,18 +1584,16 @@ export default function SprintDetailPage() {
     }
     try {
       setSavingTaskEdit(true)
-      const assigneeVal = editFormData.assigneeId
-        ? (() => {
-            const m = assignableMembers.find(member => member.id === editFormData.assigneeId)
-            if (!m) return [{ user: editFormData.assigneeId }]
-            return [{
-              user: m.id,
-              firstName: m.name.split(' ')[0] || '',
-              lastName: m.name.split(' ').slice(1).join(' ') || '',
-              email: m.email || ''
-            }]
-          })()
-        : []
+      const assigneeVal = editFormData.assigneeIds.map(id => {
+        const m = assignableMembers.find(member => member.id === id)
+        if (!m) return { user: id }
+        return {
+          user: m.id,
+          firstName: m.name.split(' ')[0] || '',
+          lastName: m.name.split(' ').slice(1).join(' ') || '',
+          email: m.email || ''
+        }
+      })
 
       const payload: any = {
         title: editFormData.title.trim(),
@@ -1548,7 +1630,7 @@ export default function SprintDetailPage() {
                     type: payload.type,
                     priority: payload.priority,
                     status: payload.status,
-                    assignedTo: updatedTaskObj?.assignedTo || t.assignedTo,
+                    assignedTo: updatedTaskObj?.assignedTo ?? assigneeVal,
                     estimatedHours: payload.estimatedHours
                   }
                 : t
@@ -3176,37 +3258,69 @@ export default function SprintDetailPage() {
                         side="bottom"
                         sideOffset={6}
                         onCloseAutoFocus={(e) => e.preventDefault()}
-                        className="z-[10050] w-64 max-h-64 overflow-y-auto thin-scrollbar rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1.5 shadow-2xl text-gray-900 dark:text-white"
+                        className="z-[10050] w-72 max-h-72 overflow-y-auto thin-scrollbar rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-1.5 shadow-2xl text-gray-900 dark:text-white"
                       >
                         <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                           Assign selected tasks to
                         </div>
-                        <DropdownMenuItem
-                          onClick={() => handleBulkAssign(null)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors text-gray-700 dark:text-gray-300"
-                        >
-                          <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
-                            <User className="w-3.5 h-3.5" />
-                          </div>
-                          <span>Unassign</span>
-                        </DropdownMenuItem>
-                        {assignableMembers.map(member => (
-                          <DropdownMenuItem
-                            key={member.id}
-                            onClick={() => handleBulkAssign(member)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors text-gray-700 dark:text-gray-300"
-                          >
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-semibold">
-                              {member.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium truncate">{member.name}</p>
-                              {member.email && (
-                                <p className="text-[10px] text-gray-400 truncate">{member.email}</p>
+                        {(() => {
+                          const allSelectedUnassigned = bulkSelectedTasks.length > 0 && bulkSelectedTasks.every(t => !Array.isArray(t.assignedTo) || t.assignedTo.length === 0)
+                          return (
+                            <DropdownMenuItem
+                              onClick={() => handleBulkAssign(null)}
+                              className="w-full flex items-center justify-between gap-2.5 px-3 py-2 text-xs text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors text-gray-700 dark:text-gray-300"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 shrink-0">
+                                  <User className="w-3.5 h-3.5" />
+                                </div>
+                                <span>Unassign all</span>
+                              </div>
+                              {allSelectedUnassigned && (
+                                <span className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 shrink-0">
+                                  <Check className="w-3.5 h-3.5" />
+                                </span>
                               )}
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
+                            </DropdownMenuItem>
+                          )
+                        })()}
+                        {assignableMembers.map(member => {
+                          const { count, isAll, isSome } = getMemberBulkSelectionStatus(member.id)
+                          return (
+                            <DropdownMenuItem
+                              key={member.id}
+                              onClick={() => handleBulkAssign(member)}
+                              className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 text-xs text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors ${
+                                isAll
+                                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50/40 dark:bg-blue-950/20 font-medium'
+                                  : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-semibold shrink-0">
+                                  {member.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium truncate">{member.name}</p>
+                                  {member.email && (
+                                    <p className="text-[10px] text-gray-400 truncate">{member.email}</p>
+                                  )}
+                                </div>
+                              </div>
+                              {isAll && (
+                                <span className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 shrink-0">
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>{bulkSelectedTasks.length > 1 ? 'On all' : 'Assigned'}</span>
+                                </span>
+                              )}
+                              {isSome && (
+                                <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 shrink-0">
+                                  On {count}/{bulkSelectedTasks.length}
+                                </span>
+                              )}
+                            </DropdownMenuItem>
+                          )
+                        })}
                       </DropdownMenuContent>
                     </DropdownMenu>
 
@@ -3351,11 +3465,11 @@ export default function SprintDetailPage() {
                     {viewMode === 'list' ? (
                       /* List View: Table */
                       <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs overflow-hidden">
-                        <div className="overflow-x-auto thin-scrollbar [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-                          <table className="w-full text-left border-collapse">
+                        <div className="w-full overflow-x-auto thin-scrollbar [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+                          <table className="w-full text-left border-collapse min-w-[760px]">
                             <thead>
                               <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/75 dark:bg-gray-800/40 text-[11px] font-semibold tracking-wider text-gray-500 dark:text-gray-400 uppercase">
-                                <th className="py-3.5 pl-4 pr-2 w-10">
+                                <th className="py-3.5 pl-3 pr-1.5 w-8">
                                   <input
                                     type="checkbox"
                                     checked={tableSelectedTasks.size > 0 && tableSelectedTasks.size === filteredSprintTasks.length}
@@ -3369,7 +3483,7 @@ export default function SprintDetailPage() {
                                     className="rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                   />
                                 </th>
-                                <th className="py-3.5 px-3 whitespace-nowrap">
+                                <th className="py-3.5 px-2 whitespace-nowrap">
                                   <button
                                     type="button"
                                     onClick={() => setTaskSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
@@ -3383,17 +3497,17 @@ export default function SprintDetailPage() {
                                     )}
                                   </button>
                                 </th>
-                                <th className="py-3.5 px-3 whitespace-nowrap">MODULE</th>
-                                <th className="py-3.5 px-3 min-w-[180px]">TASK</th>
-                                <th className="py-3.5 px-3 whitespace-nowrap">TYPE</th>
-                                <th className="py-3.5 px-3 whitespace-nowrap">ASSIGNEE</th>
-                                <th className="py-3.5 px-3 whitespace-nowrap">PRIORITY</th>
-                                <th className="py-3.5 px-3 whitespace-nowrap">STATUS</th>
-                                <th className="py-3.5 px-3 whitespace-nowrap">START</th>
-                                <th className="py-3.5 px-3 whitespace-nowrap">DUE</th>
-                                <th className="py-3.5 px-3 whitespace-nowrap">EST.</th>
-                                <th className="py-3.5 px-3 whitespace-nowrap">ACT.</th>
-                                <th className="py-3.5 pr-4 pl-2 text-right">ACTION</th>
+                                <th className="py-3.5 px-2 whitespace-nowrap">MODULE</th>
+                                <th className="py-3.5 px-2 w-full min-w-[100px]">TASK</th>
+                                <th className="py-3.5 px-2 whitespace-nowrap">TYPE</th>
+                                <th className="py-3.5 px-2 whitespace-nowrap">ASSIGNEE</th>
+                                <th className="py-3.5 px-2 whitespace-nowrap">PRIORITY</th>
+                                <th className="py-3.5 px-2 whitespace-nowrap">STATUS</th>
+                                <th className="py-3.5 px-2 whitespace-nowrap">START</th>
+                                <th className="py-3.5 px-2 whitespace-nowrap">DUE</th>
+                                <th className="py-3.5 px-2 whitespace-nowrap">EST.</th>
+                                <th className="py-3.5 px-2 whitespace-nowrap">ACT.</th>
+                                <th className="py-3.5 pr-3 pl-1.5 text-right whitespace-nowrap">ACTION</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800/70 text-sm">
@@ -3418,7 +3532,7 @@ export default function SprintDetailPage() {
                                       }`}
                                     >
                                       {/* Checkbox */}
-                                      <td className="py-3 pl-4 pr-2">
+                                      <td className="py-3 pl-3 pr-1.5">
                                         <input
                                           type="checkbox"
                                           checked={isSelected}
@@ -3435,16 +3549,16 @@ export default function SprintDetailPage() {
                                       </td>
 
                                       {/* Task ID */}
-                                      <td className="py-3 px-3 whitespace-nowrap">
+                                      <td className="py-3 px-2 whitespace-nowrap">
                                         <span className="font-apple-mono text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60">
                                           #{task.displayId || task._id.slice(-4)}
                                         </span>
                                       </td>
 
                                       {/* Module */}
-                                      <td className="py-3 px-3 whitespace-nowrap">
+                                      <td className="py-3 px-2 whitespace-nowrap">
                                         <span
-                                          className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate max-w-[120px] block"
+                                          className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate max-w-[90px] block"
                                           title={task.module || task.story?.title || task.epic?.title || 'N/A'}
                                         >
                                           {task.module || task.story?.title || task.epic?.title || 'N/A'}
@@ -3452,7 +3566,7 @@ export default function SprintDetailPage() {
                                       </td>
 
                                       {/* Task Title */}
-                                      <td className="py-3 px-3 max-w-[340px] xl:max-w-[460px]">
+                                      <td className="py-3 px-2 w-full max-w-0">
                                         <div className="flex items-center gap-2 min-w-0">
                                           {task.subtasks && task.subtasks.length > 0 && (
                                             <button
@@ -3494,7 +3608,7 @@ export default function SprintDetailPage() {
                                       </td>
 
                                       {/* Type */}
-                                      <td className="py-3 px-3 whitespace-nowrap">
+                                      <td className="py-3 px-2 whitespace-nowrap">
                                         {(() => {
                                           const t = (task.type || 'task').toLowerCase()
                                           let badgeCls = 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
@@ -3511,7 +3625,7 @@ export default function SprintDetailPage() {
                                       </td>
 
                                       {/* Assignee */}
-                                      <td className="py-3 px-3 whitespace-nowrap">
+                                      <td className="py-3 px-2 whitespace-nowrap">
                                         {(() => {
                                           if (!task.assignedTo || !Array.isArray(task.assignedTo) || task.assignedTo.length === 0) {
                                             return (
@@ -3539,7 +3653,7 @@ export default function SprintDetailPage() {
                                       </td>
 
                                       {/* Priority Dropdown */}
-                                      <td className="py-3 px-3 whitespace-nowrap">
+                                      <td className="py-3 px-2 whitespace-nowrap">
                                         <DropdownMenu>
                                           <DropdownMenuTrigger asChild>
                                             <button
@@ -3584,7 +3698,7 @@ export default function SprintDetailPage() {
                                       </td>
 
                                       {/* Status Dropdown */}
-                                      <td className="py-3 px-3 whitespace-nowrap">
+                                      <td className="py-3 px-2 whitespace-nowrap">
                                         <DropdownMenu
                                           open={activeStatusMenuTaskId === task._id}
                                           onOpenChange={(open) => setActiveStatusMenuTaskId(open ? task._id : null)}
@@ -3678,27 +3792,27 @@ export default function SprintDetailPage() {
                                       </td>
 
                                       {/* Start Date */}
-                                      <td className="py-3 px-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                                      <td className="py-3 px-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
                                         {formatShortDate(task.startDate || task.createdAt)}
                                       </td>
 
                                       {/* Due Date */}
-                                      <td className="py-3 px-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                                      <td className="py-3 px-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
                                         {formatShortDate(task.dueDate)}
                                       </td>
 
                                       {/* Estimated Hours */}
-                                      <td className="py-3 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-600 dark:text-gray-400">
+                                      <td className="py-3 px-2 whitespace-nowrap text-xs font-apple-mono text-gray-600 dark:text-gray-400">
                                         {task.estimatedHours ? `${task.estimatedHours}h` : 'N/A'}
                                       </td>
 
                                       {/* Actual Hours */}
-                                      <td className="py-3 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-600 dark:text-gray-400">
+                                      <td className="py-3 px-2 whitespace-nowrap text-xs font-apple-mono text-gray-600 dark:text-gray-400">
                                         {task.actualHours ? `${task.actualHours}h` : (task.loggedHours ? `${task.loggedHours}h` : 'N/A')}
                                       </td>
 
                                       {/* Action Buttons */}
-                                      <td className="py-3 pr-4 pl-2 text-right whitespace-nowrap">
+                                      <td className="py-3 pr-3 pl-1.5 text-right whitespace-nowrap">
                                         <div className="inline-flex items-center justify-end gap-1">
                                           <button
                                             type="button"
@@ -3743,33 +3857,33 @@ export default function SprintDetailPage() {
                                             className="bg-slate-50/50 dark:bg-slate-900/30 hover:bg-blue-50/30 dark:hover:bg-blue-950/20 border-b border-gray-100 dark:border-gray-800/50 transition-colors"
                                           >
                                           {/* Checkbox Indent with elbow branch */}
-                                          <td className="py-2.5 pl-4 pr-2 text-right">
+                                          <td className="py-2.5 pl-3 pr-1.5 text-right">
                                             <div className="flex items-center justify-end pr-1 text-gray-400 dark:text-gray-500 font-mono text-xs select-none">
                                               ↳
                                             </div>
                                           </td>
 
                                           {/* Subtask ID */}
-                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                          <td className="py-2.5 px-2 whitespace-nowrap">
                                             <span className="font-apple-mono text-[11px] font-medium px-2 py-0.5 rounded-full border border-gray-200/80 dark:border-gray-800 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 shadow-2xs">
                                               #{stDisplayId}
                                             </span>
                                           </td>
 
                                           {/* Module */}
-                                          <td className="py-2.5 px-3 whitespace-nowrap">
-                                            <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[120px] block" title={task.module || 'N/A'}>
+                                          <td className="py-2.5 px-2 whitespace-nowrap">
+                                            <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[90px] block" title={task.module || 'N/A'}>
                                               {task.module || 'N/A'}
                                             </span>
                                           </td>
 
                                           {/* Subtask Title */}
-                                          <td className="py-2.5 px-3">
-                                            <div className="flex items-center gap-2 pl-2">
+                                          <td className="py-2.5 px-2 w-full max-w-0">
+                                            <div className="flex items-center gap-2 pl-2 min-w-0">
                                               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${st.status === 'done' || st.status === 'completed' || st.isCompleted ? 'bg-emerald-500' : 'bg-blue-500'}`} />
                                               <span
                                                 onClick={() => handleOpenEditSubtask(task._id, st, stIdx)}
-                                                className={`text-xs font-medium cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-1 ${
+                                                className={`text-xs font-medium cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate min-w-0 ${
                                                   st.status === 'done' || st.status === 'completed' || st.isCompleted
                                                     ? 'line-through text-gray-400 dark:text-gray-500'
                                                     : 'text-gray-800 dark:text-gray-200'
@@ -3784,7 +3898,7 @@ export default function SprintDetailPage() {
                                                     e.stopPropagation()
                                                     handleOpenEditSubtask(task._id, st, stIdx)
                                                   }}
-                                                  className="inline-flex items-center text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40 cursor-pointer"
+                                                  className="inline-flex items-center text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40 cursor-pointer shrink-0"
                                                   title={`${st.subtasks.filter(n => n.isCompleted || n.status === 'done' || n.status === 'completed').length} of ${st.subtasks.length} nested subtasks completed`}
                                                 >
                                                   {st.subtasks.filter(n => n.isCompleted || n.status === 'done' || n.status === 'completed').length}/{st.subtasks.length}
@@ -3794,7 +3908,7 @@ export default function SprintDetailPage() {
                                           </td>
 
                                           {/* Type */}
-                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                          <td className="py-2.5 px-2 whitespace-nowrap">
                                             {(() => {
                                               const t = (st.type || 'subtask').toLowerCase()
                                               let badgeCls = 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
@@ -3811,7 +3925,7 @@ export default function SprintDetailPage() {
                                           </td>
 
                                           {/* Assignee (Interactive dropdown) */}
-                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                          <td className="py-2.5 px-2 whitespace-nowrap">
                                             <DropdownMenu>
                                               <DropdownMenuTrigger asChild>
                                                 <button
@@ -3887,7 +4001,7 @@ export default function SprintDetailPage() {
                                           </td>
 
                                           {/* Priority (Interactive dropdown) */}
-                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                          <td className="py-2.5 px-2 whitespace-nowrap">
                                             <DropdownMenu>
                                               <DropdownMenuTrigger asChild>
                                                 <button
@@ -3930,7 +4044,7 @@ export default function SprintDetailPage() {
                                           </td>
 
                                           {/* Status (Interactive dropdown) */}
-                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                          <td className="py-2.5 px-2 whitespace-nowrap">
                                             <DropdownMenu>
                                               <DropdownMenuTrigger asChild>
                                                 <button
@@ -3981,27 +4095,27 @@ export default function SprintDetailPage() {
                                           </td>
 
                                           {/* Start Date */}
-                                          <td className="py-2.5 px-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+                                          <td className="py-2.5 px-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
                                             {formatShortDate(st.createdAt)}
                                           </td>
 
                                           {/* Due Date */}
-                                          <td className="py-2.5 px-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+                                          <td className="py-2.5 px-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
                                             {formatShortDate(st.dueDate)}
                                           </td>
 
                                           {/* Estimated Hours */}
-                                          <td className="py-2.5 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-500 dark:text-gray-400">
+                                          <td className="py-2.5 px-2 whitespace-nowrap text-xs font-apple-mono text-gray-500 dark:text-gray-400">
                                             {st.estimatedHours ? `${st.estimatedHours}h` : 'N/A'}
                                           </td>
 
                                           {/* Actual Hours */}
-                                          <td className="py-2.5 px-3 whitespace-nowrap text-xs font-apple-mono text-gray-500 dark:text-gray-400">
+                                          <td className="py-2.5 px-2 whitespace-nowrap text-xs font-apple-mono text-gray-500 dark:text-gray-400">
                                             {st.actualHours ? `${st.actualHours}h` : 'N/A'}
                                           </td>
 
                                           {/* Action Buttons (Edit / Delete) */}
-                                          <td className="py-2 pr-4 pl-2 text-right whitespace-nowrap">
+                                          <td className="py-2 pr-3 pl-1.5 text-right whitespace-nowrap">
                                             <div className="inline-flex items-center justify-end gap-1">
                                               <button
                                                 type="button"
@@ -4057,34 +4171,34 @@ export default function SprintDetailPage() {
                                               className="bg-slate-100/50 dark:bg-slate-900/60 hover:bg-blue-50/20 dark:hover:bg-blue-950/20 border-b border-gray-100/60 dark:border-gray-800/40 transition-colors"
                                             >
                                               {/* Indent with double branch */}
-                                              <td className="py-2 pl-4 pr-2 text-right">
+                                              <td className="py-2 pl-3 pr-1.5 text-right">
                                                 <div className="flex items-center justify-end pr-1 text-gray-400 dark:text-gray-500 font-mono text-xs select-none">
                                                   ↳↳
                                                 </div>
                                               </td>
 
                                               {/* Nested ID */}
-                                              <td className="py-2 px-3 whitespace-nowrap">
+                                              <td className="py-2 px-2 whitespace-nowrap">
                                                 <span className="font-apple-mono text-[10px] font-medium px-2 py-0.5 rounded-full border border-gray-200/60 dark:border-gray-800 text-gray-500 dark:text-gray-400 bg-white/70 dark:bg-gray-800/70">
                                                   #{nstDisplayId}
                                                 </span>
                                               </td>
 
                                               {/* Module */}
-                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400 dark:text-gray-600">
+                                              <td className="py-2 px-2 whitespace-nowrap text-xs text-gray-400 dark:text-gray-600">
                                                 N/A
                                               </td>
 
                                               {/* Nested Subtask Title */}
-                                              <td className="py-2 px-3">
-                                                <div className="flex items-center gap-2 pl-4">
+                                              <td className="py-2 px-2 w-full max-w-0">
+                                                <div className="flex items-center gap-2 pl-4 min-w-0">
                                                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isNstDone ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                                                   <span
                                                     onClick={(e) => {
                                                       e.stopPropagation()
                                                       handleOpenEditSubtask(task._id, st, stIdx)
                                                     }}
-                                                    className={`text-xs cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-1 ${
+                                                    className={`text-xs cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate min-w-0 ${
                                                       isNstDone ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
                                                     }`}
                                                     title={`${nst.title}${nst.description ? ` (${nst.description})` : ''} (Click to edit)`}
@@ -4092,7 +4206,7 @@ export default function SprintDetailPage() {
                                                     {nst.title}
                                                   </span>
                                                   {nst.description && (
-                                                    <span className="text-[11px] text-gray-400 italic truncate max-w-[150px]">
+                                                    <span className="text-[11px] text-gray-400 italic truncate max-w-[120px] shrink-0">
                                                       {nst.description}
                                                     </span>
                                                   )}
@@ -4100,24 +4214,24 @@ export default function SprintDetailPage() {
                                               </td>
 
                                               {/* Type */}
-                                              <td className="py-2 px-3 whitespace-nowrap">
+                                              <td className="py-2 px-2 whitespace-nowrap">
                                                 <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
                                                   Nested
                                                 </span>
                                               </td>
 
                                               {/* Assignee */}
-                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                              <td className="py-2 px-2 whitespace-nowrap text-xs text-gray-400">
                                                 N/A
                                               </td>
 
                                               {/* Priority */}
-                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                              <td className="py-2 px-2 whitespace-nowrap text-xs text-gray-400">
                                                 N/A
                                               </td>
 
                                               {/* Status (Interactive dropdown) */}
-                                              <td className="py-2 px-3 whitespace-nowrap">
+                                              <td className="py-2 px-2 whitespace-nowrap">
                                                 <DropdownMenu>
                                                   <DropdownMenuTrigger asChild>
                                                     <button
@@ -4168,27 +4282,27 @@ export default function SprintDetailPage() {
                                               </td>
 
                                               {/* Start Date */}
-                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                              <td className="py-2 px-2 whitespace-nowrap text-xs text-gray-400">
                                                 N/A
                                               </td>
 
                                               {/* Due Date */}
-                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                              <td className="py-2 px-2 whitespace-nowrap text-xs text-gray-400">
                                                 N/A
                                               </td>
 
                                               {/* Est Hours */}
-                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                              <td className="py-2 px-2 whitespace-nowrap text-xs text-gray-400">
                                                 N/A
                                               </td>
 
                                               {/* Act Hours */}
-                                              <td className="py-2 px-3 whitespace-nowrap text-xs text-gray-400">
+                                              <td className="py-2 px-2 whitespace-nowrap text-xs text-gray-400">
                                                 N/A
                                               </td>
 
                                               {/* Action Buttons */}
-                                              <td className="py-2 pr-4 pl-2 text-right whitespace-nowrap">
+                                              <td className="py-2 pr-3 pl-1.5 text-right whitespace-nowrap">
                                                 <div className="inline-flex items-center justify-end gap-1">
                                                   <button
                                                     type="button"
@@ -4409,7 +4523,7 @@ export default function SprintDetailPage() {
 
                   {/* Right Column: Side Card Edit */}
                   {editingTask && (
-                    <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm space-y-4 animate-in fade-in slide-in-from-right-2 duration-150 sticky top-4">
+                    <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm space-y-4 animate-in fade-in slide-in-from-right-2 duration-150 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto thin-scrollbar">
                       {/* Side Card Header */}
                       <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800">
                         <div className="flex items-center gap-2">
@@ -4586,36 +4700,94 @@ export default function SprintDetailPage() {
                         <div className="space-y-1.5">
                           <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Assignee</label>
                           <Select
-                            value={editFormData.assigneeId || 'unassigned'}
-                            onValueChange={(val) => setEditFormData(prev => ({ ...prev, assigneeId: val === 'unassigned' ? '' : val }))}
+                            value=""
+                            onValueChange={(val) => {
+                              if (val === 'unassigned') {
+                                setEditFormData(prev => ({ ...prev, assigneeIds: [] }))
+                              } else if (val) {
+                                setEditFormData(prev => ({
+                                  ...prev,
+                                  assigneeIds: prev.assigneeIds.includes(val)
+                                    ? prev.assigneeIds.filter(id => id !== val)
+                                    : [...prev.assigneeIds, val]
+                                }))
+                              }
+                            }}
                           >
                             <SelectTrigger className="h-10 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-xs font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500/20">
-                              <SelectValue placeholder="Select assignee" />
+                              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                                <User className="w-3.5 h-3.5" />
+                                <span>{editFormData.assigneeIds.length === 0 ? 'Select assignees...' : 'Add more assignees...'}</span>
+                              </div>
                             </SelectTrigger>
                             <SelectContent className="z-[10050] max-h-60 overflow-y-auto thin-scrollbar">
                               <SelectItem value="unassigned">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 shrink-0">
-                                    <User className="w-3 h-3" />
+                                <div className="flex items-center justify-between gap-2 w-full">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 shrink-0">
+                                      <User className="w-3.5 h-3.5" />
+                                    </div>
+                                    <span>Unassigned (Clear all)</span>
                                   </div>
-                                  <span>Unassigned</span>
+                                  {editFormData.assigneeIds.length === 0 && (
+                                    <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                  )}
                                 </div>
                               </SelectItem>
                               {assignableMembers.map(member => {
                                 const initial = member.name ? member.name.charAt(0).toUpperCase() : 'U'
+                                const isSelected = editFormData.assigneeIds.includes(member.id)
                                 return (
                                   <SelectItem key={member.id} value={member.id}>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-semibold shrink-0">
-                                        {initial}
+                                    <div className="flex items-center justify-between gap-2 w-full">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-semibold shrink-0">
+                                          {initial}
+                                        </div>
+                                        <span className="truncate">{member.name}</span>
                                       </div>
-                                      <span className="truncate">{member.name}</span>
+                                      {isSelected && (
+                                        <span className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 font-medium shrink-0">
+                                          <Check className="w-3 h-3" />
+                                          Selected
+                                        </span>
+                                      )}
                                     </div>
                                   </SelectItem>
                                 )
                               })}
                             </SelectContent>
                           </Select>
+
+                          {/* Selected Assignee Pills (matches CreateTaskModal / EditTaskModal UI) */}
+                          {editFormData.assigneeIds.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {editFormData.assigneeIds.map(id => {
+                                const member = assignableMembers.find(m => m.id === id)
+                                if (!member) return null
+                                const initial = member.name ? member.name.charAt(0).toUpperCase() : 'U'
+                                return (
+                                  <span
+                                    key={id}
+                                    className="inline-flex items-center gap-1.5 text-xs bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 pl-1.5 pr-2 py-0.5 rounded-full text-gray-800 dark:text-gray-200 shadow-2xs"
+                                  >
+                                    <span className="w-4 h-4 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[9px] font-bold shrink-0">
+                                      {initial}
+                                    </span>
+                                    <span className="truncate max-w-[130px] font-medium">{member.name}</span>
+                                    <button
+                                      type="button"
+                                      aria-label={`Remove ${member.name}`}
+                                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none cursor-pointer -mr-0.5"
+                                      onClick={() => setEditFormData(prev => ({ ...prev, assigneeIds: prev.assigneeIds.filter(userId => userId !== id) }))}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         {/* Estimated Hours & Actual Hours side by side */}

@@ -264,6 +264,8 @@ export async function GET(
       loggedHours: number
       actualCost: number
       remainingHours: number
+      remainingBudget: number
+      burnRate: number
       budgetImpact: number
     }> = []
 
@@ -287,6 +289,11 @@ export async function GET(
 
       const actualCost = memberActualCostMap.get(mId) || Math.round(loggedHours * rate * 100) / 100
       const remainingHours = Math.max(0, Math.round((allocatedHours - loggedHours) * 10) / 10)
+      const allocatedBudget = Math.round(allocatedHours * rate * 100) / 100
+      const remainingBudget = Math.round((allocatedBudget - actualCost) * 100) / 100
+      const burnRate = allocatedBudget > 0
+        ? Math.round((actualCost / allocatedBudget) * 1000) / 10
+        : (actualCost > 0 ? 100 : 0)
 
       roster.push({
         id: mId,
@@ -302,6 +309,8 @@ export async function GET(
         loggedHours,
         actualCost,
         remainingHours,
+        remainingBudget,
+        burnRate,
         budgetImpact: actualCost
       })
     })
@@ -319,6 +328,13 @@ export async function GET(
             .filter(t => t.resourceId === log.resourceId)
             .reduce((sum, t) => sum + t.cost, 0)
 
+          const allocatedHours = Math.ceil(loggedHours * 1.5)
+          const allocatedBudget = Math.round(allocatedHours * log.rate * 100) / 100
+          const remainingBudget = Math.round((allocatedBudget - actualCost) * 100) / 100
+          const burnRate = allocatedBudget > 0
+            ? Math.round((actualCost / allocatedBudget) * 1000) / 10
+            : (actualCost > 0 ? 100 : 0)
+
           roster.push({
             id: log.resourceId,
             name: log.resourceName,
@@ -329,10 +345,12 @@ export async function GET(
             initials: log.resourceName.slice(0, 2).toUpperCase(),
             role: log.role,
             rate: log.rate,
-            allocatedHours: Math.ceil(loggedHours * 1.5),
+            allocatedHours,
             loggedHours: Math.round(loggedHours * 10) / 10,
             actualCost,
-            remainingHours: Math.max(0, Math.round((Math.ceil(loggedHours * 1.5) - loggedHours) * 10) / 10),
+            remainingHours: Math.max(0, Math.round((allocatedHours - loggedHours) * 10) / 10),
+            remainingBudget,
+            burnRate,
             budgetImpact: actualCost
           })
         }
@@ -345,11 +363,13 @@ export async function GET(
     // Sanitize financial fields for non-HR and non-Admin users
     const sanitizedRoster = isHrOrAdmin
       ? roster
-      : roster.map(({ rate, actualCost, budgetImpact, ...rest }) => ({
+      : roster.map(({ rate, actualCost, budgetImpact, remainingBudget, burnRate, ...rest }) => ({
           ...rest,
           rate: 0,
           actualCost: 0,
-          budgetImpact: 0
+          budgetImpact: 0,
+          remainingBudget: 0,
+          burnRate: 0
         }))
 
     const sanitizedTimeLogs = isHrOrAdmin
