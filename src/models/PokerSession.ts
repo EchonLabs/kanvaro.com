@@ -30,6 +30,12 @@ export interface IPokerSession extends Document {
   project: mongoose.Types.ObjectId
   sprint: mongoose.Types.ObjectId
   planningSession?: mongoose.Types.ObjectId
+  /**
+   * Set only on a session opened after the sprint left planning (E14). Its
+   * presence is what makes finalize freeze each estimate (DAT-6) and audit it
+   * as a late addition.
+   */
+  lateAdditionReason?: string
 
   status: PokerSessionStatus
   deckType: DeckType
@@ -86,6 +92,7 @@ const PokerSessionSchema = new Schema<IPokerSession>(
     project: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
     sprint: { type: Schema.Types.ObjectId, ref: 'Sprint', required: true },
     planningSession: { type: Schema.Types.ObjectId, ref: 'SprintPlanningSession' },
+    lateAdditionReason: { type: String, trim: true },
 
     status: { type: String, enum: [...POKER_SESSION_STATUSES], default: 'open' },
     deckType: { type: String, enum: [...DECK_TYPES], default: 'fibonacci' },

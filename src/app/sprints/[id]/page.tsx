@@ -20,6 +20,7 @@ import { DeleteSubtaskModal } from '@/components/sprints/DeleteSubtaskModal'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { hasStandups, isLiveSprint, type SprintState } from '@/lib/standup/sprint-states'
+import { LateAdditionPoker } from '@/components/standup/LateAdditionPoker'
 import { standupStrings } from '@/lib/standup/strings'
 import { InfoTooltip } from '@/components/ui/InfoTooltip'
 import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
@@ -2596,6 +2597,21 @@ export default function SprintDetailPage() {
                   <Calendar className="h-4 w-4" />
                   <span>Stand-ups</span>
                 </button>
+              )}
+
+              {/* E14: tasks added after planning can be estimated with poker.
+                  Renders nothing unless the sprint is active and either has
+                  unestimated tasks or a round is already open. */}
+              {canViewSprint && sprint.status === 'active' && (
+                <LateAdditionPoker
+                  sprintId={sprintId}
+                  sprintName={sprint.name}
+                  sprintStatus={sprint.status}
+                  projectId={sprint.project?._id}
+                  teamMemberIds={(sprint.teamMembers ?? []).map((member) => member._id).filter(Boolean)}
+                  canFacilitate={hasPermission(Permission.SPRINT_UPDATE, sprint.project?._id)}
+                  onChanged={() => fetchSprint({ silent: true })}
+                />
               )}
 
               {/* Create Task Button (opens the create task page, which returns here) */}

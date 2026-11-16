@@ -9,13 +9,7 @@
 import { StandupError } from './errors'
 import { ESTIMATE_UNITS, type EstimateUnit } from './estimates'
 
-export const DECK_TYPES = [
-  'fibonacci',
-  'modified_fibonacci',
-  'tshirt',
-  'hours',
-  'powers_of_two'
-] as const
+export const DECK_TYPES = ['fibonacci', 'hours'] as const
 export type DeckType = typeof DECK_TYPES[number]
 
 export const CONSENSUS_RULES = [
@@ -26,38 +20,23 @@ export const CONSENSUS_RULES = [
 ] as const
 export type ConsensusRule = typeof CONSENSUS_RULES[number]
 
-/**
- * T-shirt sizes map to points so the allocation engine has a number to work
- * with. The mapping is fixed rather than configurable: a project that wants its
- * own numbers should be estimating in points or hours, not letters.
- */
-export const TSHIRT_POINTS: Record<string, number> = {
-  XS: 1,
-  S: 2,
-  M: 3,
-  L: 5,
-  XL: 8
-}
-
-const NUMERIC_DECKS: Record<Exclude<DeckType, 'tshirt'>, Array<number | string>> = {
+const DECKS: Record<DeckType, Array<number | string>> = {
   // Classic Fibonacci (PLN-10), plus the two non-numeric cards the spec's own
   // wireframe shows (§15.6): '?' for unsure, 'coffee' for "let's take a
   // break". `cardValue` already falls through to `Number(card)` for these,
   // which is `NaN` and so reads as `null` — the "no numeric weight" case the
   // reveal/variance logic already treats as an abstention.
   fibonacci: [1, 2, 3, 5, 8, 13, 21, '?', 'coffee'],
-  modified_fibonacci: [0.5, 1, 2, 3, 5, 8, 12, 14, 16, 40, 100],
   // Denser at the low end, where most task estimates land: 3 and 6 are common
   // answers a team voting in time reaches for, and leaving them off forced a
   // 6h task onto 4 or 8. Carries '?' and 'coffee' like Fibonacci — a team
   // estimating in hours can be unsure or need a break just the same.
-  hours: [0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 40, '?', 'coffee'],
-  powers_of_two: [1, 2, 4, 8, 16, 32, 64]
+  hours: [0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 40, '?', 'coffee']
 }
 
 /** The cards a deck offers, in order. */
 export function deckCards(deckType: DeckType): Array<string | number> {
-  return deckType === 'tshirt' ? Object.keys(TSHIRT_POINTS) : [...NUMERIC_DECKS[deckType]]
+  return [...DECKS[deckType]]
 }
 
 /**
@@ -152,12 +131,8 @@ export function isValidCard(deckType: DeckType, card: string | number): boolean 
   return deckCards(deckType).some((candidate) => String(candidate) === String(card))
 }
 
-/** The numeric weight of a card, or `null` when it is not on the deck. */
-export function cardValue(deckType: DeckType, card: string | number): number | null {
-  const asString = String(card)
-
-  if (deckType === 'tshirt') return TSHIRT_POINTS[asString] ?? null
-
+/** The numeric weight of a card, or `null` when it carries no number. */
+export function cardValue(_deckType: DeckType, card: string | number): number | null {
   const numeric = Number(card)
   return Number.isFinite(numeric) ? numeric : null
 }
@@ -377,16 +352,9 @@ export function voteProgress(
 
 const round2 = (value: number) => Math.round(value * 100) / 100
 
-/**
- * The deck's numeric values, in card order.
- *
- * T-shirt sizes have no numeric face, so their points mapping stands in — it
- * is already the order XS..XL is dealt in.
- */
+/** The deck's numeric values, in card order. */
 export function deckScale(deckType: DeckType): number[] {
-  return deckType === 'tshirt'
-    ? Object.values(TSHIRT_POINTS)
-    : (deckCards(deckType).filter((card) => typeof card === 'number') as number[])
+  return deckCards(deckType).filter((card) => typeof card === 'number') as number[]
 }
 
 /**
@@ -409,6 +377,13 @@ export function stepDistance(deckType: DeckType, low: number, high: number): num
   return Math.abs(highIndex - lowIndex)
 }
 
+/**
+ * Hours between the lowest and highest estimate above which a round voted in
+ * hours stops reading as near consensus, and above which it reads as wide.
+ */
+export const HOURS_GAP_SOME = 5
+export const HOURS_GAP_WIDE = 8
+
 export type AgreementKey = 'none' | 'single' | 'consensus' | 'near' | 'some' | 'wide'
 export type AgreementTone = 'neutral' | 'success' | 'warning' | 'danger'
 
@@ -429,12 +404,24 @@ export interface Agreement {
  * reveal and "Some spread" in the results. Worse, a single vote counted as
  * unanimous and was announced as a consensus, which is not something one
  * person can reach.
+ *
+ * Under story points the label reads cards apart only: neighbouring Fibonacci
+ * cards are the same relative step wherever they sit on the deck. Under hours
+ * the numbers are real time, so 13h against 21h is a whole working day of
+ * disagreement even though the cards are neighbours. There the gap in hours is
+ * read as well, and the label is the wider of the two readings.
  */
 export function describeAgreement(
   deckType: DeckType,
-  input: { min: number | null; max: number | null; numericCount: number }
+  input: {
+    min: number | null
+    max: number | null
+    numericCount: number
+    /** Defaults to story points, where only cards apart is read. */
+    estimationUnit?: EstimateUnit
+  }
 ): Agreement {
-  const { min, max, numericCount } = input
+  const { min, max, numericCount, estimationUnit } = input
 
   if (numericCount === 0 || min === null || max === null) {
     return { key: 'none', label: 'No estimates', tone: 'neutral', steps: null }
@@ -455,8 +442,20 @@ export function describeAgreement(
   // Off-deck values: fall back to saying only that they differ.
   if (steps === null) return { key: 'some', label: 'Some spread', tone: 'warning', steps: null }
 
-  if (steps === 1) return { key: 'near', label: 'Near consensus', tone: 'success', steps }
-  if (steps === 2) return { key: 'some', label: 'Some spread', tone: 'warning', steps }
+  const byCards = steps === 1 ? 1 : steps === 2 ? 2 : 3
+  const gap = max - min
+  const byHours =
+    estimationUnit !== 'hours'
+      ? 1
+      : gap > HOURS_GAP_WIDE
+        ? 3
+        : gap > HOURS_GAP_SOME
+          ? 2
+          : 1
+  const level = Math.max(byCards, byHours)
+
+  if (level === 1) return { key: 'near', label: 'Near consensus', tone: 'success', steps }
+  if (level === 2) return { key: 'some', label: 'Some spread', tone: 'warning', steps }
   return { key: 'wide', label: 'Wide spread', tone: 'danger', steps }
 }
 

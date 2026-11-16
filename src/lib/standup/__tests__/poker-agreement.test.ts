@@ -12,11 +12,7 @@ import { describeAgreement, deckScale, stepDistance } from '../poker'
 describe('deckScale', () => {
   it('reads the numeric face of each card, in deal order', () => {
     expect(deckScale('fibonacci')).toEqual([1, 2, 3, 5, 8, 13, 21])
-    expect(deckScale('powers_of_two')).toEqual([1, 2, 4, 8, 16, 32, 64])
-  })
-
-  it('stands in the points mapping for t-shirt sizes, which have no numeric face', () => {
-    expect(deckScale('tshirt')).toEqual([1, 2, 3, 5, 8])
+    expect(deckScale('hours')).toEqual([0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 40])
   })
 
   it('leaves out the cards that carry no number', () => {
@@ -87,12 +83,48 @@ describe('describeAgreement', () => {
     })
   })
 
-  it('reads the same round the same way on any deck it was dealt from', () => {
-    // 8 and 16 are adjacent on powers-of-two but three cards apart on
-    // Fibonacci — the deck decides, not the numbers.
-    expect(describeAgreement('powers_of_two', { min: 8, max: 16, numericCount: 3 }).key).toBe('near')
-    // The hours deck deals 12 between them, so there they are two cards apart.
+  it('counts cards on the deck the round was dealt from', () => {
+    // The hours deck deals 12 between 8 and 16, so they are two cards apart.
     expect(describeAgreement('hours', { min: 8, max: 16, numericCount: 3 }).key).toBe('some')
     expect(describeAgreement('hours', { min: 4, max: 6, numericCount: 3 }).key).toBe('near')
+  })
+})
+
+describe('describeAgreement — voted in hours', () => {
+  const inHours = (min: number, max: number, deckType: 'fibonacci' | 'hours' = 'fibonacci') =>
+    describeAgreement(deckType, { min, max, numericCount: 3, estimationUnit: 'hours' })
+
+  it('keeps neighbouring cards near consensus while the hours between them are few', () => {
+    expect(inHours(3, 5)).toMatchObject({ key: 'near', steps: 1 })
+    expect(inHours(8, 13)).toMatchObject({ key: 'near', steps: 1 })
+  })
+
+  it('widens neighbouring cards whose hours are far apart', () => {
+    // The complaint: 3h/5h and 13h/21h both read "Near consensus", though the
+    // second pair disagrees by a whole working day.
+    expect(inHours(13, 21)).toMatchObject({ key: 'some', label: 'Some spread', steps: 1 })
+    expect(inHours(8, 21)).toMatchObject({ key: 'wide', steps: 2 })
+  })
+
+  it('never reads narrower than the cards apart', () => {
+    expect(inHours(1, 3)).toMatchObject({ key: 'some', steps: 2 })
+    expect(inHours(1, 5)).toMatchObject({ key: 'wide', steps: 3 })
+  })
+
+  it('applies to the hours deck as well', () => {
+    expect(inHours(12, 16, 'hours').key).toBe('near')
+    expect(inHours(16, 24, 'hours').key).toBe('some')
+    expect(inHours(24, 40, 'hours').key).toBe('wide')
+  })
+
+  it('leaves story points on cards apart alone', () => {
+    expect(
+      describeAgreement('fibonacci', {
+        min: 13,
+        max: 21,
+        numericCount: 3,
+        estimationUnit: 'story_points'
+      }).key
+    ).toBe('near')
   })
 })

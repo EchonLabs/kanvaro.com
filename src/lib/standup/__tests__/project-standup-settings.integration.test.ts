@@ -135,3 +135,12 @@ describe('ProjectStandupSettings — estimation unit', () => {
     ).rejects.toThrow(/estimationUnit/)
   })
 })
+
+describe('ProjectStandupSettings — stand-ups enabled switch', () => {
+  useMongo()
+
+  it('a new settings document defaults enabled to true (spec §16.2)', async () => {
+    const doc = await ProjectStandupSettings.create(base())
+    expect(doc.enabled).toBe(true)
+  })
+})

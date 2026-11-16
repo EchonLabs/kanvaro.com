@@ -57,7 +57,7 @@ export async function loadAnalyticsInputs(sprint: any): Promise<AnalyticsInputs>
       Project.findById(projectId).select('name').lean() as Promise<any>,
       ProjectStandupSettings.findOne({ project: projectId }).lean() as Promise<any>,
       Standup.find({ sprint: sprintObjectId })
-        .select('standupDate sprintDayNumber status wasBackfilled actualDurationMinutes snapshot.members')
+        .select('standupDate sprintDayNumber status wasBackfilled actualDurationMinutes snapshot.members attendance')
         .lean() as Promise<any[]>,
       Allocation.find({ sprint: sprintObjectId })
         .select('standup member task plannedMinutes carryChainRoot excludedFromCapacity addedAfterCompletion')
@@ -136,10 +136,22 @@ export async function loadAnalyticsInputs(sprint: any): Promise<AnalyticsInputs>
       actualDurationMinutes:
         typeof standup.actualDurationMinutes === 'number' ? standup.actualDurationMinutes : undefined,
       capacity: Array.isArray(standup.snapshot?.members)
-        ? standup.snapshot.members.map((member: any) => ({
-            memberId: id(member.memberId),
-            effectiveMinutes: Number(member.effectiveMinutes) || 0
-          }))
+        ? standup.snapshot.members.map((member: any) => {
+            // The snapshot is taken at planning time; attendance recorded on the
+            // day is what the member could actually give. An absent member has no
+            // capacity to leave "unallocated".
+            const attendance = (standup.attendance ?? []).find(
+              (row: any) => id(row.user) === id(member.memberId)
+            )
+            const snapshotMinutes = Number(member.effectiveMinutes) || 0
+            let effectiveMinutes = snapshotMinutes
+            if (attendance?.state === 'absent_planned' || attendance?.state === 'absent_unplanned') {
+              effectiveMinutes = 0
+            } else if (attendance?.state === 'partial' && typeof attendance.partialMinutes === 'number') {
+              effectiveMinutes = Math.min(snapshotMinutes, attendance.partialMinutes)
+            }
+            return { memberId: id(member.memberId), effectiveMinutes }
+          })
         : null
     })),
     allocations: allocations.map((allocation) => ({
@@ -181,7 +193,18 @@ export async function loadAnalyticsInputs(sprint: any): Promise<AnalyticsInputs>
       affectedMemberIds: (override.affectedMemberIds ?? []).map(id),
       issuedAt: override.issuedAt instanceof Date ? override.issuedAt.toISOString() : String(override.issuedAt ?? '')
     })),
-    carryForward: carryForward.map((item) => ({
+    // One open item per (task, member): a re-opened or re-carried item must not
+    // be counted twice, so keep the oldest.
+    carryForward: Array.from<any>(
+      carryForward
+        .reduce((byKey: Map<string, any>, item: any) => {
+          const key = item.task ? `${id(item.task)}:${item.member ? id(item.member) : ''}` : `item:${id(item._id)}`
+          const existing = byKey.get(key)
+          if (!existing || (item.ageInStandups ?? 1) > (existing.ageInStandups ?? 1)) byKey.set(key, item)
+          return byKey
+        }, new Map<string, any>())
+        .values()
+    ).map((item) => ({
       itemId: id(item._id),
       taskId: item.task ? id(item.task) : undefined,
       memberId: item.member ? id(item.member) : undefined,

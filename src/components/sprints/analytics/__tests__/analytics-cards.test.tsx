@@ -14,12 +14,13 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 
 import { AccuracyCard } from '@/components/sprints/analytics/AccuracyCard'
-import { AgeingCard } from '@/components/sprints/analytics/AgeingCard'
-import { AllocationHealthCard } from '@/components/sprints/analytics/AllocationHealthCard'
+import { AgeingCard, AgeingTooltip } from '@/components/sprints/analytics/AgeingCard'
+import { AllocationHealthCard, AllocationTooltip } from '@/components/sprints/analytics/AllocationHealthCard'
 import { AnalyticsHero } from '@/components/sprints/analytics/AnalyticsHero'
 import { AnalyticsStatGrid } from '@/components/sprints/analytics/AnalyticsStatGrid'
 import { ChronicUnderAllocationCard } from '@/components/sprints/analytics/ChronicUnderAllocationCard'
-import { DebtTrendCard } from '@/components/sprints/analytics/DebtTrendCard'
+import { DebtTrendCard, DebtTooltip } from '@/components/sprints/analytics/DebtTrendCard'
+import { CHART_HEIGHT_CLASS } from '@/components/sprints/analytics/chart-theme'
 import { DisciplineCard } from '@/components/sprints/analytics/DisciplineCard'
 import { OverrideLogCard } from '@/components/sprints/analytics/OverrideLogCard'
 import { SpillChainsCard } from '@/components/sprints/analytics/SpillChainsCard'
@@ -32,6 +33,18 @@ import {
   emptyInputs,
   populatedInputs
 } from '@/lib/standup/__tests__/helpers/analytics-fixtures'
+
+// jsdom has no layout, so ResponsiveContainer measures 0 and draws nothing.
+// Give it a fixed size so the real chart (its SVG, its accessibility layer) renders.
+jest.mock('recharts', () => {
+  const actual = jest.requireActual('recharts')
+  const { cloneElement } = jest.requireActual('react')
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children: React.ReactElement }) =>
+      cloneElement(children, { width: 520, height: 224 })
+  }
+})
 
 const s = standupStrings.analytics
 const link = { projectId: 'project-1', sprintId: 'sprint-1' }
@@ -146,9 +159,7 @@ describe('charts are readable without colour (NFR-A1) and drill to rows (UI-13)'
     render(<AllocationHealthCard payload={aggregate()} link={link} />)
 
     expect(
-      screen.getByRole('img', {
-        name: s.dayHealthLabel({ day: 1, full: '11.0h', under: '1.0h', over: '1.0h' })
-      })
+      screen.getByText(s.dayHealthLabel({ day: 1, full: '11.0h', under: '1.0h', over: '1.0h' }))
     ).toBeInTheDocument()
     expect(screen.getByText(s.legendOver())).toBeInTheDocument()
   })
@@ -157,9 +168,7 @@ describe('charts are readable without colour (NFR-A1) and drill to rows (UI-13)'
     render(<AgeingCard payload={aggregate()} link={link} />)
 
     expect(screen.getByText(s.chronicBand({ count: 1 }))).toBeInTheDocument()
-    expect(
-      screen.getByRole('img', { name: s.ageBucketLabel({ label: '8+', count: 1, chronic: true }) })
-    ).toBeInTheDocument()
+    expect(screen.getByText(s.ageBucketLabel({ label: '8+', count: 1, chronic: true }))).toBeInTheDocument()
   })
 
   it('opens and closes the rows behind a chart', () => {
@@ -188,35 +197,35 @@ describe('charts are readable without colour (NFR-A1) and drill to rows (UI-13)'
   })
 })
 
-describe('the estimate debt trend chart', () => {
-  const pointName = s.debtPointLabel({ date: shortDate('2026-10-01'), debt: '1.5h' })
+describe('the analytics charts (recharts)', () => {
+  it('shows the date and the debt in the trend tooltip', () => {
+    const datum = { date: '2026-10-01', label: shortDate('2026-10-01'), minutes: 90, hours: 1.5 }
+    render(<DebtTooltip active payload={[{ payload: datum, value: 1.5 }]} />)
 
-  it('shows the date and the debt when a point is hovered, and hides them on leave', () => {
-    render(<DebtTrendCard payload={aggregate()} link={link} />)
-
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
-
-    const point = screen.getByRole('button', { name: pointName })
-    fireEvent.mouseEnter(point)
-
-    expect(screen.getByRole('tooltip')).toHaveTextContent(`${shortDate('2026-10-01')}1.5h`)
-
-    fireEvent.mouseLeave(point)
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(screen.getByRole('tooltip')).toHaveTextContent(`${shortDate('2026-10-01')}${s.columnDebt()}1.5h`)
   })
 
-  it('shows the same on keyboard focus, so it is not hover-only (NFR-A1)', () => {
-    render(<DebtTrendCard payload={aggregate()} link={link} />)
-
-    const point = screen.getByRole('button', { name: pointName })
-    fireEvent.focus(point)
-    expect(screen.getByRole('tooltip')).toBeInTheDocument()
-
-    fireEvent.blur(point)
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  it('renders no tooltip while nothing is hovered or focused', () => {
+    const { container } = render(<DebtTooltip active={false} payload={[]} />)
+    expect(container).toBeEmptyDOMElement()
   })
 
-  it('is as tall as the allocation health chart beside it', () => {
+  it('lists every segment and the capacity in the allocation tooltip, named not just coloured (NFR-A1)', () => {
+    const day = {
+      standupId: 's1', label: 'D1', title: 'Day 1 · 1 Oct',
+      full: 11, under: 1, over: 1, fullMinutes: 660, underMinutes: 60, overMinutes: 60, capacityMinutes: 720
+    }
+    render(<AllocationTooltip active payload={[{ payload: day, value: 11 }]} />)
+
+    const tooltip = screen.getByRole('tooltip')
+    expect(tooltip).toHaveTextContent('Day 1 · 1 Oct')
+    expect(tooltip).toHaveTextContent(`${s.legendFull()}11.0h`)
+    expect(tooltip).toHaveTextContent(`${s.legendUnder()}1.0h`)
+    expect(tooltip).toHaveTextContent(`${s.legendOver()}1.0h`)
+    expect(tooltip).toHaveTextContent(`${s.columnCapacity()}12.0h`)
+  })
+
+  it('makes both charts keyboard-reachable (NFR-A1)', () => {
     render(
       <>
         <AllocationHealthCard payload={aggregate()} link={link} />
@@ -224,12 +233,42 @@ describe('the estimate debt trend chart', () => {
       </>
     )
 
-    const bars = screen.getByTestId('allocation-health-bars').className
-    const chart = screen.getByTestId('debt-trend-chart').className
-    // Allocation health: a 10rem bar area, then a legend row. The trend chart
-    // has a date row in place of the legend, so its chart is sized to match.
-    expect(bars).toContain('h-40')
-    expect(chart).toContain('h-[10.75rem]')
+    for (const id of ['allocation-health-bars', 'debt-trend-chart']) {
+      const svg = screen.getByTestId(id).querySelector('svg.recharts-surface')
+      expect(svg).toHaveAttribute('tabindex', '0')
+    }
+  })
+
+  it('opens the trend tooltip from the keyboard and walks it with the arrow keys (NFR-A1)', () => {
+    const payload = aggregate()
+    render(<DebtTrendCard payload={payload} link={link} />)
+    const svg = screen.getByTestId('debt-trend-chart').querySelector('svg.recharts-surface') as SVGElement
+
+    fireEvent.focus(svg)
+    expect(screen.getByRole('tooltip')).toHaveTextContent(shortDate(payload.debtTrend[0].date))
+
+    fireEvent.keyDown(svg, { key: 'ArrowRight' })
+    expect(screen.getByRole('tooltip')).toHaveTextContent(shortDate(payload.debtTrend[1].date))
+  })
+
+  it('names the age band and its count in the ageing tooltip, chronic in words', () => {
+    render(<AgeingTooltip active payload={[{ payload: { label: '8+', count: 2, chronic: true }, value: 2 }]} />)
+
+    const tooltip = screen.getByRole('tooltip')
+    expect(tooltip).toHaveTextContent(s.ageingTooltipTitle({ label: '8+' }))
+    expect(tooltip).toHaveTextContent(`${s.ageingKeyChronic()}2`)
+  })
+
+  it('gives the two side-by-side charts the same height', () => {
+    render(
+      <>
+        <AllocationHealthCard payload={aggregate()} link={link} />
+        <DebtTrendCard payload={aggregate()} link={link} />
+      </>
+    )
+
+    expect(screen.getByTestId('allocation-health-bars').className).toContain(CHART_HEIGHT_CLASS)
+    expect(screen.getByTestId('debt-trend-chart').className).toContain(CHART_HEIGHT_CLASS)
   })
 })
 
