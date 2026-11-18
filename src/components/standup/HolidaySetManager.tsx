@@ -311,11 +311,34 @@ export function HolidaySetManager() {
   }
 
   const importCsv = async (file: File) => {
-    if (!selectedId) return
+    let targetId = selectedId
+
+    // With no calendar selected there is nothing to import into, so the upload
+    // creates one. Asked before reading the file so cancelling costs nothing.
+    let newSetName: string | null = null
+    if (!targetId) {
+      newSetName = window.prompt('Name for the new holiday calendar (at least 3 characters):')
+      if (newSetName === null) return
+    }
+
     setBusy(true)
     try {
       const csv = await file.text()
-      const response = await fetch(`/api/organization/holiday-sets/${selectedId}/import`, {
+
+      if (!targetId) {
+        const created = await fetch('/api/organization/holiday-sets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newSetName })
+        })
+        const createdData = await created.json()
+        if (!created.ok) {
+          throw new Error(createdData?.error?.message ?? 'Could not create the holiday calendar')
+        }
+        targetId = (createdData.data ?? createdData).holidaySet.id as string
+      }
+
+      const response = await fetch(`/api/organization/holiday-sets/${targetId}/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csv })
@@ -324,7 +347,8 @@ export function HolidaySetManager() {
       if (!response.ok) throw new Error(data?.error?.message ?? 'Import failed')
 
       notifySuccess({ title: 'Holidays imported' })
-      await Promise.all([loadHolidays(selectedId), loadSets()])
+      setSelectedId(targetId)
+      await Promise.all([loadHolidays(targetId), loadSets()])
     } catch (error) {
       notifyError({ title: (error as Error).message })
     } finally {
@@ -371,7 +395,7 @@ export function HolidaySetManager() {
               </Select>
             </div>
 
-            <Button asChild variant="outline" disabled={busy || !selectedId}>
+            <Button asChild variant="outline" disabled={busy}>
               <label className="cursor-pointer">
                 <Upload className="mr-2 h-4 w-4" />
                 Import CSV

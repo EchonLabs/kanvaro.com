@@ -201,3 +201,50 @@ describe('HolidaySetManager API refresh', () => {
     expect(keyCalls.length).toBeGreaterThanOrEqual(2)
   })
 })
+
+describe('HolidaySetManager CSV import', () => {
+  it('creates a calendar when none exists, then imports the CSV into it as { csv } JSON', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = []
+    global.fetch = jest.fn((url: string, init?: RequestInit) => {
+      const urlStr = String(url)
+      calls.push({ url: urlStr, init })
+      if (urlStr.endsWith('/holiday-sets') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ data: { holidaySet: { id: 'new1', name: 'LK' } } })
+        })
+      }
+      if (urlStr.includes('/import')) {
+        return Promise.resolve({ ok: true, json: async () => ({ data: { imported: 1 } }) })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ data: { holidaySets: [], holidays: [], hasApiKey: false } })
+      })
+    }) as any
+    window.prompt = jest.fn().mockReturnValue('Sri Lanka Public Holidays')
+
+    const { container } = render(
+      <ToastProvider>
+        <HolidaySetManager />
+      </ToastProvider>
+    )
+
+    await screen.findByText(/import csv/i)
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    const csv = 'name,date,type,isFullDay,hoursIfPartial\nX,2028-01-01,public,true,\n'
+    const file = new File([csv], 'h.csv', { type: 'text/csv' })
+    Object.defineProperty(file, 'text', { value: async () => csv })
+
+    await React.act(async () => {
+      fireEvent.change(input, { target: { files: [file] } })
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    })
+
+    const create = calls.find((c) => c.url.endsWith('/holiday-sets') && c.init?.method === 'POST')
+    const imp = calls.find((c) => c.url.includes('/holiday-sets/new1/import'))
+    expect(create).toBeDefined()
+    expect(imp).toBeDefined()
+    expect(JSON.parse(String(imp!.init!.body))).toEqual({ csv })
+  })
+})

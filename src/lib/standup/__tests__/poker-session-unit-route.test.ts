@@ -115,23 +115,23 @@ describe('POST /api/sprints/:id/poker-sessions â€” estimation unit', () => 
     )
   })
 
-  it('keeps story points for a project saved before the unit existed', async () => {
+  it('defaults to hours for a project saved before the unit existed', async () => {
     const { POST, create } = loadRoute({ settings: { pointsToHours: 4 } })
 
     await post(POST, { taskIds: ['task-1'] })
 
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ estimationUnit: 'story_points', deckType: 'fibonacci' })
+      expect.objectContaining({ estimationUnit: 'hours', deckType: 'fibonacci' })
     )
   })
 
-  it('keeps story points for a project with no settings at all', async () => {
+  it('defaults to hours for a project with no settings at all', async () => {
     const { POST, create } = loadRoute({ settings: null })
 
     await post(POST, { taskIds: ['task-1'] })
 
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ estimationUnit: 'story_points', pointsToHours: 4 })
+      expect.objectContaining({ estimationUnit: 'hours', pointsToHours: 4 })
     )
   })
 
