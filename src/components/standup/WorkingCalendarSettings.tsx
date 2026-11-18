@@ -42,6 +42,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { useNotify } from '@/lib/notify'
+import { timezoneOptions } from '@/lib/timezones'
 import { cn } from '@/lib/utils'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -131,7 +132,8 @@ export function WorkingCalendarSettings({
 
   const [overrideDialogOpen, setOverrideDialogOpen] = useState(false)
 
-  const timezones = useMemo(() => listTimezones(), [])
+  // Same list as the organisation settings, so the two screens always agree.
+  const timezones = useMemo(() => timezoneOptions(calendar?.timezone), [calendar?.timezone])
 
   const loadCalendar = useCallback(async () => {
     try {
@@ -1121,28 +1123,4 @@ function lastDayOfMonth(month: string): string {
   const [year, monthIndex] = month.split('-').map(Number)
   const day = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate()
   return `${month}-${String(day).padStart(2, '0')}`
-}
-
-function listTimezones(): string[] {
-  const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] })
-    .supportedValuesOf
-  if (typeof supported === 'function') {
-    try {
-      return supported('timeZone')
-    } catch {
-      // fall through
-    }
-  }
-  return [
-    'UTC',
-    'Asia/Colombo',
-    'Asia/Kolkata',
-    'Asia/Dubai',
-    'Asia/Singapore',
-    'Europe/London',
-    'Europe/Berlin',
-    'America/New_York',
-    'America/Los_Angeles',
-    'Australia/Sydney'
-  ]
 }

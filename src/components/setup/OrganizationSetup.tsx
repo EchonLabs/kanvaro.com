@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
 import { useCurrencies } from '@/hooks/useCurrencies'
+import { timezoneOptions } from '@/lib/timezones'
 
 interface OrganizationSetupProps {
   onNext: (data: any) => void
@@ -39,11 +40,7 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
   )
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const timezones = [
-    'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-    'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Tokyo', 'Asia/Shanghai',
-    'Asia/Kolkata', 'Australia/Sydney'
-  ]
+  const timezones = timezoneOptions(formData.timezone)
 
   // Currencies are now loaded from database via useCurrencies hook
 

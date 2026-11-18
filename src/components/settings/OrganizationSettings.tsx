@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useNotify } from '@/lib/notify'
+import { timezoneOptions } from '@/lib/timezones'
 import { useAccentTheme, type AccentTheme } from '@/hooks/useAccentTheme'
 
 /* ── Section card wrapper ── */
@@ -172,11 +173,7 @@ export function OrganizationSettings() {
     }
   }, [])
 
-  const timezones = [
-    'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-    'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Tokyo', 'Asia/Shanghai',
-    'Asia/Kolkata', 'Australia/Sydney',
-  ]
+  const timezones = timezoneOptions(formData.timezone)
 
   const languages = [
     { code: 'en', name: 'English' }, { code: 'es', name: 'Spanish' },

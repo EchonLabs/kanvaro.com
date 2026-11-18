@@ -3,6 +3,7 @@ import connectDB from '@/lib/db-config'
 import { hasDatabaseConfig } from '@/lib/db-config'
 import { Organization } from '@/models/Organization'
 import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
+import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -489,17 +490,39 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update the organization
+    const previousTimezone = (
+      (await Organization.findOne({}).select('timezone').lean()) as { timezone?: string } | null
+    )?.timezone
+
     const organization = await Organization.findOneAndUpdate(
       {},
       updateDoc,
       { new: true, upsert: true }
     )
-    
+
     if (!organization) {
       return NextResponse.json(
         { error: 'Failed to update organization' },
         { status: 500 }
       )
+    }
+
+    // Projects inherit the organisation timezone: every working calendar that
+    // was still on the old zone follows the change. A project that was
+    // deliberately given a different zone keeps it.
+    if (
+      previousTimezone &&
+      organization.timezone &&
+      previousTimezone !== organization.timezone
+    ) {
+      try {
+        await WorkingCalendar.updateMany(
+          { organization: organization._id, timezone: previousTimezone },
+          { $set: { timezone: organization.timezone } }
+        )
+      } catch (error) {
+        console.error('Failed to propagate organization timezone to calendars:', error)
+      }
     }
 
     // Sync TimeTrackingSettings collection with organization settings if timeTracking was updated
