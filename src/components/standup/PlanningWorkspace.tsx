@@ -55,6 +55,7 @@ import {
   type OffendingMember,
   type OffendingTask
 } from './PlanningChecklist'
+import { useAutoJoinPoker } from '@/hooks/useAutoJoinPoker'
 import { PokerModal } from './PokerModal'
 import { PokerResultsModal } from './PokerResultsModal'
 import { AssignmentBoard, estimateLabel } from './planning/AssignmentBoard'
@@ -638,6 +639,9 @@ export function PlanningWorkspace({
       queue: buildPokerQueue(openPokerSession.queue ?? [], scopeById)
     })
   }
+
+  // Arriving from the invite popup opens the modal; the button stays for manual joins.
+  useAutoJoinPoker(openPokerSession?._id, !loading && !poker, joinPoker)
 
   const startPoker = async () => {
     // Everything in scope that a round has not already estimated — not just

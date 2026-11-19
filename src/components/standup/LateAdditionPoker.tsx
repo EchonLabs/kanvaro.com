@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { useAutoJoinPoker } from '@/hooks/useAutoJoinPoker'
 import { useNotify } from '@/lib/notify'
 import { MIN_LATE_ADDITION_REASON_LENGTH, isUnestimated } from '@/lib/standup/late-addition'
 import { deckCards, type DeckType } from '@/lib/standup/poker'
@@ -131,6 +132,17 @@ export function LateAdditionPoker({
     [teamMemberIds, facilitatorIsCandidate, user?.id]
   )
   const effectiveVoterIds = voterIds ?? defaultVoterIds
+
+  // Arriving from the invite popup opens the modal; the "Join" button stays for manual joins.
+  // Tasks and the open session are set in the same batch, so the queue resolves its titles.
+  useAutoJoinPoker(openSession?._id, active && !poker, () => {
+    if (!openSession) return
+    setPoker({
+      session: openSession,
+      cards: deckCards(openSession.deckType as DeckType),
+      queue: buildPokerQueue(openSession.queue ?? [], scopeById)
+    })
+  })
 
   if (!active) return null
 
