@@ -4,6 +4,7 @@ import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
 import { Story } from '@/models/Story'
 import { CompletionService } from '@/lib/completion-service'
+import { syncSprintTeamFromTasks } from '@/lib/sprint-team-sync'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -177,6 +178,10 @@ export async function POST(
         await Sprint.findByIdAndUpdate(
           targetSprintId,
           { $addToSet: { tasks: { $each: tasksToMoveToSprint } } }
+        )
+
+        await syncSprintTeamFromTasks(tasksToMoveToSprint).catch(err =>
+          console.error('Failed to sync target sprint team after carry-over:', err)
         )
       }
 

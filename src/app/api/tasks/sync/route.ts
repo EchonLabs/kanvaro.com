@@ -5,6 +5,7 @@ import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { Story } from '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
+import { syncSprintTeamFromTasks } from '@/lib/sprint-team-sync'
 
 export async function GET(request: NextRequest) {
   try {
@@ -153,6 +154,12 @@ export async function POST(request: NextRequest) {
       .populate('project', 'name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
+
+    if (updates.sprint || updates.assignedTo || updates.subtasks) {
+      await syncSprintTeamFromTasks([taskId]).catch(err =>
+        console.error('Failed to sync sprint team from task sync:', err)
+      )
+    }
 
     return NextResponse.json({
       success: true,
