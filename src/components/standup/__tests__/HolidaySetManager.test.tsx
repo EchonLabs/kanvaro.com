@@ -222,8 +222,6 @@ describe('HolidaySetManager CSV import', () => {
         json: async () => ({ data: { holidaySets: [], holidays: [], hasApiKey: false } })
       })
     }) as any
-    window.prompt = jest.fn().mockReturnValue('Sri Lanka Public Holidays')
-
     const { container } = render(
       <ToastProvider>
         <HolidaySetManager />
@@ -238,13 +236,101 @@ describe('HolidaySetManager CSV import', () => {
 
     await React.act(async () => {
       fireEvent.change(input, { target: { files: [file] } })
+    })
+
+    // The name is asked for in a dialog, and shorter than 3 characters is refused.
+    const nameInput = await screen.findByLabelText(/calendar name/i)
+    const confirm = screen.getByRole('button', { name: /create and import/i })
+    fireEvent.change(nameInput, { target: { value: 'LK' } })
+    expect(confirm).toBeDisabled()
+    fireEvent.change(nameInput, { target: { value: 'Sri Lanka Public Holidays' } })
+
+    await React.act(async () => {
+      fireEvent.click(confirm)
       await new Promise((resolve) => setTimeout(resolve, 200))
     })
 
     const create = calls.find((c) => c.url.endsWith('/holiday-sets') && c.init?.method === 'POST')
     const imp = calls.find((c) => c.url.includes('/holiday-sets/new1/import'))
     expect(create).toBeDefined()
+    expect(JSON.parse(String(create!.init!.body))).toEqual({ name: 'Sri Lanka Public Holidays' })
     expect(imp).toBeDefined()
     expect(JSON.parse(String(imp!.init!.body))).toEqual({ csv })
+  })
+
+  it('keeps the calendar it created selected when the import fails, so a retry reuses it', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = []
+    let importAttempts = 0
+    let created = false
+    global.fetch = jest.fn((url: string, init?: RequestInit) => {
+      const urlStr = String(url)
+      calls.push({ url: urlStr, init })
+      if (urlStr.endsWith('/holiday-sets') && init?.method === 'POST') {
+        created = true
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ data: { holidaySet: { id: 'new1', name: 'LK' } } })
+        })
+      }
+      if (urlStr.includes('/import')) {
+        importAttempts += 1
+        return Promise.resolve({
+          ok: importAttempts > 1,
+          json: async () =>
+            importAttempts > 1
+              ? { data: { imported: 1 } }
+              : { error: { message: 'Row 2 has an invalid date' } }
+        })
+      }
+      if (urlStr.endsWith('/holiday-sets')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            data: { holidaySets: created ? [{ id: 'new1', name: 'LK Holidays', count: 0 }] : [] }
+          })
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ data: { holidays: [], hasApiKey: false } })
+      })
+    }) as any
+
+    const { container } = render(
+      <ToastProvider>
+        <HolidaySetManager />
+      </ToastProvider>
+    )
+
+    await screen.findByText(/import csv/i)
+    const csv = 'name,date,type,isFullDay,hoursIfPartial\nX,2028-01-01,public,true,\n'
+    const makeFile = () => {
+      const file = new File([csv], 'h.csv', { type: 'text/csv' })
+      Object.defineProperty(file, 'text', { value: async () => csv })
+      return file
+    }
+    const input = () => container.querySelector('input[type="file"]') as HTMLInputElement
+
+    await React.act(async () => {
+      fireEvent.change(input(), { target: { files: [makeFile()] } })
+    })
+    fireEvent.change(await screen.findByLabelText(/calendar name/i), {
+      target: { value: 'LK Holidays' }
+    })
+    await React.act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /create and import/i }))
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    })
+
+    // Retry: the file picker must go straight to the import — no dialog, no second create.
+    await React.act(async () => {
+      fireEvent.change(input(), { target: { files: [makeFile()] } })
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    })
+
+    const creates = calls.filter((c) => c.url.endsWith('/holiday-sets') && c.init?.method === 'POST')
+    const imports = calls.filter((c) => c.url.includes('/holiday-sets/new1/import'))
+    expect(creates).toHaveLength(1)
+    expect(imports).toHaveLength(2)
   })
 })
