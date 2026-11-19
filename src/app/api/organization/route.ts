@@ -489,16 +489,18 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Update the organization
-    const previousTimezone = (
-      (await Organization.findOne({}).select('timezone').lean()) as { timezone?: string } | null
-    )?.timezone
+    // Update the organization. `new: false` hands back the document as it was
+    // *before* this write, so the zone we propagate from is read in the same
+    // atomic operation as the write. A separate read beforehand would let two
+    // concurrent saves both start from the same stale zone.
+    const before = (await Organization.findOneAndUpdate({}, updateDoc, {
+      new: false,
+      upsert: true
+    }).lean()) as { timezone?: string } | null
+    const previousTimezone = before?.timezone
 
-    const organization = await Organization.findOneAndUpdate(
-      {},
-      updateDoc,
-      { new: true, upsert: true }
-    )
+    // The response and the steps below need the document as saved.
+    const organization = await Organization.findOne({})
 
     if (!organization) {
       return NextResponse.json(
@@ -509,16 +511,14 @@ export async function PUT(request: NextRequest) {
 
     // Projects inherit the organisation timezone: every working calendar that
     // was still on the old zone follows the change. A project that was
-    // deliberately given a different zone keeps it.
-    if (
-      previousTimezone &&
-      organization.timezone &&
-      previousTimezone !== organization.timezone
-    ) {
+    // deliberately given the same zone as the organisation moves with it —
+    // that is accepted, not an oversight.
+    const newTimezone: string | undefined = updateDoc.timezone
+    if (previousTimezone && newTimezone && previousTimezone !== newTimezone) {
       try {
         await WorkingCalendar.updateMany(
           { organization: organization._id, timezone: previousTimezone },
-          { $set: { timezone: organization.timezone } }
+          { $set: { timezone: newTimezone } }
         )
       } catch (error) {
         console.error('Failed to propagate organization timezone to calendars:', error)
