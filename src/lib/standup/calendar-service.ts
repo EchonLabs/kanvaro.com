@@ -14,6 +14,7 @@ import { HolidaySet } from '@/models/HolidaySet'
 import { WorkingCalendar, type IWorkingCalendar } from '@/models/WorkingCalendar'
 
 import { assertIsoDate, monthDay, type IsoDate } from './calendar-dates'
+import { loadEffectiveCalendarSettings } from './effective-calendar'
 import { minutes, type Minutes } from './minutes'
 import {
   resolveWorkingDayFrom,
@@ -64,6 +65,12 @@ export async function loadCalendarContext(
     : ((await WorkingCalendar.findOne({ scope: 'organization' }).lean()) as IWorkingCalendar | null)
 
   const effective = projectCalendar ?? organizationCalendar
+
+  // An unconfigured project follows the organisation's Global Settings zone,
+  // not the zone the org calendar was seeded with.
+  const inheritedZone = projectCalendar
+    ? undefined
+    : (await loadEffectiveCalendarSettings([projectId])).get(String(projectId))?.timezone
 
   const subscribedSetIds = overrideSubscribedHolidaySetIds ?? effective?.subscribedHolidaySets ?? []
 
@@ -119,7 +126,7 @@ export async function loadCalendarContext(
   }
 
   return {
-    timezone: effective?.timezone ?? DEFAULT_TIMEZONE,
+    timezone: inheritedZone ?? effective?.timezone ?? DEFAULT_TIMEZONE,
     workingDaysOfWeek: effective?.workingDaysOfWeek?.length
       ? effective.workingDaysOfWeek
       : DEFAULT_WORKING_DAYS,
