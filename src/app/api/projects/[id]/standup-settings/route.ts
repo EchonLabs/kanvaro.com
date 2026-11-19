@@ -156,7 +156,7 @@ function serialise(settings: any) {
     defaultFacilitator: settings.defaultFacilitator?.toString(),
     // Lean reads skip schema defaults, and documents saved before the unit
     // existed have none — the screen would show neither option selected.
-    estimationUnit: settings.estimationUnit ?? 'story_points',
+    estimationUnit: settings.estimationUnit ?? 'hours',
     // Read-only display conveniences (§17.1).
     underToleranceHours: minutesToHours(settings.underToleranceMinutes ?? 15),
     overToleranceHours: minutesToHours(settings.overToleranceMinutes ?? 15)

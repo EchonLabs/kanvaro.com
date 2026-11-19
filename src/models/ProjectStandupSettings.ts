@@ -209,9 +209,9 @@ const ProjectStandupSettingsSchema = new Schema<IProjectStandupSettings>(
     requireOverAllocationAck: { type: Boolean, default: true },
     ceremoniesConsumeCapacity: { type: Boolean, default: true },
 
-    // Story points stays the default so projects configured before this
-    // setting existed keep estimating the way they always have.
-    estimationUnit: { type: String, enum: [...ESTIMATE_UNITS], default: 'story_points' },
+    // Hours is the default: a team votes in the time it expects the work to
+    // take unless the project explicitly opts into story points.
+    estimationUnit: { type: String, enum: [...ESTIMATE_UNITS], default: 'hours' },
     pointsToHours: { type: Number, default: 4, min: 0.5, max: 40 },
 
     notificationSwitches: {
