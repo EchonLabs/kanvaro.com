@@ -26,7 +26,7 @@ Kanvaro is a comprehensive, open-source project management web application desig
 
 ### Prerequisites
 
-- Docker and Docker Compose
+- Docker & Docker Compose
 - Git
 - Node.js 18+ (for development)
 
