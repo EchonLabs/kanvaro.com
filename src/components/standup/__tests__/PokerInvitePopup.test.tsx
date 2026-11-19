@@ -48,7 +48,7 @@ describe('PokerInvitePopup', () => {
     expect(await screen.findByText('Sprint 7 is being estimated')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Go to planning' })).toHaveAttribute(
       'href',
-      '/sprints/sp1/planning'
+      '/sprints/sp1/planning?joinPoker=s1'
     )
   })
 
