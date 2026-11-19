@@ -109,10 +109,10 @@ describe('ProjectStandupSettings — carry-forward threshold validation', () => 
 describe('ProjectStandupSettings — estimation unit', () => {
   useMongo()
 
-  it('defaults to story points so existing projects keep their behaviour', async () => {
+  it('defaults to hours', async () => {
     const settings = await ProjectStandupSettings.create(base())
 
-    expect(settings.estimationUnit).toBe('story_points')
+    expect(settings.estimationUnit).toBe('hours')
   })
 
   it('stores hours through findOneAndUpdate', async () => {
