@@ -27,6 +27,23 @@ export interface EffectiveCalendarSettings {
   inherited: boolean
 }
 
+/**
+ * What an unconfigured project inherits, given what was already loaded: the
+ * Organization's own zone wins, then the org calendar's, then UTC. The one
+ * place this rule lives, so `loadCalendarContext` (which has the org calendar
+ * in hand already) and `loadEffectiveCalendarSettings` cannot drift apart.
+ */
+export function resolveInheritedSettings(
+  organizationTimezone: string | null | undefined,
+  orgCalendar: { timezone?: string | null; standardMinutesPerDay?: number | null } | null | undefined
+): EffectiveCalendarSettings {
+  return {
+    timezone: organizationTimezone || orgCalendar?.timezone || DEFAULT_EFFECTIVE_TIMEZONE,
+    standardMinutesPerDay: orgCalendar?.standardMinutesPerDay ?? DEFAULT_EFFECTIVE_MINUTES_PER_DAY,
+    inherited: true
+  }
+}
+
 export async function loadEffectiveCalendarSettings(
   projectIds: string[]
 ): Promise<Map<string, EffectiveCalendarSettings>> {
@@ -109,15 +126,13 @@ export async function loadEffectiveCalendarSettings(
     const orgCalendar = organizationId
       ? calendarByOrganization.get(organizationId)
       : fallbackCalendar ?? undefined
-    result.set(key, {
-      timezone:
-        (organizationId ? zoneByOrganization.get(organizationId) : undefined) ||
-        orgCalendar?.timezone ||
-        DEFAULT_EFFECTIVE_TIMEZONE,
-      standardMinutesPerDay:
-        orgCalendar?.standardMinutesPerDay ?? DEFAULT_EFFECTIVE_MINUTES_PER_DAY,
-      inherited: true
-    })
+    result.set(
+      key,
+      resolveInheritedSettings(
+        organizationId ? zoneByOrganization.get(organizationId) : undefined,
+        orgCalendar
+      )
+    )
   }
 
   return result

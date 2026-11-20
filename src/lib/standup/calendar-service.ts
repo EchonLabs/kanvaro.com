@@ -11,10 +11,12 @@
  */
 import { Holiday } from '@/models/Holiday'
 import { HolidaySet } from '@/models/HolidaySet'
+import { Organization } from '@/models/Organization'
+import { Project } from '@/models/Project'
 import { WorkingCalendar, type IWorkingCalendar } from '@/models/WorkingCalendar'
 
 import { assertIsoDate, monthDay, type IsoDate } from './calendar-dates'
-import { loadEffectiveCalendarSettings } from './effective-calendar'
+import { resolveInheritedSettings } from './effective-calendar'
 import { minutes, type Minutes } from './minutes'
 import {
   resolveWorkingDayFrom,
@@ -60,17 +62,40 @@ export async function loadCalendarContext(
 
   // Layer 1 comes from the organisation unless the project has taken its own
   // copy (the "Override for this project" action on the calendar screen).
-  const organizationCalendar = projectCalendar
-    ? null
-    : ((await WorkingCalendar.findOne({ scope: 'organization' }).lean()) as IWorkingCalendar | null)
+  // An unconfigured project follows the organisation's Global Settings zone,
+  // not the zone the org calendar was seeded with. The org calendar and the
+  // Organization are looked up by the project's own organisation, the same
+  // way `loadEffectiveCalendarSettings` does, and the zone is resolved from
+  // what is loaded here rather than by loading it all a second time.
+  let organizationCalendar: IWorkingCalendar | null = null
+  let inheritedZone: string | undefined
+  if (!projectCalendar) {
+    const project = (await Project.findById(projectId).select('organization').lean()) as {
+      organization?: unknown
+    } | null
+    const organizationId = project?.organization
+
+    if (organizationId) {
+      const [calendar, organization] = await Promise.all([
+        WorkingCalendar.findOne({ scope: 'organization', organization: organizationId }).lean(),
+        Organization.findById(organizationId).select('timezone').lean()
+      ])
+      organizationCalendar = calendar as IWorkingCalendar | null
+      inheritedZone = resolveInheritedSettings(
+        (organization as { timezone?: string } | null)?.timezone,
+        organizationCalendar
+      ).timezone
+    } else {
+      // A project that cannot be resolved to an organisation (a stale id)
+      // still inherits from the one org calendar, as it always has.
+      organizationCalendar = (await WorkingCalendar.findOne({
+        scope: 'organization'
+      }).lean()) as IWorkingCalendar | null
+      inheritedZone = resolveInheritedSettings(undefined, organizationCalendar).timezone
+    }
+  }
 
   const effective = projectCalendar ?? organizationCalendar
-
-  // An unconfigured project follows the organisation's Global Settings zone,
-  // not the zone the org calendar was seeded with.
-  const inheritedZone = projectCalendar
-    ? undefined
-    : (await loadEffectiveCalendarSettings([projectId])).get(String(projectId))?.timezone
 
   const subscribedSetIds = overrideSubscribedHolidaySetIds ?? effective?.subscribedHolidaySets ?? []
 
