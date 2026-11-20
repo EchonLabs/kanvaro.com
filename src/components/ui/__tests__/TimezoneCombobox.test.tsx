@@ -38,6 +38,8 @@ describe('TimezoneCombobox', () => {
     fireEvent.change(screen.getByLabelText('Search timezones'), { target: { value: 'colombo' } })
 
     expect(screen.queryByText('Europe/London')).not.toBeInTheDocument()
+    // Substring, not fuzzy: scattered letters must not match.
+    expect(screen.queryByText('America/Coral_Harbour')).not.toBeInTheDocument()
     fireEvent.click(screen.getByText('Asia/Colombo'))
 
     expect(onChange).toHaveBeenCalledWith('Asia/Colombo')

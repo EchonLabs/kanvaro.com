@@ -14,6 +14,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/Popover
 import { timezoneOptions } from "@/lib/timezones"
 import { cn } from "@/lib/utils"
 
+/**
+ * Plain substring match on the zone or its spaced form. cmdk's default fuzzy
+ * scoring matches scattered letters, so "colombo" also offered
+ * America/Coral_Harbour and "UTC" a page of unrelated zones.
+ */
+function matchesTimezone(value: string, search: string, keywords?: string[]): number {
+  const needle = search.trim().toLowerCase()
+  if (!needle) return 1
+  return [value, ...(keywords ?? [])].some((candidate) =>
+    candidate.toLowerCase().includes(needle)
+  )
+    ? 1
+    : 0
+}
+
 interface TimezoneComboboxProps {
   id?: string
   value: string | null | undefined
@@ -81,7 +96,7 @@ export function TimezoneCombobox({
         align="start"
         className="w-[var(--radix-popover-trigger-width)] min-w-[16rem] p-0"
       >
-        <Command>
+        <Command filter={matchesTimezone}>
           <CommandInput placeholder="Search timezones…" aria-label="Search timezones" />
           <CommandList className="max-h-64">
             <CommandEmpty>No timezone found.</CommandEmpty>
