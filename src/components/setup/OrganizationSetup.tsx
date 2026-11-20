@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
 import { useCurrencies } from '@/hooks/useCurrencies'
-import { timezoneOptions } from '@/lib/timezones'
+import { TimezoneCombobox } from '@/components/ui/TimezoneCombobox'
 
 interface OrganizationSetupProps {
   onNext: (data: any) => void
@@ -40,7 +40,6 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
   )
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const timezones = timezoneOptions(formData.timezone)
 
   // Currencies are now loaded from database via useCurrencies hook
 
@@ -399,16 +398,12 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="timezone">Timezone</Label>
-              <Select value={formData.timezone || undefined} onValueChange={(value) => setFormData({ ...formData, timezone: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select timezone" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timezones.map((tz) => (
-                    <SelectItem key={tz} value={tz}>{tz}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <TimezoneCombobox
+                id="timezone"
+                value={formData.timezone}
+                placeholder="Select timezone"
+                onChange={(timezone) => setFormData({ ...formData, timezone })}
+              />
             </div>
 
             <div className="space-y-2">

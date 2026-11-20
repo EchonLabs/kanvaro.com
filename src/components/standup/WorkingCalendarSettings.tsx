@@ -42,7 +42,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { useNotify } from '@/lib/notify'
-import { timezoneOptions } from '@/lib/timezones'
+import { TimezoneCombobox } from '@/components/ui/TimezoneCombobox'
 import { cn } from '@/lib/utils'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -132,8 +132,6 @@ export function WorkingCalendarSettings({
 
   const [overrideDialogOpen, setOverrideDialogOpen] = useState(false)
 
-  // Same list as the organisation settings, so the two screens always agree.
-  const timezones = useMemo(() => timezoneOptions(calendar?.timezone), [calendar?.timezone])
 
   const loadCalendar = useCallback(async () => {
     try {
@@ -376,21 +374,11 @@ export function WorkingCalendarSettings({
 
           <div className="space-y-1.5">
             <Label htmlFor="timezone">Timezone</Label>
-            <Select
+            <TimezoneCombobox
+              id="timezone"
               value={calendar.timezone}
-              onValueChange={(timezone) => setCalendar({ ...calendar, timezone })}
-            >
-              <SelectTrigger id="timezone">
-                <SelectValue placeholder="Select a timezone" />
-              </SelectTrigger>
-              <SelectContent className="max-h-64">
-                {timezones.map((zone) => (
-                  <SelectItem key={zone} value={zone}>
-                    {zone}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(timezone) => setCalendar({ ...calendar, timezone })}
+            />
             <p className="flex items-center gap-1.5 text-[12px] text-[var(--apple-tertiary-label)]">
               <Globe className="h-3 w-3" />
               Decides which calendar date a stand-up belongs to.
