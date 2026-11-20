@@ -67,6 +67,9 @@ export function LateAdditionPoker({
   const [openSession, setOpenSession] = useState<any>(null)
   const [members, setMembers] = useState<ProjectMember[]>([])
   const [poker, setPoker] = useState<any>(null)
+  // True once the first read of the open session has finished, so the
+  // auto-join hook can tell "no open round" apart from "not loaded yet".
+  const [sessionsLoaded, setSessionsLoaded] = useState(false)
 
   const [choosing, setChoosing] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
@@ -94,6 +97,8 @@ export function LateAdditionPoker({
       }
     } catch {
       /* Additive: a failed read just leaves the button off. */
+    } finally {
+      setSessionsLoaded(true)
     }
   }, [sprintId])
 
@@ -135,7 +140,7 @@ export function LateAdditionPoker({
 
   // Arriving from the invite popup opens the modal; the "Join" button stays for manual joins.
   // Tasks and the open session are set in the same batch, so the queue resolves its titles.
-  useAutoJoinPoker(openSession?._id, active && !poker, () => {
+  useAutoJoinPoker(openSession?._id, active && sessionsLoaded && !poker, () => {
     if (!openSession) return
     setPoker({
       session: openSession,
