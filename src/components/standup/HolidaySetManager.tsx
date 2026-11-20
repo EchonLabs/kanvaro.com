@@ -21,6 +21,14 @@ import { AlertTriangle, CalendarPlus, Loader2, Plus, RefreshCw, Undo2, Upload } 
 
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import {
@@ -32,6 +40,8 @@ import {
 } from '@/components/ui/select'
 import { useNotify } from '@/lib/notify'
 import { cn } from '@/lib/utils'
+
+const MIN_SET_NAME_LENGTH = 3
 
 const REVOKE_REASON_MIN_LENGTH = 20
 
@@ -104,6 +114,9 @@ export function HolidaySetManager() {
   const [savingKey, setSavingKey] = useState(false)
   const [defaultHolidaySetId, setDefaultHolidaySetId] = useState<string | null>(null)
   const [savingDefault, setSavingDefault] = useState(false)
+  // A CSV waiting for a calendar name (see `startImport`).
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [newSetName, setNewSetName] = useState('')
 
   const [draft, setDraft] = useState({
     name: '',
@@ -310,12 +323,55 @@ export function HolidaySetManager() {
     }
   }
 
-  const importCsv = async (file: File) => {
-    if (!selectedId) return
+  /**
+   * With no calendar selected there is nothing to import into, so the upload
+   * creates one — named in a dialog, opened before the file is read so
+   * cancelling costs nothing.
+   */
+  const startImport = (file: File) => {
+    if (selectedId) {
+      void importCsv(file, null)
+      return
+    }
+    setPendingFile(file)
+    setNewSetName('')
+  }
+
+  const confirmNewSetImport = () => {
+    const name = newSetName.trim()
+    if (!pendingFile || name.length < MIN_SET_NAME_LENGTH) return
+    const file = pendingFile
+    setPendingFile(null)
+    void importCsv(file, name)
+  }
+
+  const importCsv = async (file: File, newName: string | null) => {
+    let targetId = selectedId
+
     setBusy(true)
     try {
       const csv = await file.text()
-      const response = await fetch(`/api/organization/holiday-sets/${selectedId}/import`, {
+
+      if (!targetId) {
+        const created = await fetch('/api/organization/holiday-sets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName })
+        })
+        const createdData = await created.json()
+        if (!created.ok) {
+          throw new Error(createdData?.error?.message ?? 'Could not create the holiday calendar')
+        }
+        targetId = (createdData.data ?? createdData).holidaySet.id as string
+
+        // The calendar now exists whatever happens to the import. Selecting it
+        // here means a failed import is retried into this calendar instead of
+        // creating another empty one on every attempt.
+        setSelectedId(targetId)
+        await loadSets()
+      }
+
+      const response = await fetch(`/api/organization/holiday-sets/${targetId}/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csv })
@@ -324,7 +380,7 @@ export function HolidaySetManager() {
       if (!response.ok) throw new Error(data?.error?.message ?? 'Import failed')
 
       notifySuccess({ title: 'Holidays imported' })
-      await Promise.all([loadHolidays(selectedId), loadSets()])
+      await Promise.all([loadHolidays(targetId), loadSets()])
     } catch (error) {
       notifyError({ title: (error as Error).message })
     } finally {
@@ -343,6 +399,44 @@ export function HolidaySetManager() {
 
   return (
     <div className="space-y-6">
+      <Dialog open={pendingFile !== null} onOpenChange={(open) => !open && setPendingFile(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Name the new holiday calendar</DialogTitle>
+            <DialogDescription>
+              No calendar is selected, so the CSV will be imported into a new one.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="new-holiday-set-name">Calendar name</Label>
+            <Input
+              id="new-holiday-set-name"
+              value={newSetName}
+              onChange={(event) => setNewSetName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') confirmNewSetImport()
+              }}
+              placeholder="e.g. Sri Lanka Public Holidays"
+              autoFocus
+            />
+            <p className="text-xs text-[var(--apple-secondary-label)]">
+              At least {MIN_SET_NAME_LENGTH} characters.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingFile(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmNewSetImport}
+              disabled={newSetName.trim().length < MIN_SET_NAME_LENGTH}
+            >
+              Create and import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle>Holiday calendars</CardTitle>
@@ -371,7 +465,7 @@ export function HolidaySetManager() {
               </Select>
             </div>
 
-            <Button asChild variant="outline" disabled={busy || !selectedId}>
+            <Button asChild variant="outline" disabled={busy}>
               <label className="cursor-pointer">
                 <Upload className="mr-2 h-4 w-4" />
                 Import CSV
@@ -381,7 +475,7 @@ export function HolidaySetManager() {
                   className="sr-only"
                   onChange={(event) => {
                     const file = event.target.files?.[0]
-                    if (file) void importCsv(file)
+                    if (file) startImport(file)
                     event.target.value = ''
                   }}
                 />

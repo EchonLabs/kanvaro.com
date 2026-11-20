@@ -107,5 +107,16 @@ async function readCsv(request: NextRequest): Promise<string> {
     return typeof inline === 'string' ? inline : ''
   }
 
-  return await request.text()
+  // The UI posts `{ csv }` as JSON; scripted callers may send the CSV itself.
+  const raw = await request.text()
+  if (contentType.includes('application/json')) {
+    try {
+      const parsed = JSON.parse(raw)
+      return typeof parsed?.csv === 'string' ? parsed.csv : ''
+    } catch {
+      return ''
+    }
+  }
+
+  return raw
 }

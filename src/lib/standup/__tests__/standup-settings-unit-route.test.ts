@@ -3,7 +3,7 @@
  *
  * The unit is a plain enum on the settings document, but two things around it
  * need pinning: the PUT must refuse a value the poker route would choke on
- * later, and the GET must report story points for a document saved before the
+ * later, and the GET must report hours for a document saved before the
  * field existed (a lean read skips schema defaults), or the settings screen
  * shows neither option selected.
  */
@@ -121,20 +121,20 @@ describe('standup-settings route â€” estimation unit', () => {
     expect(findOneAndUpdate.mock.calls[0][1].$set).not.toHaveProperty('estimationUnit')
   })
 
-  it('reports story points for a project that has never been configured', async () => {
+  it('reports hours for a project that has never been configured', async () => {
     const { GET } = loadRoute({ stored: null })
 
     const body = await (await get(GET)).json()
 
-    expect(body.data.settings.estimationUnit).toBe('story_points')
+    expect(body.data.settings.estimationUnit).toBe('hours')
   })
 
-  it('reports story points for a document saved before the unit existed', async () => {
+  it('reports hours for a document saved before the unit existed', async () => {
     const { GET } = loadRoute({ stored: { _id: 'settings-1', pointsToHours: 4 } })
 
     const body = await (await get(GET)).json()
 
-    expect(body.data.settings.estimationUnit).toBe('story_points')
+    expect(body.data.settings.estimationUnit).toBe('hours')
   })
 
   it('reports the stored unit', async () => {

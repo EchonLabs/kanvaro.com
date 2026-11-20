@@ -11,6 +11,7 @@ export interface ScopeTask {
   _id: string
   displayId?: string
   title: string
+  status?: string
   originalEstimateMinutes?: number
   estimatedHours?: number
   estimateMethod?: 'poker' | 'manual' | null

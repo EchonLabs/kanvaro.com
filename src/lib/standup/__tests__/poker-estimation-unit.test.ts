@@ -127,10 +127,10 @@ describe('formatEstimate / convertedHours', () => {
 })
 
 describe('resolveEstimationSetup', () => {
-  it('falls back to story points on the Fibonacci deck when nothing is configured', () => {
+  it('falls back to hours on the Fibonacci deck when nothing is configured', () => {
     expect(resolveEstimationSetup({})).toEqual({
       deckType: 'fibonacci',
-      estimationUnit: 'story_points'
+      estimationUnit: 'hours'
     })
   })
 

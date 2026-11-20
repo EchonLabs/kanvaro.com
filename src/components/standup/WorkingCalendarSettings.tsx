@@ -42,6 +42,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { useNotify } from '@/lib/notify'
+import { TimezoneCombobox } from '@/components/ui/TimezoneCombobox'
 import { cn } from '@/lib/utils'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -131,7 +132,6 @@ export function WorkingCalendarSettings({
 
   const [overrideDialogOpen, setOverrideDialogOpen] = useState(false)
 
-  const timezones = useMemo(() => listTimezones(), [])
 
   const loadCalendar = useCallback(async () => {
     try {
@@ -374,21 +374,11 @@ export function WorkingCalendarSettings({
 
           <div className="space-y-1.5">
             <Label htmlFor="timezone">Timezone</Label>
-            <Select
+            <TimezoneCombobox
+              id="timezone"
               value={calendar.timezone}
-              onValueChange={(timezone) => setCalendar({ ...calendar, timezone })}
-            >
-              <SelectTrigger id="timezone">
-                <SelectValue placeholder="Select a timezone" />
-              </SelectTrigger>
-              <SelectContent className="max-h-64">
-                {timezones.map((zone) => (
-                  <SelectItem key={zone} value={zone}>
-                    {zone}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(timezone) => setCalendar({ ...calendar, timezone })}
+            />
             <p className="flex items-center gap-1.5 text-[12px] text-[var(--apple-tertiary-label)]">
               <Globe className="h-3 w-3" />
               Decides which calendar date a stand-up belongs to.
@@ -1121,28 +1111,4 @@ function lastDayOfMonth(month: string): string {
   const [year, monthIndex] = month.split('-').map(Number)
   const day = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate()
   return `${month}-${String(day).padStart(2, '0')}`
-}
-
-function listTimezones(): string[] {
-  const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] })
-    .supportedValuesOf
-  if (typeof supported === 'function') {
-    try {
-      return supported('timeZone')
-    } catch {
-      // fall through
-    }
-  }
-  return [
-    'UTC',
-    'Asia/Colombo',
-    'Asia/Kolkata',
-    'Asia/Dubai',
-    'Asia/Singapore',
-    'Europe/London',
-    'Europe/Berlin',
-    'America/New_York',
-    'America/Los_Angeles',
-    'Australia/Sydney'
-  ]
 }

@@ -115,13 +115,6 @@ const navigationItems = [
         path: '/epics',
         permission: Permission.EPIC_READ
       },
-      {
-        id: 'tasks-sprint-events',
-        label: 'Sprint Events',
-        icon: Calendar,
-        path: '/sprint-events',
-        permission: Permission.SPRINT_MANAGE
-      },
     ]
   },
   {
@@ -136,6 +129,13 @@ const navigationItems = [
         icon: Zap,
         path: '/sprints',
         permission: Permission.SPRINT_VIEW
+      },
+      {
+        id: 'standup-sprint-events',
+        label: 'Sprint Events',
+        icon: Calendar,
+        path: '/sprint-events',
+        permission: Permission.SPRINT_EVENT_VIEW
       },
       {
         // No `permission` gate: see the matching comment in Sidebar.tsx —

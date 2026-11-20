@@ -104,26 +104,40 @@ export default function SprintAnalyticsPickerPage() {
     <MainLayout breadcrumbItems={breadcrumbItems}>
       {/* No padding of its own: MainLayout's <main> already pads the content. */}
       <div data-testid="analytics-picker-page" className="flex flex-col gap-6">
-        <div className={cn(planCardClass, 'flex flex-col gap-1.5 p-5 sm:p-7')}>
-          <h1 className="apple-type-title1 font-bold text-[var(--plan-text)]">{s.title()}</h1>
-          <p className="apple-type-subheadline text-[var(--plan-muted)]">{s.pickerSubtitle()}</p>
-        </div>
+        {/* Page header, as on Projects and Kanban: bare icon + title + subtitle on the
+            page background, with the one control (the project filter) in the action slot. */}
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3">
+            <BarChart3
+              className="h-8 w-8 flex-shrink-0"
+              strokeWidth={1.5}
+              style={{ color: 'var(--apple-card-gradient)' }}
+              aria-hidden="true"
+            />
+            <div>
+              <h1 className="text-[28px] font-bold leading-tight tracking-tight text-[var(--apple-label)] sm:text-[30px]">
+                {s.title()}
+              </h1>
+              <p className="mt-0.5 text-[15px] text-[var(--apple-secondary-label)]">{s.pickerSubtitle()}</p>
+            </div>
+          </div>
 
-        {projects.length > 1 && (
-          <Select value={projectId} onValueChange={setProjectId}>
-            <SelectTrigger aria-label="Project" className="w-56 text-[13px]">
-              <SelectValue placeholder="All projects" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+          {projects.length > 1 && (
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger aria-label="Project" className="h-10 w-full text-sm sm:w-[200px]">
+                <SelectValue placeholder="All projects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
 
         {state.kind === 'loading' && (
           <p role="status" className="apple-type-subheadline text-[var(--plan-muted)]">

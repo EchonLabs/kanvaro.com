@@ -11,6 +11,8 @@ import mongoose from 'mongoose'
 
 import { Holiday } from '@/models/Holiday'
 import { HolidaySet } from '@/models/HolidaySet'
+import { Organization } from '@/models/Organization'
+import { Project } from '@/models/Project'
 import { WorkingCalendar } from '@/models/WorkingCalendar'
 import {
   checkHolidayCoverage,
@@ -93,6 +95,42 @@ describe('loadCalendarContext', () => {
     expect(context.workingDaysOfWeek).toEqual([0, 1, 2, 3, 4])
     expect(context.standardMinutesPerDay).toBe(360)
     expect(context.timezone).toBe('Asia/Dubai')
+  })
+
+  it("inherits its own organisation's calendar and zone when several exist", async () => {
+    const otherOrganization = new mongoose.Types.ObjectId()
+    // Created first, so an unfiltered findOne would pick it.
+    await WorkingCalendar.create({
+      scope: 'organization',
+      organization: otherOrganization,
+      workingDaysOfWeek: [0, 1, 2, 3, 4],
+      standardMinutesPerDay: 360,
+      timezone: 'Asia/Dubai'
+    })
+    await WorkingCalendar.create({
+      scope: 'organization',
+      organization,
+      workingDaysOfWeek: [1, 2, 3, 4, 5, 6],
+      standardMinutesPerDay: 420,
+      timezone: 'UTC'
+    })
+    await Organization.create({ _id: organization, name: 'Kanvaro', timezone: 'Asia/Colombo' })
+    await Organization.create({ _id: otherOrganization, name: 'Other', timezone: 'Asia/Dubai' })
+    await Project.create({
+      _id: project,
+      name: 'Invoicing Revamp',
+      organization,
+      createdBy: user,
+      projectNumber: 1,
+      startDate: new Date('2026-01-01T00:00:00.000Z')
+    })
+
+    const context = await loadCalendarContext(project.toString(), '2026-08-01', '2026-08-31')
+
+    expect(context.workingDaysOfWeek).toEqual([1, 2, 3, 4, 5, 6])
+    expect(context.standardMinutesPerDay).toBe(420)
+    // The Organization's Global Settings zone wins over the org calendar's.
+    expect(context.timezone).toBe('Asia/Colombo')
   })
 
   it('falls back to Mon-Fri 8h UTC when nothing is configured at all', async () => {

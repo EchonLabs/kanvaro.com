@@ -1,10 +1,12 @@
 /**
  * `GET /api/sprints/:id` must be a pure read for a sprint that has not started.
  *
- * Planning adds tasks to a sprint without touching their status, so they are
- * still `backlog` until the sprint starts. The read used to treat any
- * backlog-status task as "moved back to the backlog" and detach it, so merely
- * viewing the sprint (a refresh, or navigating away and back) emptied the scope.
+ * The planning screen promotes a task it adds to `todo`, but a task can still
+ * sit in a sprint as `backlog` (added through the API or another screen, or
+ * planned before that promotion existed) until the sprint starts. The read used
+ * to treat any backlog-status task as "moved back to the backlog" and detach
+ * it, so merely viewing the sprint (a refresh, or navigating away and back)
+ * emptied the scope.
  */
 import { NextRequest } from 'next/server'
 

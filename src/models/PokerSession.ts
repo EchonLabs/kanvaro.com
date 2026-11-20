@@ -96,7 +96,7 @@ const PokerSessionSchema = new Schema<IPokerSession>(
 
     status: { type: String, enum: [...POKER_SESSION_STATUSES], default: 'open' },
     deckType: { type: String, enum: [...DECK_TYPES], default: 'fibonacci' },
-    estimationUnit: { type: String, enum: [...ESTIMATE_UNITS], default: 'story_points' },
+    estimationUnit: { type: String, enum: [...ESTIMATE_UNITS], default: 'hours' },
     pointsToHours: { type: Number, default: 4, min: 0.5, max: 40 },
     allowRevote: { type: Boolean, default: true },
     autoRevealOnAllVoted: { type: Boolean, default: true },

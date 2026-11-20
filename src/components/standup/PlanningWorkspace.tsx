@@ -55,6 +55,7 @@ import {
   type OffendingMember,
   type OffendingTask
 } from './PlanningChecklist'
+import { useAutoJoinPoker } from '@/hooks/useAutoJoinPoker'
 import { PokerModal } from './PokerModal'
 import { PokerResultsModal } from './PokerResultsModal'
 import { AssignmentBoard, estimateLabel } from './planning/AssignmentBoard'
@@ -328,10 +329,20 @@ export function PlanningWorkspace({
   const moveTask = async (taskId: string, intoSprint: boolean) => {
     setBusy(true)
     try {
+      // Mirror the backlog page: adding to a sprint promotes the task to `todo`
+      // (the task PUT only applies this while it is still `backlog`). Removing a
+      // task that is still untouched (`todo`) sends it back to `backlog`; one
+      // already in progress keeps its status.
+      const body: Record<string, unknown> = intoSprint
+        ? { sprint: sprintId, status: 'todo' }
+        : { sprint: null }
+      if (!intoSprint && scope.find((task) => task._id === taskId)?.status === 'todo') {
+        body.status = 'backlog'
+      }
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sprint: intoSprint ? sprintId : null })
+        body: JSON.stringify(body)
       })
       if (!response.ok) throw new Error('Could not move the task')
       await Promise.all([refresh(), loadBacklog(), loadScope()])
@@ -628,6 +639,9 @@ export function PlanningWorkspace({
       queue: buildPokerQueue(openPokerSession.queue ?? [], scopeById)
     })
   }
+
+  // Arriving from the invite popup opens the modal; the button stays for manual joins.
+  useAutoJoinPoker(openPokerSession?._id, !loading && !poker, joinPoker)
 
   const startPoker = async () => {
     // Everything in scope that a round has not already estimated — not just
