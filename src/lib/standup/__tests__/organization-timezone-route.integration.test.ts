@@ -92,6 +92,16 @@ describe('PUT /api/organization — timezone', () => {
     })
   })
 
+  it('stores a zone sent in the wrong case in its standard spelling', async () => {
+    const response = await put({ timezone: 'europe/london' })
+    expect(response.status).toBe(200)
+
+    const org = (await Organization.findById(organization).lean()) as any
+    const orgCalendar = (await WorkingCalendar.findOne({ scope: 'organization' }).lean()) as any
+    expect(org?.timezone).toBe('Europe/London')
+    expect(orgCalendar?.timezone).toBe('Europe/London')
+  })
+
   it('writes no audit when the zone does not change', async () => {
     const response = await put({ timezone: 'Asia/Colombo' })
     expect(response.status).toBe(200)

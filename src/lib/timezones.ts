@@ -53,6 +53,26 @@ export function listTimezones(): string[] {
 }
 
 /**
+ * The stored spelling of a timezone the user sent, or `null` when the runtime
+ * does not recognise it.
+ *
+ * `Intl` accepts identifiers in any case ("utc", "asia/colombo"), but every
+ * comparison in the app — the pickers, the org-to-calendar propagation — is
+ * by exact string, so "utc" would be saved and then match nothing. Prefer the
+ * spelling from the shared list; fall back to the runtime's own casing.
+ */
+export function normalizeTimezone(timezone: string): string | null {
+  const lower = timezone.toLowerCase()
+  const listed = listTimezones().find((zone) => zone.toLowerCase() === lower)
+  if (listed) return listed
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: timezone }).resolvedOptions().timeZone
+  } catch {
+    return null
+  }
+}
+
+/**
  * The shared list, plus `current` when it is not already there. A saved value
  * outside the list (legacy data) must still render as the selected option
  * rather than leaving the select blank.

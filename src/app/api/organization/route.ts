@@ -7,6 +7,7 @@ import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { authenticateUser } from '@/lib/auth-utils'
 import { isValidTimezone } from '@/lib/standup/calendar-dates'
 import { recordAudit } from '@/lib/standup/audit'
+import { normalizeTimezone } from '@/lib/timezones'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { writeFile } from 'fs/promises'
@@ -301,15 +302,21 @@ export async function PUT(request: NextRequest) {
     // The zone drives every working-day calculation and is copied onto the
     // org calendar below with `findOneAndUpdate`, which skips schema
     // validators — so an unknown identifier has to be refused here, before
-    // anything (logos included) is written.
-    if (
-      updateData.timezone !== undefined &&
-      (typeof updateData.timezone !== 'string' || !isValidTimezone(updateData.timezone))
-    ) {
-      return NextResponse.json(
-        { error: `"${String(updateData.timezone)}" is not a recognised IANA timezone.` },
-        { status: 400 }
-      )
+    // anything (logos included) is written. A recognised zone is stored in its
+    // standard spelling ("utc" → "UTC"), since everything downstream compares
+    // zones by exact string.
+    if (updateData.timezone !== undefined) {
+      const normalizedZone =
+        typeof updateData.timezone === 'string' && isValidTimezone(updateData.timezone)
+          ? normalizeTimezone(updateData.timezone)
+          : null
+      if (!normalizedZone) {
+        return NextResponse.json(
+          { error: `"${String(updateData.timezone)}" is not a recognised IANA timezone.` },
+          { status: 400 }
+        )
+      }
+      updateData.timezone = normalizedZone
     }
 
     // Handle logo file uploads
