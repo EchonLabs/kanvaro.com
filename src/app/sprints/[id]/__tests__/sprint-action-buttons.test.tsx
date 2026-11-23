@@ -96,8 +96,12 @@ function mockFetchFor(sprint: ReturnType<typeof buildSprint>) {
   })
 }
 
-async function renderPageFor(status: 'planning' | 'planned' | 'active', totalTasks = 0) {
-  const sprint = buildSprint(status, totalTasks)
+async function renderPageFor(
+  status: 'planning' | 'planned' | 'active',
+  totalTasks = 0,
+  legacySprintFlow = false
+) {
+  const sprint = { ...buildSprint(status, totalTasks), legacySprintFlow }
   const fetchMock = mockFetchFor(sprint)
   global.fetch = fetchMock as any
 
@@ -200,6 +204,33 @@ describe('sprint header action-button row (Task 3)', () => {
       url === '/api/sprints/sprint-1/start'
     )
     expect(startCalls).toHaveLength(0)
+  })
+
+  describe('legacy sprint flow', () => {
+    it('lets a planning sprint start without planning: no blocked reason, start API called', async () => {
+      const fetchMock = await renderPageFor('planning', 5, true)
+
+      expect(document.getElementById('start-sprint-reason')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Start Sprint' }))
+
+      await waitFor(() => {
+        const startCalls = fetchMock.mock.calls.filter(
+          ([url]: [string]) => url === '/api/sprints/sprint-1/start'
+        )
+        expect(startCalls).toHaveLength(1)
+      })
+      expect(mockNotifyError).not.toHaveBeenCalledWith({ title: standupBlockedText() })
+    })
+
+    it('hides the Plan Sprint button', async () => {
+      await renderPageFor('planning', 5, true)
+      expect(screen.queryByRole('button', { name: 'Plan Sprint' })).toBeNull()
+    })
+
+    it('keeps the Plan Sprint button when the flag is off', async () => {
+      await renderPageFor('planning', 5, false)
+      expect(screen.getByRole('button', { name: 'Plan Sprint' })).toBeInTheDocument()
+    })
   })
 })
 
