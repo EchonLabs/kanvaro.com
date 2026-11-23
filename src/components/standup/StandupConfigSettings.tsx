@@ -23,6 +23,7 @@ import { SettingsActionBar } from './SettingsActionBar'
 
 interface Settings {
   enabled: boolean
+  legacySprintFlow: boolean
   standupLocalTime: string
   durationMinutes: number
   readyLeadMinutes: number
@@ -161,6 +162,12 @@ export function StandupConfigSettings({
           hint="Off stops stand-ups being generated for sprints planned from now on. Stand-ups already scheduled are kept."
           checked={settings.enabled}
           onChange={(value) => update('enabled', value)}
+        />
+        <ToggleRow
+          label="Legacy sprint flow"
+          hint="Skip sprint planning. Sprints start straight from the backlog and complete as before, carrying unfinished tasks to the next sprint with their statuses. No stand-ups are generated for these sprints."
+          checked={settings.legacySprintFlow}
+          onChange={(value) => update('legacySprintFlow', value)}
         />
       </Section>
 

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useNotify } from '@/lib/notify'
+import { TimezoneCombobox } from '@/components/ui/TimezoneCombobox'
 import { useAccentTheme, type AccentTheme } from '@/hooks/useAccentTheme'
 
 /* ── Section card wrapper ── */
@@ -172,11 +173,6 @@ export function OrganizationSettings() {
     }
   }, [])
 
-  const timezones = [
-    'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-    'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Tokyo', 'Asia/Shanghai',
-    'Asia/Kolkata', 'Australia/Sydney',
-  ]
 
   const languages = [
     { code: 'en', name: 'English' }, { code: 'es', name: 'Spanish' },
@@ -611,12 +607,11 @@ export function OrganizationSettings() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Timezone" htmlFor="timezone">
-            <Select value={formData.timezone} onValueChange={(v) => setFormData({ ...formData, timezone: v })}>
-              <SelectTrigger id="timezone"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {timezones.map(tz => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <TimezoneCombobox
+              id="timezone"
+              value={formData.timezone}
+              onChange={(timezone) => setFormData({ ...formData, timezone })}
+            />
           </Field>
 
           <Field label="Currency" htmlFor="currency">

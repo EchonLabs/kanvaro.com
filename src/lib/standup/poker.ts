@@ -59,7 +59,7 @@ export function resolveEstimationSetup(input: {
 }): { deckType: DeckType; estimationUnit: EstimateUnit } {
   const estimationUnit =
     input.estimationUnit ??
-    (input.deckType === 'hours' ? 'hours' : input.projectUnit ?? 'story_points')
+    (input.deckType === 'hours' ? 'hours' : input.projectUnit ?? 'hours')
   if (!ESTIMATE_UNITS.includes(estimationUnit)) {
     throw new StandupError('VALIDATION_FAILED', `"${estimationUnit}" is not an estimation unit.`, {
       allowed: ESTIMATE_UNITS

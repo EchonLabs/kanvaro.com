@@ -481,6 +481,16 @@ export function PokerModal({
 
   // One rule decides what is on screen, for the facilitator and voters alike.
   useEffect(() => {
+    // A completed session closes the modal for everyone. This has to come
+    // first: once the last task is estimated the server clears `currentTask`,
+    // but the `currentTaskId` fallback below still names a queued task, so
+    // `next` is never null and the old "!next && sessionClosed" check never
+    // fired for voters.
+    if (sessionClosed) {
+      onOpenChange(false)
+      return
+    }
+
     const next = resolveVisibleTask({
       serverCurrentTask: serverCurrentTask ?? currentTaskId ?? null,
       queue: liveQueue.length ? liveQueue : queue,
@@ -488,7 +498,6 @@ export function PokerModal({
     })
 
     if (next && next !== taskId) setTaskId(next)
-    if (!next && sessionClosed) onOpenChange(false)
   }, [serverCurrentTask, liveQueue, queue, currentTaskId, taskId, sessionClosed, onOpenChange])
 
   const post = useCallback(

@@ -131,13 +131,6 @@ const navigationItems = [
         path: '/epics',
         permission: Permission.EPIC_VIEW
       },
-      {
-        id: 'tasks-sprint-events',
-        label: 'Sprint Events',
-        icon: Calendar,
-        path: '/sprint-events',
-        permission: Permission.SPRINT_EVENT_VIEW
-      },
     ]
   },
   {
@@ -152,6 +145,13 @@ const navigationItems = [
         icon: Zap,
         path: '/sprints',
         permission: Permission.SPRINT_VIEW
+      },
+      {
+        id: 'standup-sprint-events',
+        label: 'Sprint Events',
+        icon: Calendar,
+        path: '/sprint-events',
+        permission: Permission.SPRINT_EVENT_VIEW
       },
       {
         // No `permission` gate: STANDUP_VIEW is deliberately never granted at

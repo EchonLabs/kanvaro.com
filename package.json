@@ -15,6 +15,7 @@
     "db:migrate": "node scripts/migrate.js",
     "db:seed": "node scripts/seed.js",
     "standup:rebuild-debt-summaries": "node scripts/rebuild-debt-summaries.js",
+    "standup:migrate-estimation-unit": "node scripts/migrate-estimation-unit.js",
     "docker:dev": "docker-compose -f docker-compose.dev.yml up -d",
     "docker:prod": "docker-compose up -d",
     "docker:down": "docker-compose down",

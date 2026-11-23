@@ -35,7 +35,7 @@ describe('PokerSession defaults — PLN-10', () => {
     const session = await createSession()
 
     expect(session.deckType).toBe('fibonacci')
-    expect(session.estimationUnit).toBe('story_points')
+    expect(session.estimationUnit).toBe('hours')
     expect(session.consensusRule).toBe('facilitator_decides')
     expect(session.pointsToHours).toBe(4)
     expect(session.allowRevote).toBe(true)

@@ -3,7 +3,11 @@ import connectDB from '@/lib/db-config'
 import { hasDatabaseConfig } from '@/lib/db-config'
 import { Organization } from '@/models/Organization'
 import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
+import { WorkingCalendar } from '@/models/WorkingCalendar'
 import { authenticateUser } from '@/lib/auth-utils'
+import { isValidTimezone } from '@/lib/standup/calendar-dates'
+import { recordAudit } from '@/lib/standup/audit'
+import { normalizeTimezone } from '@/lib/timezones'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { writeFile } from 'fs/promises'
@@ -295,6 +299,26 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // The zone drives every working-day calculation and is copied onto the
+    // org calendar below with `findOneAndUpdate`, which skips schema
+    // validators — so an unknown identifier has to be refused here, before
+    // anything (logos included) is written. A recognised zone is stored in its
+    // standard spelling ("utc" → "UTC"), since everything downstream compares
+    // zones by exact string.
+    if (updateData.timezone !== undefined) {
+      const normalizedZone =
+        typeof updateData.timezone === 'string' && isValidTimezone(updateData.timezone)
+          ? normalizeTimezone(updateData.timezone)
+          : null
+      if (!normalizedZone) {
+        return NextResponse.json(
+          { error: `"${String(updateData.timezone)}" is not a recognised IANA timezone.` },
+          { status: 400 }
+        )
+      }
+      updateData.timezone = normalizedZone
+    }
+
     // Handle logo file uploads
     let logoUrl: string | undefined = undefined
     let darkLogoUrl: string | undefined = undefined
@@ -488,18 +512,57 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Update the organization
-    const organization = await Organization.findOneAndUpdate(
-      {},
-      updateDoc,
-      { new: true, upsert: true }
-    )
-    
+    // Update the organization. `new: false` hands back the document as it was
+    // *before* this write, so the zone we propagate from is read in the same
+    // atomic operation as the write. A separate read beforehand would let two
+    // concurrent saves both start from the same stale zone.
+    const before = (await Organization.findOneAndUpdate({}, updateDoc, {
+      new: false,
+      upsert: true
+    }).lean()) as { timezone?: string } | null
+    const previousTimezone = before?.timezone
+
+    // The response and the steps below need the document as saved.
+    const organization = await Organization.findOne({})
+
     if (!organization) {
       return NextResponse.json(
         { error: 'Failed to update organization' },
         { status: 500 }
       )
+    }
+
+    // Only the org-scoped calendar follows the organisation's zone. Projects
+    // without a calendar of their own already inherit it through
+    // `loadEffectiveCalendarSettings` (effective-calendar.ts), so there is
+    // nothing to write for them. A project calendar is a deliberate PM
+    // override — even one that happens to match the old org zone — and is
+    // left alone. Stand-ups already generated under the old zone are not
+    // recalculated.
+    const newTimezone: string | undefined = updateDoc.timezone
+    if (previousTimezone && newTimezone && previousTimezone !== newTimezone) {
+      try {
+        const calendarBefore = (await WorkingCalendar.findOneAndUpdate(
+          { organization: organization._id, scope: 'organization', timezone: previousTimezone },
+          { $set: { timezone: newTimezone } },
+          { new: false }
+        ).lean()) as { _id: unknown } | null
+
+        if (calendarBefore) {
+          await recordAudit({
+            actor: { type: 'user', userId: user.id },
+            organizationId: organization._id.toString(),
+            action: 'working_calendar_updated',
+            entityType: 'working_calendar',
+            entityId: String(calendarBefore._id),
+            before: { timezone: previousTimezone },
+            after: { timezone: newTimezone },
+            context: { source: 'organization_timezone_change' }
+          })
+        }
+      } catch (error) {
+        console.error('Failed to propagate organization timezone to its calendar:', error)
+      }
     }
 
     // Sync TimeTrackingSettings collection with organization settings if timeTracking was updated

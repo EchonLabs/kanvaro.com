@@ -19,7 +19,7 @@ import { DeleteCustomStatusModal } from '@/components/sprints/DeleteCustomStatus
 import { DeleteSubtaskModal } from '@/components/sprints/DeleteSubtaskModal'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { hasStandups, isLiveSprint, type SprintState } from '@/lib/standup/sprint-states'
+import { hasStandups, isLiveSprint, startableSprintStates, type SprintState } from '@/lib/standup/sprint-states'
 import { LateAdditionPoker } from '@/components/standup/LateAdditionPoker'
 import { standupStrings } from '@/lib/standup/strings'
 import { InfoTooltip } from '@/components/ui/InfoTooltip'
@@ -72,6 +72,8 @@ interface Sprint {
   description: string
   // Spec §8.1 adds `draft` and `planned` to the four states Kanvaro shipped with.
   status: SprintState
+  /** Project's "Legacy sprint flow" switch: start without planning. */
+  legacySprintFlow?: boolean
   project: {
     _id: string
     name: string
@@ -2028,7 +2030,7 @@ export default function SprintDetailPage() {
     }
     // The server refuses this too; saying so here saves a round trip and, more
     // to the point, names the fix instead of reporting a failure.
-    if (sprint?.status !== 'planned') {
+    if (!sprint || !startableSprintStates(!!sprint.legacySprintFlow).includes(sprint.status)) {
       const reason = standupStrings.planning.startBlockedNotPlanned()
       setActionError(reason)
       notifyError({ title: reason })
@@ -2530,7 +2532,8 @@ export default function SprintDetailPage() {
   // Only relevant when the Start Sprint button is shown while not yet
   // startable (`planning`); once `planned`, the sprint is ready to start and
   // needs no explanation.
-  const startReason = sprint.status === 'planned' ? null : standupStrings.planning.startBlockedNotPlanned()
+  const isStartableState = startableSprintStates(!!sprint.legacySprintFlow).includes(sprint.status)
+  const startReason = isStartableState ? null : standupStrings.planning.startBlockedNotPlanned()
 
   return (
     <MainLayout breadcrumbItems={breadcrumbItems}>
@@ -2624,15 +2627,15 @@ export default function SprintDetailPage() {
                   rendered while Planning, aria-disabled with the reason and a
                   route to the fix: a button that simply disappears tells
                   the PM nothing about why they cannot start. */}
-              {(sprint.status === 'planning' || sprint.status === 'planned') && canStartSprint && (
+              {(sprint.status === 'planning' || sprint.status === 'planned' || (sprint.legacySprintFlow && sprint.status === 'draft')) && canStartSprint && (
                 <div className="inline-flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={handleStartSprint}
-                    aria-disabled={startingSprint || sprint.status !== 'planned' || !hasTasks}
+                    aria-disabled={startingSprint || !isStartableState || !hasTasks}
                     aria-describedby="start-sprint-reason"
                     className={`inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold px-4 h-9 shadow-sm transition-all ${
-                      sprint.status !== 'planned' || !hasTasks
+                      !isStartableState || !hasTasks
                         ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed shadow-none'
                         : 'bg-[#16a34a] hover:bg-[#15803d] text-white cursor-pointer'
                     }`}
@@ -2640,7 +2643,7 @@ export default function SprintDetailPage() {
                     {startingSprint ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Play className={`h-4 w-4 ${sprint.status !== 'planned' || !hasTasks ? 'fill-gray-400 dark:fill-gray-500' : 'fill-white'}`} />
+                      <Play className={`h-4 w-4 ${!isStartableState || !hasTasks ?'fill-gray-400 dark:fill-gray-500' : 'fill-white'}`} />
                     )}
                     <span>{startingSprint ? 'Starting…' : 'Start Sprint'}</span>
                   </button>
@@ -2655,7 +2658,7 @@ export default function SprintDetailPage() {
                   and a team member with no sprint-edit rights still has to
                   reach the screen to cast a vote. Every action on the page is
                   permission-checked in its own right, server side. */}
-              {canViewSprint && ['draft', 'planning', 'planned'].includes(sprint.status) && (
+              {canViewSprint && !sprint.legacySprintFlow && ['draft', 'planning', 'planned'].includes(sprint.status) && (
                 <button
                   type="button"
                   onClick={() => router.push(`/sprints/${sprintId}/planning`)}

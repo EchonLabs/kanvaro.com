@@ -18,6 +18,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ArrowRight, X } from 'lucide-react'
 
+import { JOIN_POKER_PARAM } from '@/hooks/useAutoJoinPoker'
 import {
   isNotificationStreamConnected,
   subscribeNotificationStreamConnected,
@@ -35,7 +36,9 @@ interface OpenInvite {
 
 /** Where the invitee votes: the sprint page for a late-addition round, else planning. */
 const inviteHref = (invite: OpenInvite) =>
-  invite.lateAddition ? `/sprints/${invite.sprintId}` : `/sprints/${invite.sprintId}/planning`
+  `${
+    invite.lateAddition ? `/sprints/${invite.sprintId}` : `/sprints/${invite.sprintId}/planning`
+  }?${JOIN_POKER_PARAM}=${encodeURIComponent(invite.sessionId)}`
 
 const FALLBACK_POLL_MS = 30000
 const DISMISSED_KEY = 'kanvaro:poker-invite-dismissed'

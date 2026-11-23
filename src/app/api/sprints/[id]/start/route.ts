@@ -6,7 +6,9 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { logActivity } from '@/lib/activity-logger'
-import { STARTABLE_SPRINT_STATES, type SprintState } from '@/lib/standup/sprint-states'
+import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
+import { isLegacySprintFlow } from '@/lib/standup/standup-enablement'
+import { startableSprintStates, type SprintState } from '@/lib/standup/sprint-states'
 import { standupStrings } from '@/lib/standup/strings'
 
 export async function POST(
@@ -83,7 +85,17 @@ export async function POST(
     // checklist, has no frozen estimates and — because generation happens
     // inside `completePlanning` — has no stand-ups at all, so starting it
     // produced an Active sprint that could never remind anybody of anything.
-    if (!STARTABLE_SPRINT_STATES.includes(sprint.status as SprintState)) {
+    // The legacy sprint flow (per-project switch) skips planning, so a sprint
+    // may also start from `draft`/`planning`. Read only here, after the cheaper
+    // permission and already-active checks.
+    const projectSettings = sprintProjectId
+      ? await ProjectStandupSettings.findOne({ project: sprintProjectId })
+          .select('legacySprintFlow')
+          .lean<{ legacySprintFlow?: boolean } | null>()
+      : null
+    const legacyFlow = isLegacySprintFlow(projectSettings)
+
+    if (!startableSprintStates(legacyFlow).includes(sprint.status as SprintState)) {
       return NextResponse.json(
         { error: standupStrings.planning.startBlockedNotPlanned() },
         { status: 400 }

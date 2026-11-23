@@ -4,6 +4,8 @@ import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { Story } from '@/models/Story'
+import { ProjectStandupSettings } from '@/models/ProjectStandupSettings'
+import { isLegacySprintFlow } from '@/lib/standup/standup-enablement'
 import '@/models/Epic'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
@@ -236,10 +238,23 @@ export async function GET(
 
     const sprintData = sprint.toObject()
 
+    // The page needs the project's legacy-flow switch to decide whether Start
+    // is available before planning and whether to offer "Plan Sprint".
+    const settingsProjectId =
+      typeof sprint.project === 'object' && sprint.project !== null
+        ? (sprint.project as any)._id?.toString()
+        : (sprint.project as any)?.toString?.()
+    const projectStandupSettings = settingsProjectId
+      ? await ProjectStandupSettings.findOne({ project: settingsProjectId })
+          .select('legacySprintFlow')
+          .lean<{ legacySprintFlow?: boolean } | null>()
+      : null
+
     return NextResponse.json({
       success: true,
       data: {
         ...sprintData,
+        legacySprintFlow: isLegacySprintFlow(projectStandupSettings),
         progress: {
           completionPercentage,
           tasksCompleted: completedTasks,

@@ -17,6 +17,7 @@ import { recordAudit, auditSnapshot } from '@/lib/standup/audit'
 import { isValidTimezone } from '@/lib/standup/calendar-dates'
 import { checkHolidayCoverage } from '@/lib/standup/calendar-service'
 import { StandupError } from '@/lib/standup/errors'
+import { loadEffectiveCalendarSettings } from '@/lib/standup/effective-calendar'
 import { hoursToMinutes, minutesToHours } from '@/lib/standup/minutes'
 import { notifyCalendarChangeSafely } from '@/lib/standup/notifications'
 import {
@@ -58,6 +59,18 @@ export const GET = withStandupPermission(
         timezone: (organization as any)?.timezone ?? 'UTC',
         subscribedHolidaySets: [],
         overrides: []
+      }
+
+      // The org calendar's zone is seeded once and goes stale when Global
+      // Settings changes, so the inherited zone and day length are resolved
+      // the same way the working-day resolver resolves them.
+      const effective = (await loadEffectiveCalendarSettings([String(projectId)])).get(String(projectId))
+      if (effective) {
+        calendar = {
+          ...(calendar as any),
+          timezone: effective.timezone,
+          standardMinutesPerDay: effective.standardMinutesPerDay
+        }
       }
     }
 

@@ -115,7 +115,7 @@ export function PokerResultsModal({
     }
   }, [open, sessionId, notify])
 
-  const estimationUnit = data?.estimationUnit ?? 'story_points'
+  const estimationUnit = data?.estimationUnit ?? 'hours'
   const unit = estimationUnit === 'hours' ? 'h' : ' pts'
   const toHours = useCallback(
     (value: number) =>
