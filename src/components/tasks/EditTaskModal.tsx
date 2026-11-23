@@ -271,12 +271,10 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
       setSubtasks(initialSubtasksData)
       setInitialSubtasks(initialSubtasksData)
 
-      const deps = task.dependencies || []
-      const blk = task.blockingTasks || []
-      setDraftBlockedBy(deps)
-      setInitialDependencies(deps)
-      setDraftBlocking(blk)
-      setInitialBlockingTasks(blk)
+      setDraftBlockedBy([])
+      setInitialDependencies([])
+      setDraftBlocking([])
+      setInitialBlockingTasks([])
 
       if (task?._id) {
         fetch(`/api/tasks/${task._id}/dependencies`)

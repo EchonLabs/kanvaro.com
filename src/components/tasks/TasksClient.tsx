@@ -45,7 +45,7 @@ import {
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
-import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
+import { useProjectKanbanStatuses, type KanbanStatusConfig } from '@/hooks/useProjectKanbanStatuses'
 import dynamic from 'next/dynamic'
 import { extractUserId } from '@/lib/auth/user-utils'
 import { useNotify } from '@/lib/notify'
@@ -370,7 +370,7 @@ export default function TasksClient({
     const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
     const [refreshKey, setRefreshKey] = useState(0)
     const [projectCategories, setProjectCategories] = useState<Record<string, Array<{ key: string; title: string; order: number }>>>({})
-    const { statusMap: projectsWithStatuses } = useProjectKanbanStatuses()
+    const [projectsWithStatuses, setProjectsWithStatuses] = useState<Map<string, KanbanStatusConfig[]>>(new Map())
     const { success: notifySuccess, error: notifyError } = useNotify()
 
     // Check if any filters are active
@@ -562,11 +562,11 @@ export default function TasksClient({
         }
     }, [tasks, canFilterUsers, isQAEngineer, user])
 
-    // Load projects from API for filter dropdown
+    // Load projects from API for filter dropdown, task categories, and kanban statuses
     useEffect(() => {
         const loadProjects = async () => {
             try {
-                const response = await fetch('/api/projects?all=true')
+                const response = await fetch('/api/projects?all=true&minimal=true')
                 if (response.ok) {
                     const data = await response.json()
                     if (data.success && Array.isArray(data.data)) {
@@ -579,13 +579,25 @@ export default function TasksClient({
                         })
 
                         const catMap: Record<string, Array<{ key: string; title: string; order: number }>> = {}
+                        const nextStatusMap = new Map<string, KanbanStatusConfig[]>()
                         data.data.forEach((p: any) => {
                             const cats = p.settings?.taskCategories
                             if (Array.isArray(cats)) {
                                 catMap[p._id] = cats
                             }
+                            if (
+                                p?._id &&
+                                Array.isArray(p.settings?.kanbanStatuses) &&
+                                p.settings.kanbanStatuses.length > 0
+                            ) {
+                                const statuses = [...p.settings.kanbanStatuses].sort(
+                                    (a: KanbanStatusConfig, b: KanbanStatusConfig) => (a.order ?? 0) - (b.order ?? 0)
+                                )
+                                nextStatusMap.set(p._id, statuses)
+                            }
                         })
                         setProjectCategories(catMap)
+                        setProjectsWithStatuses(nextStatusMap)
                     }
                 }
             } catch (err) {
@@ -923,6 +935,7 @@ export default function TasksClient({
                 setTasks(data.data)
                 setTotalCount(data.pagination?.total || data.data.length)
                 if (reset) {
+                    prevPaginationRef.current = { currentPage: 1, pageSize }
                     setCurrentPage(1)
                 }
             } else {
@@ -949,7 +962,7 @@ export default function TasksClient({
         router
     ])
 
-    // Track if filters have been initialized and previous filter values
+    // Track if filters have been initialized and previous filter/pagination values
     const filtersInitializedRef = useRef(false)
     const prevFiltersRef = useRef<{
         debouncedSearch: string
@@ -962,29 +975,32 @@ export default function TasksClient({
         createdByFilter: string
         dateRangeFilter: { from?: string; to?: string } | null
     } | null>(null)
+    const prevPaginationRef = useRef<{ currentPage: number; pageSize: number }>({
+        currentPage,
+        pageSize
+    })
 
     // Initial fetch on mount if no initial tasks were provided
     useEffect(() => {
+        prevFiltersRef.current = {
+            debouncedSearch: debouncedSearch || '',
+            statusFilter: statusFilter || 'all',
+            priorityFilter: priorityFilter || 'all',
+            typeFilter: typeFilter || 'all',
+            categoryFilter: categoryFilter || 'all',
+            projectFilter: projectFilter || 'all',
+            assignedToFilter: assignedToFilter || 'all',
+            createdByFilter: createdByFilter || 'all',
+            dateRangeFilter: dateRangeFilter ? {
+                from: dateRangeFilter.from?.toISOString().split('T')[0],
+                to: dateRangeFilter.to?.toISOString().split('T')[0]
+            } : null
+        }
+        prevPaginationRef.current = { currentPage, pageSize }
+        filtersInitializedRef.current = true
+
         if (!initialTasks || initialTasks.length === 0) {
-            filtersInitializedRef.current = true
             fetchTasks(true)
-        } else {
-            filtersInitializedRef.current = true
-            // Initialize prev filters with current values to prevent immediate fetch
-            prevFiltersRef.current = {
-                debouncedSearch: debouncedSearch || '',
-                statusFilter: statusFilter || 'all',
-                priorityFilter: priorityFilter || 'all',
-                typeFilter: typeFilter || 'all',
-                categoryFilter: categoryFilter || 'all',
-                projectFilter: projectFilter || 'all',
-                assignedToFilter: assignedToFilter || 'all',
-                createdByFilter: createdByFilter || 'all',
-                dateRangeFilter: dateRangeFilter ? {
-                    from: dateRangeFilter.from?.toISOString().split('T')[0],
-                    to: dateRangeFilter.to?.toISOString().split('T')[0]
-                } : null
-            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
@@ -1045,11 +1061,17 @@ export default function TasksClient({
         fetchTasks
     ])
 
-    // Fetch when pagination changes
+    // Fetch when pagination changes (only when currentPage or pageSize actually changes)
     useEffect(() => {
-        if (filtersInitializedRef.current) {
-            fetchTasks(false)
+        if (!filtersInitializedRef.current) return
+        if (
+            prevPaginationRef.current.currentPage === currentPage &&
+            prevPaginationRef.current.pageSize === pageSize
+        ) {
+            return
         }
+        prevPaginationRef.current = { currentPage, pageSize }
+        fetchTasks(false)
     }, [currentPage, pageSize, fetchTasks])
 
     const getStatusColor = (status: string) => {

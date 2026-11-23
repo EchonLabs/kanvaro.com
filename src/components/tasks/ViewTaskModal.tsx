@@ -425,8 +425,6 @@ export default function ViewTaskModal({
           <TaskDependencies
             taskId={task._id}
             taskStatus={task.status}
-            initialBlockedBy={task.dependencies}
-            initialBlocking={task.blockingTasks}
             readOnly={!canEdit}
           />
 

@@ -89,10 +89,8 @@ export async function GET(request: NextRequest) {
       if (!isAll) {
         query = query.skip((page - 1) * limit).limit(limit)
       }
-      const [members, total] = await Promise.all([
-        query.lean(),
-        User.countDocuments(filters)
-      ])
+      const members = await query.lean()
+      const total = isAll ? members.length : await User.countDocuments(filters)
 
       return NextResponse.json({
         success: true,

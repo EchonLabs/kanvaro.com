@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useMemo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -61,48 +61,10 @@ export default function SortableTask({
   canEdit = true,
   canDelete = true
 }: SortableTaskProps) {
-  const [userData, setUserData] = useState<Record<string, any>>({})
-  const [loadingUsers, setLoadingUsers] = useState(false)
-
-  // Fetch user data for assignees that are ObjectIds
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!task.assignedTo || !Array.isArray(task.assignedTo)) return
-
-      const userIdsToFetch = task.assignedTo
-        .map(assignee => typeof assignee === 'string' ? assignee : assignee._id || assignee)
-        .filter(userId => userId && !userData[userId.toString()]) // Only fetch users we don't already have
-
-      if (userIdsToFetch.length === 0) return
-
-      setLoadingUsers(true)
-      try {
-        // Use batch API to fetch all users at once
-        const idsParam = userIdsToFetch.join(',')
-        const response = await fetch(`/api/users?ids=${idsParam}`, {
-          cache: 'force-cache',
-        })
-
-        if (response.ok) {
-          const userMap = await response.json()
-          setUserData(prev => ({ ...prev, ...userMap }))
-        } else {
-          console.warn('Failed to fetch user data batch:', response.status)
-        }
-      } catch (error) {
-        console.error('Failed to fetch user data:', error)
-      } finally {
-        setLoadingUsers(false)
-      }
-    }
-
-    fetchUserData()
-  }, [task.assignedTo])
-
   // Helper function to get assignee data
   const getAssigneeData = (assignee: any) => {
     // Check if assignee.user is populated (from backend populate)
-    if (typeof assignee === 'object' && assignee.user && typeof assignee.user === 'object' && assignee.user.firstName) {
+    if (typeof assignee === 'object' && assignee?.user && typeof assignee.user === 'object' && assignee.user.firstName) {
       return {
         firstName: assignee.user.firstName,
         lastName: assignee.user.lastName,
@@ -111,20 +73,8 @@ export default function SortableTask({
     }
 
     // Check if assignee itself has the user data (stored directly)
-    if (typeof assignee === 'object' && assignee.firstName) {
+    if (typeof assignee === 'object' && assignee?.firstName) {
       return assignee
-    }
-
-    // Need to look up from fetched user data
-    const userId = typeof assignee === 'string' ? assignee : assignee._id || assignee.user || assignee
-    const userInfo = userData[userId]
-
-    if (userInfo) {
-      return {
-        firstName: userInfo.firstName || '',
-        lastName: userInfo.lastName || '',
-        email: userInfo.email || ''
-      }
     }
 
     // Fallback
@@ -380,11 +330,9 @@ export default function SortableTask({
                     <TooltipTrigger asChild>
                       <Badge
                         variant="outline"
-                        className={`text-xs px-2 py-1 cursor-help hover:bg-muted transition-colors border-dashed ${
-                          loadingUsers ? 'animate-pulse' : ''
-                        }`}
+                        className="text-xs px-2 py-1 cursor-help hover:bg-muted transition-colors border-dashed"
                       >
-                        {loadingUsers ? '...' : `+${task.assignedTo.length - 1} more`}
+                        +{task.assignedTo.length - 1} more
                       </Badge>
                     </TooltipTrigger>
                     <TooltipContent
