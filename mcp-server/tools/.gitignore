@@ -1,0 +1,6 @@
+log-*.jsonl
+.test-users.json
+.route-check-*.json
+.route-check-run.log
+.route-inventory.json
+.test-data.json

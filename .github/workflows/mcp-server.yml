@@ -1,0 +1,40 @@
+name: MCP server
+
+on:
+  pull_request:
+    paths:
+      - 'mcp-server/**'
+      - '.github/workflows/mcp-server.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'mcp-server/**'
+      - '.github/workflows/mcp-server.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mcp-server/.nvmrc
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
