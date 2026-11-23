@@ -6,6 +6,9 @@ import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { Sprint } from '@/models/Sprint'
+import { Standup } from '@/models/Standup'
+import mongoose from 'mongoose'
 
 export async function GET(
   request: NextRequest,
@@ -181,6 +184,36 @@ export async function PUT(
       CompletionService.checkEpicCompletion(story?.epic.toString()).catch(error => {
         console.error('Error checking epic completion:', error)
       })
+    }
+
+    // Sync story assignee into sprint team and upcoming standups if story is in a sprint
+    if (story?.sprint && story?.assignedTo) {
+      const sprintIdStr = (typeof story.sprint === 'object' && story.sprint !== null && '_id' in story.sprint)
+        ? String(story.sprint._id)
+        : String(story.sprint)
+      const assigneeIdStr = (typeof story.assignedTo === 'object' && story.assignedTo !== null && '_id' in story.assignedTo)
+        ? String(story.assignedTo._id)
+        : String(story.assignedTo)
+
+      if (sprintIdStr && assigneeIdStr && mongoose.Types.ObjectId.isValid(assigneeIdStr)) {
+        const memberObjectId = new mongoose.Types.ObjectId(assigneeIdStr)
+        Sprint.updateOne(
+          { _id: sprintIdStr, status: { $nin: ['completed', 'cancelled'] } },
+          { 
+            $addToSet: { 
+              teamMembers: memberObjectId,
+              stories: new mongoose.Types.ObjectId(storyId)
+            } 
+          }
+        ).then(res => {
+          if (res.modifiedCount > 0) {
+            return Standup.updateMany(
+              { sprint: sprintIdStr, status: { $in: ['Scheduled', 'Ready'] } },
+              { $addToSet: { expectedAttendees: memberObjectId } }
+            )
+          }
+        }).catch(err => console.error('Failed to sync story assignee to sprint:', err))
+      }
     }
 
     return NextResponse.json({

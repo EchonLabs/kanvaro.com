@@ -18,6 +18,7 @@ import { resolveBaseUrl } from '@/lib/request-base-url'
 import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
 import { closeCarryForwardItemsForDeletedTask } from '@/lib/standup/carry-forward-service'
 import { hoursToMinutes } from '@/lib/standup/minutes'
+import { syncSprintTeamFromTasks } from '@/lib/sprint-team-sync'
 import { DEFAULT_TASK_STATUS_KEYS } from '@/constants/taskStatuses'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
@@ -1197,6 +1198,16 @@ export async function PUT(
       } catch (err) {
         console.error('Failed to auto-adjust dependent tasks schedule:', err)
       }
+    }
+
+    // Sync sprint team if sprint or assignees changed
+    if (
+      task.sprint &&
+      ['sprint', 'assignedTo', 'subtasks'].some((key) => Object.prototype.hasOwnProperty.call(updateData, key))
+    ) {
+      await syncSprintTeamFromTasks([taskId]).catch(err =>
+        console.error('Failed to sync sprint team from task assignees:', err)
+      )
     }
 
     // Prepare response immediately

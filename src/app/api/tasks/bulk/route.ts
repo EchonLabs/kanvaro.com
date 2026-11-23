@@ -6,6 +6,8 @@ import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { invalidateCache } from '@/lib/redis'
 import { CompletionService } from '@/lib/completion-service'
+import { Sprint } from '@/models/Sprint'
+import { syncSprintTeamFromTasks } from '@/lib/sprint-team-sync'
 
 function scheduleTaskCacheInvalidation(projectIds: string[], organizationId: string) {
   // Best-effort cache invalidation: do not block the API response.
@@ -127,6 +129,18 @@ export async function POST(request: NextRequest) {
           { _id: { $in: validTaskIds }, organization: organizationId },
           { $set: updates }
         )
+
+        // Bulk move to sprint / bulk reassign: add assignees to the sprint team
+        if (updates.sprint || updates.assignedTo || updates.subtasks) {
+          if (updates.sprint) {
+            await Sprint.findByIdAndUpdate(updates.sprint, {
+              $addToSet: { tasks: { $each: validTaskIds } }
+            }).catch(err => console.error('Failed to add tasks to sprint in bulk update:', err))
+          }
+          await syncSprintTeamFromTasks(validTaskIds).catch(err =>
+            console.error('Failed to sync sprint team after bulk update:', err)
+          )
+        }
 
         // Check for story completion if status was updated to 'done' or 'completed'
         if (updates.status === 'done' || updates.status === 'completed') {
