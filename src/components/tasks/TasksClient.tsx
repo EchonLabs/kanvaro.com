@@ -923,6 +923,7 @@ export default function TasksClient({
                 setTasks(data.data)
                 setTotalCount(data.pagination?.total || data.data.length)
                 if (reset) {
+                    prevPaginationRef.current = { currentPage: 1, pageSize }
                     setCurrentPage(1)
                 }
             } else {
@@ -949,7 +950,7 @@ export default function TasksClient({
         router
     ])
 
-    // Track if filters have been initialized and previous filter values
+    // Track if filters have been initialized and previous filter/pagination values
     const filtersInitializedRef = useRef(false)
     const prevFiltersRef = useRef<{
         debouncedSearch: string
@@ -962,29 +963,32 @@ export default function TasksClient({
         createdByFilter: string
         dateRangeFilter: { from?: string; to?: string } | null
     } | null>(null)
+    const prevPaginationRef = useRef<{ currentPage: number; pageSize: number }>({
+        currentPage,
+        pageSize
+    })
 
     // Initial fetch on mount if no initial tasks were provided
     useEffect(() => {
+        prevFiltersRef.current = {
+            debouncedSearch: debouncedSearch || '',
+            statusFilter: statusFilter || 'all',
+            priorityFilter: priorityFilter || 'all',
+            typeFilter: typeFilter || 'all',
+            categoryFilter: categoryFilter || 'all',
+            projectFilter: projectFilter || 'all',
+            assignedToFilter: assignedToFilter || 'all',
+            createdByFilter: createdByFilter || 'all',
+            dateRangeFilter: dateRangeFilter ? {
+                from: dateRangeFilter.from?.toISOString().split('T')[0],
+                to: dateRangeFilter.to?.toISOString().split('T')[0]
+            } : null
+        }
+        prevPaginationRef.current = { currentPage, pageSize }
+        filtersInitializedRef.current = true
+
         if (!initialTasks || initialTasks.length === 0) {
-            filtersInitializedRef.current = true
             fetchTasks(true)
-        } else {
-            filtersInitializedRef.current = true
-            // Initialize prev filters with current values to prevent immediate fetch
-            prevFiltersRef.current = {
-                debouncedSearch: debouncedSearch || '',
-                statusFilter: statusFilter || 'all',
-                priorityFilter: priorityFilter || 'all',
-                typeFilter: typeFilter || 'all',
-                categoryFilter: categoryFilter || 'all',
-                projectFilter: projectFilter || 'all',
-                assignedToFilter: assignedToFilter || 'all',
-                createdByFilter: createdByFilter || 'all',
-                dateRangeFilter: dateRangeFilter ? {
-                    from: dateRangeFilter.from?.toISOString().split('T')[0],
-                    to: dateRangeFilter.to?.toISOString().split('T')[0]
-                } : null
-            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
@@ -1045,11 +1049,17 @@ export default function TasksClient({
         fetchTasks
     ])
 
-    // Fetch when pagination changes
+    // Fetch when pagination changes (only when currentPage or pageSize actually changes)
     useEffect(() => {
-        if (filtersInitializedRef.current) {
-            fetchTasks(false)
+        if (!filtersInitializedRef.current) return
+        if (
+            prevPaginationRef.current.currentPage === currentPage &&
+            prevPaginationRef.current.pageSize === pageSize
+        ) {
+            return
         }
+        prevPaginationRef.current = { currentPage, pageSize }
+        fetchTasks(false)
     }, [currentPage, pageSize, fetchTasks])
 
     const getStatusColor = (status: string) => {
