@@ -49,6 +49,11 @@ export function evaluateTaskDispositions(
 export interface CarryForwardDispositionRow {
   itemId: string
   taskKey?: string
+  /**
+   * What the final-day banner calls this item. A blocker or owner-absent item
+   * has no task key, and the banner used to fall back to the raw database id.
+   */
+  label?: string
   status: string
   hasResolution: boolean
 }

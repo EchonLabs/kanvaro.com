@@ -134,7 +134,7 @@ export function CapacityMembersSettings({ projectId }: { projectId: string }) {
 
                   <td className="px-4 py-3">
                     <span className="font-apple-mono text-[13px] tabular-nums text-[var(--apple-secondary-label)]">
-                      {member.effectiveFrom ?? '—'}
+                      {member.effectiveFrom ?? 'N/A'}
                     </span>
                   </td>
 

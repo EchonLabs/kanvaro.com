@@ -124,7 +124,7 @@ describe('renderSummaryMarkdown', () => {
 
   it('produces the expected header line', () => {
     const output = renderSummaryMarkdown(fixture)
-    expect(output).toContain('# Stand-up — 2026-08-10 (Day 3 of 9)')
+    expect(output).toContain('# Stand-up: 2026-08-10 (Day 3 of 9)')
   })
 
   it('produces the expected attendance lines', () => {
@@ -161,13 +161,13 @@ describe('renderSummaryMarkdown', () => {
 
   it('renders blockers raised/resolved as prose — not JSON', () => {
     const output = renderSummaryMarkdown(fixture)
-    expect(output).toContain('- Waiting on vendor sandbox (external_party, high) — open')
+    expect(output).toContain('- Waiting on vendor sandbox (external_party, high) (open)')
     expect(output).toContain('- Vendor restored access.')
   })
 
   it('renders carry-forward rows as prose — not JSON', () => {
     const output = renderSummaryMarkdown(fixture)
-    expect(output).toContain('- KAN-5 (3-5) — open')
+    expect(output).toContain('- KAN-5 (3-5) (open)')
   })
 
   it('renders pmNotes under its own heading only when present', () => {
@@ -195,6 +195,37 @@ describe('renderSummaryMarkdown', () => {
     expect(output).toContain('## Estimate debt movements')
     expect(output).toContain('## Blockers raised')
     expect(output).toContain('None.')
+  })
+  it('says the day outcome is pending until the next stand-up records it', () => {
+    const output = renderSummaryMarkdown(fixture)
+    expect(output).toContain('## How the day went')
+    expect(output).toContain('recorded when the next stand-up is completed')
+  })
+
+  it('says no later stand-up records the outcome on the final day, matching the screen', () => {
+    const output = renderSummaryMarkdown({
+      ...fixture,
+      headerFacts: { ...fixture.headerFacts, dayNumber: 5, totalDays: 5 }
+    } as SummaryDocument)
+    expect(output).toContain("This was the sprint's last stand-up")
+    expect(output).not.toContain('recorded when the next stand-up is completed')
+  })
+
+  it('renders a recorded day outcome with logged vs planned hours and completed tasks', () => {
+    const output = renderSummaryMarkdown({
+      ...fixture,
+      dayOutcome: {
+        recordedAt: new Date(),
+        recordedByStandup: 'standup-2',
+        recordedByStandupDate: '2026-08-18',
+        completedTasks: [{ taskId: 'task-1', taskKey: 'KAN-1', title: 'Login page' }],
+        varianceTable: [],
+        memberTotals: [{ memberId: 'member-x', name: 'Nadeesha', plannedMinutes: 240, loggedMinutesOnDay: 270, dayVarianceMinutes: 30 }]
+      }
+    } as unknown as SummaryDocument)
+    expect(output).toContain('Recorded at the 2026-08-18 stand-up.')
+    expect(output).toContain('- Nadeesha: 4.5h logged of 4.0h planned')
+    expect(output).toContain('- Completed KAN-1 Login page')
   })
 })
 

@@ -13,6 +13,12 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { StandupError } from '@/lib/standup/errors'
 import { type EstimateUnit } from '@/lib/standup/estimates'
 import {
+  assertLateAdditionReason,
+  isPastPlanning,
+  isUnestimated
+} from '@/lib/standup/late-addition'
+import { TERMINAL_SPRINT_STATES } from '@/lib/standup/sprint-states'
+import {
   CONSENSUS_RULES,
   deckCards,
   resolveEstimationSetup,
@@ -45,6 +51,8 @@ interface CreateBody {
   hideVoterIdentity?: boolean
   allowRevote?: boolean
   autoRevealOnAllVoted?: boolean
+  /** Required once the sprint has left planning (E14); ignored before. */
+  reason?: string
 }
 
 export const POST = withSprintPermission(
@@ -75,6 +83,22 @@ export const POST = withSprintPermission(
       projectUnit: (settings as any)?.estimationUnit
     })
 
+    // A sprint past planning makes this a late-addition round (E14): it needs a
+    // reason, only touches tasks nobody has estimated, and finalize freezes
+    // each result. Before that, nothing here changes.
+    // A finished sprint is refused whichever way it ended: `cancelled` is not
+    // "past planning" by `hasStandups`, but it is no more estimable than
+    // `completed`.
+    if (TERMINAL_SPRINT_STATES.includes(sprint.status)) {
+      throw new StandupError(
+        'VALIDATION_FAILED',
+        `This sprint is ${sprint.status}; its tasks can no longer be estimated.`
+      )
+    }
+
+    const lateAddition = isPastPlanning(sprint.status)
+    const lateAdditionReason = lateAddition ? assertLateAdditionReason(body.reason) : undefined
+
     // Only tasks actually in this sprint, and only ones not already frozen —
     // a poker round over a locked estimate could not be applied (DAT-6).
     const tasks = await Task.find({
@@ -82,8 +106,23 @@ export const POST = withSprintPermission(
       sprint: sprintId,
       estimateLockedAt: { $exists: false }
     })
-      .select('_id')
+      .select('_id displayId title originalEstimateMinutes estimatedHours')
       .lean()
+
+    if (lateAddition) {
+      // A task that already has an estimate stays on the revision path. Say so
+      // by name rather than quietly dropping it from the round.
+      const estimated = (tasks as any[]).filter((task) => !isUnestimated(task))
+      if (estimated.length > 0) {
+        throw new StandupError(
+          'VALIDATION_FAILED',
+          `These tasks already have an estimate and cannot be estimated with poker: ${estimated
+            .map((task) => task.displayId ?? task.title)
+            .join(', ')}. Revise the remaining estimate instead.`,
+          { taskIds: estimated.map((task) => task._id.toString()) }
+        )
+      }
+    }
 
     if (tasks.length === 0) {
       throw new StandupError(
@@ -105,6 +144,7 @@ export const POST = withSprintPermission(
       project: projectId,
       sprint: sprintId,
       planningSession: (planningSession as any)?._id,
+      ...(lateAdditionReason ? { lateAdditionReason } : {}),
       deckType,
       estimationUnit,
       consensusRule,
@@ -133,7 +173,8 @@ export const POST = withSprintPermission(
         sessionId: (session as any)._id.toString(),
         sprintId,
         sprintName: sprint.name,
-        facilitatorId: userId
+        facilitatorId: userId,
+        ...(lateAddition ? { lateAddition: true } : {})
       }
     )
 

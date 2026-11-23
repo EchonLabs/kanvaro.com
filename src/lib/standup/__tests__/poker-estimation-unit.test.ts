@@ -166,8 +166,12 @@ describe('resolveEstimationSetup', () => {
 
   it('keeps an explicitly requested points deck on an hours project', () => {
     expect(
-      resolveEstimationSetup({ deckType: 'powers_of_two', projectUnit: 'hours' })
-    ).toEqual({ deckType: 'powers_of_two', estimationUnit: 'hours' })
+      resolveEstimationSetup({ deckType: 'fibonacci', projectUnit: 'hours' })
+    ).toEqual({ deckType: 'fibonacci', estimationUnit: 'hours' })
+  })
+
+  it('refuses a deck that is no longer offered', () => {
+    expect(() => resolveEstimationSetup({ deckType: 'tshirt' as any })).toThrow(StandupError)
   })
 
   it('refuses the hours deck with a story-points unit', () => {

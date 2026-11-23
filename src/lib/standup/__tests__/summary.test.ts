@@ -3,7 +3,12 @@
  * already has in memory and shapes them into `StandupSummary`'s schema,
  * without querying anything itself. No database in this file.
  */
-import { buildSummaryDocument, personalCommitmentFor, type BuildSummaryInput } from '@/lib/standup/summary'
+import {
+  buildDayOutcome,
+  buildSummaryDocument,
+  personalCommitmentFor,
+  type BuildSummaryInput
+} from '@/lib/standup/summary'
 
 const fixture: BuildSummaryInput = {
   standupId: 'standup-1',
@@ -84,5 +89,27 @@ describe('personalCommitmentFor', () => {
 
     expect(result?.name).toBe('Nadeesha')
     expect(result?.allocations).toEqual([{ taskId: 'task-3', taskKey: 'KAN-3', plannedMinutes: 90 }])
+  })
+})
+
+describe('buildDayOutcome', () => {
+  it("shapes the next stand-up's classification into the day outcome and stamps recordedAt", () => {
+    const before = Date.now()
+    const outcome = buildDayOutcome({
+      recordedByStandupId: 'standup-2',
+      recordedByStandupDate: '2026-08-18',
+      completedTasks: [{ taskId: 'task-1', taskKey: 'KAN-1' }],
+      varianceTable: [{ allocationId: 'a-1', outcome: 'delivered_on_plan' }],
+      memberTotals: [{ memberId: 'm-1', plannedMinutes: 240, loggedMinutesOnDay: 240, dayVarianceMinutes: 0 }]
+    })
+
+    expect(outcome).toMatchObject({
+      recordedByStandup: 'standup-2',
+      recordedByStandupDate: '2026-08-18',
+      completedTasks: [{ taskKey: 'KAN-1' }],
+      varianceTable: [{ allocationId: 'a-1' }],
+      memberTotals: [{ memberId: 'm-1', plannedMinutes: 240 }]
+    })
+    expect(outcome.recordedAt.getTime()).toBeGreaterThanOrEqual(before)
   })
 })

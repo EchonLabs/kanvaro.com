@@ -18,6 +18,7 @@ import {
 } from './sprint-close'
 import { minutes, ZERO_MINUTES } from './minutes'
 import { StandupError } from './errors'
+import { standupStrings } from './strings'
 
 const DONE_STATUSES = new Set(['done', 'cancelled'])
 
@@ -94,6 +95,9 @@ export async function loadSprintCloseReadiness(
   const carryForwardItems: CarryForwardDispositionRow[] = carryForwardPanel.items.map((item) => ({
     itemId: item.itemId,
     taskKey: item.taskKey,
+    label:
+      item.taskKey ??
+      [standupStrings.carryForward.itemTypeLabel(item.type), item.memberName].filter(Boolean).join(' · '),
     status: item.status,
     hasResolution: item.resolution !== undefined
   }))

@@ -173,7 +173,7 @@ export async function recordNotStartedReason(
   if (reason.length < MIN_NOT_STARTED_REASON_LENGTH) {
     throw new StandupError(
       'VALIDATION_FAILED',
-      `Say why the planned time did not happen — at least ${MIN_NOT_STARTED_REASON_LENGTH} characters.`,
+      `Say why the planned time did not happen. Use at least ${MIN_NOT_STARTED_REASON_LENGTH} characters.`,
       { field: 'reason', minLength: MIN_NOT_STARTED_REASON_LENGTH }
     )
   }
@@ -322,7 +322,7 @@ function assertReason(
   if (reason === 'other' && trimmed.length < MIN_REVISION_DETAIL_LENGTH) {
     throw new StandupError(
       'VALIDATION_FAILED',
-      `Say a little more — at least ${MIN_REVISION_DETAIL_LENGTH} characters.`,
+      `Say a little more. Use at least ${MIN_REVISION_DETAIL_LENGTH} characters.`,
       { field: 'detail', minLength: MIN_REVISION_DETAIL_LENGTH }
     )
   }

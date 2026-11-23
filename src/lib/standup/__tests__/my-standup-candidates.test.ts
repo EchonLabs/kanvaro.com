@@ -108,7 +108,10 @@ describe('findOpenStandupCandidates', () => {
     expect(readyCandidate.sprintName).toBe('Sprint 4')
   })
 
-  it('falls back to an empty sprint name rather than throwing when the sprint record is missing', async () => {
+  // Regression: the scheduler still promotes a stand-up whose sprint was
+  // deleted, and with an earlier start time it outranked the member's real
+  // stand-up, so /my/standup redirected to a stand-up that can never start.
+  it('skips stand-ups whose sprint was deleted, completed or cancelled, so the live one wins', async () => {
     const project = await Project.create({
       name: 'Project C',
       organization,
@@ -118,31 +121,54 @@ describe('findOpenStandupCandidates', () => {
       startDate: new Date('2026-01-01'),
       teamMembers: [{ memberId: member }]
     })
-    const danglingSprintId = anyId()
-    await Standup.create({
-      project: project._id,
-      sprint: danglingSprintId,
+    const liveSprint = await Sprint.create({
+      name: 'Live sprint',
       organization,
-      standupDate: '2026-09-11',
-      scheduledStartAt: new Date('2026-09-11T03:30:00Z'),
-      durationMinutes: 15,
-      sprintDayNumber: 1,
-      totalSprintDays: 5,
-      shape: 'mid_sprint',
-      status: 'Ready',
-      facilitator: user,
-      expectedAttendees: [member],
-      version: 0
+      project: project._id,
+      createdBy: user,
+      status: 'active',
+      startDate: new Date('2026-09-07'),
+      endDate: new Date('2026-09-18'),
+      capacity: 0
     })
+    const completedSprint = await Sprint.create({
+      name: 'Finished sprint',
+      organization,
+      project: project._id,
+      createdBy: user,
+      status: 'completed',
+      startDate: new Date('2026-08-24'),
+      endDate: new Date('2026-09-04'),
+      capacity: 0
+    })
+    const standup = (sprint: unknown, date: string, hour: string) =>
+      Standup.create({
+        project: project._id,
+        sprint,
+        organization,
+        standupDate: date,
+        scheduledStartAt: new Date(`${date}T${hour}:00Z`),
+        durationMinutes: 15,
+        sprintDayNumber: 1,
+        totalSprintDays: 5,
+        shape: 'mid_sprint',
+        status: 'Ready',
+        facilitator: user,
+        expectedAttendees: [member],
+        version: 0
+      })
+    // Both dead ones start earlier than the live one, which is what made them win.
+    await standup(anyId(), '2026-09-10', '03:30')
+    await standup(completedSprint._id, '2026-09-04', '03:30')
+    const live = await standup(liveSprint._id, '2026-09-11', '05:00')
 
     const candidates = await findOpenStandupCandidates({
       organizationId: String(organization),
       userId: String(member)
     })
 
-    expect(candidates).toHaveLength(1)
-    expect(candidates[0].sprintId).toBe(String(danglingSprintId))
-    expect(candidates[0].sprintName).toBe('')
+    expect(candidates.map((candidate) => candidate.standupId)).toEqual([String(live._id)])
+    expect(candidates[0].sprintName).toBe('Live sprint')
   })
 
   it('returns an empty array when the member has no open stand-up', async () => {

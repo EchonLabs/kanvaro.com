@@ -53,7 +53,7 @@ export function DebtMovementsCard({ rows }: { rows: LooseRow[] }) {
           {rows.map((row, index) => {
             const debt = asMinutes(row.outstandingDebtMinutes)
             const surplus = asMinutes(row.surplusMinutes)
-            const name = field(row, 'name') ?? field(row, 'memberId') ?? '—'
+            const name = field(row, 'name') ?? field(row, 'memberId') ?? 'N/A'
 
             return (
               <tr

@@ -10,6 +10,8 @@ import { Project } from '@/models/Project'
 import { Sprint } from '@/models/Sprint'
 import { Standup } from '@/models/Standup'
 
+import { TERMINAL_SPRINT_STATES } from './sprint-states'
+
 export interface StandupCandidate {
   standupId: string
   status: string
@@ -17,7 +19,6 @@ export interface StandupCandidate {
   projectId: string
   projectName: string
   sprintId: string
-  /** Empty string if the sprint record could not be found. */
   sprintName: string
 }
 
@@ -52,16 +53,28 @@ export async function findOpenStandupCandidates(input: {
   // stand-up") needs this to label each option; nothing read it before.
   const sprintIds = Array.from(new Set(rows.map((row) => String(row.sprint))))
   const sprints = (await Sprint.find({ _id: { $in: sprintIds } })
-    .select('name')
+    .select('name status')
     .lean()) as any[]
   const sprintNameById = new Map(sprints.map((sprint) => [String(sprint._id), sprint.name]))
+  const runnableSprintIds = new Set(
+    sprints
+      .filter((sprint) => !TERMINAL_SPRINT_STATES.includes(sprint.status))
+      .map((sprint) => String(sprint._id))
+  )
 
   // A stand-up outlives a deleted project. Nobody can open it — the project
   // permission check has nothing to resolve against and answers 403 — and an
   // In_Progress one outranks every live stand-up in PRIORITY, so the
-  // redirector would land every attendee on that dead end every day. (A
-  // missing sprint is tolerated: the project still resolves.)
-  const live = rows.filter((row) => projectNameById.has(String(row.project)))
+  // redirector would land every attendee on that dead end every day.
+  //
+  // The same holds for a deleted, completed or cancelled sprint. Starting a
+  // stand-up needs its sprint (the planning gate reads the sprint's state),
+  // so such a stand-up can never run — yet the scheduler still promotes it to
+  // Ready, and with an earlier start time it outranked the member's real
+  // stand-up and became the redirect target.
+  const live = rows.filter(
+    (row) => projectNameById.has(String(row.project)) && runnableSprintIds.has(String(row.sprint))
+  )
 
   const byPriorityThenTime = [...live].sort((a, b) => {
     const priorityDiff = PRIORITY.indexOf(a.status) - PRIORITY.indexOf(b.status)

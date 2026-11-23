@@ -23,7 +23,7 @@ export function AccuracyCard({ payload }: { payload: AnalyticsPayload; link: Spr
     key,
     cells: {
       scope,
-      tasks: <Figure value={figures.taskCount === 0 ? '—' : String(figures.taskCount)} />,
+      tasks: <Figure value={figures.taskCount === 0 ? 'N/A' : String(figures.taskCount)} />,
       estimated: <Figure value={hoursOrDash(figures.estimatedMinutes)} />,
       logged: <Figure value={hoursOrDash(figures.loggedMinutes)} />,
       accuracy: <Figure value={percentOrDash(figures.percent)} className="font-semibold" />

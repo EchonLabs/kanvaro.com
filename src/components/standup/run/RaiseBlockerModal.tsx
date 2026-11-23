@@ -83,7 +83,7 @@ export function RaiseBlockerModal({ tasks, onSubmit, onCancel }: RaiseBlockerMod
           <option value="">General blocker, not tied to one task</option>
           {tasks.map((task) => (
             <option key={task.taskId} value={task.taskId}>
-              {task.key ? `${task.key} — ${task.title}` : task.title}
+              {task.key ? `${task.key}: ${task.title}` : task.title}
             </option>
           ))}
         </select>

@@ -854,7 +854,14 @@ export async function loadCarryForwardPanel(standupId: string): Promise<CarryFor
       originDate: item.originDate,
       ageInStandups: item.ageInStandups,
       ageBand: ageBandFor(item.ageInStandups, thresholds),
-      requiresNoteToday: requiresNoteToday(item.ageInStandups, thresholds),
+      // Only an item still on the register can owe today's note. A resolved
+      // item keeps the age it reached, so without this guard CC-4 (hard, not
+      // overridable) kept demanding a note on it, and the register offers no
+      // note box once an item is resolved: a final day with an aged item it
+      // had just resolved could never complete.
+      requiresNoteToday:
+        OPEN_CARRY_FORWARD_STATUSES.includes(item.status) &&
+        requiresNoteToday(item.ageInStandups, thresholds),
       notedToday:
         (item.notes ?? []).length > 0 &&
         item.notes[item.notes.length - 1].standupDate === standup.standupDate,
@@ -923,6 +930,16 @@ export async function addCarryForwardNote(input: AddNoteInput): Promise<CarryFor
       'That item is not on this stand-up.',
       { itemId: input.itemId, standupId: input.standupId }
     )
+  }
+
+  // A note marks the item `noted` below, which is an open status: on a
+  // resolved item that silently reopened it, and the next completion then aged
+  // it back onto the register. Resolution is final for this round.
+  if (!OPEN_CARRY_FORWARD_STATUSES.includes(item.status)) {
+    throw new StandupError('VALIDATION_FAILED', 'This item is already resolved, so it cannot take a note.', {
+      itemId: input.itemId,
+      status: item.status
+    })
   }
 
   const standup = (await Standup.findById(input.standupId).select('standupDate organization project').lean()) as any

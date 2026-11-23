@@ -180,7 +180,11 @@ export default function StandupRunPage({
     // change once `In_Progress` (RUN-26 unlocks members' own rows) is
     // reflected without this function duplicating that fetch.
     async start({ expectedVersion }) {
-      await unwrap(await mutate(`/api/standups/${standupId}/start`, 'POST', { expectedVersion }))
+      const result = await unwrap(
+        await mutate(`/api/standups/${standupId}/start`, 'POST', { expectedVersion })
+      )
+      const standupVersion = (result as { standup?: { version?: number } } | undefined)?.standup?.version
+      return typeof standupVersion === 'number' ? { standupVersion } : undefined
     },
 
     async completeStandup({ notes, expectedVersion }) {
@@ -560,6 +564,7 @@ function toSprintCloseView(sprintClose: any): NonNullable<RunScreenData['sprintC
     carryForwardItems: (sprintClose.carryForwardItems ?? []).map((item: any) => ({
       itemId: item.itemId,
       taskKey: item.taskKey,
+      ...(item.label ? { label: item.label } : {}),
       status: item.status,
       hasResolution: item.hasResolution ?? false
     }))

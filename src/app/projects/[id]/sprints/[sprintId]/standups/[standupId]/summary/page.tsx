@@ -34,6 +34,7 @@ import { BlockersRaisedCard, BlockersResolvedCard } from '@/components/standup/s
 import { CarryForwardCard } from '@/components/standup/summary/CarryForwardCard'
 import { CommitmentsCard } from '@/components/standup/summary/CommitmentsCard'
 import { CompletedYesterdayCard } from '@/components/standup/summary/CompletedYesterdayCard'
+import { DayOutcomeCard } from '@/components/standup/summary/DayOutcomeCard'
 import { DebtMovementsCard } from '@/components/standup/summary/DebtMovementsCard'
 import { OverridesCard } from '@/components/standup/summary/OverridesCard'
 import { SummaryPrintDocument } from '@/components/standup/summary/SummaryPrintDocument'
@@ -76,7 +77,7 @@ export default function StandupSummaryPage({
     { label: 'View Project', href: `/projects/${projectId}` },
     { label: 'View Sprint', href: `/sprints/${sprintId}` },
     { label: 'Stand-up', href: standupHref },
-    { label: 'Summary' }
+    { label: s.breadcrumb() }
   ]
 
   useEffect(() => {
@@ -86,7 +87,14 @@ export default function StandupSummaryPage({
       try {
         const response = await fetch(`/api/standups/${standupId}/summary`)
         if (!cancelled && response.status === 404) {
-          setNotAvailable(true)
+          // The route tells "not completed yet" apart from "completed, but
+          // the record is gone"; only the first is a normal wait.
+          const body = await response.json().catch(() => null)
+          if (body?.error?.details?.reason === 'summary_missing') {
+            setError(s.summaryMissing())
+          } else {
+            setNotAvailable(true)
+          }
           return
         }
         if (!response.ok) throw new Error('failed')
@@ -195,6 +203,13 @@ export default function StandupSummaryPage({
               <VarianceCard rows={summary.varianceTable} />
             </div>
             <CommitmentsCard members={summary.memberCommitments} />
+
+            {/* The plan above is frozen at the start of the day; this is how
+                that plan went, written back by the next stand-up. */}
+            <DayOutcomeCard
+              outcome={summary.dayOutcome}
+              isFinalDay={summary.headerFacts.dayNumber >= summary.headerFacts.totalDays}
+            />
 
             {/* Lighter, naturally-paired sections share a row on desktop
                 rather than each claiming a full-width card for a few lines. */}

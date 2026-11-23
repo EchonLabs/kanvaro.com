@@ -241,6 +241,31 @@ export async function assembleCompletionContext(input: {
     ...(notes ? { pmNotes: notes } : {})
   } as unknown as CompletionContext['summaryInputs']
 
+  // The day the previous stand-up planned has now been classified by this one
+  // (Panel 3), so this is the first moment its outcome is known. Built from
+  // the very rows this stand-up's own summary records as "completed
+  // yesterday" and "variance" above, and written back onto that day's summary
+  // by the saga's `record-previous-day-outcome` step. Day one has no previous
+  // stand-up to report on.
+  const previousDayOutcome =
+    !isDayOne && variance.previousStandupId
+      ? {
+          standupId: variance.previousStandupId,
+          outcome: {
+            recordedByStandupId: standupId,
+            recordedByStandupDate: board.date,
+            completedTasks: summaryInputs.completedYesterday,
+            varianceTable: summaryInputs.varianceTable,
+            memberTotals: variance.members.map((member) => ({
+              memberId: member.memberId,
+              plannedMinutes: member.plannedMinutes,
+              loggedMinutesOnDay: member.loggedMinutesOnDay,
+              dayVarianceMinutes: member.dayVarianceMinutes
+            }))
+          }
+        }
+      : undefined
+
   return {
     runId,
     standupId,
@@ -257,7 +282,8 @@ export async function assembleCompletionContext(input: {
     overridesIssued,
     summaryInputs,
     summaryUrl: `/my/standup/${standupId}`,
-    carryForwardCloseItems: sprintCloseReadiness.carryForwardItems
+    carryForwardCloseItems: sprintCloseReadiness.carryForwardItems,
+    ...(previousDayOutcome ? { previousDayOutcome } : {})
   }
 }
 

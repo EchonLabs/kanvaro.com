@@ -427,7 +427,11 @@ export interface RunScreenApi {
    * Optional so a caller that has not wired it yet still compiles — the
    * button below only renders when it is present.
    */
-  start?(input: { expectedVersion: number }): Promise<void>
+  /**
+   * Resolves with the version the start produced, when the caller knows it,
+   * so the screen can use it before the follow-up reload lands.
+   */
+  start?(input: { expectedVersion: number }): Promise<{ standupVersion?: number } | void>
 
   /**
    * RUN-19..22 (Task 17). Resuming an interrupted completion is the same
@@ -1269,7 +1273,14 @@ export function StandupRunScreen({
     setNotice(null)
     setStartRefusal(null)
     try {
-      await api.start({ expectedVersion: versionRef.current })
+      const started = await api.start({ expectedVersion: versionRef.current })
+      // Starting bumps the version, and the reload below takes several
+      // requests to land. An edit made in that window (marking attendance,
+      // the first thing a facilitator does) went out with the pre-start
+      // version and was refused as "Someone else changed this stand-up".
+      if (started && typeof started.standupVersion === 'number') {
+        versionRef.current = started.standupVersion
+      }
       setNotice(standupStrings.run.startSuccess())
       await reload()
     } catch (error) {
@@ -2118,7 +2129,7 @@ export function StandupRunScreen({
         {/* A completed stand-up is immutable: the saga would answer
             STANDUP_ALREADY_COMPLETED, and "All checks passed" is a claim about
             a gate that has already closed. The header's status pill and
-            "View summary" link already say it is done.
+            "View stand-up record" link already say it is done.
             A Missed one is closed only through Backfill: a failed backfill can
             leave attendance recorded, so CC-7 passes and this panel would offer
             a Complete that skips the SCH-14 window and the backfill stamps

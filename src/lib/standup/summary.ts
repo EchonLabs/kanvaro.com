@@ -8,7 +8,11 @@
  * is unit-testable without a database and never causes the saga to re-read
  * data it already holds.
  */
-import type { ISummaryMemberCommitment, IStandupSummary } from '@/models/StandupSummary'
+import type {
+  ISummaryDayOutcome,
+  ISummaryMemberCommitment,
+  IStandupSummary
+} from '@/models/StandupSummary'
 
 export interface BuildSummaryInput {
   standupId: string
@@ -46,6 +50,33 @@ export function buildSummaryDocument(input: BuildSummaryInput) {
     carryForwardState: input.carryForwardState,
     overridesIssued: input.overridesIssued,
     pmNotes: input.pmNotes
+  }
+}
+
+export interface BuildDayOutcomeInput {
+  /** The stand-up being completed now: the one that classified the previous day. */
+  recordedByStandupId: string
+  recordedByStandupDate: string
+  completedTasks: ISummaryDayOutcome['completedTasks']
+  varianceTable: ISummaryDayOutcome['varianceTable']
+  memberTotals: ISummaryDayOutcome['memberTotals']
+}
+
+/**
+ * The previous day's outcome, as written back onto that day's summary.
+ *
+ * Built from the same rows the current stand-up's own summary records as
+ * "completed yesterday" and "variance", so the two documents can never tell
+ * different stories about the same day.
+ */
+export function buildDayOutcome(input: BuildDayOutcomeInput): ISummaryDayOutcome {
+  return {
+    recordedAt: new Date(),
+    recordedByStandup: input.recordedByStandupId,
+    recordedByStandupDate: input.recordedByStandupDate,
+    completedTasks: input.completedTasks,
+    varianceTable: input.varianceTable,
+    memberTotals: input.memberTotals
   }
 }
 

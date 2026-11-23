@@ -475,7 +475,7 @@ function Verdict({ view }: { view: OversightView }) {
                 <span className="font-semibold text-[var(--ovs-text)]">
                   {worst.sprintName} · {worst.projectName}
                 </span>{' '}
-                first — {verdictOf(worst).toLowerCase()}.
+                first: {verdictOf(worst).toLowerCase()}.
               </>
             ) : (
               'Nothing has missed a stand-up, gone over capacity, or aged past a decision.'
@@ -580,7 +580,7 @@ function OrgCadenceChart({ days }: { days: Array<{ date: string; ran: number; mi
           return (
             <div
               key={day.date}
-              title={`${day.date} — ${day.ran} ran, ${day.missed} missed, ${day.ahead} still to come`}
+              title={`${day.date}: ${day.ran} ran, ${day.missed} missed, ${day.ahead} still to come`}
               className="flex min-w-0 max-w-[18px] flex-1 flex-col items-center gap-[5px]"
             >
               <span
@@ -657,7 +657,7 @@ function CadenceRibbon({ days, label }: { days: CadenceDay[]; label: string }) {
       {days.map((day) => (
         <span
           key={day.date}
-          title={`${day.date} — ${CADENCE_WORD[day.state]}`}
+          title={`${day.date}: ${CADENCE_WORD[day.state]}`}
           className={cn('h-[18px] rounded-[3px]', CADENCE_CELL[day.state])}
         />
       ))}
@@ -838,7 +838,7 @@ function BlockerDisclosure({ blockers }: { blockers: BlockerRow[] }) {
                 )}
               />
               <span className="min-w-0">
-                <span className="sr-only">{blocker.severity} — </span>
+                <span className="sr-only">{blocker.severity}: </span>
                 <span>{blocker.description}</span>
                 {blocker.taskKey && (
                   <>

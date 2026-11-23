@@ -286,6 +286,11 @@ export default function MyStandupDetailPage({ params }: { params: { standupId: s
       })
       if (!response.ok) throw await asError(response)
       const payload = await response.json()
+      // The row, the Done/Logged totals and the variance sentence beside it
+      // are all read from the screen's loaded data, not from this response —
+      // without a refetch a member's saved status or hours looked unsaved
+      // until a manual reload. Same remedy as `changeHours` above.
+      setReloadToken((token) => token + 1)
       return { standupVersion: payload.data.standupVersion, panel: payload.data.panel }
     },
     async raiseBlocker(input) {

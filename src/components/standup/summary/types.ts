@@ -52,6 +52,27 @@ export interface MemberCommitment extends MemberIdentity {
 /** A row the schema stores as `Mixed`, optionally hydrated with its member. */
 export type LooseRow = Record<string, unknown> & MemberIdentity
 
+/**
+ * How the day this stand-up planned went. Written back by the next
+ * stand-up's completion, so absent until then (see `StandupSummary.ts`).
+ */
+export interface DayOutcome {
+  recordedAt: string
+  recordedByStandup: string
+  recordedByStandupDate: string
+  completedTasks: CompletedYesterdayRow[]
+  varianceTable: LooseRow[]
+  memberTotals: Array<
+    MemberIdentity & {
+      memberId: string
+      name?: string
+      plannedMinutes: number
+      loggedMinutesOnDay: number
+      dayVarianceMinutes: number
+    }
+  >
+}
+
 export interface SummaryPayload {
   headerFacts: HeaderFacts
   attendance: AttendanceRow[]
@@ -64,4 +85,5 @@ export interface SummaryPayload {
   carryForwardState: LooseRow[]
   overridesIssued: LooseRow[]
   pmNotes?: string
+  dayOutcome?: DayOutcome
 }

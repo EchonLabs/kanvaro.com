@@ -54,7 +54,7 @@ export function SpillChainsCard({ payload }: { payload: AnalyticsPayload; link: 
                 })}
               />
             ),
-            owner: 'assigneeName' in chain ? (chain.assigneeName ?? '—') : undefined
+            owner: 'assigneeName' in chain ? (chain.assigneeName ?? 'N/A') : undefined
           }
         }))}
       />

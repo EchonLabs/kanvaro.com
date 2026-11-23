@@ -162,7 +162,7 @@ async function loadProjectAdmins(projectId: string): Promise<string[]> {
 async function describeItem(item: any): Promise<string> {
   if (item.task) {
     const task = (await Task.findById(item.task).select('displayId title').lean()) as any
-    if (task) return task.displayId ? `${task.displayId} — ${task.title}` : task.title
+    if (task) return task.displayId ? `${task.displayId}: ${task.title}` : task.title
   }
   return standupStrings.carryForward.itemTypeLabel(item.type)
 }

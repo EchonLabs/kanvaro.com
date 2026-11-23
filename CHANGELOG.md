@@ -1,3 +1,72 @@
+# [1.52.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.51.0...v1.52.0) (2026-11-16)
+
+
+### Bug Fixes
+
+* add multi-assignee support in edit panel and fix table scrolling ([b6d6aad](https://github.com/EchonLabs/kanvaro.com/commit/b6d6aad332f95435b40ff92e767f4ef12f555fed))
+* enhance assignee multi-selection and bulk assignment indicators ([a96ecc1](https://github.com/EchonLabs/kanvaro.com/commit/a96ecc1efed2c0d0f0dfe951ce9d5b4e356bef70))
+* update search bar styling, calendar icon, and code quality in project insights ([7f57588](https://github.com/EchonLabs/kanvaro.com/commit/7f575882a26b723a18e9ac6b1cfc2b8db15f5587))
+
+
+### Features
+
+* add remaining budget, burn rate columns, and date range filter ([26ac27f](https://github.com/EchonLabs/kanvaro.com/commit/26ac27fd341b5294c04ef0de7c658c8ff5bff375))
+* add remaining hours column with low-hours alert to time tracking table ([180874c](https://github.com/EchonLabs/kanvaro.com/commit/180874c4981aa0c5d32b15e68238f47ccef8edf4))
+
+# [1.51.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.50.0...v1.51.0) (2026-11-16)
+
+
+### Bug Fixes
+
+* add descending startTime and approval compound indexes on TimeEntry ([ccf4559](https://github.com/EchonLabs/kanvaro.com/commit/ccf4559c4e6cb98c16c5f8be2f227a5abb7709c5))
+* add lean queries, filter archived records, and index backlog sprint queries ([2d300df](https://github.com/EchonLabs/kanvaro.com/commit/2d300df60894461db66d534f1cd5232086df4a6d))
+* bypass pagination for all=true in minimal routes and drop toObject on lean backlog ([0094d6c](https://github.com/EchonLabs/kanvaro.com/commit/0094d6c5869362c0d51ef445795fe41e948d2461))
+* explain empty schedules on already-planned sprints and stop the Regenerate flash ([04952cc](https://github.com/EchonLabs/kanvaro.com/commit/04952ccf31f1bafc4580a49677eada89656e775f))
+* improve sprint start validation and enhance analytics attendance handling ([7632d3a](https://github.com/EchonLabs/kanvaro.com/commit/7632d3a9745cda6280ba8de38b8922143f16041e))
+* introduce minimal query fast-path for projects and members dropdowns ([4551e30](https://github.com/EchonLabs/kanvaro.com/commit/4551e30c54f3369a41a084d7e1f82bb91f429a15))
+* never back-fill a stand-up schedule from reconcile when a sprint has none ([193c97c](https://github.com/EchonLabs/kanvaro.com/commit/193c97cef96a1921a93b0da92766112727b5fa10))
+* preserve sort order in minimal routes, use minimal endpoints in sprint forms, and drop redundant indexes ([3e79c0f](https://github.com/EchonLabs/kanvaro.com/commit/3e79c0f159c73591b49d4518c0d75d89d6231a6b))
+* read the stand-ups switch once during planning and give the API error its own message ([554cd5c](https://github.com/EchonLabs/kanvaro.com/commit/554cd5c6d9262aed58fd7114e4216edbcfb59674))
+* replace the inaccurate scheduler line on the planning-complete card ([e7b4d6b](https://github.com/EchonLabs/kanvaro.com/commit/e7b4d6b73e306477412ac2a80d60b756e2ca525f))
+* stop reconciler and audit job from generating schedules for disabled or empty sprints ([f7c580e](https://github.com/EchonLabs/kanvaro.com/commit/f7c580ee9b57eac6917ca02b07d03c59d75e0aa6))
+* use minimal endpoints in sprint forms and drop redundant indexes ([bb11ddc](https://github.com/EchonLabs/kanvaro.com/commit/bb11ddc0a694efa20c07e40037e7c7f47a7cfb8d))
+* use minimal project and member endpoints across filter ([2f00e29](https://github.com/EchonLabs/kanvaro.com/commit/2f00e29ed92e4a932d06c978d2c270a497223f10))
+
+
+### Features
+
+* add stand-up enablement policy and align default with spec ([24d687f](https://github.com/EchonLabs/kanvaro.com/commit/24d687f734fa80580a62fd67ad2cab3b04ab3e4b))
+* add tests for late addition poker functionality and rules enforcement ([47c4d74](https://github.com/EchonLabs/kanvaro.com/commit/47c4d747e8eb9e177d886ba20361b9b2ca954981))
+* implement AllocationHealthCard and DebtTrendCard with enhanced chart features and tooltips ([24bd586](https://github.com/EchonLabs/kanvaro.com/commit/24bd58628856ca0828c1a29eeb7ea41b57705703))
+* implement late addition handling for poker sessions and task estimates ([78d2512](https://github.com/EchonLabs/kanvaro.com/commit/78d25121decbe9f9b7c5eba1f8b0b2f4a2e8847e))
+* implement late addition poker functionality for tasks added after sprint planning ([b4bbcd7](https://github.com/EchonLabs/kanvaro.com/commit/b4bbcd7f3c3085097c9621e2eb84687ae1fc3d2d))
+* show stand-ups-disabled state on the schedule and settings screens ([3b649dd](https://github.com/EchonLabs/kanvaro.com/commit/3b649dd82da82e8dde4aa9f33d7f014aacfd1757))
+* skip stand-up generation for projects with stand-ups turned off ([fe1b765](https://github.com/EchonLabs/kanvaro.com/commit/fe1b765feab02a42aa9a78a15aa3f8e84f698526))
+* streamline deck types and enhance estimation handling in Poker components ([987eacf](https://github.com/EchonLabs/kanvaro.com/commit/987eacf1231276cd5c272db1e9bffd9301ea50aa))
+* update poker decks to support only Fibonacci and hours, enhancing estimation handling ([af3c592](https://github.com/EchonLabs/kanvaro.com/commit/af3c5925b270dc8a57af7ec58efa127a0af188ec))
+
+# [1.50.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.49.2...v1.50.0) (2026-11-11)
+
+
+### Bug Fixes
+
+* **standup:** enhance clarity in standup messages by replacing em dashes with periods ([f5b2d60](https://github.com/EchonLabs/kanvaro.com/commit/f5b2d60d9e165b084c8b8d11a735b29e634aedfc))
+* **standup:** improve clarity in planning session message by removing em dash ([3b60b4a](https://github.com/EchonLabs/kanvaro.com/commit/3b60b4a85589a3172621cf71add85afdd3372b42))
+* **standup:** replace dashes with 'N/A' for improved clarity in analytics components ([1b0a4a2](https://github.com/EchonLabs/kanvaro.com/commit/1b0a4a2359fa6fad4e9aa2012a2c1e90bce5fb3f))
+* **standup:** replace em dashes with 'N/A' for better clarity in various components ([38b893f](https://github.com/EchonLabs/kanvaro.com/commit/38b893f231ce94de7c1a57f756c16a187650b79e))
+* **standup:** replace em dashes with 'N/A' for improved clarity in sprint and task details ([118ac2c](https://github.com/EchonLabs/kanvaro.com/commit/118ac2cff366fc9dbafd1f89801dd96b026ed08e))
+* **standup:** replace em dashes with colons for consistency in standup headers and messages ([056da1c](https://github.com/EchonLabs/kanvaro.com/commit/056da1cf0a6b6a47c4b848b06335ce853ce1be54))
+* **standup:** replace em dashes with colons for consistency in various components ([d35570a](https://github.com/EchonLabs/kanvaro.com/commit/d35570a3088704b80186fa9228301fc499b6ca4c))
+* **standup:** replace em dashes with en dashes for consistency in labels and messages ([2948683](https://github.com/EchonLabs/kanvaro.com/commit/2948683bc6433dc6a3fbd9c4b2743654d71fef03))
+
+
+### Features
+
+* enhance stand-up summary and day outcome handling ([e99c767](https://github.com/EchonLabs/kanvaro.com/commit/e99c76722d1e134d0ca20853b7833ad90a1628d8))
+* implement Day Outcome Card and enhance stand-up summary components ([0c46039](https://github.com/EchonLabs/kanvaro.com/commit/0c460393746b76b8e900490af5539dfb6a6a0440))
+* implement Day Outcome interface and enhance summary handling in stand-up components ([013a3cf](https://github.com/EchonLabs/kanvaro.com/commit/013a3cf1cb30e95a2a2c21eedcbf1b7ff282bad9))
+* implement day outcome tracking and enhance summary handling ([d8842e3](https://github.com/EchonLabs/kanvaro.com/commit/d8842e3d5e4de34d93b82e89cb21da8f97c9634d))
+
 ## [1.49.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.49.1...v1.49.2) (2026-11-09)
 
 

@@ -817,7 +817,7 @@ function AddOverrideDialog({
                 onCheckedChange={(checked) => setIsPartialDay(checked === true)}
               />
               <span className="text-[13px] text-[var(--apple-label)]">
-                Half day — the team works part of this day
+                Half day: the team works part of this day
               </span>
             </label>
             {isPartialDay && (
