@@ -17,3 +17,17 @@ export function isStandupsEnabled(
 ): boolean {
   return settings?.enabled ?? STANDUPS_ENABLED_DEFAULT
 }
+
+/**
+ * The per-project "Legacy sprint flow" switch. On, sprints skip the planning
+ * session and start straight from `planning`/`draft`. Unlike the stand-ups
+ * switch it defaults **off**: a project with no settings document, or one saved
+ * before the field existed, keeps the planning gate.
+ */
+export const LEGACY_SPRINT_FLOW_DEFAULT = false
+
+export function isLegacySprintFlow(
+  settings: { legacySprintFlow?: boolean | null } | null | undefined
+): boolean {
+  return settings?.legacySprintFlow ?? LEGACY_SPRINT_FLOW_DEFAULT
+}

@@ -153,3 +153,15 @@ export function isLiveSprint(status: string | null | undefined): boolean {
  * anybody of anything, so it is refused — finish planning first.
  */
 export const STARTABLE_SPRINT_STATES: SprintState[] = ['planned']
+
+/**
+ * States a sprint can be started from when the project uses the legacy sprint
+ * flow (no planning session). `planned` stays startable so a sprint planned
+ * before the switch was turned on is not stranded.
+ */
+export const LEGACY_STARTABLE_SPRINT_STATES: SprintState[] = ['draft', 'planning', 'planned']
+
+/** The start-eligible states for a project, given its legacy-flow switch. */
+export function startableSprintStates(legacySprintFlow: boolean): SprintState[] {
+  return legacySprintFlow ? LEGACY_STARTABLE_SPRINT_STATES : STARTABLE_SPRINT_STATES
+}

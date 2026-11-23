@@ -64,6 +64,14 @@ export interface IProjectStandupSettings extends Document {
    */
   enabled: boolean
 
+  /**
+   * Legacy sprint flow (default off). On, a sprint may be started straight from
+   * `planning`/`draft`, skipping the planning session and its checklist. No
+   * stand-ups are generated for such a sprint. Read through
+   * `isLegacySprintFlow()` in `lib/standup/standup-enablement.ts`.
+   */
+  legacySprintFlow: boolean
+
   /** Local wall-clock time, `HH:mm`. Combined with the calendar timezone per CAL-6. */
   standupLocalTime: string
   durationMinutes: number
@@ -152,6 +160,8 @@ const ProjectStandupSettingsSchema = new Schema<IProjectStandupSettings>(
     organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
 
     enabled: { type: Boolean, default: true },
+
+    legacySprintFlow: { type: Boolean, default: false },
 
     standupLocalTime: {
       type: String,
