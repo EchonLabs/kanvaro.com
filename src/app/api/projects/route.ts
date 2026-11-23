@@ -125,14 +125,12 @@ export async function GET(request: NextRequest) {
 
     // Fast-path for dropdowns and pickers: skip aggregations, calculations, and heavy populates
     if (minimal) {
-      let query = Project.find(projectQuery).select('_id name')
+      let query = Project.find(projectQuery).select('_id name settings.kanbanStatuses settings.taskCategories')
       if (!isAll) {
         query = query.skip((page - 1) * limit).limit(limit)
       }
-      const [projects, total] = await Promise.all([
-        query.lean(),
-        Project.countDocuments(projectQuery)
-      ])
+      const projects = await query.lean()
+      const total = isAll ? projects.length : await Project.countDocuments(projectQuery)
 
       return NextResponse.json({
         success: true,

@@ -25,7 +25,7 @@ export function useProjectKanbanStatuses(autoFetch: boolean = true): UseProjectK
   const refreshStatuses = useCallback(async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/projects')
+      const response = await fetch('/api/projects?all=true&minimal=true')
       const data = await response.json().catch(() => ({}))
 
       if (response.ok && data.success && Array.isArray(data.data)) {

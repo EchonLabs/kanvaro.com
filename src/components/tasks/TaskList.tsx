@@ -118,7 +118,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     if (projId === 'all') {
       // For "all", collect statuses from all projects
       try {
-        const response = await fetch('/api/projects')
+        const response = await fetch('/api/projects?all=true&minimal=true')
         const data = await response.json()
         
         if (data.success && Array.isArray(data.data)) {

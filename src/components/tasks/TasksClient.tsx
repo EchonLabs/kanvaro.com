@@ -45,7 +45,7 @@ import {
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
-import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
+import { useProjectKanbanStatuses, type KanbanStatusConfig } from '@/hooks/useProjectKanbanStatuses'
 import dynamic from 'next/dynamic'
 import { extractUserId } from '@/lib/auth/user-utils'
 import { useNotify } from '@/lib/notify'
@@ -370,7 +370,7 @@ export default function TasksClient({
     const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
     const [refreshKey, setRefreshKey] = useState(0)
     const [projectCategories, setProjectCategories] = useState<Record<string, Array<{ key: string; title: string; order: number }>>>({})
-    const { statusMap: projectsWithStatuses } = useProjectKanbanStatuses()
+    const [projectsWithStatuses, setProjectsWithStatuses] = useState<Map<string, KanbanStatusConfig[]>>(new Map())
     const { success: notifySuccess, error: notifyError } = useNotify()
 
     // Check if any filters are active
@@ -562,11 +562,11 @@ export default function TasksClient({
         }
     }, [tasks, canFilterUsers, isQAEngineer, user])
 
-    // Load projects from API for filter dropdown
+    // Load projects from API for filter dropdown, task categories, and kanban statuses
     useEffect(() => {
         const loadProjects = async () => {
             try {
-                const response = await fetch('/api/projects?all=true')
+                const response = await fetch('/api/projects?all=true&minimal=true')
                 if (response.ok) {
                     const data = await response.json()
                     if (data.success && Array.isArray(data.data)) {
@@ -579,13 +579,25 @@ export default function TasksClient({
                         })
 
                         const catMap: Record<string, Array<{ key: string; title: string; order: number }>> = {}
+                        const nextStatusMap = new Map<string, KanbanStatusConfig[]>()
                         data.data.forEach((p: any) => {
                             const cats = p.settings?.taskCategories
                             if (Array.isArray(cats)) {
                                 catMap[p._id] = cats
                             }
+                            if (
+                                p?._id &&
+                                Array.isArray(p.settings?.kanbanStatuses) &&
+                                p.settings.kanbanStatuses.length > 0
+                            ) {
+                                const statuses = [...p.settings.kanbanStatuses].sort(
+                                    (a: KanbanStatusConfig, b: KanbanStatusConfig) => (a.order ?? 0) - (b.order ?? 0)
+                                )
+                                nextStatusMap.set(p._id, statuses)
+                            }
                         })
                         setProjectCategories(catMap)
+                        setProjectsWithStatuses(nextStatusMap)
                     }
                 }
             } catch (err) {
