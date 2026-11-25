@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rejectUnlessSetupOrPermission } from '@/lib/setup-guard'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { SECRET_MASK, unmaskSecret } from '@/lib/settings/secret-mask'
+import connectDB from '@/lib/db-config'
+import { Organization } from '@/models/Organization'
 import nodemailer from 'nodemailer'
 
 export async function POST(request: NextRequest) {
@@ -9,6 +12,17 @@ export async function POST(request: NextRequest) {
     if (denied) return denied
 
     const { provider, smtp, azure } = await request.json()
+
+    // The Settings page shows stored secrets as a placeholder. Swap in the
+    // stored values (the placeholder is only ever issued after setup, to a
+    // caller who passed the permission check above).
+    if (smtp?.password === SECRET_MASK || azure?.clientSecret === SECRET_MASK) {
+      await connectDB()
+      const org = (await Organization.findOne({}).select('emailConfig').lean()) as any
+      const stored = org?.emailConfig || {}
+      if (smtp) smtp.password = unmaskSecret(smtp.password, stored.smtp?.password)
+      if (azure) azure.clientSecret = unmaskSecret(azure.clientSecret, stored.azure?.clientSecret)
+    }
 
     if (provider === 'smtp') {
       // Trim all input values to remove any whitespace

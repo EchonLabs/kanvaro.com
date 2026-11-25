@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rejectUnlessSetupOrPermission } from '@/lib/setup-guard'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { unmaskSecret } from '@/lib/settings/secret-mask'
 import mongoose from 'mongoose'
 
 async function checkExistingData(db: any) {
@@ -77,6 +78,9 @@ export async function POST(request: NextRequest) {
     if (denied) return denied
 
     const config = await request.json()
+    // The Settings page shows the stored password as a placeholder; test with
+    // the real one (the same source GET /api/settings/database masks).
+    config.password = unmaskSecret(config.password, process.env.MONGODB_PASSWORD)
     
     // Test MongoDB connection
     // Always convert localhost to mongodb service name since we always run in Docker
