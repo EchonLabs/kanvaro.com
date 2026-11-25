@@ -26,7 +26,7 @@ interface TaskCategoryManagerModalProps {
   isOpen: boolean
   onClose: () => void
   projectId: string
-  onCategoriesUpdated: (categories: TaskCategory[], deleteInfo?: { deletedKey: string; targetKey?: string }) => void
+  onCategoriesUpdated: (categories: TaskCategory[], deleteInfo?: { deletedKey: string; targetKey?: string; lessonTargetKey?: string }) => void
 }
 
 export default function TaskCategoryManagerModal({
@@ -34,7 +34,7 @@ export default function TaskCategoryManagerModal({
   onClose,
   projectId,
   onCategoriesUpdated
-}: TaskCategoryManagerModalProps) {
+}: Readonly<TaskCategoryManagerModalProps>) {
   const { success: notifySuccess, error: notifyError } = useNotify()
   const [categories, setCategories] = useState<TaskCategory[]>([])
   const [newTitle, setNewTitle] = useState('')
@@ -43,6 +43,8 @@ export default function TaskCategoryManagerModal({
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null)
   const [deleteAction, setDeleteAction] = useState<'migrate' | 'unassign'>('migrate')
   const [migrationKey, setMigrationKey] = useState('')
+  const [lessonDeleteAction, setLessonDeleteAction] = useState<'migrate' | 'unassign'>('migrate')
+  const [lessonMigrationKey, setLessonMigrationKey] = useState('')
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -88,6 +90,8 @@ export default function TaskCategoryManagerModal({
     setCategoryToDelete(null)
     setDeleteAction('migrate')
     setMigrationKey('')
+    setLessonDeleteAction('migrate')
+    setLessonMigrationKey('')
     setDeleteConfirmOpen(false)
     setError('')
   }, [isOpen])
@@ -199,11 +203,13 @@ export default function TaskCategoryManagerModal({
     setCategoryToDelete(category.key)
     setDeleteAction('migrate')
     setMigrationKey(destination?.key || '')
+    setLessonDeleteAction('migrate')
+    setLessonMigrationKey(destination?.key || '')
     setDeleteConfirmOpen(true)
   }
 
   const handleDelete = async () => {
-    if (!categoryToDelete || (deleteAction === 'migrate' && !migrationKey) || saving) return
+    if (!categoryToDelete || (deleteAction === 'migrate' && !migrationKey) || (lessonDeleteAction === 'migrate' && !lessonMigrationKey) || saving) return
 
     setSaving(true)
     setError('')
@@ -214,7 +220,9 @@ export default function TaskCategoryManagerModal({
         body: JSON.stringify({
           key: categoryToDelete,
           action: deleteAction,
-          ...(deleteAction === 'migrate' ? { targetKey: migrationKey } : {})
+          ...(deleteAction === 'migrate' ? { targetKey: migrationKey } : {}),
+          lessonAction: lessonDeleteAction,
+          ...(lessonDeleteAction === 'migrate' ? { lessonTargetKey: lessonMigrationKey } : {})
         })
       })
       const data = await response.json()
@@ -223,12 +231,15 @@ export default function TaskCategoryManagerModal({
       }
       const deletedKey = categoryToDelete
       const targetKey = deleteAction === 'migrate' ? migrationKey : undefined
+      const lessonTargetKey = lessonDeleteAction === 'migrate' ? lessonMigrationKey : undefined
       setDeleteConfirmOpen(false)
       setCategoryToDelete(null)
       setDeleteAction('migrate')
       setMigrationKey('')
+      setLessonDeleteAction('migrate')
+      setLessonMigrationKey('')
       const updatedCategories = await loadCategories()
-      onCategoriesUpdated(updatedCategories, { deletedKey, targetKey })
+      onCategoriesUpdated(updatedCategories, { deletedKey, targetKey, lessonTargetKey })
       notifySuccess({ title: 'Category Deleted', message: 'Task category deleted successfully' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete task category')
@@ -242,7 +253,6 @@ export default function TaskCategoryManagerModal({
   const destinationCategories = categories.filter(category => category.key !== categoryToDelete)
 
   return (
-    <>
       <Dialog open={isOpen} onOpenChange={(open) => {
         if (!open) onClose()
       }}>
@@ -253,46 +263,86 @@ export default function TaskCategoryManagerModal({
             </DialogTitle>
             <DialogDescription className="text-[13px] text-[var(--apple-secondary-label)] mt-0.5">
               {deleteConfirmOpen
-                ? 'Choose whether to move or unassign tasks in this category.'
+                ? 'Choose whether to move or unassign tasks and lessons in this category.'
                 : 'Create, rename, or remove categories used to organize tasks in this project.'}
             </DialogDescription>
           </DialogHeader>
 
           <DialogBody className="flex-1 overflow-y-auto px-6 py-5">
             {deleteConfirmOpen ? (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <p className="text-[14px] text-[var(--apple-label)]">
                   Delete <strong>{categoryBeingDeleted?.title}</strong>?
                 </p>
-                <div>
-                  <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">What should happen to its tasks?</label>
-                  <Select value={deleteAction} onValueChange={(value) => setDeleteAction(value as 'migrate' | 'unassign')}>
-                    <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050]">
-                      <SelectItem value="migrate">Move tasks to another category</SelectItem>
-                      <SelectItem value="unassign">Unassign tasks</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {deleteAction === 'migrate' && (
+
+                {/* Tasks section */}
+                <div className="space-y-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-4">
+                  <div className="text-[13px] font-semibold text-[var(--apple-label)]">Tasks</div>
                   <div>
-                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Destination category</label>
-                    <Select value={migrationKey} onValueChange={setMigrationKey}>
-                      <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] text-[14px]">
-                        <SelectValue placeholder="Select a destination" />
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">What should happen to its tasks?</label>
+                    <Select value={deleteAction} onValueChange={(value) => setDeleteAction(value as 'migrate' | 'unassign')}>
+                      <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-secondary-system-background)] text-[14px]">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="z-[10050]">
-                        {destinationCategories.map((category) => (
-                          <SelectItem key={category.key} value={category.key}>
-                            {category.title}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="migrate">Move tasks to another category</SelectItem>
+                        <SelectItem value="unassign">Unassign tasks</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                )}
+                  {deleteAction === 'migrate' && (
+                    <div>
+                      <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Destination category for tasks</label>
+                      <Select value={migrationKey} onValueChange={setMigrationKey}>
+                        <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-secondary-system-background)] text-[14px]">
+                          <SelectValue placeholder="Select a destination" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[10050]">
+                          {destinationCategories.map((category) => (
+                            <SelectItem key={category.key} value={category.key}>
+                              {category.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Lessons section */}
+                <div className="space-y-3 rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-[var(--apple-quaternary-fill)] p-4">
+                  <div className="text-[13px] font-semibold text-[var(--apple-label)]">Lessons</div>
+                  <div>
+                    <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">What should happen to its lessons?</label>
+                    <Select value={lessonDeleteAction} onValueChange={(value) => setLessonDeleteAction(value as 'migrate' | 'unassign')}>
+                      <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-secondary-system-background)] text-[14px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050]">
+                        <SelectItem value="migrate">Move lessons to another category</SelectItem>
+                        <SelectItem value="unassign">Unassign lessons</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {lessonDeleteAction === 'migrate' && (
+                    <div>
+                      <label className="text-[13px] font-medium text-[var(--apple-secondary-label)]">Destination category for lessons</label>
+                      <Select value={lessonMigrationKey} onValueChange={setLessonMigrationKey}>
+                        <SelectTrigger className="mt-1.5 w-full h-10 rounded-[var(--apple-radius-pill)] border-[var(--apple-separator)] bg-[var(--apple-secondary-system-background)] text-[14px]">
+                          <SelectValue placeholder="Select a destination" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[10050]">
+                          {destinationCategories.map((category) => (
+                            <SelectItem key={category.key} value={category.key}>
+                              {category.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
                 {error && (
                   <div className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-system-red)] bg-[var(--apple-system-red)]/10 px-3 py-2 text-[13px] text-[var(--apple-system-red)]">
                     {error}
@@ -460,6 +510,8 @@ export default function TaskCategoryManagerModal({
                   setCategoryToDelete(null)
                   setDeleteAction('migrate')
                   setMigrationKey('')
+                  setLessonDeleteAction('migrate')
+                  setLessonMigrationKey('')
                   setError('')
                   return
                 }
@@ -474,7 +526,7 @@ export default function TaskCategoryManagerModal({
                 type="button"
                 variant="destructive"
                 onClick={() => void handleDelete()}
-                disabled={saving || (deleteAction === 'migrate' && !migrationKey)}
+                disabled={saving || (deleteAction === 'migrate' && !migrationKey) || (lessonDeleteAction === 'migrate' && !lessonMigrationKey)}
                 className="rounded-full px-6 h-10 text-[14px] font-medium"
               >
                 {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
@@ -484,6 +536,5 @@ export default function TaskCategoryManagerModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
   )
 }
