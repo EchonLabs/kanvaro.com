@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     const query: any = { project: projectId, organization: authResult.user.organization }
 
     if (search) {
-      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
       const searchRegex = new RegExp(escapedSearch, 'i')
 
       const orConditions: any[] = [
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { projectId, sprintId, category, impactLevel, context, rootCause, actionRecommendation } = body
+    const { projectId, category, impactLevel, context, rootCause, actionRecommendation } = body
 
     if (!projectId || !category || !context || !actionRecommendation) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -185,7 +185,6 @@ export async function POST(req: NextRequest) {
 
     const lesson = await Lesson.create({
       project: projectId,
-      sprint: sprintId || undefined,
       organization: authResult.user.organization,
       lessonNumber: nextNumber,
       category,
@@ -196,11 +195,9 @@ export async function POST(req: NextRequest) {
       modifiedBy: authResult.user.id
     })
 
-    const populatedLesson = await Lesson.findById(lesson._id)
-      .populate('modifiedBy', 'firstName lastName email avatar role')
-      .lean()
+    await lesson.populate('modifiedBy', 'firstName lastName email avatar role')
 
-    return NextResponse.json({ lesson: populatedLesson }, { status: 201 })
+    return NextResponse.json({ lesson }, { status: 201 })
   } catch (error) {
     console.error('Error creating lesson:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const body = await req.json()
-    const { category, impactLevel, context, rootCause, actionRecommendation, sprintId } = body
+    const { category, impactLevel, context, rootCause, actionRecommendation } = body
 
     const updateData: any = {
       modifiedBy: authResult.user.id
@@ -53,7 +53,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (context !== undefined) updateData.context = context
     if (rootCause !== undefined) updateData.rootCause = rootCause
     if (actionRecommendation !== undefined) updateData.actionRecommendation = actionRecommendation
-    if (sprintId !== undefined) updateData.sprint = sprintId || null
 
     const updated = await Lesson.findOneAndUpdate(
       { _id: id, organization: authResult.user.organization },

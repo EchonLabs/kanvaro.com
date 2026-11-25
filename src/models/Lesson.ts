@@ -4,13 +4,12 @@ export type LessonImpactLevel = 'low' | 'medium' | 'high' | 'critical'
 
 export interface ILesson extends Document {
   project: mongoose.Types.ObjectId
-  sprint?: mongoose.Types.ObjectId
   organization: mongoose.Types.ObjectId
   lessonNumber?: number
   category?: string
   impactLevel: LessonImpactLevel
   context: string
-  rootCause: string
+  rootCause?: string
   actionRecommendation: string
   modifiedBy?: mongoose.Types.ObjectId
   createdAt: Date
@@ -22,10 +21,6 @@ const LessonSchema = new Schema<ILesson>({
     type: Schema.Types.ObjectId,
     ref: 'Project',
     required: true
-  },
-  sprint: {
-    type: Schema.Types.ObjectId,
-    ref: 'Sprint'
   },
   organization: {
     type: Schema.Types.ObjectId,
@@ -54,6 +49,7 @@ const LessonSchema = new Schema<ILesson>({
   },
   rootCause: {
     type: String,
+    default: '',
     trim: true,
     maxlength: 5000
   },
@@ -71,13 +67,7 @@ const LessonSchema = new Schema<ILesson>({
   timestamps: true
 })
 
-// Indexes for fast lookup and filtering
-LessonSchema.index({ project: 1, lessonNumber: 1, createdAt: 1 })
-LessonSchema.index({ sprint: 1, createdAt: -1 })
-LessonSchema.index({ organization: 1 })
-LessonSchema.index({ category: 1 })
-LessonSchema.index({ impactLevel: 1 })
-LessonSchema.index({ modifiedBy: 1 })
+LessonSchema.index({ project: 1, organization: 1, lessonNumber: 1, createdAt: 1 })
 
 export const Lesson = mongoose.models.Lesson || mongoose.model<ILesson>('Lesson', LessonSchema)
 export default Lesson
