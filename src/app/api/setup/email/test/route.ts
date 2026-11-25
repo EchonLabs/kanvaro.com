@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rejectUnlessSetupOrPermission } from '@/lib/setup-guard'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import nodemailer from 'nodemailer'
 
 export async function POST(request: NextRequest) {
   try {
+    const denied = await rejectUnlessSetupOrPermission(Permission.SETTINGS_MANAGE_EMAIL)
+    if (denied) return denied
+
     const { provider, smtp, azure } = await request.json()
 
     if (provider === 'smtp') {

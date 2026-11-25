@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rejectUnlessSetupOrPermission } from '@/lib/setup-guard'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import mongoose from 'mongoose'
 
 async function checkExistingData(db: any) {
@@ -71,6 +73,9 @@ async function checkExistingData(db: any) {
 
 export async function POST(request: NextRequest) {
   try {
+    const denied = await rejectUnlessSetupOrPermission(Permission.SETTINGS_MANAGE_DATABASE)
+    if (denied) return denied
+
     const config = await request.json()
     
     // Test MongoDB connection

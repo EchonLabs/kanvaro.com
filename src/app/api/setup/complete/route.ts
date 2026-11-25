@@ -6,6 +6,7 @@ import { Currency } from '@/models/Currency'
 import bcrypt from 'bcryptjs'
 import { saveDatabaseConfig, markSetupCompleted } from '@/lib/config'
 import connectDB from '@/lib/db-config'
+import { rejectIfSetupCompleted } from '@/lib/setup-guard'
 
 // Currency data for seeding
 const currencyData = [
@@ -167,8 +168,10 @@ async function seedCurrencies() {
 
 export async function POST(request: NextRequest) {
   try {
+    const locked = await rejectIfSetupCompleted()
+    if (locked) return locked
+
     const setupData = await request.json()
-    console.log('Setup data received:', JSON.stringify(setupData, null, 2))
     
     // Validate required setup data
     if (!setupData.database) {
@@ -226,7 +229,7 @@ export async function POST(request: NextRequest) {
     console.log('Organization upserted successfully:', organization._id)
     
     // Create or update admin user
-    console.log('Creating/updating admin user with data:', setupData.admin)
+    console.log('Creating/updating admin user:', setupData.admin.email)
     const hashedPassword = await bcrypt.hash(setupData.admin.password, 12)
     
     const adminUserData = {
