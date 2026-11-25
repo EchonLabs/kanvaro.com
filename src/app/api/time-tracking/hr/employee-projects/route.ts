@@ -5,9 +5,8 @@ import { Project } from '@/models/Project'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { Role } from '@/lib/permissions/permission-definitions'
+import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
 export async function GET(request: NextRequest) {
@@ -34,13 +33,13 @@ export async function GET(request: NextRequest) {
     let requester: any = null
     try {
       if (accessToken) {
-        const decoded: any = jwt.verify(accessToken, JWT_SECRET)
+        const decoded: any = jwt.verify(accessToken, getJwtSecret())
         requester = await User.findById(decoded.userId).select('organization role isActive').lean()
       }
     } catch {}
     if (!requester && refreshToken) {
       try {
-        const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
+        const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
         requester = await User.findById(decoded.userId).select('organization role isActive').lean()
       } catch {}
     }

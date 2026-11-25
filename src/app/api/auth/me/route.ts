@@ -5,11 +5,10 @@ import { User } from '@/models/User'
 import '@/models/CustomRole' // Ensure CustomRole model is registered for populate
 import jwt from 'jsonwebtoken'
 import { normalizeUploadUrl } from '@/lib/file-utils'
+import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
 
 export const dynamic = 'force-dynamic'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 
 export async function GET() {
   try {
@@ -34,7 +33,7 @@ export async function GET() {
     // Try to verify access token first
     if (accessToken) {
       try {
-        const decoded = jwt.verify(accessToken, JWT_SECRET) as any
+        const decoded = jwt.verify(accessToken, getJwtSecret()) as any
         console.log('Access token verified for user:', decoded.userId)
         
         // Database mode - fetch user from database
@@ -77,7 +76,7 @@ export async function GET() {
         // Access token is invalid, try refresh token
         if (refreshToken) {
           try {
-            const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any
+            const decoded = jwt.verify(refreshToken, getJwtRefreshSecret()) as any
             console.log('Refresh token verified for user:', decoded.userId)
             
             // Database mode - fetch user from database
@@ -89,7 +88,7 @@ export async function GET() {
               // Create new access token
               const newAccessToken = jwt.sign(
                 { userId: user._id, email: user.email, role: user.role },
-                JWT_SECRET,
+                getJwtSecret(),
                 { expiresIn: '15m' }
               )
 
@@ -149,7 +148,7 @@ export async function GET() {
     } else if (refreshToken) {
       // Only refresh token available
       try {
-        const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any
+        const decoded = jwt.verify(refreshToken, getJwtRefreshSecret()) as any
         console.log('Only refresh token available, verifying for user:', decoded.userId)
         
         await connectDB()
@@ -160,7 +159,7 @@ export async function GET() {
           // Create new access token
           const newAccessToken = jwt.sign(
             { userId: user._id, email: user.email, role: user.role },
-            JWT_SECRET,
+            getJwtSecret(),
             { expiresIn: '15m' }
           )
 

@@ -7,9 +7,8 @@ import jwt from 'jsonwebtoken'
 import { User } from '@/models/User'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 
 async function getAuthenticatedUserId(): Promise<string | null> {
   const cookieStore = cookies()
@@ -21,14 +20,14 @@ async function getAuthenticatedUserId(): Promise<string | null> {
   let user: any = null
   try {
     if (accessToken) {
-      const decoded: any = jwt.verify(accessToken, JWT_SECRET)
+      const decoded: any = jwt.verify(accessToken, getJwtSecret())
       user = await User.findById(decoded.userId)
     }
   } catch { }
 
   if (!user && refreshToken) {
     try {
-      const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
+      const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
       user = await User.findById(decoded.userId)
     } catch { }
   }

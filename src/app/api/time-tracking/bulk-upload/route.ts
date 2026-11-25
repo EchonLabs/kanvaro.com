@@ -12,9 +12,8 @@ import jwt from 'jsonwebtoken'
 import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { getOrgLocalDateString, getOrgLocalTimeString, calendarDayDiff, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
+import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 
 // Super Admin, Admin, and HR bypass the manual-log kill switch, the member sub-setting,
 // and the past-time-limit checks below — same unrestricted set as the single-entry endpoint.
@@ -57,7 +56,7 @@ export async function POST(request: NextRequest) {
     let requesterId: string = ''
     try {
       if (accessToken) {
-        const decoded: any = jwt.verify(accessToken, JWT_SECRET)
+        const decoded: any = jwt.verify(accessToken, getJwtSecret())
         requester = await User.findById(decoded.userId)
       }
     } catch (error) {
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
     if (!requester && refreshToken) {
       try {
-        const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
+        const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
         requester = await User.findById(decoded.userId)
       } catch (error) {
         console.error('[Bulk Upload] Refresh token verification failed:', error)

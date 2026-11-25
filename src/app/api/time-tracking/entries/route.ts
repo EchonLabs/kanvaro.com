@@ -17,9 +17,8 @@ import { getOrgLocalDateString, getOrgLocalTimeString, calendarDayDiff, computeE
 import mongoose from 'mongoose'
 import { zonedTimeToUtc } from 'date-fns-tz'
 import { logActivity } from '@/lib/activity-logger'
+import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 
 // Super Admin, Admin, and HR can log time for any org member, on any date, unrestricted
 // by allowMembersToAddTimeLogs / pastTimeLimitDays. Everyone else may only log their own
@@ -62,13 +61,13 @@ export async function GET(request: NextRequest) {
     let viewerId: string = ''
     try {
       if (accessToken) {
-        const decoded: any = jwt.verify(accessToken, JWT_SECRET)
+        const decoded: any = jwt.verify(accessToken, getJwtSecret())
         viewer = await User.findById(decoded.userId)
       }
     } catch { }
     if (!viewer && refreshToken) {
       try {
-        const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
+        const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
         viewer = await User.findById(decoded.userId)
       } catch { }
     }
@@ -368,13 +367,13 @@ export async function POST(request: NextRequest) {
     let requesterId: string = ''
     try {
       if (accessToken) {
-        const decoded: any = jwt.verify(accessToken, JWT_SECRET)
+        const decoded: any = jwt.verify(accessToken, getJwtSecret())
         requester = await User.findById(decoded.userId)
       }
     } catch { }
     if (!requester && refreshToken) {
       try {
-        const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
+        const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
         requester = await User.findById(decoded.userId)
       } catch { }
     }

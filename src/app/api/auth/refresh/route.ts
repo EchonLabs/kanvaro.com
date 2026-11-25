@@ -5,9 +5,8 @@ import connectDB from '@/lib/db-config'
 import { hasDatabaseConfig } from '@/lib/db-config'
 import { User } from '@/models/User'
 import { normalizeUploadUrl } from '@/lib/file-utils'
+import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 
 export async function POST() {
   try {
@@ -22,7 +21,7 @@ export async function POST() {
     }
 
     // Verify refresh token
-    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any
+    const decoded = jwt.verify(refreshToken, getJwtRefreshSecret()) as any
 
     // Check if database is configured
     const isConfigured = await hasDatabaseConfig()
@@ -54,7 +53,7 @@ export async function POST() {
       // Create new access token
       const newAccessToken = jwt.sign(
         { userId: mockUser.id, email: mockUser.email, role: mockUser.role },
-        JWT_SECRET,
+        getJwtSecret(),
         { expiresIn: '15m' }
       )
 
@@ -86,7 +85,7 @@ export async function POST() {
     // Create new access token
     const newAccessToken = jwt.sign(
       { userId: user._id, email: user.email, role: user.role },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '15m' }
     )
 

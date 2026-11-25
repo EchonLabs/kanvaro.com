@@ -5,9 +5,8 @@ import { connectWithStoredConfig, hasDatabaseConfig } from '@/lib/db-config'
 import { User } from '@/models/User'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 
 export async function POST(request: Request) {
   try {
@@ -107,13 +106,13 @@ export async function POST(request: Request) {
     // Create JWT tokens
     const accessToken = jwt.sign(
       { userId: user._id, email: user.email, role: user.role },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '15m' }
     )
 
     const refreshToken = jwt.sign(
       { userId: user._id, email: user.email },
-      JWT_REFRESH_SECRET,
+      getJwtRefreshSecret(),
       { expiresIn: '7d' }
     )
     
