@@ -15,8 +15,8 @@ const detail = (over: Record<string, unknown> = {}) => ({
   member: { _id: 'u1', name: 'Shalini Fernando' },
   requestedBy: { _id: 'pm', name: 'Nadeeshani De Zoysa', roleLabel: 'Project Manager' },
   lines: [
-    { projectId: P1, projectName: 'BaseNeo SaaS', previousPercent: 50, newPercent: 35, currentPercent: 50 },
-    { projectId: P2, projectName: 'MediFinder', previousPercent: 0, newPercent: 60, currentPercent: 0 }
+    { projectId: P1, projectName: 'BaseNeo SaaS', previousPercent: 50, newPercent: 35, currentPercent: 50, active: true },
+    { projectId: P2, projectName: 'MediFinder', previousPercent: 0, newPercent: 60, currentPercent: 0, active: true }
   ],
   totalBefore: 50,
   totalAfter: 95,
@@ -71,7 +71,7 @@ describe('ApprovalModal', () => {
     serve(
       detail({
         stale: true,
-        lines: [{ projectId: P2, projectName: 'MediFinder', previousPercent: 0, newPercent: 60, currentPercent: 10 }],
+        lines: [{ projectId: P2, projectName: 'MediFinder', previousPercent: 0, newPercent: 60, currentPercent: 10, active: true }],
         liveTotalBefore: 60,
         liveTotalAfter: 110 - 10 - 40
       })
@@ -120,6 +120,47 @@ describe('ApprovalModal', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }))
     expect(await screen.findByText('This request has already been decided.')).toBeInTheDocument()
     expect(props.onDecided).not.toHaveBeenCalled()
+  })
+
+  it('reloads the request when the sheet changed after it opened, then asks for acknowledgement', async () => {
+    let loads = 0
+    fetchMock = jest.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith('/requests/r1') && !init?.method) {
+        loads += 1
+        const data =
+          loads === 1
+            ? detail()
+            : detail({
+                stale: true,
+                lines: [{ projectId: P2, projectName: 'MediFinder', previousPercent: 0, newPercent: 60, currentPercent: 10, active: true }]
+              })
+        return json(200, { success: true, data })
+      }
+      return json(409, { error: { code: 'STALE_REQUEST_UNACKNOWLEDGED', message: 'The allocation changed after this request was made.' } })
+    })
+    global.fetch = fetchMock as unknown as typeof fetch
+    render(<ApprovalModal {...props} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }))
+
+    expect(await screen.findByLabelText('I’ve reviewed the current values')).toBeInTheDocument()
+    expect(loads).toBe(2)
+  })
+
+  it('names an inactive project and only allows rejecting', async () => {
+    serve(
+      detail({
+        lines: [
+          { projectId: P1, projectName: 'BaseNeo SaaS', previousPercent: 50, newPercent: 35, currentPercent: 50, active: true },
+          { projectId: P2, projectName: 'MediFinder', previousPercent: 0, newPercent: 60, currentPercent: 0, active: false }
+        ]
+      })
+    )
+    render(<ApprovalModal {...props} />)
+
+    expect(await screen.findByText('MediFinder is no longer active, so this request can only be rejected.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Reject' })).toBeEnabled()
   })
 
   it('shows a decided request read-only', async () => {

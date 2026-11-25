@@ -1085,6 +1085,7 @@ export default function MembersPage() {
           memberId={allocatingMember._id}
           open
           mode={allocationAccess.canManage ? 'apply' : 'request'}
+          currentUserId={user?.id}
           onClose={() => setAllocatingMember(null)}
           onDone={({ mode }) => {
             setAllocatingMember(null)

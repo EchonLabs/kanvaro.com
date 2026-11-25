@@ -166,6 +166,32 @@ function ResourceAllocationScreen() {
 
       {tab === 'overview' && (
         <>
+          {sheet && access.canApprove && sheet.orphanedRequests.length > 0 && (
+            <section className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-4">
+              <h2 className="text-[14px] font-semibold text-[var(--apple-label)]">Requests for people no longer on the sheet</h2>
+              <p className="mt-0.5 text-[13px] text-[var(--apple-secondary-label)]">
+                These people were deactivated or moved to a non-resource role. Reject or cancel their pending requests.
+              </p>
+              <ul className="mt-3 divide-y divide-[var(--apple-separator)]">
+                {sheet.orphanedRequests.map((request) => (
+                  <li key={request.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
+                    <span className="text-[var(--apple-label)]">
+                      {request.memberName}
+                      <span className="text-[var(--apple-secondary-label)]"> requested by {request.requestedBy.name}</span>
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOpenRequestId(request.id)}
+                      aria-label={`Review request for ${request.memberName}`}
+                    >
+                      Review
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {sheet && <KpiCards kpis={sheet.kpis} />}
           <AllocationFilters
             value={filters}
@@ -220,6 +246,7 @@ function ResourceAllocationScreen() {
           memberId={managing}
           open
           mode={access.canManage ? 'apply' : 'request'}
+          currentUserId={user?.id}
           onClose={() => setManaging(null)}
           onDone={({ mode }) => {
             setManaging(null)

@@ -18,6 +18,8 @@ interface Props {
   open: boolean
   /** `apply` for Admin/HR (changes go live), `request` for PMs (changes go to approval). */
   mode: 'apply' | 'request'
+  /** In request mode, a PM may only increase projects they manage (the server enforces the same rule). */
+  currentUserId?: string
   onClose(): void
   onDone(result: { mode: 'applied' | 'requested' }): void
 }
@@ -29,7 +31,7 @@ export function clampPercent(raw: string): number {
   return Math.min(100, Math.max(0, value))
 }
 
-export function ManageAllocationModal({ memberId, open, mode, onClose, onDone }: Props) {
+export function ManageAllocationModal({ memberId, open, mode, currentUserId, onClose, onDone }: Props) {
   const [data, setData] = useState<MemberAllocations | null>(null)
   const [values, setValues] = useState<Record<string, number>>({})
   const [reason, setReason] = useState('')
@@ -71,6 +73,9 @@ export function ManageAllocationModal({ memberId, open, mode, onClose, onDone }:
       available: data.threshold - totalAfter
     }
   }, [data, values])
+
+  const canIncrease = (line: MemberAllocations['lines'][number]) =>
+    mode === 'apply' || (!!currentUserId && line.managerIds.includes(currentUserId))
 
   const canReview = !!summary && summary.changed.length > 0 && reason.trim().length > 0 && !summary.over
 
@@ -186,6 +191,7 @@ export function ManageAllocationModal({ memberId, open, mode, onClose, onDone }:
                 {data.lines.map((line) => {
                   const next = values[line.projectId] ?? line.percent
                   const difference = next - line.percent
+                  const ceiling = canIncrease(line) ? 100 : line.percent
                   return (
                     <tr key={line.projectId} className="border-t border-[var(--apple-separator)]">
                       <td className="px-3 py-2 font-medium text-[var(--apple-label)]">{line.projectName}</td>
@@ -196,12 +202,15 @@ export function ManageAllocationModal({ memberId, open, mode, onClose, onDone }:
                             type="number"
                             inputMode="numeric"
                             min={0}
-                            max={100}
+                            max={ceiling}
                             step={1}
                             value={next}
                             aria-label={`New allocation for ${line.projectName}`}
                             onChange={(event) =>
-                              setValues((current) => ({ ...current, [line.projectId]: clampPercent(event.target.value) }))
+                              setValues((current) => ({
+                                ...current,
+                                [line.projectId]: Math.min(ceiling, clampPercent(event.target.value))
+                              }))
                             }
                             className="h-8 w-24 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-transparent pl-2 pr-6 text-[13px] tabular-nums text-[var(--apple-label)] focus:outline-none focus:ring-2 focus:ring-[var(--apple-system-blue)]"
                           />
@@ -209,6 +218,11 @@ export function ManageAllocationModal({ memberId, open, mode, onClose, onDone }:
                             %
                           </span>
                         </span>
+                        {!canIncrease(line) && (
+                          <span className="mt-0.5 block text-[10px] text-[var(--apple-tertiary-label)]">
+                            You can only reduce this project
+                          </span>
+                        )}
                       </td>
                       <td
                         className={cn(

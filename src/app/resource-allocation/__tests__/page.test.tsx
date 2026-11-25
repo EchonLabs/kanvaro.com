@@ -56,7 +56,8 @@ const sheet = {
   byRole: [],
   roles: ['Team Member'],
   threshold: 100,
-  pagination: { page: 1, limit: 10, total: 1, totalPages: 1 }
+  pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+  orphanedRequests: [] as { id: string; memberName: string; requestedBy: { _id: string; name: string } }[]
 }
 
 const detail = {
@@ -102,6 +103,15 @@ describe('Resource Allocation page', () => {
     render(<ResourceAllocationPage />)
 
     expect(await screen.findByText('Need design help')).toBeInTheDocument()
+  })
+
+  it('lets approvers reach pending requests for people no longer on the sheet', async () => {
+    sheet.orphanedRequests = [{ id: 'r1', memberName: 'Gone Person', requestedBy: { _id: 'pm', name: 'Pam' } }]
+    render(<ResourceAllocationPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Review request for Gone Person' }))
+    expect(await screen.findByText('Need design help')).toBeInTheDocument()
+    sheet.orphanedRequests = []
   })
 
   it('shows the history tab when selected', async () => {

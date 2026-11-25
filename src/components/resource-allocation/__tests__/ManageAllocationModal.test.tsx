@@ -12,9 +12,9 @@ const P3 = 'cccccccccccccccccccccccc'
 const member = {
   member: { _id: 'u1', name: 'Shalini Fernando', email: 's@example.com', roleLabel: 'Senior UI/UX Designer' },
   lines: [
-    { projectId: P1, projectName: 'AVO', percent: 0, onTeam: false },
-    { projectId: P2, projectName: 'BaseNeo SaaS', percent: 50, onTeam: true },
-    { projectId: P3, projectName: 'MediFinder', percent: 0, onTeam: false }
+    { projectId: P1, projectName: 'AVO', percent: 0, onTeam: false, managerIds: ['me'] },
+    { projectId: P2, projectName: 'BaseNeo SaaS', percent: 50, onTeam: true, managerIds: ['other'] },
+    { projectId: P3, projectName: 'MediFinder', percent: 0, onTeam: false, managerIds: ['other'] }
   ],
   total: 50,
   remaining: 50,
@@ -39,7 +39,7 @@ beforeEach(() => {
   global.fetch = fetchMock as unknown as typeof fetch
 })
 
-const props = { memberId: 'u1', open: true, onClose: jest.fn(), onDone: jest.fn() }
+const props = { memberId: 'u1', open: true, currentUserId: 'me', onClose: jest.fn(), onDone: jest.fn() }
 
 const newInput = (projectName: string) => screen.getByLabelText(`New allocation for ${projectName}`) as HTMLInputElement
 
@@ -138,6 +138,18 @@ describe('ManageAllocationModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Share to Approvals' }))
 
     await waitFor(() => expect(props.onDone).toHaveBeenCalledWith({ mode: 'requested' }))
+  })
+
+  it('in request mode, only allows increases on projects the PM manages', async () => {
+    await renderModal('request')
+
+    fireEvent.change(newInput('MediFinder'), { target: { value: '30' } })
+    expect(newInput('MediFinder').value).toBe('0')
+    fireEvent.change(newInput('BaseNeo SaaS'), { target: { value: '20' } })
+    expect(newInput('BaseNeo SaaS').value).toBe('20')
+    fireEvent.change(newInput('AVO'), { target: { value: '30' } })
+    expect(newInput('AVO').value).toBe('30')
+    expect(screen.getAllByText('You can only reduce this project').length).toBe(2)
   })
 
   it('shows the server message when the change is refused, and stays open', async () => {

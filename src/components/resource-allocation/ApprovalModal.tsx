@@ -6,7 +6,7 @@ import { AlertTriangle, Info } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 
-import { approveRequest, fetchRequest, rejectRequest, type RequestDetail } from './api'
+import { ApiError, approveRequest, fetchRequest, rejectRequest, type RequestDetail } from './api'
 import { ChangeReview } from './ChangeReview'
 
 interface Props {
@@ -48,7 +48,7 @@ export function RequestSummary({ request }: { request: RequestDetail }) {
 
 /** The live effect of a request: what changes from today's values, not from the values at submit time. */
 export function liveReviewLines(request: RequestDetail) {
-  return request.lines.map((line) => ({
+  return request.lines.filter((line) => line.active !== false).map((line) => ({
     projectName: line.projectName,
     previousPercent: line.currentPercent,
     newPercent: line.newPercent
@@ -74,10 +74,21 @@ export function ApprovalModal({ requestId, open, onClose, onDecided }: Props) {
     setAcknowledged(false)
     setNote('')
     setError(null)
+    setLoadError(null)
     fetchRequest(requestId)
       .then(setRequest)
       .catch((err: Error) => setLoadError(err.message))
   }, [requestId, open])
+
+  /** The sheet moved while the modal was open: show what is true now, and ask again. */
+  const reload = async () => {
+    try {
+      setRequest(await fetchRequest(requestId))
+      setAcknowledged(false)
+    } catch {
+      // Keep the current view; the error message already explains what happened.
+    }
+  }
 
   const decide = async (decision: 'approved' | 'rejected') => {
     setBusy(true)
@@ -88,14 +99,19 @@ export function ApprovalModal({ requestId, open, onClose, onDecided }: Props) {
       onDecided(decision)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
+      if (err instanceof ApiError && ['STALE_REQUEST_UNACKNOWLEDGED', 'OVER_THRESHOLD', 'VALIDATION_FAILED', 'REQUEST_NOT_PENDING'].includes(err.code)) {
+        await reload()
+      }
     } finally {
       setBusy(false)
     }
   }
 
   const pending = request?.status === 'pending'
+  const inactiveLines = request?.lines.filter((line) => line.active === false) ?? []
   const driftedLines = request?.lines.filter((line) => line.currentPercent !== line.previousPercent) ?? []
-  const confirmDisabled = busy || !request || request.exceedsThresholdNow || (request.stale && !acknowledged)
+  const confirmDisabled =
+    busy || !request || inactiveLines.length > 0 || request.exceedsThresholdNow || (request.stale && !acknowledged)
 
   const footer = !request ? undefined : pending ? (
     <>
@@ -164,7 +180,15 @@ export function ApprovalModal({ requestId, open, onClose, onDecided }: Props) {
             </div>
           )}
 
-          {pending && request.exceedsThresholdNow && (
+          {pending && inactiveLines.length > 0 && (
+            <p className="flex items-center gap-2 rounded-[var(--apple-radius-md)] bg-[color-mix(in_srgb,var(--apple-system-orange)_12%,transparent)] px-3 py-2 text-[13px] text-[var(--apple-label)]">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 text-[var(--apple-system-orange)]" />
+              {inactiveLines.map((line) => line.projectName).join(', ')} {inactiveLines.length === 1 ? 'is' : 'are'} no longer
+              active, so this request can only be rejected.
+            </p>
+          )}
+
+          {pending && inactiveLines.length === 0 && request.exceedsThresholdNow && (
             <p
               role="alert"
               className="flex items-center gap-2 rounded-[var(--apple-radius-md)] bg-[color-mix(in_srgb,var(--apple-system-red)_10%,transparent)] px-3 py-2 text-[13px] text-[var(--apple-system-red)]"
