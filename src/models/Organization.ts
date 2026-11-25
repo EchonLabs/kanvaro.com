@@ -49,6 +49,11 @@ export interface IOrganization extends Document {
         onTimeSubmitted: boolean
       }
     }
+    /** Cross-project resource allocation. */
+    resourceAllocation: {
+      /** A member whose total allocation would exceed this % cannot be allocated further. */
+      overAllocationThresholdPercent: number
+    }
   }
   billing: {
     plan: 'free' | 'starter' | 'professional' | 'enterprise'
@@ -161,6 +166,9 @@ const OrganizationSchema = new Schema<IOrganization>({
         onApprovalNeeded: { type: Boolean, default: true },
         onTimeSubmitted: { type: Boolean, default: true }
       }
+    },
+    resourceAllocation: {
+      overAllocationThresholdPercent: { type: Number, default: 100, min: 50, max: 200 }
     }
   },
   billing: {
