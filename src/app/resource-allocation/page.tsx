@@ -12,11 +12,13 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { AllocationFilters, type FilterState } from '@/components/resource-allocation/AllocationFilters'
 import { AllocationMatrix } from '@/components/resource-allocation/AllocationMatrix'
 import { KpiCards } from '@/components/resource-allocation/KpiCards'
+import { ManageAllocationModal } from '@/components/resource-allocation/ManageAllocationModal'
 import { ResourceAllocationTabs, type ResourceAllocationTab } from '@/components/resource-allocation/ResourceAllocationTabs'
 import { RoleSummary } from '@/components/resource-allocation/RoleSummary'
 import { SheetPagination } from '@/components/resource-allocation/SheetPagination'
 import { useResourceAllocationAccess } from '@/components/resource-allocation/useResourceAllocationAccess'
 import { exportUrl, fetchHistory, fetchSheet, type Sheet } from '@/components/resource-allocation/api'
+import { useNotify } from '@/lib/notify'
 
 const EMPTY_FILTERS: FilterState = { q: '', role: '', project: '', status: '' }
 
@@ -46,6 +48,8 @@ function ResourceAllocationScreen() {
   const [loading, setLoading] = useState(true)
   const [historyCount, setHistoryCount] = useState<number | undefined>()
   const [refreshKey, setRefreshKey] = useState(0)
+  const [managing, setManaging] = useState<string | null>(null)
+  const notify = useNotify()
 
   const q = useDebounced(filters.q)
   const params = useMemo(
@@ -167,7 +171,7 @@ function ResourceAllocationScreen() {
                   canApprove={access.canApprove}
                   currentUserId={user?.id}
                   rowOffset={(sheet.pagination.page - 1) * sheet.pagination.limit}
-                  onManage={() => undefined}
+                  onManage={setManaging}
                   onOpenRequest={() => undefined}
                 />
                 <SheetPagination
@@ -189,6 +193,26 @@ function ResourceAllocationScreen() {
           </section>
           {sheet && <RoleSummary roles={sheet.byRole} />}
         </>
+      )}
+
+      {managing && (
+        <ManageAllocationModal
+          memberId={managing}
+          open
+          mode={access.canManage ? 'apply' : 'request'}
+          onClose={() => setManaging(null)}
+          onDone={({ mode }) => {
+            setManaging(null)
+            notify.success({
+              title: mode === 'applied' ? 'Allocation updated' : 'Shared to approvals',
+              message:
+                mode === 'applied'
+                  ? 'The allocation sheet has been updated.'
+                  : 'HR will review the change before it is applied.'
+            })
+            refresh()
+          }}
+        />
       )}
 
       {tab === 'history' && (
