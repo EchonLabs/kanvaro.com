@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Organization } from '@/models/Organization'
+import { authenticateUser } from '@/lib/auth-utils'
 
 export async function GET() {
   try {
+    const auth = await authenticateUser()
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     await connectDB()
     
     const organization = await Organization.findOne({})

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { emailService } from '@/lib/email/EmailService'
 import { authenticateUser } from '@/lib/auth-utils'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,6 +12,12 @@ export async function POST(request: NextRequest) {
         { error: authResult.error },
         { status: authResult.status }
       )
+    }
+
+    // Sends through the organisation's mail server to any address, so only
+    // people who manage email settings may use it.
+    if (!(await PermissionService.hasPermission(authResult.user.id, Permission.SETTINGS_MANAGE_EMAIL))) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
     const { email } = await request.json()
