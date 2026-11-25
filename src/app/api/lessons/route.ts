@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { projectId, category, impactLevel, context, rootCause, actionRecommendation } = body
 
-    if (!projectId || !category || !context || !actionRecommendation) {
+    if (!projectId || !category?.trim() || !context?.trim() || !actionRecommendation?.trim()) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -161,10 +161,18 @@ export async function POST(req: NextRequest) {
       organization: authResult.user.organization,
       is_deleted: { $ne: true }
     })
-      .select('_id')
-      .lean()
+      .select('_id settings.taskCategories')
+      .lean() as {
+      _id: unknown
+      settings?: { taskCategories?: Array<{ key?: string }> }
+    } | null
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    const taskCategories = project.settings?.taskCategories || []
+    if (taskCategories.length > 0 && !taskCategories.some((c) => c.key === category.trim())) {
+      return NextResponse.json({ error: 'Select a valid task category for this project' }, { status: 400 })
     }
 
     const canManage = await PermissionService.hasPermission(
@@ -199,6 +207,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ lesson }, { status: 201 })
   } catch (error) {
+    if (error instanceof mongoose.Error.ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Error creating lesson:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

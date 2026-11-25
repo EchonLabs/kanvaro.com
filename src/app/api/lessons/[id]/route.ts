@@ -45,6 +45,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const body = await req.json()
     const { category, impactLevel, context, rootCause, actionRecommendation } = body
 
+    if (
+      (category !== undefined && !String(category).trim()) ||
+      (context !== undefined && !String(context).trim()) ||
+      (actionRecommendation !== undefined && !String(actionRecommendation).trim())
+    ) {
+      return NextResponse.json({ error: 'Required fields cannot be empty' }, { status: 400 })
+    }
+
     const updateData: any = {
       modifiedBy: authResult.user.id
     }
@@ -68,6 +76,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     return NextResponse.json({ lesson: updated })
   } catch (error) {
+    if (error instanceof mongoose.Error.ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Error updating lesson:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
