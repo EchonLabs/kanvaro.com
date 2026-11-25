@@ -40,6 +40,9 @@ export enum PermissionCategory {
 
   // Documentation permissions
   DOCUMENTATION = 'documentation',
+
+  // Cross-project resource allocation (% of each member per project)
+  RESOURCE_ALLOCATION = 'resource_allocation',
 }
 
 export enum Permission {
@@ -253,6 +256,21 @@ export enum Permission {
   DOCUMENTATION_UPDATE = 'documentation:update',
   DOCUMENTATION_DELETE = 'documentation:delete',
   DOCUMENTATION_MANAGE_PERMISSIONS = 'documentation:manage_permissions',
+
+  /**
+   * Resource allocation: an org-wide sheet of each member's % per project.
+   *
+   * VIEW reads the sheet (every internal role). MANAGE applies changes
+   * directly and sets the over-allocation threshold (Admin/HR). REQUEST raises
+   * a change for approval (PMs). APPROVE decides those requests (Admin/HR).
+   * VIEW_HISTORY reads the audit trail and request reasons, kept narrower than
+   * VIEW because a reason can carry sensitive HR text.
+   */
+  RESOURCE_ALLOCATION_VIEW = 'resource_allocation:view',
+  RESOURCE_ALLOCATION_MANAGE = 'resource_allocation:manage',
+  RESOURCE_ALLOCATION_REQUEST = 'resource_allocation:request',
+  RESOURCE_ALLOCATION_APPROVE = 'resource_allocation:approve',
+  RESOURCE_ALLOCATION_VIEW_HISTORY = 'resource_allocation:view_history',
 }
 
 export enum Role {
@@ -280,6 +298,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.SUPER_ADMIN]: Object.values(Permission),
 
   [Role.ADMIN]: [
+    // Resource allocation
+    Permission.RESOURCE_ALLOCATION_VIEW,
+    Permission.RESOURCE_ALLOCATION_MANAGE,
+    Permission.RESOURCE_ALLOCATION_APPROVE,
+    Permission.RESOURCE_ALLOCATION_VIEW_HISTORY,
+
     // User management
     Permission.USER_CREATE,
     Permission.USER_READ,
@@ -470,6 +494,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   // Human Resource role - currently has the same permissions as ADMIN.
   // This can be fine-tuned later as needed.
   [Role.HUMAN_RESOURCE]: [
+    // Resource allocation
+    Permission.RESOURCE_ALLOCATION_VIEW,
+    Permission.RESOURCE_ALLOCATION_MANAGE,
+    Permission.RESOURCE_ALLOCATION_APPROVE,
+    Permission.RESOURCE_ALLOCATION_VIEW_HISTORY,
+
     // User management
     Permission.USER_CREATE,
     Permission.USER_READ,
@@ -644,6 +674,11 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.PROJECT_MANAGER]: [
+    // Resource allocation
+    Permission.RESOURCE_ALLOCATION_VIEW,
+    Permission.RESOURCE_ALLOCATION_REQUEST,
+    Permission.RESOURCE_ALLOCATION_VIEW_HISTORY,
+
     // Stand-ups — every capability except the planning waiver, which the §3.2
     // matrix reserves for Org Admin. SEC-2: any PM on the project may run the
     // stand-up; whoever starts it becomes facilitator but the rest keep full
@@ -832,6 +867,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.TEAM_MEMBER]: [
+    // Resource allocation
+    Permission.RESOURCE_ALLOCATION_VIEW,
+
     // Stand-ups are granted per project, NOT here — see PROJECT_MEMBER.
     //
     // A grant in this table is organisation-wide: `hasPermission` returns true
@@ -1019,6 +1057,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.QA_ENGINEER]: [
+    // Resource allocation
+    Permission.RESOURCE_ALLOCATION_VIEW,
+
     // Stand-ups are granted per project, NOT here — see PROJECT_QA_LEAD and
     // PROJECT_MEMBER. A grant here would be organisation-wide; see the note on
     // TEAM_MEMBER.
@@ -1106,6 +1147,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   [Role.TESTER]: [
+    // Resource allocation
+    Permission.RESOURCE_ALLOCATION_VIEW,
+
     // Stand-ups are granted per project, NOT here — see PROJECT_TESTER and
     // PROJECT_MEMBER. A grant here would be organisation-wide; see the note on
     // TEAM_MEMBER.
@@ -1458,6 +1502,12 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     // PROJECT scope, which only worked because the roles that hold it hold it
     // globally — a custom role granting it would have been scoped wrongly.
     Permission.HOLIDAY_MANAGE,
+    // Resource allocation is organisation-wide: the sheet spans every project.
+    Permission.RESOURCE_ALLOCATION_VIEW,
+    Permission.RESOURCE_ALLOCATION_MANAGE,
+    Permission.RESOURCE_ALLOCATION_REQUEST,
+    Permission.RESOURCE_ALLOCATION_APPROVE,
+    Permission.RESOURCE_ALLOCATION_VIEW_HISTORY,
   ];
 
   const ownPermissions = [
