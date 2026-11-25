@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Project } from '@/models/Project'
 import { Task } from '@/models/Task'
+import { Lesson } from '@/models/Lesson'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -153,24 +154,41 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: 'Only project managers and admins can manage task categories' }, { status: 403 })
     }
 
-    const { key, action, targetKey } = await request.json()
+    const { key, action, targetKey, lessonAction, lessonTargetKey } = await request.json()
     const categories = categoriesFor(project)
-    const category = categories.find(item => item.key === key)
+    const category = categories.some(item => item.key === key)
     if (!category) return NextResponse.json({ error: 'Task category not found' }, { status: 404 })
     if (!['unassign', 'migrate'].includes(action)) return NextResponse.json({ error: "action must be 'unassign' or 'migrate'" }, { status: 400 })
 
     const target = action === 'migrate' ? categories.find(item => item.key === targetKey && item.key !== key) : undefined
     if (action === 'migrate' && !target) return NextResponse.json({ error: 'A different destination category is required' }, { status: 400 })
 
+    const effectiveLessonAction = lessonAction || action
+    if (!['unassign', 'migrate'].includes(effectiveLessonAction)) {
+      return NextResponse.json({ error: "lessonAction must be 'unassign' or 'migrate'" }, { status: 400 })
+    }
+    const lessonTarget = effectiveLessonAction === 'migrate'
+      ? categories.find(item => item.key === (lessonTargetKey || targetKey) && item.key !== key)
+      : undefined
+    if (effectiveLessonAction === 'migrate' && !lessonTarget) {
+      return NextResponse.json({ error: 'A different destination category is required for lessons' }, { status: 400 })
+    }
+
     const remaining = categories.filter(item => item.key !== key).map((item, order) => ({ ...item, order }))
     project.set('settings.taskCategories', remaining)
     const taskUpdate = action === 'migrate' ? { $set: { category: target!.key } } : { $unset: { category: 1 } }
-    const [, taskResult] = await Promise.all([
+    const lessonUpdate = effectiveLessonAction === 'migrate' ? { $set: { category: lessonTarget!.key } } : { $unset: { category: 1 } }
+    const [, taskResult, lessonResult] = await Promise.all([
       project.save(),
-      Task.updateMany({ project: project._id, organization: user.organization, category: key }, taskUpdate)
+      Task.updateMany({ project: project._id, organization: user.organization, category: key }, taskUpdate),
+      Lesson.updateMany({ project: project._id, organization: user.organization, category: key }, lessonUpdate)
     ])
 
-    return NextResponse.json({ success: true, affectedTasks: taskResult.modifiedCount })
+    return NextResponse.json({
+      success: true,
+      affectedTasks: taskResult.modifiedCount,
+      affectedLessons: lessonResult.modifiedCount
+    })
   } catch (error) {
     console.error('Delete task category error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

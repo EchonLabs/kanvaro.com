@@ -10,7 +10,6 @@ import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { useNotify } from '@/lib/notify'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Progress } from '@/components/ui/Progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -39,9 +38,7 @@ import {
   Link as LinkIcon,
   File,
   Image as ImageIcon,
-  ExternalLink,
-  Upload,
-  FolderOpen
+  ExternalLink
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import BulkTaskUploadDialog from '@/components/tasks/BulkTaskUploadDialog'
@@ -65,6 +62,7 @@ import { ProjectTeamTab } from '@/components/projects/ProjectTeamTab'
 import { ProjectViewHeader } from '@/components/projects/ProjectViewHeader'
 import { ProjectBudgetConsumptionCard } from '@/components/projects/ProjectBudgetConsumptionCard'
 import { ProjectInsightsTab } from '@/components/projects/ProjectInsightsTab'
+import { ProjectLearningsTab } from '@/components/projects/ProjectLearningsTab'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { Permission } from '@/lib/permissions'
 import { usePermissions } from '@/lib/permissions/permission-context'
@@ -299,6 +297,7 @@ export default function ProjectDetailPage() {
     ...(canManageTests ? [{ id: 'testing', label: 'Testing' }] : []),
     { id: 'reports', label: 'Reports' },
     { id: 'insights', label: 'Insights' },
+    { id: 'learnings', label: 'Learnings' },
     { id: 'settings', label: 'Settings' },
   ].map((tab, idx) => ({ ...tab, order: idx + 1 }))
 
@@ -2204,6 +2203,13 @@ export default function ProjectDetailPage() {
                 formatCurrency={formatCurrency}
                 currency={orgCurrency}
                 canViewFinancials={isHrOrAdmin}
+              />
+            </TabsContent>
+
+            <TabsContent value="learnings" className="space-y-6">
+              <ProjectLearningsTab
+                projectId={projectId}
+                project={project}
               />
             </TabsContent>
 

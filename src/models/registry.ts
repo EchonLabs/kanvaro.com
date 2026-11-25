@@ -37,6 +37,7 @@ import './TestExecution'
 import './ProjectVersion'
 import './Counter'
 import './Notification'
+import './Lesson'
 
 // Export all models for convenience
 export * from './index'
