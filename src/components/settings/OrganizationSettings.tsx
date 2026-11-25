@@ -15,6 +15,8 @@ import {
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useNotify } from '@/lib/notify'
 import { useAccentTheme, type AccentTheme } from '@/hooks/useAccentTheme'
+import { ThresholdSettingsCard } from '@/components/resource-allocation/ThresholdSettingsCard'
+import { useResourceAllocationAccess } from '@/components/resource-allocation/useResourceAllocationAccess'
 
 /* ── Section card wrapper ── */
 function SectionCard({
@@ -94,6 +96,7 @@ function Field({ label, htmlFor, error, hint, children }: {
 }
 
 export function OrganizationSettings() {
+  const { canManage: canManageAllocation } = useResourceAllocationAccess()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { organization, loading, refetch } = useOrganization()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, getCurrencyByCode } = useCurrencies(true)
@@ -996,6 +999,8 @@ export function OrganizationSettings() {
           <SaveButton loading={savingNotifications} disabled={!hasNotificationChanges} onClick={handleSaveNotificationSettings} label="Save Notifications" />
         </div>
       </SectionCard>
+
+      {canManageAllocation && <ThresholdSettingsCard />}
 
     </div>
   )

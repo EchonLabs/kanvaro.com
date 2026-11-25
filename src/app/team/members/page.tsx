@@ -33,6 +33,10 @@ import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useNotify } from '@/lib/notify'
+import { AllocationBar } from '@/components/resource-allocation/AllocationBar'
+import { ManageAllocationModal } from '@/components/resource-allocation/ManageAllocationModal'
+import { useMemberAllocationTotals } from '@/components/resource-allocation/useMemberAllocationTotals'
+import { useResourceAllocationAccess } from '@/components/resource-allocation/useResourceAllocationAccess'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -171,6 +175,9 @@ function MemberListRow({
   onEdit,
   onRemove,
   formatDate,
+  allocation,
+  threshold,
+  onManageAllocation,
 }: {
   member: Member
   index: number
@@ -179,6 +186,10 @@ function MemberListRow({
   onEdit: (m: Member) => void
   onRemove: (m: Member) => void
   formatDate: (d: string) => string
+  /** Total allocation %, when the viewer may see allocations and this member is a resource. */
+  allocation?: number
+  threshold?: number
+  onManageAllocation?: (m: Member) => void
 }) {
   const palette = getMemberPalette(member._id)
   return (
@@ -220,6 +231,11 @@ function MemberListRow({
         </div>
         <p className="text-[13px] text-[var(--apple-secondary-label)] truncate">{member.email}</p>
         <p className="text-[12px] text-[var(--apple-tertiary-label)]">Joined {formatDate(member.createdAt)}</p>
+        {allocation !== undefined && (
+          <div className="mt-1 max-w-[200px]">
+            <AllocationBar total={allocation} threshold={threshold ?? 100} compact />
+          </div>
+        )}
       </div>
 
       {/* Role */}
@@ -233,7 +249,13 @@ function MemberListRow({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 apple-transition">
+      <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 apple-transition">
+        {onManageAllocation && allocation !== undefined && (
+          <Button variant="ghost" size="sm" onClick={() => onManageAllocation(member)}
+            className="h-7 px-2.5 text-xs text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)]">
+            Manage Allocation
+          </Button>
+        )}
         {canEdit && (
           <Button variant="ghost" size="sm" onClick={() => onEdit(member)}
             className="h-7 px-2.5 text-xs text-[var(--apple-secondary-label)] hover:text-[var(--apple-label)] hover:bg-[var(--apple-tertiary-fill)]">
@@ -261,6 +283,9 @@ function MemberGridCard({
   onEdit,
   onRemove,
   formatDate,
+  allocation,
+  threshold,
+  onManageAllocation,
 }: {
   member: Member
   index: number
@@ -269,6 +294,10 @@ function MemberGridCard({
   onEdit: (m: Member) => void
   onRemove: (m: Member) => void
   formatDate: (d: string) => string
+  /** Total allocation %, when the viewer may see allocations and this member is a resource. */
+  allocation?: number
+  threshold?: number
+  onManageAllocation?: (m: Member) => void
 }) {
   const palette = getMemberPalette(member._id)
   return (
@@ -322,6 +351,19 @@ function MemberGridCard({
         <p className="text-[12px] text-[var(--apple-tertiary-label)]">
           Joined {formatDate(member.createdAt)}
         </p>
+
+        {allocation !== undefined && (
+          <div className="w-full space-y-2 text-left">
+            <p className="text-[12px] text-[var(--apple-secondary-label)]">Allocation</p>
+            <AllocationBar total={allocation} threshold={threshold ?? 100} />
+            {onManageAllocation && (
+              <Button variant="outline" size="sm" onClick={() => onManageAllocation(member)}
+                className="w-full text-xs h-8 apple-transition hover:bg-[var(--apple-tertiary-fill)]">
+                Manage Allocation
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         {(canEdit || (canDelete && member.isActive)) && (
@@ -575,6 +617,14 @@ export default function MembersPage() {
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
   const canEditMembers = hasPermission(Permission.TEAM_EDIT)
   const canDeleteMembers = hasPermission(Permission.TEAM_REMOVE)
+  const allocationAccess = useResourceAllocationAccess()
+  const allocations = useMemberAllocationTotals(allocationAccess.canView)
+  const [allocatingMember, setAllocatingMember] = useState<Member | null>(null)
+  const allocationProps = (member: Member) => ({
+    allocation: allocations.totals.get(member._id),
+    threshold: allocations.threshold,
+    onManageAllocation: allocationAccess.canEdit ? setAllocatingMember : undefined,
+  })
   const hasActiveFilters = searchQuery !== '' || roleFilter !== 'all' || statusFilter !== 'all'
 
   useEffect(() => {
@@ -930,6 +980,7 @@ export default function MembersPage() {
                       onEdit={setEditingMember}
                       onRemove={(m) => { setMemberToRemove(m); setShowRemoveConfirm(true) }}
                       formatDate={formatDate}
+                      {...allocationProps(member)}
                     />
                   ))}
                 </div>
@@ -946,6 +997,7 @@ export default function MembersPage() {
                       onEdit={setEditingMember}
                       onRemove={(m) => { setMemberToRemove(m); setShowRemoveConfirm(true) }}
                       formatDate={formatDate}
+                      {...allocationProps(member)}
                     />
                   ))}
                 </div>
@@ -1027,6 +1079,22 @@ export default function MembersPage() {
       )}
       {editingMember && canEditMemberRecord(editingMember) && (
         <EditMemberModal member={editingMember} onClose={() => setEditingMember(null)} onUpdate={handleUpdateMember} canEditAdminUsers={canEditMembers} />
+      )}
+      {allocatingMember && (
+        <ManageAllocationModal
+          memberId={allocatingMember._id}
+          open
+          mode={allocationAccess.canManage ? 'apply' : 'request'}
+          onClose={() => setAllocatingMember(null)}
+          onDone={({ mode }) => {
+            setAllocatingMember(null)
+            notifySuccess({
+              title: mode === 'applied' ? 'Allocation updated' : 'Shared to approvals',
+              message: mode === 'applied' ? 'The allocation sheet has been updated.' : 'HR will review the change before it is applied.',
+            })
+            allocations.refresh()
+          }}
+        />
       )}
       <ConfirmationModal
         isOpen={showRemoveConfirm}
