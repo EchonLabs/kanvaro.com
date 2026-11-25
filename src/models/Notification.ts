@@ -3,13 +3,13 @@ import mongoose, { Schema, Document } from 'mongoose'
 export interface INotification extends Document {
   user: mongoose.Types.ObjectId
   organization: mongoose.Types.ObjectId
-  type: 'task' | 'project' | 'team' | 'system' | 'budget' | 'deadline' | 'reminder' | 'invitation' | 'time_tracking' | 'sprint_event' | 'standup'
+  type: 'task' | 'project' | 'team' | 'system' | 'budget' | 'deadline' | 'reminder' | 'invitation' | 'time_tracking' | 'sprint_event' | 'standup' | 'resource_allocation'
   title: string
   message: string
   data?: {
-    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'sprint_event' | 'standup' | 'carry_forward_item' | 'standup_override' | 'working_calendar'
+    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'sprint_event' | 'standup' | 'carry_forward_item' | 'standup_override' | 'working_calendar' | 'resource_allocation'
     entityId?: mongoose.Types.ObjectId
-    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'unassigned' | 'completed' | 'overdue' | 'reminder' | 'upcoming'
+    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'unassigned' | 'completed' | 'overdue' | 'reminder' | 'upcoming' | 'approved' | 'rejected'
     priority?: 'low' | 'medium' | 'high' | 'critical'
     projectName?: string
     url?: string
@@ -33,7 +33,7 @@ const NotificationSchema = new Schema<INotification>({
   organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
   type: { 
     type: String, 
-    enum: ['task', 'project', 'team', 'system', 'budget', 'deadline', 'reminder', 'invitation', 'time_tracking', 'sprint_event', 'standup'],
+    enum: ['task', 'project', 'team', 'system', 'budget', 'deadline', 'reminder', 'invitation', 'time_tracking', 'sprint_event', 'standup', 'resource_allocation'],
     required: true 
   },
   title: { type: String, required: true },
@@ -41,12 +41,12 @@ const NotificationSchema = new Schema<INotification>({
   data: {
     entityType: { 
       type: String, 
-      enum: ['task', 'project', 'epic', 'sprint', 'story', 'user', 'budget', 'time_entry', 'sprint_event', 'standup', 'carry_forward_item', 'standup_override', 'working_calendar']
+      enum: ['task', 'project', 'epic', 'sprint', 'story', 'user', 'budget', 'time_entry', 'sprint_event', 'standup', 'carry_forward_item', 'standup_override', 'working_calendar', 'resource_allocation']
     },
     entityId: { type: Schema.Types.ObjectId },
     action: { 
       type: String, 
-      enum: ['created', 'updated', 'deleted', 'assigned', 'unassigned', 'completed', 'overdue', 'reminder', 'upcoming']
+      enum: ['created', 'updated', 'deleted', 'assigned', 'unassigned', 'completed', 'overdue', 'reminder', 'upcoming', 'approved', 'rejected']
     },
     priority: { 
       type: String, 
