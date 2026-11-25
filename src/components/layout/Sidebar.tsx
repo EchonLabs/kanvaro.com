@@ -40,7 +40,8 @@ import {
   FileText,
   Bug,
   Target,
-  Activity
+  Activity,
+  BarChart3
 } from 'lucide-react'
 import {
   Popover,
@@ -210,6 +211,13 @@ const navigationItems = [
         permission: Permission.TEAM_VIEW_ACTIVITY
       }
     ]
+  },
+  {
+    id: 'resource-allocation',
+    label: 'Resource Allocation',
+    icon: BarChart3,
+    path: '/resource-allocation',
+    permission: Permission.RESOURCE_ALLOCATION_VIEW
   },
   {
     id: 'time',
