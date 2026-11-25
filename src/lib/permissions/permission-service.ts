@@ -78,6 +78,20 @@ export class PermissionService {
     projectId?: string
   ): Promise<boolean> {
     const userPermissions = await this.getUserPermissions(userId);
+    return this.hasPermissionIn(userPermissions, permission, projectId);
+  }
+
+  /**
+   * Same check as `hasPermission`, against permissions already loaded with
+   * `getUserPermissions`. Each `hasPermission` call re-reads the user and all
+   * their projects, so a route needing several checks should load once and
+   * use this.
+   */
+  static hasPermissionIn(
+    userPermissions: UserPermissions,
+    permission: Permission,
+    projectId?: string
+  ): boolean {
     const scope = getPermissionScope(permission);
 
     switch (scope) {

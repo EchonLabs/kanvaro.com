@@ -4,6 +4,8 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { CustomRole } from '@/models/CustomRole'
 import { User } from '@/models/User'
 import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { canManageRoles, canWorkWithCustomRole } from '@/lib/permissions/role-grant-policy'
 
 /**
  * Get predefined system role names
@@ -148,6 +150,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // F11: managing roles needs user:manage_roles, and non-admins can only
+    // work with custom roles inside their own permissions.
+    const actor = await PermissionService.getUserPermissions(authResult.user.id)
+    const manage = canManageRoles(actor)
+    if (!manage.ok) {
+      return NextResponse.json({ success: false, error: manage.error }, { status: 403 })
+    }
+
     const body = await req.json()
     const { name, description, permissions } = body
 
@@ -167,6 +177,11 @@ export async function POST(req: NextRequest) {
         success: false,
         error: `Invalid permissions: ${invalidPermissions.join(', ')}`
       }, { status: 400 })
+    }
+
+    const grant = canWorkWithCustomRole(actor, permissions)
+    if (!grant.ok) {
+      return NextResponse.json({ success: false, error: grant.error }, { status: 403 })
     }
 
     // Check if role name already exists in predefined roles

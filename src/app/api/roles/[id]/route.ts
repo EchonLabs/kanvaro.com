@@ -4,6 +4,8 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { CustomRole } from '@/models/CustomRole'
 import { User } from '@/models/User'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { canManageRoles, canWorkWithCustomRole } from '@/lib/permissions/role-grant-policy'
 
 /**
  * Get predefined system role names
@@ -85,6 +87,14 @@ export async function PUT(
       )
     }
 
+    // F11: managing roles needs user:manage_roles, and non-admins can only
+    // work with custom roles inside their own permissions.
+    const actor = await PermissionService.getUserPermissions(authResult.user.id)
+    const manage = canManageRoles(actor)
+    if (!manage.ok) {
+      return NextResponse.json({ success: false, error: manage.error }, { status: 403 })
+    }
+
     const body = await req.json()
     const { name, description, permissions } = body
 
@@ -118,6 +128,14 @@ export async function PUT(
         success: false,
         error: 'Role not found'
       }, { status: 404 })
+    }
+
+    // Both the role as it stands and the new permission set must be within
+    // the caller's own permissions (a non-admin must not strip or rewrite a
+    // role an admin made more powerful than them).
+    const grant = canWorkWithCustomRole(actor, [...(role.permissions || []), ...permissions])
+    if (!grant.ok) {
+      return NextResponse.json({ success: false, error: grant.error }, { status: 403 })
     }
 
     // Check if role name already exists in predefined roles
@@ -194,6 +212,14 @@ export async function DELETE(
       )
     }
 
+    // F11: managing roles needs user:manage_roles, and non-admins can only
+    // work with custom roles inside their own permissions.
+    const actor = await PermissionService.getUserPermissions(authResult.user.id)
+    const manage = canManageRoles(actor)
+    if (!manage.ok) {
+      return NextResponse.json({ success: false, error: manage.error }, { status: 403 })
+    }
+
     // Find the role
     const role = await CustomRole.findOne({
       _id: params.id,
@@ -206,6 +232,11 @@ export async function DELETE(
         success: false,
         error: 'Role not found'
       }, { status: 404 })
+    }
+
+    const grant = canWorkWithCustomRole(actor, role.permissions || [])
+    if (!grant.ok) {
+      return NextResponse.json({ success: false, error: grant.error }, { status: 403 })
     }
 
     // Check if role is in use

@@ -3,6 +3,12 @@ import connectDB from '@/lib/db-config'
 import { authenticateUser } from '@/lib/auth-utils'
 import { User } from '@/models/User'
 import { CustomRole } from '@/models/CustomRole'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import {
+  canManageRoles,
+  canChangeRoleOf,
+  canWorkWithCustomRole
+} from '@/lib/permissions/role-grant-policy'
 
 export async function PUT(
   req: NextRequest,
@@ -19,6 +25,14 @@ export async function PUT(
       )
     }
 
+    // F11: needs user:manage_roles; nobody changes their own role; only admins
+    // act on admins or hand out permissions they do not hold.
+    const actor = await PermissionService.getUserPermissions(authResult.user.id)
+    const manage = canManageRoles(actor)
+    if (!manage.ok) {
+      return NextResponse.json({ success: false, error: manage.error }, { status: 403 })
+    }
+
     const body = await req.json()
     const { customRoleId } = body
 
@@ -26,13 +40,26 @@ export async function PUT(
     const user = await User.findOne({
       _id: params.id,
       organization: authResult.user.organization
-    })
+    }).populate('customRole', 'permissions')
 
     if (!user) {
       return NextResponse.json({
         success: false,
         error: 'User not found'
       }, { status: 404 })
+    }
+
+    const target = canChangeRoleOf(actor, authResult.user.id, { id: user._id.toString(), role: user.role })
+    if (!target.ok) {
+      return NextResponse.json({ success: false, error: target.error }, { status: 403 })
+    }
+
+    // Removing or replacing a custom role that carries permissions beyond the
+    // caller's is acting on more power than they have.
+    const currentPermissions: string[] = (user.customRole as any)?.permissions || []
+    const current = canWorkWithCustomRole(actor, currentPermissions)
+    if (!current.ok) {
+      return NextResponse.json({ success: false, error: current.error }, { status: 403 })
     }
 
     // If customRoleId is provided, validate it exists
@@ -48,6 +75,11 @@ export async function PUT(
           success: false,
           error: 'Custom role not found'
         }, { status: 404 })
+      }
+
+      const grant = canWorkWithCustomRole(actor, customRole.permissions || [])
+      if (!grant.ok) {
+        return NextResponse.json({ success: false, error: grant.error }, { status: 403 })
       }
 
       user.customRole = customRole._id
