@@ -11,8 +11,11 @@ import { PageContent } from '@/components/ui/PageContent'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { AllocationFilters, type FilterState } from '@/components/resource-allocation/AllocationFilters'
 import { AllocationMatrix } from '@/components/resource-allocation/AllocationMatrix'
+import { ApprovalModal } from '@/components/resource-allocation/ApprovalModal'
+import { HistoryTab } from '@/components/resource-allocation/HistoryTab'
 import { KpiCards } from '@/components/resource-allocation/KpiCards'
 import { ManageAllocationModal } from '@/components/resource-allocation/ManageAllocationModal'
+import { RequestViewModal } from '@/components/resource-allocation/RequestViewModal'
 import { ResourceAllocationTabs, type ResourceAllocationTab } from '@/components/resource-allocation/ResourceAllocationTabs'
 import { RoleSummary } from '@/components/resource-allocation/RoleSummary'
 import { SheetPagination } from '@/components/resource-allocation/SheetPagination'
@@ -49,7 +52,14 @@ function ResourceAllocationScreen() {
   const [historyCount, setHistoryCount] = useState<number | undefined>()
   const [refreshKey, setRefreshKey] = useState(0)
   const [managing, setManaging] = useState<string | null>(null)
+  // A request opened from the Approvals column, the Actions column, or a notification link (?request=).
+  const requestParam = searchParams.get('request')
+  const [openRequestId, setOpenRequestId] = useState<string | null>(requestParam)
   const notify = useNotify()
+
+  useEffect(() => {
+    if (requestParam) setOpenRequestId(requestParam)
+  }, [requestParam])
 
   const q = useDebounced(filters.q)
   const params = useMemo(
@@ -82,6 +92,16 @@ function ResourceAllocationScreen() {
       .then((data) => setHistoryCount(data.total))
       .catch(() => setHistoryCount(undefined))
   }, [access.canViewHistory, refreshKey])
+
+  const closeRequest = () => {
+    setOpenRequestId(null)
+    if (searchParams.get('request')) {
+      const search = new URLSearchParams(searchParams.toString())
+      search.delete('request')
+      const text = search.toString()
+      router.replace(text ? `${pathname}?${text}` : pathname, { scroll: false })
+    }
+  }
 
   const setTab = (next: ResourceAllocationTab) => {
     const search = new URLSearchParams(searchParams.toString())
@@ -172,7 +192,7 @@ function ResourceAllocationScreen() {
                   currentUserId={user?.id}
                   rowOffset={(sheet.pagination.page - 1) * sheet.pagination.limit}
                   onManage={setManaging}
-                  onOpenRequest={() => undefined}
+                  onOpenRequest={setOpenRequestId}
                 />
                 <SheetPagination
                   page={sheet.pagination.page}
@@ -215,11 +235,36 @@ function ResourceAllocationScreen() {
         />
       )}
 
-      {tab === 'history' && (
-        <section className="rounded-[var(--apple-radius-lg)] border border-[var(--apple-separator)] bg-card p-6 text-[14px] text-[var(--apple-secondary-label)]">
-          Allocation history is coming in the next step.
-        </section>
+      {openRequestId && access.canApprove && (
+        <ApprovalModal
+          requestId={openRequestId}
+          open
+          onClose={closeRequest}
+          onDecided={(decision) => {
+            closeRequest()
+            notify.success({
+              title: decision === 'approved' ? 'Request approved' : 'Request rejected',
+              message: decision === 'approved' ? 'The allocation sheet has been updated.' : 'The requester has been notified.'
+            })
+            refresh()
+          }}
+        />
       )}
+
+      {openRequestId && !access.canApprove && access.canViewHistory && (
+        <RequestViewModal
+          requestId={openRequestId}
+          open
+          onClose={closeRequest}
+          onCancelled={() => {
+            closeRequest()
+            notify.success({ title: 'Request cancelled' })
+            refresh()
+          }}
+        />
+      )}
+
+      {tab === 'history' && <HistoryTab key={refreshKey} />}
     </div>
   )
 }
