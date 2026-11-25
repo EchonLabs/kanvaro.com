@@ -57,6 +57,12 @@ export interface Sheet {
   roles: string[]
   threshold: number
   pagination: { page: number; limit: number; total: number; totalPages: number }
+  /**
+   * Pending requests for people no longer on the sheet (deactivated, or now a
+   * client/viewer). Without a row there is no pencil, so they are listed here
+   * to stay decidable instead of silently blocking that person's next request.
+   */
+  orphanedRequests: { id: string; memberName: string; requestedBy: { _id: string; name: string } }[]
 }
 
 export interface HistoryEntry {
@@ -96,6 +102,7 @@ export async function loadSheet(organizationId: string, query: SheetQuery): Prom
     Project.find({ _id: { $in: projectIds } }).select('teamMembers').lean() as Promise<any[]>,
     AllocationRequest.find({ organization: organizationId, status: 'pending' })
       .select('member requestedBy')
+      .populate('member', 'firstName lastName')
       .populate('requestedBy', 'firstName lastName')
       .lean() as Promise<any[]>
   ])
@@ -111,7 +118,7 @@ export async function loadSheet(organizationId: string, query: SheetQuery): Prom
   }
   const pendingByMember = new Map(
     pending.map((request) => [
-      String(request.member),
+      String(request.member?._id ?? request.member),
       {
         id: String(request._id),
         requestedBy: { _id: String(request.requestedBy?._id ?? request.requestedBy), name: fullName(request.requestedBy) }
@@ -141,6 +148,14 @@ export async function loadSheet(organizationId: string, query: SheetQuery): Prom
     .sort((a, b) => a.name.localeCompare(b.name))
 
   const { kpis, byRole } = summarize(allRows, threshold)
+  const onSheet = new Set(allRows.map((row) => row.memberId))
+  const orphanedRequests = pending
+    .filter((request) => !onSheet.has(String(request.member?._id ?? request.member)))
+    .map((request) => ({
+      id: String(request._id),
+      memberName: fullName(request.member),
+      requestedBy: { _id: String(request.requestedBy?._id ?? request.requestedBy), name: fullName(request.requestedBy) }
+    }))
 
   const q = query.q?.trim().toLowerCase()
   const rows = allRows.filter((row) => {
@@ -165,7 +180,8 @@ export async function loadSheet(organizationId: string, query: SheetQuery): Prom
       limit: query.limit,
       total: rows.length,
       totalPages: Math.max(1, Math.ceil(rows.length / query.limit))
-    }
+    },
+    orphanedRequests
   }
 }
 
@@ -273,8 +289,14 @@ export async function loadHistory(
   return { items: merged.slice(start, start + opts.limit), total: historyTotal + rejectedEntries.length }
 }
 
+/**
+ * One CSV cell. Text that a spreadsheet would evaluate as a formula (leading
+ * `=`, `+`, `-`, `@`, tab or CR) is prefixed with `'` so names and project
+ * titles typed by users can never run when HR opens the export.
+ */
 function csvCell(value: string | number): string {
-  const text = String(value)
+  const raw = String(value)
+  const text = typeof value === 'string' && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 

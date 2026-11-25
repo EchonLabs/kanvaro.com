@@ -244,6 +244,26 @@ describe('request-service', () => {
       })
     })
 
+    it('names an inactive project and leaves it out of the live total', async () => {
+      await plant(w.org._id, w.users.member._id, w.projects.p2._id, 30, w.users.hr._id)
+      const request = await submit([
+        { projectId: id(w.projects.p1), newPercent: 60 },
+        { projectId: id(w.projects.p2), newPercent: 10 }
+      ])
+      await Project.updateOne({ _id: w.projects.p1._id }, { archived: true })
+
+      const detail = await getRequestDetail(w.organizationId, id(request))
+      expect(detail.lines.find((line) => line.projectId === id(w.projects.p1))).toMatchObject({ active: false })
+      expect(detail.lines.find((line) => line.projectId === id(w.projects.p2))).toMatchObject({ active: true })
+      expect(detail.liveTotalAfter).toBe(10)
+      expect(detail.exceedsThresholdNow).toBe(false)
+
+      await expect(approveRequest(hr, id(request), {})).rejects.toMatchObject({
+        code: 'VALIDATION_FAILED',
+        message: expect.stringContaining('AVO')
+      })
+    })
+
     it('answers NOT_FOUND for a request in another org or a malformed id', async () => {
       const request = await submit([{ projectId: id(w.projects.p1), newPercent: 60 }])
       const outsider = { userId: id(w.users.outsider), organizationId: String(w.otherOrg._id) }

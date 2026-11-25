@@ -264,6 +264,13 @@ describe('allocation-service: reads and settings', () => {
     expect(result.member).toMatchObject({ name: 'Dulmi Tester', roleLabel: 'Team Member' })
   })
 
+  it('lists each project’s managers so editors can apply the PM-only-increase rule', async () => {
+    const result = await getMemberAllocations(w.organizationId, id(w.users.member))
+
+    expect(result.lines[0].managerIds.sort()).toEqual([id(w.users.pm), id(w.users.admin)].sort())
+    expect(result.lines[1].managerIds).toEqual([id(w.users.otherPm)])
+  })
+
   it('reports onTeam=false when the member was removed from the team elsewhere', async () => {
     await directChange(
       { userId: id(w.users.hr), organizationId: w.organizationId },

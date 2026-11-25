@@ -64,7 +64,8 @@ export interface ResourceUser {
 
 export interface MemberAllocations {
   member: { _id: string; name: string; email: string; roleLabel: string }
-  lines: { projectId: string; projectName: string; percent: number; onTeam: boolean }[]
+  /** `managerIds` lets an editor apply the rule that a PM may only increase projects they manage. */
+  lines: { projectId: string; projectName: string; percent: number; onTeam: boolean; managerIds: string[] }[]
   total: number
   remaining: number
   status: WorkloadStatus
@@ -197,7 +198,7 @@ async function currentAllocations(
 export async function getMemberAllocations(organizationId: string, memberId: string): Promise<MemberAllocations> {
   const member = await loadResource(organizationId, memberId)
   const projects: any[] = await Project.find(activeProjectFilter(organizationId))
-    .select('name teamMembers')
+    .select('name teamMembers projectRoles createdBy')
     .sort({ name: 1 })
     .lean()
   const current = await currentAllocations(
@@ -219,7 +220,8 @@ export async function getMemberAllocations(organizationId: string, memberId: str
       projectId: String(project._id),
       projectName: project.name,
       percent: current.get(String(project._id)) ?? 0,
-      onTeam: isProjectTeamMember(project, memberId)
+      onTeam: isProjectTeamMember(project, memberId),
+      managerIds: managerIdsOf(project)
     })),
     total,
     remaining: computeRemaining(total),

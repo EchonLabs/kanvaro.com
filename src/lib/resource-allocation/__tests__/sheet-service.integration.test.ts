@@ -14,6 +14,7 @@ import { AllocationHistory } from '@/models/AllocationHistory'
 import { AllocationRequest } from '@/models/AllocationRequest'
 import { Project } from '@/models/Project'
 import { ResourceAllocation } from '@/models/ResourceAllocation'
+import { User } from '@/models/User'
 
 import { syncIndexes, useMongo } from '@/lib/standup/__tests__/helpers/mongo'
 
@@ -149,6 +150,24 @@ describe('sheet-service', () => {
       expect(first.pagination).toEqual({ page: 1, limit: 3, total: 7, totalPages: 3 })
     })
 
+    it('lists pending requests whose member has left the sheet, so they can still be decided', async () => {
+      const request = await createRequest(
+        { userId: id(w.users.pm), organizationId: w.organizationId },
+        { memberId: id(w.users.member), lines: [{ projectId: id(w.projects.p1), newPercent: 20 }], reason: 'x' }
+      )
+      expect((await loadSheet(w.organizationId, page)).orphanedRequests).toEqual([])
+
+      await User.updateOne({ _id: w.users.member._id }, { isActive: false })
+
+      expect((await loadSheet(w.organizationId, page)).orphanedRequests).toEqual([
+        {
+          id: id(request),
+          memberName: 'Dulmi Tester',
+          requestedBy: { _id: id(w.users.pm), name: 'Pamela Tester' }
+        }
+      ])
+    })
+
     it('marks onTeam=false for a member removed from the team elsewhere', async () => {
       await directChange(
         { userId: id(w.users.hr), organizationId: w.organizationId },
@@ -248,6 +267,17 @@ describe('sheet-service', () => {
   })
 
   describe('sheetToCsv', () => {
+    it('neutralises cells that a spreadsheet would run as a formula', async () => {
+      await User.updateOne({ _id: w.users.member._id }, { firstName: '=HYPERLINK("http://evil","x")' })
+      await Project.updateOne({ _id: w.projects.p2._id }, { name: '+SUM(1)' })
+
+      const csv = sheetToCsv(await loadSheet(w.organizationId, page))
+
+      expect(csv).toContain(`"'=HYPERLINK(""http://evil"",""x"") Tester"`)
+      expect(csv.split('\r\n')[0]).toContain(",'+SUM(1),")
+      expect(csv).not.toMatch(/(^|,)"?[=+@-]/m)
+    })
+
     it('writes one row per resource with a Role column and escapes commas and quotes', async () => {
       await Project.updateOne({ _id: w.projects.p1._id }, { name: 'A, "B"' })
       await plant(w.org._id, w.users.member._id, w.projects.p1._id, 60, w.users.hr._id)

@@ -26,7 +26,6 @@ import {
   buildPrepared,
   getThreshold,
   loadResource,
-  partitionProjects,
   prepareChange
 } from './allocation-service'
 import { ResourceAllocationError } from './errors'
@@ -58,7 +57,8 @@ export interface RequestListItem {
 }
 
 export interface RequestDetail extends Omit<RequestListItem, 'lines'> {
-  lines: (RequestLineView & { currentPercent: number })[]
+  /** `active` is false when the project was completed, archived or deleted after submit. */
+  lines: (RequestLineView & { currentPercent: number; active: boolean })[]
   stale: boolean
   liveTotalBefore: number
   liveTotalAfter: number
@@ -211,11 +211,17 @@ export async function getRequestDetail(organizationId: string, requestId: string
   const current = new Map(rows.map((row) => [String(row.project), row.percent as number]))
   const threshold = await getThreshold(organizationId)
 
-  const lines = item.lines.map((line) => ({ ...line, currentPercent: current.get(line.projectId) ?? 0 }))
+  const activeSet = new Set(activeIds)
+  const lines = item.lines.map((line) => ({
+    ...line,
+    currentPercent: current.get(line.projectId) ?? 0,
+    active: activeSet.has(line.projectId)
+  }))
+  // Inactive projects cannot be applied, so they must not inflate the live result either.
   const live = buildPrepared(
     { _id: new mongoose.Types.ObjectId(memberId) } as any,
     current,
-    lines.map((line) => ({ projectId: line.projectId, newPercent: line.newPercent })),
+    lines.filter((line) => line.active).map((line) => ({ projectId: line.projectId, newPercent: line.newPercent })),
     threshold
   )
 
@@ -254,15 +260,13 @@ export async function approveRequest(
   if (detail.status !== 'pending') throw notPending()
 
   const member = await loadResource(actor.organizationId, detail.member._id)
-  const { inactive } = await partitionProjects(
-    actor.organizationId,
-    detail.lines.map((line) => line.projectId)
-  ).catch(() => ({ inactive: detail.lines.map((line) => line.projectId) }))
-  if (inactive.length > 0) {
+  const inactiveLines = detail.lines.filter((line) => !line.active)
+  if (inactiveLines.length > 0) {
+    const names = inactiveLines.map((line) => line.projectName).join(', ')
     throw new ResourceAllocationError(
       'VALIDATION_FAILED',
-      'A project in this request is no longer active, so it cannot be approved. Reject it instead.',
-      { projectIds: inactive }
+      `${names} ${inactiveLines.length === 1 ? 'is' : 'are'} no longer active, so this request can only be rejected.`,
+      { projectIds: inactiveLines.map((line) => line.projectId) }
     )
   }
 
