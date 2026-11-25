@@ -7,7 +7,7 @@ export interface ILesson extends Document {
   sprint?: mongoose.Types.ObjectId
   organization: mongoose.Types.ObjectId
   lessonNumber?: number
-  category: string
+  category?: string
   impactLevel: LessonImpactLevel
   context: string
   rootCause: string
@@ -37,7 +37,6 @@ const LessonSchema = new Schema<ILesson>({
   },
   category: {
     type: String,
-    required: true,
     trim: true,
     maxlength: 100
   },
@@ -55,7 +54,6 @@ const LessonSchema = new Schema<ILesson>({
   },
   rootCause: {
     type: String,
-    required: true,
     trim: true,
     maxlength: 5000
   },

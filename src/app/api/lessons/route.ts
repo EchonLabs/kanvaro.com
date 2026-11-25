@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { projectId, sprintId, category, impactLevel, context, rootCause, actionRecommendation } = body
 
-    if (!projectId || !category || !context || !rootCause || !actionRecommendation) {
+    if (!projectId || !category || !context || !actionRecommendation) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
