@@ -1,17 +1,13 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { randomBytes } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { rmSync } from 'node:fs'
 import type { Env } from '../src/config.js'
-import { ConfigError, describeConfig, loadConfig } from '../src/config.js'
+import { ConfigError, SECRET_NAMES, describeConfig, loadConfig } from '../src/config.js'
 
 const dir = mkdtempSync(join(tmpdir(), 'mcp-config-test-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-const KEY_A = randomBytes(32).toString('base64')
-const KEY_B = randomBytes(32).toString('base64')
 const CLIENT_SECRET = 'client-secret-value-123'
 const DB_URI = 'mongodb://mcp:db-password-456@localhost:27017/kanvaro_mcp'
 
@@ -31,7 +27,6 @@ function devEnv(overrides: Env = {}): Env {
     KANVARO_CLIENT_ID: 'kanvaro-mcp-server',
     KANVARO_CLIENT_SECRET: CLIENT_SECRET,
     MONGODB_URI: DB_URI,
-    TOKEN_ENCRYPTION_KEYS: `k1:${KEY_A}`,
     ...overrides,
   }
 }
@@ -46,7 +41,6 @@ function prodEnv(overrides: Env = {}): Env {
     KANVARO_CLIENT_ID: 'kanvaro-mcp-server',
     KANVARO_CLIENT_SECRET_FILE: secretFile('client_secret', CLIENT_SECRET),
     MONGODB_URI_FILE: secretFile('mongodb_uri', DB_URI),
-    TOKEN_ENCRYPTION_KEYS_FILE: secretFile('keys', `k2:${KEY_B},k1:${KEY_A}`),
     ...overrides,
   }
 }
@@ -66,28 +60,26 @@ describe('loadConfig — valid input', () => {
     const c = loadConfig(devEnv())
     expect(c.env).toBe('development')
     expect(c.server).toMatchObject({ host: '127.0.0.1', port: 3100, publicBaseUrl: 'http://localhost:3100', resourceUrl: 'http://localhost:3100/mcp' })
-    expect(c.tokens).toEqual({ accessTtlSeconds: 900, refreshTtlSeconds: 604800, authCodeTtlSeconds: 60 })
-    expect(c.audit.retentionDays).toBe(180)
+    expect(c.kanvaro).toMatchObject({ apiBaseUrl: 'http://localhost:3000', issuer: 'http://localhost:3000', clientId: 'kanvaro-mcp-server' })
+    expect(c.audit.retentionDays).toBe(90)
     expect(c.database.name).toBe('kanvaro_mcp')
-    expect(c.encryption.activeKeyId).toBe('k1')
-    expect(c.encryption.keys.get('k1')?.length).toBe(32)
   })
 
   it('loads a production config with secrets from files', () => {
     const c = loadConfig(prodEnv())
     expect(c.kanvaro.clientSecret).toBe(CLIENT_SECRET)
+    expect(c.kanvaro.issuer).toBe('https://kanvaro.example.com')
     expect(c.database.uri).toBe(DB_URI)
-    expect([...c.encryption.keys.keys()]).toEqual(['k2', 'k1'])
-    expect(c.encryption.activeKeyId).toBe('k2') // first listed key is active by default
   })
 
-  it('uses TOKEN_ENCRYPTION_ACTIVE_KEY_ID when given', () => {
-    expect(loadConfig(prodEnv({ TOKEN_ENCRYPTION_ACTIVE_KEY_ID: 'k1' })).encryption.activeKeyId).toBe('k1')
+  it('needs only two secrets: the database URI and the Kanvaro client secret (D10)', () => {
+    expect([...SECRET_NAMES]).toEqual(['MONGODB_URI', 'KANVARO_CLIENT_SECRET'])
   })
 
   it('normalises origins (lower-case host, no trailing slash)', () => {
-    const c = loadConfig(devEnv({ PUBLIC_BASE_URL: 'http://LOCALHOST:3100/' }))
+    const c = loadConfig(devEnv({ PUBLIC_BASE_URL: 'http://LOCALHOST:3100/', KANVARO_PUBLIC_URL: 'http://LOCALHOST:3000/' }))
     expect(c.server.publicBaseUrl).toBe('http://localhost:3100')
+    expect(c.kanvaro.issuer).toBe('http://localhost:3000')
   })
 
   it('treats empty values as unset', () => {
@@ -102,7 +94,7 @@ describe('loadConfig — valid input', () => {
   it('returns a frozen object', () => {
     const c = loadConfig(devEnv())
     expect(Object.isFrozen(c)).toBe(true)
-    expect(Object.isFrozen(c.server)).toBe(true)
+    expect(Object.isFrozen(c.kanvaro)).toBe(true)
   })
 })
 
@@ -113,7 +105,7 @@ describe('loadConfig — startup fails on missing or invalid values', () => {
   })
 
   it('fails when required settings are missing', () => {
-    const p = problemsOf({ KANVARO_CLIENT_SECRET: 'x', MONGODB_URI: DB_URI, TOKEN_ENCRYPTION_KEYS: `k1:${KEY_A}` })
+    const p = problemsOf({ KANVARO_CLIENT_SECRET: 'x', MONGODB_URI: DB_URI })
     expect(p).toEqual(expect.arrayContaining([
       'PUBLIC_BASE_URL: is required',
       'KANVARO_API_BASE_URL: is required',
@@ -123,14 +115,12 @@ describe('loadConfig — startup fails on missing or invalid values', () => {
   })
 
   it('reports every problem at once', () => {
-    const p = problemsOf(devEnv({ PORT: 'abc', LOG_LEVEL: 'loud', MONGODB_URI: undefined }))
-    expect(p.length).toBeGreaterThanOrEqual(3)
+    expect(problemsOf(devEnv({ PORT: 'abc', LOG_LEVEL: 'loud', MONGODB_URI: undefined })).length).toBeGreaterThanOrEqual(3)
   })
 
   it('refuses plain-variable secrets in production', () => {
     const { KANVARO_CLIENT_SECRET_FILE: _f, ...env } = prodEnv()
-    const p = problemsOf({ ...env, KANVARO_CLIENT_SECRET: CLIENT_SECRET })
-    expect(p.join('\n')).toMatch(/KANVARO_CLIENT_SECRET: in production, secrets must come from the secret store/)
+    expect(problemsOf({ ...env, KANVARO_CLIENT_SECRET: CLIENT_SECRET }).join('\n')).toMatch(/KANVARO_CLIENT_SECRET: in production, secrets must come from the secret store/)
   })
 
   it('fails when a secret file is missing or empty', () => {
@@ -148,46 +138,30 @@ describe('loadConfig — startup fails on missing or invalid values', () => {
     expect(p).toContain('KANVARO_PUBLIC_URL: must use https in production')
   })
 
+  it('allows an internal http address for Kanvaro API calls in production', () => {
+    expect(loadConfig(prodEnv({ KANVARO_API_BASE_URL: 'http://kanvaro:3000' })).kanvaro.apiBaseUrl).toBe('http://kanvaro:3000')
+  })
+
   it('rejects a public URL with a path', () => {
     expect(problemsOf(devEnv({ PUBLIC_BASE_URL: 'http://localhost:3100/mcp' })).join('\n')).toMatch(/PUBLIC_BASE_URL: must be an origin only/)
   })
 
-  it('rejects a refresh token lifetime longer than Kanvaro\'s 7 days', () => {
-    expect(problemsOf(devEnv({ REFRESH_TOKEN_TTL_SECONDS: '700000' }))).toContain('REFRESH_TOKEN_TTL_SECONDS: must be at most 604800')
-  })
-
   it('rejects a database URI that is not MongoDB', () => {
     expect(problemsOf(devEnv({ MONGODB_URI: 'postgres://x' }))).toContain('MONGODB_URI: must start with mongodb:// or mongodb+srv://')
-  })
-
-  it.each([
-    ['no id', KEY_A, /needs an id/],
-    ['short key', `k1:${randomBytes(16).toString('base64')}`, /must be 32 bytes/],
-    ['not base64', 'k1:not*base64', /must be 32 bytes/],
-    ['duplicate id', `k1:${KEY_A},k1:${KEY_B}`, /listed twice/],
-  ])('rejects an invalid encryption key ring (%s)', (_label, keys, pattern) => {
-    expect(problemsOf(devEnv({ TOKEN_ENCRYPTION_KEYS: keys })).join('\n')).toMatch(pattern)
-  })
-
-  it('rejects an active key id that is not in the ring', () => {
-    expect(problemsOf(devEnv({ TOKEN_ENCRYPTION_ACTIVE_KEY_ID: 'nope' }))).toContain('TOKEN_ENCRYPTION_ACTIVE_KEY_ID: no key with this id in TOKEN_ENCRYPTION_KEYS')
   })
 })
 
 describe('secrets never leak', () => {
   it('describeConfig contains no secret values', () => {
     const text = JSON.stringify(describeConfig(loadConfig(prodEnv())))
-    for (const secret of [CLIENT_SECRET, 'db-password-456', KEY_A, KEY_B]) expect(text).not.toContain(secret)
+    for (const secret of [CLIENT_SECRET, 'db-password-456']) expect(text).not.toContain(secret)
     expect(text).toContain('"clientSecret":"[set]"')
   })
 
   it('error messages contain no secret values', () => {
-    const msg = (() => {
-      try { loadConfig(devEnv({ MONGODB_URI: 'postgres://user:db-password-456@x', TOKEN_ENCRYPTION_KEYS: `k1:${KEY_A.slice(0, 20)}` })) } catch (e) { return String(e) }
-      return ''
-    })()
+    let msg = ''
+    try { loadConfig(devEnv({ MONGODB_URI: 'postgres://user:db-password-456@x' })) } catch (e) { msg = String(e) }
     expect(msg).not.toBe('')
     expect(msg).not.toContain('db-password-456')
-    expect(msg).not.toContain(KEY_A.slice(0, 20))
   })
 })
