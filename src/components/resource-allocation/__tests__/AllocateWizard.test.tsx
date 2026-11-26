@@ -166,6 +166,16 @@ describe('AllocateWizard', () => {
     ])
   })
 
+  it('reviews only the people whose allocation changes, and says how many are left as they are', async () => {
+    await toStep3('apply', ['Aruni Perera', 'Dion Silva'])
+    fireEvent.change(screen.getByLabelText('Allocation for Aruni Perera on AVO'), { target: { value: '30' } })
+    fireEvent.click(button('Continue'))
+
+    expect(await screen.findByText('Resulting capacity: 80% total')).toBeInTheDocument()
+    expect(document.querySelectorAll('[data-review-row]')).toHaveLength(1)
+    expect(screen.getByText('1 person keeps their current allocation and won’t be changed.')).toBeInTheDocument()
+  })
+
   it('says which employees failed and keeps them for another try', async () => {
     changeResponses.u2 = {
       status: 409,

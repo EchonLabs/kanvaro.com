@@ -138,7 +138,12 @@ export function HistoryTab() {
                     <td className={cn(cell, 'text-[var(--apple-label)]')}>{entry.project.name}</td>
                     <td className={cn(cell, 'tabular-nums text-[var(--apple-secondary-label)]')}>{entry.previousPercent}%</td>
                     <td className={cn(cell, 'tabular-nums font-semibold text-[var(--apple-label)]')}>{entry.newPercent}%</td>
-                    <td className={cn(cell, 'max-w-[240px] text-[var(--apple-secondary-label)]')}>{entry.reason}</td>
+                    <td className={cn(cell, 'max-w-[240px] text-[var(--apple-secondary-label)]')}>
+                      {entry.reason}
+                      {entry.note && (
+                        <span className="mt-1 block text-[11px] text-[var(--apple-system-red)]">Note: {entry.note}</span>
+                      )}
+                    </td>
                     <td className={cell}>
                       <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-medium', STATUS[entry.status].className)}>
                         {STATUS[entry.status].label}

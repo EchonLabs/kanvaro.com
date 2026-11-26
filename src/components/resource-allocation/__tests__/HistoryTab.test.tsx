@@ -61,6 +61,16 @@ describe('HistoryTab', () => {
     expect(within(row).getByText('BP')).toBeInTheDocument()
   })
 
+  it('shows the approver’s note under the reason of a rejected entry', async () => {
+    global.fetch = jest.fn(() =>
+      json({ success: true, data: { items: [entry('e1', 'rejected', { note: 'Not this quarter' })], total: 1 } })
+    ) as unknown as typeof fetch
+
+    render(<HistoryTab />)
+
+    expect(await screen.findByText('Note: Not this quarter')).toBeInTheDocument()
+  })
+
   it('searches history', async () => {
     const fetchMock = jest.fn((_url: string) => json({ success: true, data: { items: [], total: 0 } }))
     global.fetch = fetchMock as unknown as typeof fetch

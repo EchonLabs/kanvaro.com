@@ -148,6 +148,9 @@ export function AllocateWizard({ mode, currentUserId, onDone }: Props) {
   }
   const setValue = (memberId: string, next: number) => setValues((v) => ({ ...v, [memberId]: clampFor(memberId, next) }))
 
+  // Review and save only cover people whose percentage actually changes.
+  const changedPeople = people.filter((person) => figures(person.memberId).value !== figures(person.memberId).current)
+  const unchangedCount = people.length - changedPeople.length
   const allLoaded = people.every((person) => members.has(person.memberId))
   const anyChange = people.some((person) => figures(person.memberId).value !== figures(person.memberId).current)
 
@@ -169,9 +172,8 @@ export function AllocateWizard({ mode, currentUserId, onDone }: Props) {
     const failures: string[] = []
     const failed = new Map<string, SheetRow>()
     let resultMode: 'applied' | 'requested' = mode === 'apply' ? 'applied' : 'requested'
-    for (const person of people) {
-      const { value, current } = figures(person.memberId)
-      if (value === current) continue
+    for (const person of changedPeople) {
+      const { value } = figures(person.memberId)
       try {
         const result = await submitChange({
           memberId: person.memberId,
@@ -436,7 +438,7 @@ export function AllocateWizard({ mode, currentUserId, onDone }: Props) {
           {step === 3 && project && (
             <>
               <div className="divide-y divide-[var(--apple-separator)]">
-                {people.map((person) => {
+                {changedPeople.map((person) => {
                   const { value, current, totalAfter } = figures(person.memberId)
                   const used = Math.min(100, totalAfter)
                   return (
@@ -470,6 +472,13 @@ export function AllocateWizard({ mode, currentUserId, onDone }: Props) {
                   )
                 })}
               </div>
+              {unchangedCount > 0 && (
+                <p className="text-[12px] text-[var(--apple-secondary-label)]">
+                  {unchangedCount === 1
+                    ? '1 person keeps their current allocation and won’t be changed.'
+                    : `${unchangedCount} people keep their current allocation and won’t be changed.`}
+                </p>
+              )}
               <label className="block">
                 <span className="mb-1.5 block text-[13px] font-medium text-[var(--apple-label)]">Reason for allocation</span>
                 <textarea
