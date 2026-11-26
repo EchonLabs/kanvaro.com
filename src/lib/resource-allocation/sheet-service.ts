@@ -8,6 +8,7 @@
  */
 import { isProjectTeamMember } from '@/lib/permissions/project-team-membership'
 import { AllocationHistory } from '@/models/AllocationHistory'
+import { CustomRole } from '@/models/CustomRole'
 import { AllocationRequest } from '@/models/AllocationRequest'
 import { Project } from '@/models/Project'
 import { ResourceAllocation } from '@/models/ResourceAllocation'
@@ -75,6 +76,8 @@ export interface HistoryEntry {
   previousPercent: number
   newPercent: number
   reason: string
+  /** The approver's note, on rejected entries. */
+  note?: string
   status: 'updated' | 'approved' | 'rejected'
 }
 
@@ -147,7 +150,21 @@ export async function loadSheet(organizationId: string, query: SheetQuery): Prom
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 
-  const { kpis, byRole } = summarize(allRows, threshold)
+  const { kpis, byRole: heldRoles } = summarize(allRows, threshold)
+
+  // Every active custom role gets a card, even before anyone is assigned to it,
+  // so HR can see the roles they defined rather than only the ones in use.
+  const customRoles = (await CustomRole.find({ organization: organizationId, isActive: { $ne: false } })
+    .select('name')
+    .lean()) as any[]
+  const held = new Set(heldRoles.map((role) => role.roleLabel))
+  const byRole = [
+    ...heldRoles,
+    ...customRoles
+      .map((role) => String(role.name ?? '').trim())
+      .filter((name) => name && !held.has(name))
+      .map((name) => ({ roleLabel: name, resources: 0, allocated: 0, available: 0 }))
+  ].sort((a, b) => a.roleLabel.localeCompare(b.roleLabel))
   const onSheet = new Set(allRows.map((row) => row.memberId))
   const orphanedRequests = pending
     .filter((request) => !onSheet.has(String(request.member?._id ?? request.member)))
@@ -173,7 +190,7 @@ export async function loadSheet(organizationId: string, query: SheetQuery): Prom
     rows: rows.slice(start, start + query.limit),
     kpis,
     byRole,
-    roles: Array.from(new Set(allRows.map((row) => row.roleLabel))).sort(),
+    roles: byRole.map((role) => role.roleLabel),
     threshold,
     pagination: {
       page: query.page,
@@ -278,6 +295,7 @@ export async function loadHistory(
         previousPercent: line.previousPercent,
         newPercent: line.newPercent,
         reason: request.reason,
+        ...(request.decisionNote ? { note: request.decisionNote as string } : {}),
         status: 'rejected' as const
       }))
       .filter(

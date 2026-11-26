@@ -164,6 +164,9 @@ export async function getActiveProjects(organizationId: string): Promise<ActiveP
 
 /** Loads a member and checks they are an active resource of this organisation. */
 export async function loadResource(organizationId: string, memberId: unknown): Promise<ResourceUser> {
+  if (memberId === undefined || memberId === null || memberId === '') {
+    throw new ResourceAllocationError('VALIDATION_FAILED', 'Choose a team member.')
+  }
   if (typeof memberId !== 'string' || !OBJECT_ID.test(memberId)) {
     throw new ResourceAllocationError('NOT_FOUND', 'That team member does not exist.')
   }

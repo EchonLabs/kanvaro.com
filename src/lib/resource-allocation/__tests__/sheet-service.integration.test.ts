@@ -15,6 +15,7 @@ import { AllocationRequest } from '@/models/AllocationRequest'
 import { Project } from '@/models/Project'
 import { ResourceAllocation } from '@/models/ResourceAllocation'
 import { User } from '@/models/User'
+import { CustomRole } from '@/models/CustomRole'
 
 import { syncIndexes, useMongo } from '@/lib/standup/__tests__/helpers/mongo'
 
@@ -68,6 +69,24 @@ describe('sheet-service', () => {
         pendingRequest: { id: id(request), requestedBy: { _id: id(w.users.pm), name: 'Pamela Tester' } }
       })
       expect(sheet.threshold).toBe(100)
+    })
+
+    it('lists every active custom role in the by-role summary and the role filter, even with nobody assigned', async () => {
+      await CustomRole.create({ name: 'Designer', description: 'UI work', permissions: [], organization: w.org._id, createdBy: w.users.admin._id })
+      await CustomRole.create({ name: 'Old Role', description: 'Retired', permissions: [], organization: w.org._id, createdBy: w.users.admin._id, isActive: false })
+      await CustomRole.create({ name: 'Foreign Role', description: 'Other org', permissions: [], organization: w.otherOrg._id, createdBy: w.users.outsider._id })
+
+      const sheet = await loadSheet(w.organizationId, page)
+
+      expect(sheet.byRole).toContainEqual({ roleLabel: 'Designer', resources: 0, allocated: 0, available: 0 })
+      expect(sheet.roles).toContain('Designer')
+      expect(sheet.byRole.map((role) => role.roleLabel)).not.toContain('Old Role')
+      expect(sheet.roles).not.toContain('Foreign Role')
+      // A custom role someone holds still appears once, with their numbers.
+      expect(sheet.byRole.filter((role) => role.roleLabel === 'Resource Lead')).toEqual([
+        { roleLabel: 'Resource Lead', resources: 1, allocated: 0, available: 100 }
+      ])
+      expect(sheet.kpis.totalResources).toBe(7)
     })
 
     it('labels custom roles by their name', async () => {
@@ -253,6 +272,13 @@ describe('sheet-service', () => {
       const [entry] = (await loadHistory(w.organizationId, { page: 1, limit: 5 })).items
       expect(entry.member.avatar).toBe('/api/uploads/avatars/dulmi.jpg')
       expect(entry.changedBy.avatar).toBe('/api/uploads/avatars/hanna.jpg')
+    })
+
+    it('shows the approver’s note on rejected entries', async () => {
+      await seedTrail()
+
+      const rejected = (await loadHistory(w.organizationId, { page: 1, limit: 50 })).items.find((item) => item.status === 'rejected')
+      expect(rejected?.note).toBe('No')
     })
 
     it('searches by member, changer or project name', async () => {

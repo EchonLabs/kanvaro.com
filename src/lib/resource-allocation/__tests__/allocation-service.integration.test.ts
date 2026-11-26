@@ -183,6 +183,12 @@ describe('allocation-service: direct changes', () => {
     })
   })
 
+  it.each([undefined, null, ''])('answers VALIDATION_FAILED when no member is chosen (%p)', async (memberId) => {
+    await expect(
+      directChange(actor, { memberId, lines: [{ projectId: id(w.projects.p1), newPercent: 10 }], reason: 'x' })
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', message: 'Choose a team member.' })
+  })
+
   it('answers NOT_FOUND for a member id that does not exist or is malformed', async () => {
     await expect(
       change([{ projectId: id(w.projects.p1), newPercent: 10 }], String(new mongoose.Types.ObjectId()))
