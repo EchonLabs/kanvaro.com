@@ -1,7 +1,8 @@
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
-import { OAuthAuthorizationCode, OAuthRefreshToken } from '@/models/OAuth'
+import { OAuthAuthorizationCode } from '@/models/OAuthAuthorizationCode'
+import { OAuthRefreshToken } from '@/models/OAuthRefreshToken'
 import { User } from '@/models/User'
 import {
   ACCESS_TOKEN_TTL,
