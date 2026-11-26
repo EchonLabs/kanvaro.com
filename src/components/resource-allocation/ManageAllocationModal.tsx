@@ -275,7 +275,7 @@ export function ManageAllocationModal({ memberId, open, mode, currentUserId, onC
 
       {data && summary && step === 'review' && (
         <div className="space-y-3">
-          <ChangeHeader memberName={memberName} />
+          <ChangeHeader memberName={memberName} avatar={data.member.avatar} />
           <ChangeReview lines={summary.changed} totalAfter={summary.totalAfter} threshold={data.threshold} />
           <p className="rounded-[var(--apple-radius-md)] bg-[color-mix(in_srgb,var(--apple-system-blue)_8%,transparent)] px-3 py-2 text-[13px] text-[var(--apple-system-blue)]">
             {mode === 'apply'

@@ -75,6 +75,22 @@ describe('ApprovalModal', () => {
     expect(header).toHaveTextContent('SF')
   })
 
+  it('shows the member’s photo in the header when they have one', async () => {
+    serve(detail({ member: { _id: 'u1', name: 'Shalini Fernando', avatar: '/api/uploads/avatars/u1.jpg' } }))
+    render(<ApprovalModal {...props} />)
+
+    const header = await screen.findByTestId('change-header')
+    expect(header.querySelector('img')).toHaveAttribute('src', '/api/uploads/avatars/u1.jpg')
+    expect(header).not.toHaveTextContent('SF')
+  })
+
+  it('describes the dialog while the request is still loading', () => {
+    global.fetch = jest.fn(() => new Promise(() => {})) as unknown as typeof fetch
+    render(<ApprovalModal {...props} />)
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription('Loading the request…')
+  })
+
   it('requires acknowledging stale values before Confirm is enabled', async () => {
     serve(
       detail({

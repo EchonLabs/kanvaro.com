@@ -137,7 +137,7 @@ export function ApprovalModal({ requestId, open, onClose, onDecided }: Props) {
       open={open}
       onOpenChange={(next) => !next && onClose()}
       title="Confirm Allocation Change"
-      description={request ? `Review the changes for ${request.member.name} before updating their allocation` : undefined}
+      description={request ? `Review the changes for ${request.member.name} before updating their allocation` : 'Loading the request…'}
       footer={footer}
       headerClassName="text-center sm:text-center"
       className="sm:max-w-xl lg:max-w-xl"
@@ -151,7 +151,7 @@ export function ApprovalModal({ requestId, open, onClose, onDecided }: Props) {
 
       {request && (
         <div className="space-y-3">
-          <ChangeHeader memberName={request.member.name} />
+          <ChangeHeader memberName={request.member.name} avatar={request.member.avatar} />
           <RequestSummary request={request} />
 
           {!pending && (

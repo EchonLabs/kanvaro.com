@@ -45,7 +45,7 @@ export interface RequestListItem {
   _id: string
   status: AllocationRequestStatus
   reason: string
-  member: { _id: string; name: string }
+  member: { _id: string; name: string; avatar?: string }
   requestedBy: { _id: string; name: string; roleLabel: string }
   lines: RequestLineView[]
   totalBefore: number
@@ -90,7 +90,11 @@ async function toListItems(requests: any[]): Promise<RequestListItem[]> {
     _id: String(request._id),
     status: request.status,
     reason: request.reason,
-    member: { _id: String(request.member?._id ?? request.member), name: fullName(request.member) },
+    member: {
+      _id: String(request.member?._id ?? request.member),
+      name: fullName(request.member),
+      ...(request.member?.avatar ? { avatar: request.member.avatar as string } : {})
+    },
     requestedBy: {
       _id: String(request.requestedBy?._id ?? request.requestedBy),
       name: fullName(request.requestedBy),
@@ -115,7 +119,7 @@ async function toListItems(requests: any[]): Promise<RequestListItem[]> {
 
 function populateRequest<T>(query: T): T {
   return (query as any)
-    .populate('member', 'firstName lastName')
+    .populate('member', 'firstName lastName avatar')
     .populate({ path: 'requestedBy', select: 'firstName lastName role customRole', populate: { path: 'customRole', select: 'name' } })
     .populate('decidedBy', 'firstName lastName')
 }

@@ -56,7 +56,7 @@ export function RequestViewModal({ requestId, open, onClose, onCancelled }: Prop
       open={open}
       onOpenChange={(next) => !next && onClose()}
       title="Allocation Request"
-      description={request ? `Your requested change for ${request.member.name}` : undefined}
+      description={request ? `Your requested change for ${request.member.name}` : 'Loading the request…'}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={busy}>

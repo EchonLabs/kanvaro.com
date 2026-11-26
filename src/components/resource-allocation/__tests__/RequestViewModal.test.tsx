@@ -45,4 +45,11 @@ describe('RequestViewModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel request' }))
     await waitFor(() => expect(onCancelled).toHaveBeenCalled())
   })
+
+  it('describes the dialog while the request is still loading', () => {
+    global.fetch = jest.fn(() => new Promise(() => {})) as unknown as typeof fetch
+    render(<RequestViewModal requestId="r1" open onClose={jest.fn()} onCancelled={jest.fn()} />)
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription('Loading the request…')
+  })
 })

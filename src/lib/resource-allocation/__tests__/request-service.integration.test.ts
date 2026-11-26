@@ -194,6 +194,14 @@ describe('request-service', () => {
       expect(await percentOn(w.projects.p1)).toBe(60)
     })
 
+    it('includes the member’s photo so the approval header can show it', async () => {
+      await User.updateOne({ _id: w.users.member._id }, { avatar: '/api/uploads/avatars/member.jpg' })
+      const request = await submit([{ projectId: id(w.projects.p1), newPercent: 60 }])
+
+      const detail = await getRequestDetail(w.organizationId, id(request))
+      expect(detail.member.avatar).toBe('/api/uploads/avatars/member.jpg')
+    })
+
     it('re-checks the threshold on live totals at approval', async () => {
       const request = await submit([{ projectId: id(w.projects.p1), newPercent: 60 }])
       await directChange(admin, {
