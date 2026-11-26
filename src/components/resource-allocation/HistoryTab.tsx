@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
 
+import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { cn } from '@/lib/utils'
 
 import { fetchHistory, type HistoryEntry } from './api'
@@ -24,6 +25,11 @@ const STATUS: Record<HistoryEntry['status'], { label: string; className: string 
 }
 
 const cell = 'px-3 py-3 align-top'
+
+function splitName(name: string) {
+  const [firstName, ...rest] = name.split(' ')
+  return { firstName, lastName: rest.join(' ') }
+}
 const head = 'px-3 py-2 text-left text-[11px] font-semibold text-[var(--apple-secondary-label)] whitespace-nowrap'
 
 /** Every applied change and every rejected request, newest first. */
@@ -109,15 +115,25 @@ export function HistoryTab() {
                         {date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                       </span>
                     </td>
-                    <td className={cn(cell, 'font-medium text-[var(--apple-label)]')}>{entry.member.name}</td>
                     <td className={cell}>
-                      <span className="block text-[var(--apple-label)]">{entry.changedBy.name}</span>
-                      <span className="block text-[11px] text-[var(--apple-secondary-label)]">{entry.changedBy.roleLabel}</span>
-                      {entry.approvedBy && (
-                        <span className="block text-[11px] text-[var(--apple-secondary-label)]">
-                          Approved by {entry.approvedBy.name}
+                      <span className="flex items-center gap-2">
+                        <GravatarAvatar user={splitName(entry.member.name)} size={28} />
+                        <span className="font-medium text-[var(--apple-label)]">{entry.member.name}</span>
+                      </span>
+                    </td>
+                    <td className={cell}>
+                      <span className="flex items-start gap-2">
+                        <GravatarAvatar user={splitName(entry.changedBy.name)} size={28} />
+                        <span>
+                          <span className="block text-[var(--apple-label)]">{entry.changedBy.name}</span>
+                          <span className="block text-[11px] text-[var(--apple-secondary-label)]">{entry.changedBy.roleLabel}</span>
+                          {entry.approvedBy && (
+                            <span className="block text-[11px] text-[var(--apple-secondary-label)]">
+                              Approved by {entry.approvedBy.name}
+                            </span>
+                          )}
                         </span>
-                      )}
+                      </span>
                     </td>
                     <td className={cn(cell, 'text-[var(--apple-label)]')}>{entry.project.name}</td>
                     <td className={cn(cell, 'tabular-nums text-[var(--apple-secondary-label)]')}>{entry.previousPercent}%</td>

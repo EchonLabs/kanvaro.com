@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, Loader2, Save } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
 import { THRESHOLD_MAX, THRESHOLD_MIN } from '@/lib/resource-allocation/workload'
@@ -88,7 +88,14 @@ export function ThresholdSettingsCard({ onSaved }: { onSaved?: (value: number) =
           </p>
         )}
         <div className="flex justify-end">
-          <Button onClick={save} disabled={!valid || !changed || saving} className="h-9 rounded-[var(--apple-radius-sm)] px-4 text-[13px]">
+          {/* Same button as the other Organization Settings cards. */}
+          <Button
+            onClick={save}
+            disabled={!valid || !changed || saving}
+            className="h-9 gap-2 rounded-[var(--apple-radius-sm)] px-4 text-[13px] apple-transition"
+            style={{ background: 'var(--apple-card-gradient)' }}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} /> : <Save className="h-3.5 w-3.5" strokeWidth={1.5} />}
             {saving ? 'Saving…' : 'Save threshold'}
           </Button>
         </div>

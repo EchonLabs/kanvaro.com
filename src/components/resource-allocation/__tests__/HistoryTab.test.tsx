@@ -51,6 +51,16 @@ describe('HistoryTab', () => {
     expect(await screen.findByText('Kavindu Silva')).toBeInTheDocument()
   })
 
+  it('shows avatars for the employee and the person who made the change, like the design', async () => {
+    global.fetch = jest.fn(() => json({ success: true, data: { items: [entry('e1', 'updated')], total: 1 } })) as unknown as typeof fetch
+
+    render(<HistoryTab />)
+
+    const row = (await screen.findByText('Dulmi Kaushalya')).closest('tr') as HTMLElement
+    expect(within(row).getByText('DK')).toBeInTheDocument()
+    expect(within(row).getByText('BP')).toBeInTheDocument()
+  })
+
   it('searches history', async () => {
     const fetchMock = jest.fn((_url: string) => json({ success: true, data: { items: [], total: 0 } }))
     global.fetch = fetchMock as unknown as typeof fetch
