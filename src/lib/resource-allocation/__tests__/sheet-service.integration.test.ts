@@ -289,6 +289,18 @@ describe('sheet-service', () => {
       expect((await loadHistory(w.organizationId, { q: 'baseneo', page: 1, limit: 50 })).items).toHaveLength(3)
     })
 
+    it('searches the reason text of applied and rejected entries', async () => {
+      await seedTrail()
+
+      const swap = await loadHistory(w.organizationId, { q: 'qa swap', page: 1, limit: 50 })
+      expect(swap.items.map((item) => item.reason)).toEqual(['QA swap'])
+      expect(swap.total).toBe(1)
+
+      const rejected = await loadHistory(w.organizationId, { q: 'want dulmi', page: 1, limit: 50 })
+      expect(rejected.items.map((item) => item.status)).toEqual(['rejected'])
+      expect(rejected.total).toBe(1)
+    })
+
     it('never shows another organisation\'s history', async () => {
       await seedTrail()
       await AllocationHistory.create({

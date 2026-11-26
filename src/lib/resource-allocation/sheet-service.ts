@@ -218,8 +218,8 @@ export async function loadHistory(
   const q = opts.q?.trim()
   let matchUsers: string[] | undefined
   let matchProjects: string[] | undefined
-  if (q) {
-    const pattern = new RegExp(escapeRegex(q), 'i')
+  const pattern = q ? new RegExp(escapeRegex(q), 'i') : undefined
+  if (q && pattern) {
     const [users, projects] = await Promise.all([
       User.find({ organization: organizationId, $or: [{ firstName: pattern }, { lastName: pattern }] })
         .select('_id firstName lastName')
@@ -241,7 +241,8 @@ export async function loadHistory(
     historyFilter.$or = [
       { member: { $in: matchUsers } },
       { changedBy: { $in: matchUsers } },
-      { project: { $in: matchProjects } }
+      { project: { $in: matchProjects } },
+      { reason: pattern }
     ]
   }
 
@@ -300,7 +301,11 @@ export async function loadHistory(
       }))
       .filter(
         (entry: HistoryEntry) =>
-          !q || userSet.has(entry.member._id) || userSet.has(entry.changedBy._id) || projectSet.has(entry.project._id)
+          !pattern ||
+          userSet.has(entry.member._id) ||
+          userSet.has(entry.changedBy._id) ||
+          projectSet.has(entry.project._id) ||
+          pattern.test(entry.reason)
       )
   )
 
