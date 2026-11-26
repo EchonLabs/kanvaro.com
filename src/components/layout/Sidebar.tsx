@@ -40,7 +40,8 @@ import {
   FileText,
   Bug,
   Target,
-  Activity
+  Activity,
+  BarChart3
 } from 'lucide-react'
 import {
   Popover,
@@ -50,7 +51,7 @@ import {
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/lib/permissions/permission-context'
-import { isNavPathActive } from '@/lib/nav-active'
+import { isNavPathActive, isTopLevelNavActive } from '@/lib/nav-active'
 import packageJson from '../../../package.json'
 
 interface SidebarProps {
@@ -210,6 +211,13 @@ const navigationItems = [
         permission: Permission.TEAM_VIEW_ACTIVITY
       }
     ]
+  },
+  {
+    id: 'resource-allocation',
+    label: 'Resource Allocation',
+    icon: BarChart3,
+    path: '/resource-allocation',
+    permission: Permission.RESOURCE_ALLOCATION_VIEW
   },
   {
     id: 'time',
@@ -576,7 +584,7 @@ interface NavigationItemProps {
 }
 
 function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpanded, setExpandedItems, router }: NavigationItemProps) {
-  const isActive = pathname === item.path
+  const isActive = isTopLevelNavActive(pathname, item)
   const hasChildren = item.children && item.children.length > 0
   const isExpanded = expandedItems.includes(item.id)
   const Icon = item.icon

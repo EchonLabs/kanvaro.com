@@ -27,3 +27,15 @@ export function isNavPathActive(pathname: string, itemPath: string): boolean {
   if (SPRINT_ANALYTICS_ROUTE.test(pathname)) return itemPath === SPRINT_ANALYTICS_PATH
   return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
 }
+
+/**
+ * Whether a top-level sidebar entry is the active one.
+ *
+ * An entry without children stays lit on its own sub-pages (Resource
+ * Allocation on /resource-allocation/allocate). An entry with children keeps
+ * its exact-path match; its children light themselves via isNavPathActive.
+ */
+export function isTopLevelNavActive(pathname: string, item: { path: string; children?: unknown[] }): boolean {
+  if (item.children && item.children.length > 0) return pathname === item.path
+  return isNavPathActive(pathname, item.path)
+}

@@ -235,6 +235,16 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
       { permission: Permission.DOCUMENTATION_DELETE, label: 'Delete Documentation', description: 'Delete documentation pages' },
       { permission: Permission.DOCUMENTATION_MANAGE_PERMISSIONS, label: 'Manage Doc Permissions', description: 'Manage documentation access permissions' },
     ]
+  },
+  {
+    category: PermissionCategory.RESOURCE_ALLOCATION,
+    permissions: [
+      { permission: Permission.RESOURCE_ALLOCATION_VIEW, label: 'View Allocations', description: 'View the organisation-wide resource allocation sheet' },
+      { permission: Permission.RESOURCE_ALLOCATION_MANAGE, label: 'Manage Allocations', description: 'Change allocations directly and set the over-allocation threshold' },
+      { permission: Permission.RESOURCE_ALLOCATION_REQUEST, label: 'Request Allocation Changes', description: 'Submit allocation changes for approval' },
+      { permission: Permission.RESOURCE_ALLOCATION_APPROVE, label: 'Approve Requests', description: 'Approve or reject allocation change requests' },
+      { permission: Permission.RESOURCE_ALLOCATION_VIEW_HISTORY, label: 'View Allocation History', description: 'View the allocation audit trail and request reasons' },
+    ]
   }
 ]
 

@@ -5,13 +5,13 @@ import { broadcastNotification, broadcastToUsers } from './notification-broadcas
 import connectDB from './db-config'
 
 export interface NotificationData {
-  type: 'task' | 'project' | 'team' | 'system' | 'budget' | 'deadline' | 'reminder' | 'invitation' | 'time_tracking' | 'standup'
+  type: 'task' | 'project' | 'team' | 'system' | 'budget' | 'deadline' | 'reminder' | 'invitation' | 'time_tracking' | 'sprint_event' | 'standup' | 'resource_allocation'
   title: string
   message: string
   data?: {
-    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'standup' | 'carry_forward_item' | 'standup_override' | 'working_calendar'
+    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'sprint_event' | 'standup' | 'carry_forward_item' | 'standup_override' | 'working_calendar' | 'resource_allocation'
     entityId?: string
-    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'unassigned' | 'completed' | 'overdue' | 'reminder'
+    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'unassigned' | 'completed' | 'overdue' | 'reminder' | 'upcoming' | 'approved' | 'rejected'
     priority?: 'low' | 'medium' | 'high' | 'critical'
     url?: string
     projectName?: string

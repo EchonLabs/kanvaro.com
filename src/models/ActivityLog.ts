@@ -21,7 +21,10 @@ export const ACTIVITY_ENTITY_TYPES = [
   'working_calendar',
   'member_capacity',
   'planning_session',
-  'project_standup_settings'
+  'project_standup_settings',
+  // Resource allocation (cross-project % sheet)
+  'resource_allocation',
+  'allocation_request'
 ] as const
 
 export const ACTIVITY_ACTIONS = [
@@ -94,7 +97,13 @@ export const ACTIVITY_ACTIONS = [
   // Configuration (CAL-*)
   'working_calendar_updated',
   'holiday_set_imported',
-  'member_capacity_updated'
+  'member_capacity_updated',
+  // Resource allocation
+  'resource_allocation_changed',
+  'resource_request_submitted',
+  'resource_request_approved',
+  'resource_request_rejected',
+  'resource_request_cancelled'
 ] as const
 
 export type ActivityEntityType = typeof ACTIVITY_ENTITY_TYPES[number]
