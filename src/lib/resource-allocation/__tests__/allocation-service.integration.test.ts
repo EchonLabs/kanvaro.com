@@ -21,6 +21,7 @@ import { AllocationHistory } from '@/models/AllocationHistory'
 import { Organization } from '@/models/Organization'
 import { Project } from '@/models/Project'
 import { ResourceAllocation } from '@/models/ResourceAllocation'
+import { User } from '@/models/User'
 
 import { useMongo, syncIndexes } from '@/lib/standup/__tests__/helpers/mongo'
 
@@ -262,6 +263,14 @@ describe('allocation-service: reads and settings', () => {
       expect.objectContaining({ projectName: 'BaseNeo SaaS', percent: 0, onTeam: false })
     ])
     expect(result.member).toMatchObject({ name: 'Dulmi Tester', roleLabel: 'Team Member' })
+  })
+
+  it('includes the member’s uploaded avatar so editors can show their photo', async () => {
+    await User.updateOne({ _id: w.users.member._id }, { avatar: '/api/uploads/avatars/dulmi.jpg' })
+
+    const result = await getMemberAllocations(w.organizationId, id(w.users.member))
+
+    expect(result.member.avatar).toBe('/api/uploads/avatars/dulmi.jpg')
   })
 
   it('lists each project’s managers so editors can apply the PM-only-increase rule', async () => {

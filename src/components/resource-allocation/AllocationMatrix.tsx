@@ -37,7 +37,8 @@ const RIGHT = { status: 148, actions: 104, approvals: 84, remaining: 84 } as con
 const PROJECT_WIDTH = 136
 
 const pin = 'lg:sticky lg:z-10 bg-card'
-const head = 'apple-section-label px-3 py-2 text-left whitespace-nowrap align-bottom'
+// Labels may wrap ("Total allocation" sits on two lines in the design) rather than spill into the next column.
+const head = 'apple-section-label px-3 py-2 text-left align-bottom leading-tight'
 
 function fixed(width: number, side: 'left' | 'right', offset: number): CSSProperties {
   return { width, minWidth: width, maxWidth: width, [side]: offset }
@@ -190,7 +191,10 @@ export function AllocationMatrix({
                   {rowOffset + index + 1}
                 </td>
                 <td className={cn('px-3 py-3', pin)} style={left.role}>
-                  <span className="inline-block max-w-full truncate rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-0.5 text-[11px] text-[var(--apple-label)]">
+                  <span
+                    title={row.roleLabel}
+                    className="inline-block max-w-full truncate rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-0.5 text-[11px] text-[var(--apple-label)]"
+                  >
                     {row.roleLabel}
                   </span>
                 </td>

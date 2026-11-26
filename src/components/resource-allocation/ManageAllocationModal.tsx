@@ -150,7 +150,7 @@ export function ManageAllocationModal({ memberId, open, mode, currentUserId, onC
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <GravatarAvatar user={{ firstName: nameParts[0], lastName: nameParts.slice(1).join(' '), email: data.member.email }} size={36} />
+              <GravatarAvatar user={{ firstName: nameParts[0], lastName: nameParts.slice(1).join(' '), email: data.member.email, avatar: data.member.avatar }} size={36} />
               <div>
                 <p className="text-[14px] font-semibold text-[var(--apple-label)]">{data.member.name}</p>
                 <p className="text-[12px] text-[var(--apple-secondary-label)]">{data.member.roleLabel}</p>

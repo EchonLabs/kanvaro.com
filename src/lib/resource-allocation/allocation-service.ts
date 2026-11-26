@@ -60,10 +60,11 @@ export interface ResourceUser {
   role: string
   customRole?: { name?: string } | null
   hourlyRate?: number
+  avatar?: string
 }
 
 export interface MemberAllocations {
-  member: { _id: string; name: string; email: string; roleLabel: string }
+  member: { _id: string; name: string; email: string; roleLabel: string; avatar?: string }
   /** `managerIds` lets an editor apply the rule that a PM may only increase projects they manage. */
   lines: { projectId: string; projectName: string; percent: number; onTeam: boolean; managerIds: string[] }[]
   total: number
@@ -167,7 +168,7 @@ export async function loadResource(organizationId: string, memberId: unknown): P
     throw new ResourceAllocationError('NOT_FOUND', 'That team member does not exist.')
   }
   const user: any = await User.findOne({ _id: memberId, organization: organizationId })
-    .select('firstName lastName email role customRole hourlyRate isActive')
+    .select('firstName lastName email role customRole hourlyRate isActive avatar')
     .populate('customRole', 'name')
     .lean()
   if (!user) throw new ResourceAllocationError('NOT_FOUND', 'That team member does not exist.')
@@ -214,7 +215,8 @@ export async function getMemberAllocations(organizationId: string, memberId: str
       _id: String(member._id),
       name: fullName(member),
       email: member.email,
-      roleLabel: roleLabel(member)
+      roleLabel: roleLabel(member),
+      ...(member.avatar ? { avatar: member.avatar } : {})
     },
     lines: projects.map((project) => ({
       projectId: String(project._id),
