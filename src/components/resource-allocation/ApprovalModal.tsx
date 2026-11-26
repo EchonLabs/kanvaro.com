@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 
 import { ApiError, approveRequest, fetchRequest, rejectRequest, type RequestDetail } from './api'
+import { ChangeHeader } from './ChangeHeader'
 import { ChangeReview } from './ChangeReview'
 
 interface Props {
@@ -138,6 +139,7 @@ export function ApprovalModal({ requestId, open, onClose, onDecided }: Props) {
       title="Confirm Allocation Change"
       description={request ? `Review the changes for ${request.member.name} before updating their allocation` : undefined}
       footer={footer}
+      headerClassName="text-center sm:text-center"
       className="sm:max-w-xl lg:max-w-xl"
     >
       {loadError && (
@@ -149,6 +151,7 @@ export function ApprovalModal({ requestId, open, onClose, onDecided }: Props) {
 
       {request && (
         <div className="space-y-3">
+          <ChangeHeader memberName={request.member.name} />
           <RequestSummary request={request} />
 
           {!pending && (

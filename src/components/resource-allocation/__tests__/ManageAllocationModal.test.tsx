@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import { ManageAllocationModal } from '@/components/resource-allocation/ManageAllocationModal'
 
@@ -57,6 +57,24 @@ describe('ManageAllocationModal', () => {
     expect(newInput('MediFinder').value).toBe('0')
     expect(screen.getByText('Total Allocation').nextSibling).toHaveTextContent('50%')
     expect(screen.getByText('Available Capacity').nextSibling).toHaveTextContent('50%')
+  })
+
+  it('shows a project tile with the first two letters of each project, like the design', async () => {
+    await renderModal()
+
+    for (const [name, tile] of [['AVO', 'AV'], ['BaseNeo SaaS', 'Ba'], ['MediFinder', 'Me']]) {
+      const row = newInput(name).closest('tr') as HTMLElement
+      expect(within(row).getByText(tile)).toHaveAttribute('aria-hidden', 'true')
+    }
+  })
+
+  it('shows the person-to-project header on the review step', async () => {
+    await renderModal()
+    fireEvent.change(newInput('MediFinder'), { target: { value: '30' } })
+    fireEvent.change(screen.getByLabelText('Reason for change'), { target: { value: 'Need design' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Review Changes' }))
+
+    expect(screen.getByTestId('change-header')).toBeInTheDocument()
   })
 
   it('disables Review Changes until a value changes and a reason is entered', async () => {

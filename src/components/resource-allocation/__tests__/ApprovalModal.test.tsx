@@ -67,6 +67,14 @@ describe('ApprovalModal', () => {
     expect(postBody('/approve')).toEqual({ acknowledgeStale: false })
   })
 
+  it('shows the person-to-project header from the design', async () => {
+    serve(detail())
+    render(<ApprovalModal {...props} />)
+
+    const header = await screen.findByTestId('change-header')
+    expect(header).toHaveTextContent('SF')
+  })
+
   it('requires acknowledging stale values before Confirm is enabled', async () => {
     serve(
       detail({

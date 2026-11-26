@@ -10,6 +10,7 @@ import { classify, exceedsThreshold } from '@/lib/resource-allocation/workload'
 import { cn } from '@/lib/utils'
 
 import { ApiError, fetchMember, submitChange, type MemberAllocations } from './api'
+import { ChangeHeader, ProjectTile } from './ChangeHeader'
 import { ChangeReview } from './ChangeReview'
 import { StatusChip } from './StatusChip'
 
@@ -135,6 +136,7 @@ export function ManageAllocationModal({ memberId, open, mode, currentUserId, onC
           : `Review the changes for ${memberName} before updating their allocation`
       }
       footer={data ? footer : undefined}
+      headerClassName={step === 'review' ? 'text-center sm:text-center' : undefined}
       className="sm:max-w-xl lg:max-w-xl"
     >
       {loadError && (
@@ -194,7 +196,12 @@ export function ManageAllocationModal({ memberId, open, mode, currentUserId, onC
                   const ceiling = canIncrease(line) ? 100 : line.percent
                   return (
                     <tr key={line.projectId} className="border-t border-[var(--apple-separator)]">
-                      <td className="px-3 py-2 font-medium text-[var(--apple-label)]">{line.projectName}</td>
+                      <td className="px-3 py-2 font-medium text-[var(--apple-label)]">
+                        <span className="flex items-center gap-2">
+                          <ProjectTile name={line.projectName} />
+                          {line.projectName}
+                        </span>
+                      </td>
                       <td className="px-3 py-2 tabular-nums text-[var(--apple-secondary-label)]">{line.percent}%</td>
                       <td className="px-3 py-2">
                         <span className="relative inline-flex items-center">
@@ -268,6 +275,7 @@ export function ManageAllocationModal({ memberId, open, mode, currentUserId, onC
 
       {data && summary && step === 'review' && (
         <div className="space-y-3">
+          <ChangeHeader memberName={memberName} />
           <ChangeReview lines={summary.changed} totalAfter={summary.totalAfter} threshold={data.threshold} />
           <p className="rounded-[var(--apple-radius-md)] bg-[color-mix(in_srgb,var(--apple-system-blue)_8%,transparent)] px-3 py-2 text-[13px] text-[var(--apple-system-blue)]">
             {mode === 'apply'
