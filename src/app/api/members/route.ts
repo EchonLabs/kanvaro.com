@@ -10,6 +10,7 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Role } from '@/lib/permissions/permission-definitions'
 import { convertOpenAllocationsToCarryForward } from '@/lib/standup/carry-forward-service'
+import { revokeAllForUser } from '@/lib/oauth'
 
 export async function GET(request: NextRequest) {
   try {
@@ -227,8 +228,20 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update member
+    const wasActive = member.isActive
     Object.assign(member, updates)
     await member.save()
+
+    if (wasActive && member.isActive === false) {
+      try {
+        await revokeAllForUser(member._id.toString())
+      } catch (revokeError) {
+        console.error(
+          'Failed to revoke OAuth tokens on user deactivation:',
+          revokeError instanceof Error ? revokeError.message : 'Unknown error'
+        )
+      }
+    }
 
     // If hourlyRate was updated, propagate to all projects where this user is a team member
     if (updates.hourlyRate !== undefined) {
