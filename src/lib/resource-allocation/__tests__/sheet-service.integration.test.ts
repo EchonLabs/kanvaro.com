@@ -241,6 +241,20 @@ describe('sheet-service', () => {
       expect([...first.items, ...second.items].map((item) => item.id)).toEqual(all.items.map((item) => item.id))
     })
 
+    it('includes uploaded photos for the member and the person who made the change', async () => {
+      await User.updateOne({ _id: w.users.member._id }, { avatar: '/api/uploads/avatars/dulmi.jpg' })
+      await User.updateOne({ _id: w.users.hr._id }, { avatar: '/api/uploads/avatars/hanna.jpg' })
+      await directChange(hr(), {
+        memberId: id(w.users.member),
+        lines: [{ projectId: id(w.projects.p1), newPercent: 10 }],
+        reason: 'Photo check'
+      })
+
+      const [entry] = (await loadHistory(w.organizationId, { page: 1, limit: 5 })).items
+      expect(entry.member.avatar).toBe('/api/uploads/avatars/dulmi.jpg')
+      expect(entry.changedBy.avatar).toBe('/api/uploads/avatars/hanna.jpg')
+    })
+
     it('searches by member, changer or project name', async () => {
       await seedTrail()
 

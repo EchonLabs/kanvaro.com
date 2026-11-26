@@ -68,8 +68,8 @@ export interface Sheet {
 export interface HistoryEntry {
   id: string
   date: Date
-  member: { _id: string; name: string }
-  changedBy: { _id: string; name: string; roleLabel: string }
+  member: { _id: string; name: string; avatar?: string }
+  changedBy: { _id: string; name: string; roleLabel: string; avatar?: string }
   approvedBy?: { _id: string; name: string }
   project: { _id: string; name: string }
   previousPercent: number
@@ -232,20 +232,24 @@ export async function loadHistory(
     AllocationHistory.find(historyFilter)
       .sort({ createdAt: -1, _id: -1 })
       .limit(opts.page * opts.limit)
-      .populate('member', 'firstName lastName')
-      .populate({ path: 'changedBy', select: 'firstName lastName role customRole', populate: { path: 'customRole', select: 'name' } })
+      .populate('member', 'firstName lastName avatar')
+      .populate({ path: 'changedBy', select: 'firstName lastName role customRole avatar', populate: { path: 'customRole', select: 'name' } })
       .populate('approvedBy', 'firstName lastName')
       .populate('project', 'name')
       .lean() as Promise<any[]>,
     AllocationHistory.countDocuments(historyFilter),
     AllocationRequest.find({ organization: organizationId, status: 'rejected' })
-      .populate('member', 'firstName lastName')
-      .populate({ path: 'requestedBy', select: 'firstName lastName role customRole', populate: { path: 'customRole', select: 'name' } })
+      .populate('member', 'firstName lastName avatar')
+      .populate({ path: 'requestedBy', select: 'firstName lastName role customRole avatar', populate: { path: 'customRole', select: 'name' } })
       .populate('lines.project', 'name')
       .lean() as Promise<any[]>
   ])
 
-  const person = (user: any) => ({ _id: String(user?._id ?? user), name: fullName(user) })
+  const person = (user: any) => ({
+    _id: String(user?._id ?? user),
+    name: fullName(user),
+    ...(user?.avatar ? { avatar: user.avatar as string } : {})
+  })
   const changer = (user: any) => ({ ...person(user), roleLabel: user?.role ? roleLabel(user) : '' })
 
   const applied: HistoryEntry[] = historyRows.map((row) => ({

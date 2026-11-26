@@ -30,7 +30,7 @@ function splitName(name: string) {
   const [firstName, ...rest] = name.split(' ')
   return { firstName, lastName: rest.join(' ') }
 }
-const head = 'px-3 py-2 text-left text-[11px] font-semibold text-[var(--apple-secondary-label)] whitespace-nowrap'
+const head = 'apple-section-label px-3 py-2 text-left whitespace-nowrap'
 
 /** Every applied change and every rejected request, newest first. */
 export function HistoryTab() {
@@ -117,13 +117,13 @@ export function HistoryTab() {
                     </td>
                     <td className={cell}>
                       <span className="flex items-center gap-2">
-                        <GravatarAvatar user={splitName(entry.member.name)} size={28} />
+                        <GravatarAvatar user={{ ...splitName(entry.member.name), avatar: entry.member.avatar }} size={28} fallbackClassName="bg-[var(--apple-tertiary-fill)] text-[var(--apple-label)]" />
                         <span className="font-medium text-[var(--apple-label)]">{entry.member.name}</span>
                       </span>
                     </td>
                     <td className={cell}>
                       <span className="flex items-start gap-2">
-                        <GravatarAvatar user={splitName(entry.changedBy.name)} size={28} />
+                        <GravatarAvatar user={{ ...splitName(entry.changedBy.name), avatar: entry.changedBy.avatar }} size={28} fallbackClassName="bg-[var(--apple-tertiary-fill)] text-[var(--apple-label)]" />
                         <span>
                           <span className="block text-[var(--apple-label)]">{entry.changedBy.name}</span>
                           <span className="block text-[11px] text-[var(--apple-secondary-label)]">{entry.changedBy.roleLabel}</span>

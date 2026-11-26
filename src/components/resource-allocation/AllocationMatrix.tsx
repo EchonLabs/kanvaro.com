@@ -33,7 +33,7 @@ interface Props {
  * be pinned on top of its neighbour.
  */
 const LEFT = { no: 44, role: 120, employee: 216, total: 112 } as const
-const RIGHT = { status: 148, actions: 104, approvals: 84, remaining: 84 } as const
+const RIGHT = { status: 148, actions: 104, approvals: 96, remaining: 96 } as const
 const PROJECT_WIDTH = 136
 
 const pin = 'lg:sticky lg:z-10 bg-card'
@@ -156,10 +156,11 @@ export function AllocationMatrix({
                 Allocation %
               </th>
             ))}
-            <th scope="col" className={cn(head, pin, rightEdge)} style={right.remaining}>Remaining</th>
-            {canApprove && <th scope="col" className={cn(head, pin)} style={right.approvals}>Approvals</th>}
-            {canEdit && <th scope="col" className={cn(head, pin)} style={right.actions}>Actions</th>}
-            <th scope="col" className={cn(head, pin)} style={right.status}>Status</th>
+            {/* Single-word labels stay on one line; only multi-word ones may wrap. */}
+            <th scope="col" className={cn(head, pin, rightEdge, 'whitespace-nowrap')} style={right.remaining}>Remaining</th>
+            {canApprove && <th scope="col" className={cn(head, pin, 'whitespace-nowrap')} style={right.approvals}>Approvals</th>}
+            {canEdit && <th scope="col" className={cn(head, pin, 'whitespace-nowrap')} style={right.actions}>Actions</th>}
+            <th scope="col" className={cn(head, pin, 'whitespace-nowrap')} style={right.status}>Status</th>
           </tr>
         </thead>
         <tbody>
