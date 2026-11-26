@@ -133,6 +133,37 @@ describe('AllocationMatrix', () => {
     expect(screen.getByRole('button', { name: 'Manage allocation for Dulmi Kaushalya' })).toBeDisabled()
   })
 
+  it('labels the header rows like the design: Project name, PM / BA, then Allocation % per project', () => {
+    render(<AllocationMatrix {...base} rows={[row()]} />)
+
+    const rows = screen.getAllByRole('row')
+    expect(within(rows[0]).getByText('Project name')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('PM / BA')).toBeInTheDocument()
+    expect(within(rows[2]).getAllByText('Allocation %')).toHaveLength(2)
+    expect(within(rows[2]).getByText('Employee')).toBeInTheDocument()
+  })
+
+  it('pins each left column at the sum of the widths before it, so pinned cells never overlap', () => {
+    render(<AllocationMatrix {...base} rows={[row()]} />)
+
+    const pinned = Array.from(document.querySelectorAll<HTMLElement>('thead tr:last-child th[data-pin="left"]'))
+    expect(pinned).toHaveLength(4)
+    let offset = 0
+    for (const cell of pinned) {
+      expect(cell.style.left).toBe(`${offset}px`)
+      offset += parseInt(cell.style.width, 10)
+    }
+  })
+
+  it('keeps pinned cells opaque on an overallocated row', () => {
+    render(<AllocationMatrix {...base} rows={[row({ total: 120, remaining: 0, status: 'over' })]} />)
+
+    const tr = screen.getByText('Dulmi Kaushalya').closest('tr') as HTMLElement
+    // `--card` is an HSL triplet, so it must be wrapped in hsl() to be a colour at all.
+    expect(tr.className).toContain('hsl(var(--card))')
+    expect(tr.className).not.toMatch(/,var\(--card\)\)/)
+  })
+
   it('shows an empty state when there are no rows', () => {
     render(<AllocationMatrix {...base} rows={[]} />)
     expect(screen.getByText('No resources match these filters.')).toBeInTheDocument()

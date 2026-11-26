@@ -30,7 +30,7 @@ export function StatusChip({ status, pending, className }: { status: WorkloadSta
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium',
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[color-mix(in_srgb,currentColor_30%,transparent)] px-2.5 py-1 text-[11px] font-medium',
         style.className,
         className
       )}

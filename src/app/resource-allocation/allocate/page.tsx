@@ -20,7 +20,8 @@ export default function AllocateResourcePage() {
   return (
     <MainLayout>
       <PageContent>
-        <div className="mx-auto max-w-4xl space-y-5">
+        {/* No padding or width cap of its own: MainLayout already pads and sizes the content. */}
+        <div data-testid="allocate-page" className="space-y-5">
           <Link
             href="/resource-allocation"
             className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--apple-system-blue)] hover:underline"

@@ -206,12 +206,13 @@ export function ManageAllocationModal({ memberId, open, mode, currentUserId, onC
                             step={1}
                             value={next}
                             aria-label={`New allocation for ${line.projectName}`}
-                            onChange={(event) =>
-                              setValues((current) => ({
-                                ...current,
-                                [line.projectId]: Math.min(ceiling, clampPercent(event.target.value))
-                              }))
-                            }
+                            onChange={(event) => {
+                              const next = Math.min(ceiling, clampPercent(event.target.value))
+                              // When clamping lands on the value already held, React has nothing
+                              // to re-render, so write it back or the box keeps what was typed ("00").
+                              event.target.value = String(next)
+                              setValues((current) => ({ ...current, [line.projectId]: next }))
+                            }}
                             className="h-8 w-24 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-transparent pl-2 pr-6 text-[13px] tabular-nums text-[var(--apple-label)] focus:outline-none focus:ring-2 focus:ring-[var(--apple-system-blue)]"
                           />
                           <span aria-hidden className="pointer-events-none absolute right-2 text-[12px] text-[var(--apple-tertiary-label)]">

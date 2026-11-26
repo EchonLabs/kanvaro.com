@@ -1,5 +1,6 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import { Pencil, SlidersHorizontal, UserX } from 'lucide-react'
 
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
@@ -24,13 +25,23 @@ interface Props {
 /*
  * Layout: who (No, Role, Employee, Total) stays pinned on the left and the
  * outcome (Remaining, Approvals, Actions, Status) on the right, while the
- * project columns scroll between them — the sheet can grow to many projects
- * without losing track of whose row you are reading. Pinning only applies on
- * wide screens; on a phone the whole table scrolls.
+ * project columns scroll between them. Pinning only applies on wide screens;
+ * on a phone the whole table scrolls.
+ *
+ * Pinned columns get fixed widths, and each sticky offset is the sum of the
+ * widths before it. Both come from the same numbers below, so a cell can never
+ * be pinned on top of its neighbour.
  */
-const pinLeft = 'lg:sticky lg:z-10 bg-card'
-const pinRight = 'lg:sticky lg:z-10 bg-card'
-const headCell = 'px-3 py-2 text-left text-[11px] font-semibold text-[var(--apple-secondary-label)] whitespace-nowrap'
+const LEFT = { no: 44, role: 120, employee: 216, total: 112 } as const
+const RIGHT = { status: 148, actions: 104, approvals: 84, remaining: 84 } as const
+const PROJECT_WIDTH = 136
+
+const pin = 'lg:sticky lg:z-10 bg-card'
+const head = 'apple-section-label px-3 py-2 text-left whitespace-nowrap align-bottom'
+
+function fixed(width: number, side: 'left' | 'right', offset: number): CSSProperties {
+  return { width, minWidth: width, maxWidth: width, [side]: offset }
+}
 
 function splitName(name: string) {
   const [firstName, ...rest] = name.split(' ')
@@ -48,36 +59,48 @@ export function AllocationMatrix({
   onManage,
   onOpenRequest
 }: Props) {
-  // Right-hand pinned offsets, from the outer edge inwards.
-  const statusRight = 0
-  const actionsRight = 152
-  const approvalsRight = actionsRight + (canEdit ? 120 : 0)
-  const remainingRight = approvalsRight + (canApprove ? 96 : 0)
+  const left = {
+    no: fixed(LEFT.no, 'left', 0),
+    role: fixed(LEFT.role, 'left', LEFT.no),
+    employee: fixed(LEFT.employee, 'left', LEFT.no + LEFT.role),
+    total: fixed(LEFT.total, 'left', LEFT.no + LEFT.role + LEFT.employee)
+  }
+  const leftWidth = LEFT.no + LEFT.role + LEFT.employee + LEFT.total
+
+  // Right side, from the outer edge inwards; hidden columns take no space.
+  const actionsRight = RIGHT.status
+  const approvalsRight = actionsRight + (canEdit ? RIGHT.actions : 0)
+  const remainingRight = approvalsRight + (canApprove ? RIGHT.approvals : 0)
+  const right = {
+    status: fixed(RIGHT.status, 'right', 0),
+    actions: fixed(RIGHT.actions, 'right', actionsRight),
+    approvals: fixed(RIGHT.approvals, 'right', approvalsRight),
+    remaining: fixed(RIGHT.remaining, 'right', remainingRight)
+  }
+  const rightColumns = 2 + (canEdit ? 1 : 0) + (canApprove ? 1 : 0)
+  const rightWidth = remainingRight + RIGHT.remaining
+  const columnCount = 4 + projects.length + rightColumns
+
+  const leftEdge = 'border-r border-[var(--apple-separator)]'
+  const rightEdge = 'border-l border-[var(--apple-separator)]'
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-max border-collapse text-[13px]">
         <thead>
+          {/* Row 1: project names */}
           <tr className="border-b border-[var(--apple-separator)]">
-            <th rowSpan={2} scope="col" className={cn(headCell, pinLeft, 'w-12 lg:left-0')}>
-              No
-            </th>
-            <th rowSpan={2} scope="col" className={cn(headCell, pinLeft, 'w-36 lg:left-12')}>
-              Role
-            </th>
-            <th rowSpan={2} scope="col" className={cn(headCell, pinLeft, 'w-60 lg:left-48')}>
-              Employee
-            </th>
-            <th
-              rowSpan={2}
-              scope="col"
-              className={cn(headCell, pinLeft, 'w-32 border-r border-[var(--apple-separator)] lg:left-[432px]')}
-            >
-              Total allocation
+            <th scope="row" colSpan={4} className={cn(head, pin, leftEdge, 'lg:left-0')} style={{ width: leftWidth, left: 0 }}>
+              Project name
             </th>
             {projects.map((project) => (
-              <th key={project._id} scope="col" className={cn(headCell, 'min-w-[132px] text-[var(--apple-label)]')}>
-                <span className="block max-w-[180px] truncate text-[12px]" title={project.name}>
+              <th
+                key={project._id}
+                scope="col"
+                className="px-3 py-2 text-left align-bottom"
+                style={{ minWidth: PROJECT_WIDTH }}
+              >
+                <span className="block max-w-[180px] truncate text-[12px] font-semibold text-[var(--apple-label)]" title={project.name}>
                   {project.name}
                 </span>
                 <span
@@ -93,30 +116,21 @@ export function AllocationMatrix({
               </th>
             ))}
             <th
+              aria-hidden
+              colSpan={rightColumns}
               rowSpan={2}
-              scope="col"
-              className={cn(headCell, pinRight, 'w-24 border-l border-[var(--apple-separator)]')}
-              style={{ right: remainingRight }}
-            >
-              Remaining
-            </th>
-            {canApprove && (
-              <th rowSpan={2} scope="col" className={cn(headCell, pinRight, 'w-24')} style={{ right: approvalsRight }}>
-                Approvals
-              </th>
-            )}
-            {canEdit && (
-              <th rowSpan={2} scope="col" className={cn(headCell, pinRight, 'w-[120px]')} style={{ right: actionsRight }}>
-                Actions
-              </th>
-            )}
-            <th rowSpan={2} scope="col" className={cn(headCell, pinRight, 'w-[152px]')} style={{ right: statusRight }}>
-              Status
-            </th>
+              className={cn(pin, rightEdge)}
+              style={{ width: rightWidth, right: 0 }}
+            />
           </tr>
+
+          {/* Row 2: who runs each project */}
           <tr className="border-b border-[var(--apple-separator)]">
+            <th scope="row" colSpan={4} className={cn(head, pin, leftEdge)} style={{ width: leftWidth, left: 0 }}>
+              PM / BA
+            </th>
             {projects.map((project) => (
-              <th key={project._id} scope="col" className={cn(headCell, 'font-normal')}>
+              <th key={project._id} scope="col" className="px-3 py-2 text-left text-[12px] font-normal text-[var(--apple-secondary-label)]">
                 {project.managers.length > 0 ? (
                   project.managers.map((manager) => (
                     <span key={manager._id} className="block max-w-[180px] truncate">
@@ -129,11 +143,28 @@ export function AllocationMatrix({
               </th>
             ))}
           </tr>
+
+          {/* Row 3: column labels */}
+          <tr className="border-b border-[var(--apple-separator)]">
+            <th scope="col" data-pin="left" className={cn(head, pin)} style={left.no}>No</th>
+            <th scope="col" data-pin="left" className={cn(head, pin)} style={left.role}>Role</th>
+            <th scope="col" data-pin="left" className={cn(head, pin)} style={left.employee}>Employee</th>
+            <th scope="col" data-pin="left" className={cn(head, pin, leftEdge)} style={left.total}>Total allocation</th>
+            {projects.map((project) => (
+              <th key={project._id} scope="col" className={head}>
+                Allocation %
+              </th>
+            ))}
+            <th scope="col" className={cn(head, pin, rightEdge)} style={right.remaining}>Remaining</th>
+            {canApprove && <th scope="col" className={cn(head, pin)} style={right.approvals}>Approvals</th>}
+            {canEdit && <th scope="col" className={cn(head, pin)} style={right.actions}>Actions</th>}
+            <th scope="col" className={cn(head, pin)} style={right.status}>Status</th>
+          </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={8 + projects.length} className="px-3 py-10 text-center text-[var(--apple-secondary-label)]">
+              <td colSpan={columnCount} className="px-3 py-10 text-center text-[var(--apple-secondary-label)]">
                 No resources match these filters.
               </td>
             </tr>
@@ -143,40 +174,40 @@ export function AllocationMatrix({
             const ownPending = !!pending && pending.requestedBy._id === currentUserId
             // A PM cannot raise a second request while one is pending; Admin/HR may still edit directly.
             const manageBlocked = !!pending && !canApprove
+            const over = row.status === 'over'
             return (
               <tr
                 key={row.memberId}
                 data-status={row.status}
                 className={cn(
                   'border-b border-[var(--apple-separator)] last:border-b-0',
-                  row.status === 'over' && '[&>td]:bg-[color-mix(in_srgb,var(--apple-system-red)_6%,var(--card))]'
+                  // `--card` is an HSL triplet, so it has to be wrapped in hsl() to mix;
+                  // the pinned cells must stay opaque or the scrolling columns show through.
+                  over && '[&>td]:bg-[color-mix(in_srgb,var(--apple-system-red)_6%,hsl(var(--card)))]'
                 )}
               >
-                <td className={cn('px-3 py-3 tabular-nums text-[var(--apple-secondary-label)]', pinLeft, 'lg:left-0')}>
+                <td className={cn('px-3 py-3 tabular-nums text-[var(--apple-secondary-label)]', pin)} style={left.no}>
                   {rowOffset + index + 1}
                 </td>
-                <td className={cn('px-3 py-3', pinLeft, 'lg:left-12')}>
-                  <span className="inline-block max-w-[128px] truncate rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-0.5 text-[11px] text-[var(--apple-label)]">
+                <td className={cn('px-3 py-3', pin)} style={left.role}>
+                  <span className="inline-block max-w-full truncate rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] px-2 py-0.5 text-[11px] text-[var(--apple-label)]">
                     {row.roleLabel}
                   </span>
                 </td>
-                <td className={cn('px-3 py-3', pinLeft, 'lg:left-48')}>
+                <td className={cn('px-3 py-3', pin)} style={left.employee}>
                   <div className="flex items-center gap-2.5">
-                    <GravatarAvatar
-                      user={{ ...splitName(row.name), email: row.email, avatar: row.avatar }}
-                      size={30}
-                    />
+                    <GravatarAvatar user={{ ...splitName(row.name), email: row.email, avatar: row.avatar }} size={30} />
                     <div className="min-w-0">
                       <p className="truncate font-medium text-[var(--apple-label)]">{row.name}</p>
-                      <p className="max-w-[170px] truncate text-[11px] text-[var(--apple-secondary-label)]">{row.email}</p>
+                      <p className="truncate text-[11px] text-[var(--apple-secondary-label)]">{row.email}</p>
                     </div>
                   </div>
                 </td>
-                <td className={cn('px-3 py-3 border-r border-[var(--apple-separator)]', pinLeft, 'lg:left-[432px]')}>
+                <td className={cn('px-3 py-3', pin, leftEdge)} style={left.total}>
                   <span className={cn('font-semibold tabular-nums', row.total > threshold && 'text-[var(--apple-system-red)]')}>
                     {row.total}%
                   </span>
-                  <span aria-hidden className="mt-1.5 block h-1 w-24 overflow-hidden rounded-full bg-[var(--apple-tertiary-fill)]">
+                  <span aria-hidden className="mt-1.5 block h-1 w-full overflow-hidden rounded-full bg-[var(--apple-tertiary-fill)]">
                     <span
                       className={cn(
                         'block h-full rounded-full',
@@ -211,16 +242,13 @@ export function AllocationMatrix({
                   )
                 })}
                 <td
-                  className={cn(
-                    'px-3 py-3 font-semibold tabular-nums text-[var(--apple-system-green)] border-l border-[var(--apple-separator)]',
-                    pinRight
-                  )}
-                  style={{ right: remainingRight }}
+                  className={cn('px-3 py-3 font-semibold tabular-nums text-[var(--apple-system-green)]', pin, rightEdge)}
+                  style={right.remaining}
                 >
                   {row.remaining}%
                 </td>
                 {canApprove && (
-                  <td className={cn('px-3 py-3', pinRight)} style={{ right: approvalsRight }}>
+                  <td className={cn('px-3 py-3', pin)} style={right.approvals}>
                     {pending ? (
                       <button
                         type="button"
@@ -237,13 +265,13 @@ export function AllocationMatrix({
                   </td>
                 )}
                 {canEdit && (
-                  <td className={cn('px-3 py-3', pinRight)} style={{ right: actionsRight }}>
+                  <td className={cn('px-3 py-3', pin)} style={right.actions}>
                     {ownPending && !canApprove ? (
                       <button
                         type="button"
                         onClick={() => onOpenRequest(pending!.id)}
                         aria-label={`View request for ${row.name}`}
-                        className="mb-1 block text-[12px] font-medium text-[var(--apple-system-blue)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)] rounded-sm"
+                        className="mb-1 block rounded-sm text-[12px] font-medium text-[var(--apple-system-blue)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--apple-system-blue)]"
                       >
                         View request
                       </button>
@@ -261,7 +289,7 @@ export function AllocationMatrix({
                     </button>
                   </td>
                 )}
-                <td className={cn('px-3 py-3', pinRight)} style={{ right: statusRight }}>
+                <td className={cn('px-3 py-3', pin)} style={right.status}>
                   <StatusChip status={row.status} pending={!!pending} />
                 </td>
               </tr>

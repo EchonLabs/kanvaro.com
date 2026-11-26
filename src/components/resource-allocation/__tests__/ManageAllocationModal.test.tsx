@@ -152,6 +152,13 @@ describe('ManageAllocationModal', () => {
     expect(screen.getAllByText('You can only reduce this project').length).toBe(2)
   })
 
+  it('redraws a held value instead of leaving what was typed (no "00")', async () => {
+    await renderModal('request')
+
+    fireEvent.change(newInput('MediFinder'), { target: { value: '00' } })
+    expect(newInput('MediFinder').value).toBe('0')
+  })
+
   it('shows the server message when the change is refused, and stays open', async () => {
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
       if (url.endsWith('/members/u1')) return json(200, { success: true, data: member })

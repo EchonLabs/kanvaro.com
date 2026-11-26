@@ -233,7 +233,11 @@ export function AllocateWizard({ mode, currentUserId, onDone }: Props) {
                       max={max}
                       value={value}
                       aria-label={`Allocation for ${project.name}`}
-                      onChange={(e) => setValue(clamp(clampPercent(e.target.value)))}
+                      onChange={(e) => {
+                        const next = clamp(clampPercent(e.target.value))
+                        e.target.value = String(next)
+                        setValue(next)
+                      }}
                       className="h-9 w-24 rounded-[var(--apple-radius-sm)] border border-[var(--apple-separator)] bg-transparent pl-3 pr-7 text-center text-[15px] font-semibold tabular-nums text-[var(--apple-label)] focus:outline-none focus:ring-2 focus:ring-[var(--apple-system-blue)]"
                     />
                     <span aria-hidden className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[13px] text-[var(--apple-tertiary-label)]">
