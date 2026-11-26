@@ -16,13 +16,15 @@
     "lint": "eslint .",
     "test": "node scripts/vitest.mjs run",
     "test:watch": "node scripts/vitest.mjs",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "stub:kanvaro": "tsx test/stub-kanvaro/cli.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/express": "2.0.2",
     "@modelcontextprotocol/node": "2.1.2",
     "@modelcontextprotocol/server": "2.4.0",
     "express": "5.3.0",
+    "jose": "6.2.18",
     "mongodb": "7.9.1",
     "pino": "10.4.0",
     "zod": "4.6.7"
