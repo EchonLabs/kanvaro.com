@@ -16,6 +16,8 @@ export interface AuditLogDoc {
   clientId?: string
   /** Kanvaro user id (the token's subject). */
   userId?: string
+  /** Caller's IP address (behind a proxy: as resolved with TRUST_PROXY). */
+  ip?: string
   /** Tool name, or an event such as "token.rejected" / "exchange.refused". */
   action: string
   /** What was acted on, e.g. "task:6b00…". Never contains secrets. */

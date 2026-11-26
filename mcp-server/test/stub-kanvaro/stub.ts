@@ -13,8 +13,8 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { Server } from 'node:http'
 import { createServer } from 'node:http'
-import type { AddressInfo } from 'node:net'
 import express from 'express'
+import { listenSafely } from '../../src/http/server.js'
 import type { Request, Response } from 'express'
 import type { JWK } from 'jose'
 import { SignJWT, exportJWK, generateKeyPair, jwtVerify } from 'jose'
@@ -257,6 +257,19 @@ export async function startStubKanvaro(opts: StubOptions): Promise<StubKanvaro> 
     oauthError(res, 400, 'unsupported_grant_type', 'grant not supported')
   })
 
+  // Test controls over HTTP, for manual runs where the stand-in is a separate process
+  // (not part of the Kanvaro contract): revoke a user's sessions, deactivate, reactivate.
+  app.post('/_stub/users/:id/:action', (req: Request, res: Response) => {
+    const id = String(req.params.id)
+    const user = users.get(id)
+    if (!user) return void res.status(404).json({ error: 'unknown user' })
+    if (req.params.action === 'revoke') { for (const f of families.values()) if (f.userId === id) f.revoked = true }
+    else if (req.params.action === 'deactivate') user.active = false
+    else if (req.params.action === 'activate') user.active = true
+    else return void res.status(400).json({ error: 'action must be revoke, deactivate or activate' })
+    res.json({ ok: true, user: id, action: req.params.action })
+  })
+
   // K-7: revoke a refresh token (RFC 7009: always 200).
   app.post('/api/oauth/revoke', (req: Request, res: Response) => {
     const f = (req.body ?? {}) as Record<string, string | undefined>
@@ -266,8 +279,7 @@ export async function startStubKanvaro(opts: StubOptions): Promise<StubKanvaro> 
   })
 
   const server: Server = createServer(app)
-  await new Promise<void>(r => server.listen(opts.port ?? 0, opts.host ?? '127.0.0.1', r))
-  const port = (server.address() as AddressInfo).port
+  const { port } = await listenSafely(server, opts.port ?? 0, opts.host ?? '127.0.0.1')
   issuer = `http://${opts.host ?? '127.0.0.1'}:${port}`
 
   return {

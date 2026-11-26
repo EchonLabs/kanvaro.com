@@ -107,11 +107,24 @@ with a **new** refresh token. The old one is used up; presenting it again → `i
   inactive, **or the refresh family it came from was revoked** (so revocation takes effect
   at once, not after 15 minutes).
 - Wrong or missing client credentials → 401 `invalid_client`.
+- **Expected load:** the MCP server re-exchanges each active session **at least once a
+  minute** (so revocation takes effect within a minute), plus once per new MCP token —
+  about one exchange per active user per minute. Keep the exchange cheap (no extra
+  database round trips beyond the user and refresh-family lookups).
 
 ## 5. JWKS (K-6) — `GET {issuer}/api/oauth/jwks`
 
 `{ "keys": [ { "kty": "EC", "crv": "P-256", "x": "…", "y": "…", "kid": "…", "alg": "ES256", "use": "sig" } ] }`
 — during key rotation both old and new keys are listed.
+
+The MCP server fetches this from Kanvaro's **internal** address
+(`KANVARO_API_BASE_URL` + `/api/oauth/jwks`), so the path must be the same on both
+addresses. It caches keys for 10 minutes and refetches at once when a token names an
+unknown `kid`.
+
+**Enforced by the MCP server (task 3.2):** `typ: at+jwt`, `alg` ES256 or RS256, `iss`,
+`aud`, `exp` (30 s tolerance), `sub`, `jti`, `client_id`, scope `kanvaro`. A token missing
+any of these is refused.
 
 ## 6. Revoke (K-7) — `POST {issuer}/api/oauth/revoke`
 

@@ -35,8 +35,11 @@ only the audit log.
 
 **Renewal:** Claude Code refreshes its own token at Kanvaro. The MCP server does nothing.
 **Sign out / deactivation:** Kanvaro revokes the refresh token or refuses the exchange.
-Access ends within one access-token lifetime (15 min) at most. Kanvaro already rechecks
-`isActive` on every API call, so a deactivated user loses access at once.
+The MCP server re-checks every session with Kanvaro (a new exchange) **at least once a
+minute**, so a sign-out or admin revoke takes effect within about a minute (found and
+fixed in task 3.4; a plain 15-minute cache would have let it run for up to 15 minutes).
+Kanvaro already rechecks `isActive` on every API call, so a deactivated user loses
+access at once.
 
 ## What Kanvaro builds (workstream A)
 

@@ -1,6 +1,7 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { listenSafely } from '../src/http/server.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { KanvaroClient } from '../src/kanvaro/index.js'
 import { KanvaroAuthError, KanvaroError, KanvaroUsageError, apiPath, createKanvaroClient } from '../src/kanvaro/index.js'
@@ -42,7 +43,7 @@ const server = createServer((req, res) => {
 })
 
 beforeAll(async () => {
-  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  await listenSafely(server, 0, '127.0.0.1')
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   client = createKanvaroClient({ baseUrl, timeoutMs: 500, maxResponseBytes: 1024 })
 })

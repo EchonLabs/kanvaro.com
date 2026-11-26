@@ -13,7 +13,7 @@ import { hostHeaderValidation, originValidation } from '@modelcontextprotocol/ex
 import { toNodeHandler } from '@modelcontextprotocol/node'
 import type { McpHttpHandler, McpRequestContext } from '@modelcontextprotocol/server'
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
-import type { Express, NextFunction, Request, Response } from 'express'
+import type { Express, NextFunction, Request, RequestHandler, Response } from 'express'
 import { z } from 'zod'
 import { localsOf } from '../http/app.js'
 import { serverInfo } from '../index.js'
@@ -25,8 +25,15 @@ export const INSTRUCTIONS =
   'Kanvaro project management, as the signed-in user: projects, tasks, sprints, stories, ' +
   'epics, stand-ups and more. Every action runs with that user\'s own Kanvaro permissions.'
 
+/** The signed-in Kanvaro user id, set by the token check (3.2). */
+function userIdOf(ctx: McpRequestContext): string | undefined {
+  const id = ctx.authInfo?.extra?.userId
+  return typeof id === 'string' ? id : undefined
+}
+
 /** Builds the MCP server for one request. Used for both protocol eras. */
-export function buildMcpServer(_ctx: McpRequestContext): McpServer {
+export function buildMcpServer(ctx: McpRequestContext): McpServer {
+  const userId = userIdOf(ctx)
   const server = new McpServer(
     { name: serverInfo.name, title: 'Kanvaro', version: serverInfo.version },
     { instructions: INSTRUCTIONS },
@@ -37,14 +44,14 @@ export function buildMcpServer(_ctx: McpRequestContext): McpServer {
     {
       title: 'Ping',
       description:
-        'Checks that the Kanvaro MCP server is reachable and returns its name and version. ' +
-        'Example input: {}. It does not contact Kanvaro and returns no Kanvaro data.',
+        'Checks that the Kanvaro MCP server is reachable and that you are signed in. Returns the ' +
+        'server name, version and your Kanvaro user id. Example input: {}. It returns no Kanvaro data.',
       inputSchema: z.object({}).strict(),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     () => ({
-      content: [{ type: 'text', text: `pong from ${serverInfo.name} ${serverInfo.version}` }],
-      structuredContent: { status: 'ok', server: serverInfo.name, version: serverInfo.version },
+      content: [{ type: 'text', text: `pong from ${serverInfo.name} ${serverInfo.version}${userId ? ` — signed in as Kanvaro user ${userId}` : ''}` }],
+      structuredContent: { status: 'ok', server: serverInfo.name, version: serverInfo.version, ...(userId ? { userId } : {}) },
     }),
   )
 
@@ -64,6 +71,12 @@ export interface MountOptions {
   host: string
   /** Browser origins allowed to call /mcp (full origins from config). */
   allowedOrigins: readonly string[]
+  /**
+   * Sign-in steps run before the MCP handler, in order: token check (3.2), then token
+   * exchange (3.3). Required, so the endpoint can never be mounted unprotected by accident;
+   * tests that don't test sign-in pass an explicit no-op.
+   */
+  authenticate: RequestHandler | RequestHandler[]
   log: Logger
 }
 
@@ -92,6 +105,7 @@ export function mountMcp(app: Express, handler: McpHttpHandler, opts: MountOptio
     MCP_PATH,
     hostHeaderValidation(allowedHostnames(opts.publicBaseUrl, opts.host)),
     originValidation(allowedOriginHostnames(opts.allowedOrigins)),
+    opts.authenticate,
     (req: Request, res: Response, next: NextFunction) => {
       node(req, res).catch((err: unknown) => {
         localsOf(res).log.error({ err }, 'mcp handler failed')

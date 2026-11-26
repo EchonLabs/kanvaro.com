@@ -7,6 +7,11 @@
  *    gracefully on SIGTERM / SIGINT.
  * All output is structured JSON logs with secrets removed (1.6).
  */
+import { createAuditLog } from './audit.js'
+import { mountResourceMetadata, resourceMetadataUrl } from './auth/metadata.js'
+import { createTokenExchanger, kanvaroTokenUrl } from './auth/exchange.js'
+import { requireKanvaroExchange, requireKanvaroToken } from './auth/middleware.js'
+import { createTokenVerifier, kanvaroJwksUrl } from './auth/verify.js'
 import type { Config } from './config.js'
 import { ConfigError, describeConfig, loadConfig } from './config.js'
 import { DatabaseError, connectDatabase, ensureIndexes } from './db/index.js'
@@ -50,12 +55,38 @@ async function main(): Promise<void> {
     trustProxy: config.server.trustProxy,
     readiness: { database: databaseCheck(database.db), kanvaro: kanvaroCheck(config.kanvaro.apiBaseUrl) },
   })
+  const audit = createAuditLog(database.collections.auditLog, log)
+  // Discovery: "to use this server, sign in at Kanvaro" (3.1).
+  mountResourceMetadata(app, { resourceUrl: config.server.resourceUrl, issuer: config.kanvaro.issuer })
+  // Token check (3.2): Kanvaro-issued tokens, verified against Kanvaro's published keys.
+  const authenticate = requireKanvaroToken({
+    verify: createTokenVerifier({
+      issuer: config.kanvaro.issuer,
+      audience: config.server.resourceUrl,
+      jwksUrl: kanvaroJwksUrl(config.kanvaro.apiBaseUrl),
+    }),
+    resourceMetadataUrl: resourceMetadataUrl(config.server.resourceUrl),
+    resourceUrl: config.server.resourceUrl,
+    audit,
+  })
+  // Token exchange (3.3): the verified MCP token → a Kanvaro API token, in memory only.
+  // Refusal → 401 (sign in again); outage → 503 (3.4). Both audited.
+  const exchange = requireKanvaroExchange({
+    exchanger: createTokenExchanger({
+      tokenUrl: kanvaroTokenUrl(config.kanvaro.apiBaseUrl),
+      clientId: config.kanvaro.clientId,
+      clientSecret: config.kanvaro.clientSecret,
+      timeoutMs: config.kanvaro.requestTimeoutMs,
+    }),
+    resourceMetadataUrl: resourceMetadataUrl(config.server.resourceUrl),
+    audit,
+  })
   const mcp = createMcpEndpoint(log)
-  // Sign-in (Phase 3) goes in front of the MCP endpoint.
   mountMcp(app, mcp, {
     publicBaseUrl: config.server.publicBaseUrl,
     host: config.server.host,
     allowedOrigins: config.server.allowedOrigins,
+    authenticate: [authenticate, exchange],
     log,
   })
   finishApp(app)

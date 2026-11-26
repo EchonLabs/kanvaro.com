@@ -6,7 +6,7 @@ import { createApp, finishApp } from '../src/http/app.js'
 import type { ReadinessChecks } from '../src/http/health.js'
 import { kanvaroCheck, runChecks } from '../src/http/health.js'
 import type { RunningServer } from '../src/http/server.js'
-import { startServer } from '../src/http/server.js'
+import { listenSafely, startServer } from '../src/http/server.js'
 import { createLogger } from '../src/log.js'
 
 const ok = () => Promise.resolve()
@@ -66,7 +66,7 @@ describe('kanvaroCheck', () => {
   })
   async function fakeKanvaro(status: number, location?: string): Promise<string> {
     const srv = createServer((_req, res) => { res.writeHead(status, location ? { Location: location } : {}); res.end('{}') })
-    await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+    await listenSafely(srv, 0, '127.0.0.1')
     fakes.push(srv)
     return `http://127.0.0.1:${(srv.address() as AddressInfo).port}`
   }

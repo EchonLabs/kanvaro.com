@@ -2,6 +2,7 @@ import { request as httpRequest } from 'node:http'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { McpHttpHandler } from '@modelcontextprotocol/server'
+import type { RequestHandler } from 'express'
 import { createApp, finishApp } from '../src/http/app.js'
 import type { RunningServer } from '../src/http/server.js'
 import { startServer } from '../src/http/server.js'
@@ -26,7 +27,9 @@ async function serve(allowedOrigins: string[] = []): Promise<string> {
   const app = createApp({ log, readiness: { database: ok, kanvaro: ok }, trustProxy: false })
   handler = createMcpEndpoint(log)
   running = await startServer(app, '127.0.0.1', 0)
-  mountMcp(app, handler, { publicBaseUrl: running.url, host: '127.0.0.1', allowedOrigins, log })
+  // These tests cover the endpoint itself; sign-in is tested in auth.test.ts.
+  const noAuth: RequestHandler = (_req, _res, next) => next()
+  mountMcp(app, handler, { publicBaseUrl: running.url, host: '127.0.0.1', allowedOrigins, authenticate: noAuth, log })
   finishApp(app)
   return running.url
 }
