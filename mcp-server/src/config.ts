@@ -30,6 +30,8 @@ export interface Config {
     readonly resourceUrl: string
     /** Browser origins allowed to call the MCP endpoint (Origin header check). */
     readonly allowedOrigins: readonly string[]
+    /** Express "trust proxy": false, a hop count, or proxy addresses/ranges (e.g. "loopback"). */
+    readonly trustProxy: boolean | number | string
   }
   readonly kanvaro: {
     /** Address this server uses for API calls, token exchange and JWKS (may be internal http). */
@@ -78,6 +80,11 @@ const settingsSchema = z.object({
   PORT: int(1, 65535, 3100),
   PUBLIC_BASE_URL: required,
   ALLOWED_ORIGINS: z.string().default(''),
+  TRUST_PROXY: z
+    .string()
+    .trim()
+    .regex(/^(false|true|\d{1,2}|[A-Za-z0-9.:/,\s]+)$/, 'must be false, true, a hop count, or proxy addresses such as "loopback"')
+    .default('false'),
   KANVARO_API_BASE_URL: required,
   KANVARO_PUBLIC_URL: required,
   KANVARO_CLIENT_ID: required,
@@ -132,6 +139,7 @@ export function loadConfig(env: Env = process.env): Config {
       mcpPath: '/mcp',
       resourceUrl: `${publicBaseUrl!}/mcp`,
       allowedOrigins,
+      trustProxy: parseTrustProxy(s.TRUST_PROXY),
     },
     kanvaro: {
       apiBaseUrl: kanvaroApi!,
@@ -216,6 +224,13 @@ function origin(name: string, value: string, requireHttps: boolean, problems: st
     return undefined
   }
   return url.origin
+}
+
+function parseTrustProxy(value: string): boolean | number | string {
+  if (value === 'false') return false
+  if (value === 'true') return true
+  if (/^\d+$/.test(value)) return Number(value)
+  return value
 }
 
 function deepFreeze<T>(value: T): T {
