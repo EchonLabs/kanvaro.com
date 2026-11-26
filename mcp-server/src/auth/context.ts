@@ -12,6 +12,8 @@ import type { VerifiedToken } from './verify.js'
 
 export interface SignedInContext {
   requestId: string
+  /** Caller's IP address (as resolved with TRUST_PROXY), for audit entries. */
+  ip?: string
   /** The verified MCP token (user, client, expiry). */
   mcp: VerifiedToken
   /** The current Kanvaro API token for this user. */

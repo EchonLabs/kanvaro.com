@@ -6,8 +6,9 @@
  *   A fresh server instance is built per request; nothing is kept between requests.
  * - Mounted on Express at /mcp behind Host-header (DNS rebinding) and Origin checks: the
  *   SDK handler itself performs no such validation.
- * - Tools are added in Phase 4; for now there is one placeholder, `ping`.
- * - Sign-in (Phase 3) will pass the verified token as `authInfo`; the factory receives it.
+ * - Kanvaro tools are declared with defineTool() (4.1, src/tools) and registered here,
+ *   next to the built-in `ping`.
+ * - Sign-in (Phase 3) passes the verified token as `authInfo`; the factory receives it.
  */
 import { hostHeaderValidation, originValidation } from '@modelcontextprotocol/express'
 import { toNodeHandler } from '@modelcontextprotocol/node'
@@ -18,6 +19,8 @@ import { z } from 'zod'
 import { localsOf } from '../http/app.js'
 import { serverInfo } from '../index.js'
 import type { Logger } from '../log.js'
+import type { Tool, ToolRuntime } from '../tools/define.js'
+import { registerTools } from '../tools/define.js'
 
 export const MCP_PATH = '/mcp'
 
@@ -31,8 +34,14 @@ function userIdOf(ctx: McpRequestContext): string | undefined {
   return typeof id === 'string' ? id : undefined
 }
 
+/** The Kanvaro tools and the services they share. */
+export interface ToolSet {
+  tools: readonly Tool[]
+  runtime: ToolRuntime
+}
+
 /** Builds the MCP server for one request. Used for both protocol eras. */
-export function buildMcpServer(ctx: McpRequestContext): McpServer {
+export function buildMcpServer(ctx: McpRequestContext, toolSet?: ToolSet): McpServer {
   const userId = userIdOf(ctx)
   const server = new McpServer(
     { name: serverInfo.name, title: 'Kanvaro', version: serverInfo.version },
@@ -55,11 +64,12 @@ export function buildMcpServer(ctx: McpRequestContext): McpServer {
     }),
   )
 
+  if (toolSet) registerTools(server, toolSet.tools, toolSet.runtime)
   return server
 }
 
-export function createMcpEndpoint(log: Logger): McpHttpHandler {
-  return createMcpHandler(buildMcpServer, {
+export function createMcpEndpoint(log: Logger, toolSet?: ToolSet): McpHttpHandler {
+  return createMcpHandler(ctx => buildMcpServer(ctx, toolSet), {
     onerror: err => log.warn({ err }, 'mcp request rejected'),
   })
 }

@@ -136,7 +136,7 @@ export function requireKanvaroExchange(opts: ExchangeOptions): RequestHandler {
       ({ kanvaro, first }) => {
         // First exchange of this session only; the once-a-minute re-checks are not audited.
         if (first) void audit.record({ ...base, action: 'session.exchange', outcome: 'ok' })
-        runSignedIn({ requestId, mcp, kanvaro, exchanger: opts.exchanger }, () => next())
+        runSignedIn({ requestId, ...(req.ip ? { ip: req.ip } : {}), mcp, kanvaro, exchanger: opts.exchanger }, () => next())
       },
       (err: unknown) => {
         if (err instanceof ExchangeError && err.kind === 'refused') {

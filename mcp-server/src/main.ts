@@ -20,7 +20,10 @@ import { createApp, finishApp } from './http/app.js'
 import { databaseCheck, kanvaroCheck } from './http/health.js'
 import { startServer } from './http/server.js'
 import { createLogger } from './log.js'
+import { createKanvaroClient } from './kanvaro/client.js'
 import { createMcpEndpoint, mountMcp } from './mcp/server.js'
+import { tools } from './tools/index.js'
+import { createRateLimiter } from './tools/limits.js'
 
 async function main(): Promise<void> {
   // Before the configuration is read, log at the default level.
@@ -81,7 +84,16 @@ async function main(): Promise<void> {
     resourceMetadataUrl: resourceMetadataUrl(config.server.resourceUrl),
     audit,
   })
-  const mcp = createMcpEndpoint(log)
+  // Kanvaro tools (4.1): each call runs as the signed-in user, rate-limited, filtered, audited.
+  const mcp = createMcpEndpoint(log, {
+    tools,
+    runtime: {
+      kanvaro: createKanvaroClient({ baseUrl: config.kanvaro.apiBaseUrl, timeoutMs: config.kanvaro.requestTimeoutMs }),
+      audit,
+      limiter: createRateLimiter(),
+      log,
+    },
+  })
   mountMcp(app, mcp, {
     publicBaseUrl: config.server.publicBaseUrl,
     host: config.server.host,
