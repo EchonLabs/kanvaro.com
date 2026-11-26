@@ -56,10 +56,14 @@ function LoginForm() {
 
         try {
           const returnTo = searchParams.get('returnTo')
-          const redirectTarget =
-            returnTo && returnTo.startsWith('/') && !returnTo.startsWith('/login')
-              ? decodeURIComponent(returnTo)
-              : '/dashboard'
+          const isSafePath =
+            returnTo &&
+            returnTo.startsWith('/') &&
+            !returnTo.startsWith('//') &&
+            !returnTo.includes('\\') &&
+            !returnTo.startsWith('/login')
+
+          const redirectTarget = isSafePath ? returnTo : '/dashboard'
 
           // Hard navigation — forces browser to send the new HTTP-only cookies
           setTimeout(() => { window.location.href = redirectTarget }, 100)
