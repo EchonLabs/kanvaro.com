@@ -34,9 +34,9 @@ jobs:
       MONGODB_TEST_URI: mongodb://localhost:27017
       REQUIRE_MONGO: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: mcp-server/.nvmrc
           cache: npm
