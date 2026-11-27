@@ -24,16 +24,28 @@ export interface GanttData {
   totalDuration: number
 }
 
+/**
+ * What the caller may see. Tasks are always limited to their organisation;
+ * `projectIds` (when set) further limits them to those projects. Without a
+ * scope the query used to return every task in the database.
+ */
+export interface GanttScope {
+  organizationId: string
+  projectIds?: string[]
+}
+
 export async function generateGanttData(
+  scope: GanttScope,
   projectId?: string,
   sprintId?: string,
   assigneeId?: string,
   startDate?: Date,
   endDate?: Date
 ): Promise<GanttData> {
-  const query: any = {}
-  
+  const query: any = { organization: scope.organizationId }
+
   if (projectId) query.project = projectId
+  else if (scope.projectIds) query.project = { $in: scope.projectIds }
   if (sprintId) query.sprint = sprintId
   if (assigneeId) query.assignedTo = assigneeId
   if (startDate || endDate) {

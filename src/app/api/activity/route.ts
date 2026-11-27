@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { ActivityLog } from '@/models/ActivityLog'
 import { withAuth } from '@/lib/auth-utils'
+import mongoose from 'mongoose'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { canReadProject, projectScopeOf } from '@/lib/permissions/project-scope'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 export async function GET(request: NextRequest) {
   return withAuth(request, async (user) => {
@@ -38,8 +42,28 @@ export async function GET(request: NextRequest) {
         filters.action = action
       }
 
+      // Only activity the caller may see. This feed used to show every
+      // project in the organisation to everyone, clients and viewers included.
+      // Admins and project:view_all see it all; everyone else sees their
+      // projects, plus their own activity that belongs to no project.
+      const scope = projectScopeOf(await PermissionService.getUserPermissions(user.id))
+      const and: any[] = []
+
       if (projectId && projectId !== 'all') {
+        if (!mongoose.Types.ObjectId.isValid(projectId)) {
+          return NextResponse.json({ error: 'Invalid project' }, { status: 400 })
+        }
+        if (!canReadProject(scope, projectId)) {
+          return NextResponse.json({ error: 'You do not have access to this project' }, { status: 403 })
+        }
         filters.project = projectId
+      } else if (!scope.allProjects) {
+        and.push({
+          $or: [
+            { project: { $in: scope.projectIds } },
+            { project: null, user: user.id }
+          ]
+        })
       }
 
       if (userId && userId !== 'all') {
@@ -70,13 +94,17 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Search by entity name or project name
+      // Search by entity name or project name (escaped: matched literally).
       if (search) {
-        filters.$or = [
-          { entityName: { $regex: search, $options: 'i' } },
-          { projectName: { $regex: search, $options: 'i' } }
-        ]
+        const pattern = escapeRegex(search)
+        and.push({
+          $or: [
+            { entityName: { $regex: pattern, $options: 'i' } },
+            { projectName: { $regex: pattern, $options: 'i' } }
+          ]
+        })
       }
+      if (and.length > 0) filters.$and = and
 
       // Execute query with pagination
       const skip = (page - 1) * limit
