@@ -15,6 +15,7 @@ import {
   SCOPE,
   getClient,
   getIssuer,
+  getJwtSecret,
   getMcpResource,
   normalizeUrl,
   redirectUriMatches,
@@ -231,6 +232,14 @@ export type ValidateAuthorizeResult =
       error: string
       redirectable: false
     }
+  | {
+      ok: false
+      error: string
+      oauthError: string
+      redirectable: true
+      redirectUri: string
+      state: string | undefined
+    }
 
 export function validateAuthorizeRequest(q: AuthorizeQuery): ValidateAuthorizeResult {
   const clientId = typeof q.client_id === 'string' ? q.client_id.trim() : ''
@@ -259,46 +268,89 @@ export function validateAuthorizeRequest(q: AuthorizeQuery): ValidateAuthorizeRe
     }
   }
 
+  const rawState = typeof q.state === 'string' ? q.state.trim() : ''
+  const state = rawState || undefined
+
+  if (!state) {
+    return {
+      ok: false,
+      error: 'Missing required parameter: state',
+      oauthError: 'invalid_request',
+      redirectable: true,
+      redirectUri,
+      state: undefined,
+    }
+  }
+
   if (q.response_type !== 'code') {
     return {
       ok: false,
       error: 'Unsupported response_type. Expected "code"',
-      redirectable: false,
+      oauthError: 'unsupported_response_type',
+      redirectable: true,
+      redirectUri,
+      state,
     }
   }
 
   const codeChallenge = typeof q.code_challenge === 'string' ? q.code_challenge : ''
   if (!/^[A-Za-z0-9\-_]{43,128}$/.test(codeChallenge)) {
-    return { ok: false, error: 'Missing or invalid code_challenge', redirectable: false }
+    return {
+      ok: false,
+      error: 'Missing or invalid code_challenge',
+      oauthError: 'invalid_request',
+      redirectable: true,
+      redirectUri,
+      state,
+    }
   }
 
   if (q.code_challenge_method !== 'S256') {
     return {
       ok: false,
       error: 'Unsupported or missing code_challenge_method. Must be "S256"',
-      redirectable: false,
+      oauthError: 'invalid_request',
+      redirectable: true,
+      redirectUri,
+      state,
     }
-  }
-
-  const state = typeof q.state === 'string' ? q.state : ''
-  if (!state.trim()) {
-    return { ok: false, error: 'Missing required parameter: state', redirectable: false }
   }
 
   const rawResource = typeof q.resource === 'string' ? q.resource : ''
   if (!rawResource.trim()) {
-    return { ok: false, error: 'Missing required parameter: resource', redirectable: false }
+    return {
+      ok: false,
+      error: 'Missing required parameter: resource',
+      oauthError: 'invalid_target',
+      redirectable: true,
+      redirectUri,
+      state,
+    }
   }
 
   const normalizedResource = normalizeUrl(rawResource)
   if (normalizedResource !== getMcpResource()) {
-    return { ok: false, error: 'Invalid resource parameter', redirectable: false }
+    return {
+      ok: false,
+      error: 'Invalid resource parameter',
+      oauthError: 'invalid_target',
+      redirectable: true,
+      redirectUri,
+      state,
+    }
   }
 
   if (typeof q.scope === 'string' && q.scope.trim().length > 0) {
     const scopes = q.scope.trim().split(/\s+/)
     if (scopes.some((s) => s !== SCOPE)) {
-      return { ok: false, error: 'Unsupported scope requested', redirectable: false }
+      return {
+        ok: false,
+        error: 'Unsupported scope requested',
+        oauthError: 'invalid_scope',
+        redirectable: true,
+        redirectUri,
+        state,
+      }
     }
   }
 
@@ -591,7 +643,7 @@ export async function exchangeToken(params: {
     throw new OAuthError('invalid_grant', 'subject token expired', 400)
   }
 
-  const jwtSecret = process.env.JWT_SECRET || 'your-secret-key'
+  const jwtSecret = getJwtSecret()
   const apiToken = jwt.sign(
     {
       userId: user._id,

@@ -6,8 +6,7 @@ import { AlertTriangle, Check, CheckCircle2, Loader2, ShieldCheck } from 'lucide
 import { getAppVersion } from '@/lib/version'
 
 function buildLoginRedirectUrl(authorizePathWithSearch: string): string {
-  const safeReturnTo = authorizePathWithSearch.replace(/%/g, '%25')
-  return `/login?returnTo=${encodeURIComponent(safeReturnTo)}`
+  return `/login?returnTo=${encodeURIComponent(authorizePathWithSearch)}`
 }
 
 interface ConsentData {
@@ -69,6 +68,19 @@ function OAuthAuthorizeContent() {
         if (cancelled) return
 
         if (response.status === 400 || data.validParams === false) {
+          if (typeof data.redirectUrl === 'string') {
+            try {
+              const parsed = new URL(data.redirectUrl)
+              const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
+              if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && isLoopback) {
+                setStatus('redirecting')
+                window.location.href = data.redirectUrl
+                return
+              }
+            } catch {
+              // Fall through to showing error page
+            }
+          }
           setErrorMessage(data.error || 'Invalid authorization request parameters.')
           setStatus('error')
           return

@@ -7,6 +7,8 @@ import {
   NO_STORE_HEADERS,
   OAuthConfigError,
   buildRedirect,
+  getJwtRefreshSecret,
+  getJwtSecret,
   issueAuthorizationCode,
   validateAuthorizeRequest,
 } from '@/lib/oauth'
@@ -14,10 +16,9 @@ import {
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
-
 async function resolveAuthenticatedUser() {
+  const jwtSecret = getJwtSecret()
+  const jwtRefreshSecret = getJwtRefreshSecret()
   const cookieStore = cookies()
   const accessToken = cookieStore.get('accessToken')?.value
   const refreshToken = cookieStore.get('refreshToken')?.value
@@ -30,7 +31,7 @@ async function resolveAuthenticatedUser() {
 
   if (accessToken) {
     try {
-      const decoded = jwt.verify(accessToken, JWT_SECRET) as { userId?: string }
+      const decoded = jwt.verify(accessToken, jwtSecret) as { userId?: string }
       if (decoded?.userId) {
         const user = await User.findById(decoded.userId)
         if (user && user.isActive) {
@@ -44,7 +45,7 @@ async function resolveAuthenticatedUser() {
 
   if (refreshToken) {
     try {
-      const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as { userId?: string }
+      const decoded = jwt.verify(refreshToken, jwtRefreshSecret) as { userId?: string }
       if (decoded?.userId) {
         const user = await User.findById(decoded.userId)
         if (user && user.isActive) {
@@ -116,6 +117,21 @@ export async function POST(request: NextRequest) {
     })
 
     if (!validation.ok) {
+      if (validation.redirectable) {
+        return NextResponse.json(
+          {
+            error: validation.error,
+            validParams: false,
+            redirectUrl: buildRedirect(validation.redirectUri, {
+              error: validation.oauthError,
+              error_description: validation.error,
+              state: validation.state,
+            }),
+          },
+          { status: 400, headers: NO_STORE_HEADERS }
+        )
+      }
+
       return NextResponse.json(
         { error: validation.error, validParams: false },
         { status: 400, headers: NO_STORE_HEADERS }

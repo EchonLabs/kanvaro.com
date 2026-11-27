@@ -55,15 +55,27 @@ function LoginForm() {
         setIsLoadingPermissions(true)
 
         try {
+          let redirectTarget = '/dashboard'
           const returnTo = searchParams.get('returnTo')
-          const isSafePath =
+          if (
             returnTo &&
             returnTo.startsWith('/') &&
             !returnTo.startsWith('//') &&
-            !returnTo.includes('\\') &&
-            !returnTo.startsWith('/login')
-
-          const redirectTarget = isSafePath ? returnTo : '/dashboard'
+            !returnTo.includes('\\')
+          ) {
+            try {
+              const u = new URL(returnTo, window.location.origin)
+              if (
+                u.origin === window.location.origin &&
+                !u.pathname.startsWith('//') &&
+                !u.pathname.startsWith('/login')
+              ) {
+                redirectTarget = `${u.pathname}${u.search}`
+              }
+            } catch {
+              redirectTarget = '/dashboard'
+            }
+          }
 
           // Hard navigation — forces browser to send the new HTTP-only cookies
           setTimeout(() => { window.location.href = redirectTarget }, 100)
