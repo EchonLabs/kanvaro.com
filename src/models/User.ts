@@ -81,9 +81,12 @@ const UserSchema = new Schema<IUser>({
   lastLogin: Date,
   emailVerified: { type: Boolean, default: false },
   twoFactorEnabled: { type: Boolean, default: false },
-  passwordResetOtp: String,
-  passwordResetExpiry: Date,
-  passwordResetToken: String,
+  // Never returned unless a query asks for them with .select('+field'):
+  // GET /api/members used to hand every user's reset OTP and token to any
+  // signed-in caller, which allowed taking over any account (decision record F1).
+  passwordResetOtp: { type: String, select: false },
+  passwordResetExpiry: { type: Date, select: false },
+  passwordResetToken: { type: String, select: false },
   // Project-specific roles
   projectRoles: [{
     project: { type: Schema.Types.ObjectId, ref: 'Project', required: true },

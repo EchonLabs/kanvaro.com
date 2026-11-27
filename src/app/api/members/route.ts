@@ -10,6 +10,12 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Role } from '@/lib/permissions/permission-definitions'
 import { convertOpenAllocationsToCarryForward } from '@/lib/standup/carry-forward-service'
+import { canChangeRoleOf, canGrantSystemRole, canManageRoles, isAdminRole } from '@/lib/permissions/role-grant-policy'
+
+/** Fields the edit-member form and the project team tab send. Nothing else is saved. */
+const EDITABLE_FIELDS = ['firstName', 'lastName', 'memberId', 'isActive', 'hourlyRate', 'role'] as const
+
+const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,10 +34,13 @@ export async function GET(request: NextRequest) {
     const organizationId = user.organization
 
     // Check if user has permission to view members
-    const [canReadTeam, canReadUsers] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TEAM_READ),
-      PermissionService.hasPermission(userId, Permission.USER_READ)
-    ])
+    const permissions = await PermissionService.getUserPermissions(userId)
+    const canReadTeam = PermissionService.hasPermissionIn(permissions, Permission.TEAM_READ)
+    const canReadUsers = PermissionService.hasPermissionIn(permissions, Permission.USER_READ)
+    // Pay rates only for people who can edit members (same rule as PUT).
+    const canSeeRates =
+      PermissionService.hasPermissionIn(permissions, Permission.USER_UPDATE) &&
+      PermissionService.hasPermissionIn(permissions, Permission.TEAM_EDIT)
 
     if (!canReadTeam && !canReadUsers) {
       return NextResponse.json(
@@ -41,9 +50,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10000')
-    const search = searchParams.get('search') || ''
+    // Pickers ask for every member at once (limit=10000), so the ceiling stays
+    // at 10000; this only stops absurd or invalid values.
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1)
+    const limit = Math.min(10000, Math.max(1, parseInt(searchParams.get('limit') || '10000') || 10000))
+    // Escaped: the search text goes into $regex.
+    const search = escapeRegex(searchParams.get('search') || '')
     const role = searchParams.get('role') || ''
     const status = searchParams.get('status') || ''
 
@@ -110,7 +122,8 @@ export async function GET(request: NextRequest) {
 
     // Get members with custom role and partner information
     const members = await User.find(filters)
-      .select('-password')
+      // password is excluded here; the reset OTP/token are hidden by the schema.
+      .select(canSeeRates ? '-password' : '-password -hourlyRate -billingRate')
       .populate('customRole', 'name description')
       .populate('projectManager', 'firstName lastName email role')
       .populate('humanResourcePartner', 'firstName lastName email role')
@@ -133,6 +146,8 @@ export async function GET(request: NextRequest) {
       isAccepted: false,
       expiresAt: { $gt: new Date() }
     })
+      // The invitation token is what accepts an invitation; never return it.
+      .select('-token')
       .populate('invitedBy', 'firstName lastName email')
       .populate('customRole', 'name')
 
@@ -175,13 +190,19 @@ export async function PUT(request: NextRequest) {
     const userId = user.id
     const organizationId = user.organization
 
-    const { memberId, updates } = await request.json()
+    const { memberId, updates: rawUpdates } = await request.json()
 
-    // Check if user has permission to update members
-    const [canEditMembers, hasTeamEditPermission] = await Promise.all([
-      PermissionService.hasPermission(userId.toString(), Permission.USER_UPDATE),
-      PermissionService.hasPermission(userId.toString(), Permission.TEAM_EDIT)
-    ])
+    // Only known fields are saved (F1/F7: this used to Object.assign the raw
+    // body, so a caller could set password, organization or anything else).
+    const updates: Record<string, any> = {}
+    for (const field of EDITABLE_FIELDS) {
+      if (rawUpdates && rawUpdates[field] !== undefined) updates[field] = rawUpdates[field]
+    }
+
+    // Check if user has permission to update members (loaded once)
+    const actor = await PermissionService.getUserPermissions(userId)
+    const canEditMembers = PermissionService.hasPermissionIn(actor, Permission.USER_UPDATE)
+    const hasTeamEditPermission = PermissionService.hasPermissionIn(actor, Permission.TEAM_EDIT)
 
     if (!canEditMembers || !hasTeamEditPermission) {
       return NextResponse.json(
@@ -204,13 +225,38 @@ export async function PUT(request: NextRequest) {
     }
 
     if (member.role === 'admin') {
-      const canManageAdminUsers = await PermissionService.hasPermission(userId, Permission.USER_MANAGE_ROLES)
+      const canManageAdminUsers = PermissionService.hasPermissionIn(actor, Permission.USER_MANAGE_ROLES)
       if (!canManageAdminUsers) {
         return NextResponse.json(
           { error: 'You do not have permission to edit administrator accounts' },
           { status: 403 }
         )
       }
+    }
+
+    // F11 rules (lib/permissions/role-grant-policy.ts) for role changes.
+    if (updates.role !== undefined && updates.role !== member.role) {
+      const decision = [
+        canManageRoles(actor),
+        canChangeRoleOf(actor, userId, { id: String(member._id), role: member.role }),
+        canGrantSystemRole(actor, updates.role)
+      ].find((d) => !d.ok)
+      if (decision && !decision.ok) {
+        return NextResponse.json({ error: decision.error }, { status: 403 })
+      }
+    }
+
+    // Only admins may deactivate or reactivate an administrator.
+    if (
+      updates.isActive !== undefined &&
+      updates.isActive !== member.isActive &&
+      isAdminRole(member.role) &&
+      !isAdminRole(actor.userRole)
+    ) {
+      return NextResponse.json(
+        { error: "Only administrators can change an administrator's status" },
+        { status: 403 }
+      )
     }
 
     if (updates.firstName !== undefined && updates.firstName.trim().length < 2) {
@@ -323,9 +369,10 @@ export async function DELETE(request: NextRequest) {
     }
 
 
-    if (member.role === 'admin') {
-      const canManageAdminUsers = await PermissionService.hasPermission(userId, Permission.USER_MANAGE_ROLES)
-      if (!canManageAdminUsers) {
+    // F11: only administrators remove an administrator.
+    if (isAdminRole(member.role)) {
+      const actor = await PermissionService.getUserPermissions(userId)
+      if (!isAdminRole(actor.userRole)) {
         return NextResponse.json(
           { error: 'You do not have permission to remove administrator accounts' },
           { status: 403 }

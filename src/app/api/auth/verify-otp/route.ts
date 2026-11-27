@@ -20,6 +20,7 @@ export async function POST(request: Request) {
 
     // Find user by email
     const user = await User.findOne({ email: email.toLowerCase() })
+      .select('+passwordResetOtp +passwordResetExpiry')
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
