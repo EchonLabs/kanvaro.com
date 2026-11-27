@@ -7,12 +7,10 @@ import { User } from '@/models/User'
 import { Organization } from '@/models/Organization'
 import { Task } from '@/models/Task'
 import { applyRoundingRules } from '@/lib/utils'
-import { cookies } from 'next/headers'
-import jwt from 'jsonwebtoken'
 import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { getOrgLocalDateString, getOrgLocalTimeString, calendarDayDiff, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
-import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
+import { authenticateUserWithDocument } from '@/lib/auth-utils'
 
 
 // Super Admin, Admin, and HR bypass the manual-log kill switch, the member sub-setting,
@@ -42,38 +40,14 @@ export async function POST(request: NextRequest) {
     await connectDB()
     console.log('[Bulk Upload] Database connected successfully')
 
-    // Authenticate requester from cookies
-    const cookieStore = cookies()
-    const accessToken = cookieStore.get('accessToken')?.value
-    const refreshToken = cookieStore.get('refreshToken')?.value
-
-    if (!accessToken && !refreshToken) {
-      console.error('[Bulk Upload] No authentication tokens provided')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // F3: the shared sign-in check (accepts a Bearer token as well as the
+    // cookies; this route used to carry its own cookie-only copy).
+    const auth = await authenticateUserWithDocument()
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
-
-    let requester: any = null
+    const requester: any = auth.document
     let requesterId: string = ''
-    try {
-      if (accessToken) {
-        const decoded: any = jwt.verify(accessToken, getJwtSecret())
-        requester = await User.findById(decoded.userId)
-      }
-    } catch (error) {
-      console.error('[Bulk Upload] Access token verification failed:', error)
-    }
-    if (!requester && refreshToken) {
-      try {
-        const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
-        requester = await User.findById(decoded.userId)
-      } catch (error) {
-        console.error('[Bulk Upload] Refresh token verification failed:', error)
-      }
-    }
-    if (!requester || !requester.isActive) {
-      console.error('[Bulk Upload] User not found or inactive')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
     requesterId = requester._id.toString()
     console.log('[Bulk Upload] User authenticated:', requesterId)
 

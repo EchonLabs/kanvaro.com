@@ -2,38 +2,37 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { TimeEntry } from '@/models/TimeEntry'
 import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
-import { cookies } from 'next/headers'
-import jwt from 'jsonwebtoken'
 import { User } from '@/models/User'
-import { Permission } from '@/lib/permissions/permission-definitions'
+import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
-import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
+import { authenticateUser } from '@/lib/auth-utils'
 
 
-async function getAuthenticatedUserId(): Promise<string | null> {
-  const cookieStore = cookies()
-  const accessToken = cookieStore.get('accessToken')?.value
-  const refreshToken = cookieStore.get('refreshToken')?.value
+/** The signed-in user via the shared sign-in check (F3: Bearer or cookies). */
+async function getAuthenticatedUser(): Promise<{ id: string; role: string; organization: string } | null> {
+  const auth = await authenticateUser()
+  return 'error' in auth ? null : auth.user
+}
 
-  if (!accessToken && !refreshToken) return null
+// Same list as POST /api/time-tracking/entries: the only roles that may set an
+// entry's hourly rate. Everyone else's rate comes from their user record.
+const RATE_EDIT_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
-  let user: any = null
-  try {
-    if (accessToken) {
-      const decoded: any = jwt.verify(accessToken, getJwtSecret())
-      user = await User.findById(decoded.userId)
-    }
-  } catch { }
-
-  if (!user && refreshToken) {
-    try {
-      const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
-      user = await User.findById(decoded.userId)
-    } catch { }
-  }
-
-  if (!user || !user.isActive) return null
-  return user._id.toString()
+/**
+ * May `viewer` see a time entry owned by `ownerId`? Same rule as the entries
+ * list: your own, view_all, or view_assigned for people you are the project
+ * manager or HR partner of.
+ */
+async function canViewEntryOf(viewer: { id: string; organization: string }, ownerId: string): Promise<boolean> {
+  if (ownerId === viewer.id) return true
+  const permissions = await PermissionService.getUserPermissions(viewer.id)
+  if (PermissionService.hasPermissionIn(permissions, Permission.TIME_TRACKING_VIEW_ALL)) return true
+  if (!PermissionService.hasPermissionIn(permissions, Permission.TIME_TRACKING_VIEW_ASSIGNED)) return false
+  const owner = (await User.findById(ownerId).select('projectManager humanResourcePartner').lean()) as any
+  return !!owner && (
+    String(owner.projectManager || '') === viewer.id ||
+    String(owner.humanResourcePartner || '') === viewer.id
+  )
 }
 
 export async function GET(
@@ -42,14 +41,26 @@ export async function GET(
 ) {
   try {
     await connectDB()
-    
+
+    // This route had no sign-in at all: anyone could read any entry by id.
+    const viewer = await getAuthenticatedUser()
+    if (!viewer) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const timeEntry = await TimeEntry.findById(params.id)
       .populate('user', 'firstName lastName email')
       .populate('project', 'name')
       .populate('task', 'title')
       .populate('approvedBy', 'firstName lastName')
 
-    if (!timeEntry) {
+    // Not found and not allowed look the same, so ids cannot be probed.
+    const ownerId = String((timeEntry?.user as any)?._id || timeEntry?.user || '')
+    if (
+      !timeEntry ||
+      String(timeEntry.organization) !== viewer.organization ||
+      !(await canViewEntryOf(viewer, ownerId))
+    ) {
       return NextResponse.json({ error: 'Time entry not found' }, { status: 404 })
     }
 
@@ -67,8 +78,9 @@ export async function PUT(
   try {
     await connectDB()
 
-    const requesterId = await getAuthenticatedUserId()
-    if (!requesterId) {
+    const requester = await getAuthenticatedUser()
+    const requesterId = requester?.id
+    if (!requester || !requesterId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
@@ -156,7 +168,8 @@ export async function PUT(
     if (endTime) timeEntry.endTime = new Date(endTime)
     if (duration !== undefined) timeEntry.duration = duration
     if (isBillable !== undefined) timeEntry.isBillable = isBillable
-    if (hourlyRate !== undefined) timeEntry.hourlyRate = hourlyRate
+    // The rate is money: only admin, super admin and HR may change it.
+    if (hourlyRate !== undefined && RATE_EDIT_ROLES.includes(requester.role)) timeEntry.hourlyRate = hourlyRate
     if (category) timeEntry.category = category
     if (tags) timeEntry.tags = tags
     if (notes) timeEntry.notes = notes
@@ -187,8 +200,9 @@ export async function DELETE(
   try {
     await connectDB()
 
-    const requesterId = await getAuthenticatedUserId()
-    if (!requesterId) {
+    const requester = await getAuthenticatedUser()
+    const requesterId = requester?.id
+    if (!requester || !requesterId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     

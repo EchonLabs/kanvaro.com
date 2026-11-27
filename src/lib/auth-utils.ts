@@ -34,6 +34,18 @@ export async function withAuth(request: any, handler: (user: AuthUser) => Promis
 }
 
 export async function authenticateUser(): Promise<{ user: AuthUser } | { error: string; status: number }> {
+  const result = await authenticateUserWithDocument()
+  return 'error' in result ? result : { user: result.user }
+}
+
+/**
+ * `authenticateUser`, plus the user document it already loaded. For routes
+ * that need more of the user than `AuthUser` (GET /api/auth/me), so they don't
+ * load the same user a second time.
+ */
+export async function authenticateUserWithDocument(): Promise<
+  { user: AuthUser; document: any } | { error: string; status: number }
+> {
   try {
     // Read both secrets first: a misconfigured production server must surface
     // here (logged, 500), not be swallowed by the token fallback logic below.
@@ -61,6 +73,7 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
     }
 
     let userData = null
+    let document: any = null
 
     // Try to verify access token first
     if (effectiveAccessToken) {
@@ -68,6 +81,7 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
         const decoded = jwt.verify(effectiveAccessToken, getJwtSecret()) as any
         const user = await User.findById(decoded.userId)
         if (user && user.isActive) {
+          document = user
           userData = {
             id: user._id.toString(),
             organization: user.organization?.toString(),
@@ -82,6 +96,7 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
             const decoded = jwt.verify(refreshToken, getJwtRefreshSecret()) as any
             const user = await User.findById(decoded.userId)
             if (user && user.isActive) {
+              document = user
               // Create new access token
               const newAccessToken = jwt.sign(
                 { userId: user._id, email: user.email, role: user.role },
@@ -121,6 +136,7 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
         const decoded = jwt.verify(refreshToken, getJwtRefreshSecret()) as any
         const user = await User.findById(decoded.userId)
         if (user && user.isActive) {
+          document = user
           // Create new access token
           const newAccessToken = jwt.sign(
             { userId: user._id, email: user.email, role: user.role },
@@ -152,7 +168,7 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
       return { error: 'User not found or inactive', status: 401 }
     }
 
-    return { user: userData }
+    return { user: userData, document }
   } catch (error) {
     console.error('Authentication error:', error)
     return { error: 'Internal server error', status: 500 }

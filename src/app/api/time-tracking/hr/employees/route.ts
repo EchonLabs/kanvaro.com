@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
-import { cookies } from 'next/headers'
-import jwt from 'jsonwebtoken'
 import { Role } from '@/lib/permissions/permission-definitions'
-import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
+import { authenticateUserWithDocument } from '@/lib/auth-utils'
 
 const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
@@ -16,30 +14,13 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
 
     // Authenticate from cookies
-    const cookieStore = cookies()
-    const accessToken = cookieStore.get('accessToken')?.value
-    const refreshToken = cookieStore.get('refreshToken')?.value
-
-    if (!accessToken && !refreshToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // F3: the shared sign-in check (accepts a Bearer token as well as the
+    // cookies; this route used to carry its own cookie-only copy).
+    const auth = await authenticateUserWithDocument()
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
-
-    let requester: any = null
-    try {
-      if (accessToken) {
-        const decoded: any = jwt.verify(accessToken, getJwtSecret())
-        requester = await User.findById(decoded.userId)
-      }
-    } catch {}
-    if (!requester && refreshToken) {
-      try {
-        const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
-        requester = await User.findById(decoded.userId)
-      } catch {}
-    }
-    if (!requester || !requester.isActive) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const requester: any = auth.document
 
     // Only unrestricted roles (Super Admin/Admin/HR) can pick an arbitrary employee to log time for
     if (!UNRESTRICTED_TIME_LOG_ROLES.includes(requester.role)) {

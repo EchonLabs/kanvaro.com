@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 import { Task } from '@/models/Task'
-import { cookies } from 'next/headers'
-import jwt from 'jsonwebtoken'
 import { Role } from '@/lib/permissions/permission-definitions'
-import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
+import { authenticateUserWithDocument } from '@/lib/auth-utils'
 
 const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
@@ -23,30 +21,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Authenticate from cookies
-    const cookieStore = cookies()
-    const accessToken = cookieStore.get('accessToken')?.value
-    const refreshToken = cookieStore.get('refreshToken')?.value
-
-    if (!accessToken && !refreshToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // F3: the shared sign-in check (accepts a Bearer token as well as the
+    // cookies; this route used to carry its own cookie-only copy).
+    const auth = await authenticateUserWithDocument()
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
-
-    let requester: any = null
-    try {
-      if (accessToken) {
-        const decoded: any = jwt.verify(accessToken, getJwtSecret())
-        requester = await User.findById(decoded.userId).select('organization role isActive').lean()
-      }
-    } catch { }
-    if (!requester && refreshToken) {
-      try {
-        const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
-        requester = await User.findById(decoded.userId).select('organization role isActive').lean()
-      } catch { }
-    }
-    if (!requester || !requester.isActive) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const requester: any = auth.document
 
     // Unrestricted roles (Super Admin/Admin/HR) can look up anyone's tasks; everyone else
     // may only look up their own (self-service manual log flow).

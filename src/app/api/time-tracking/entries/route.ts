@@ -8,8 +8,6 @@ import { User } from '@/models/User'
 import { Organization } from '@/models/Organization'
 import { Task } from '@/models/Task'
 import { applyRoundingRules } from '@/lib/utils'
-import { cookies } from 'next/headers'
-import jwt from 'jsonwebtoken'
 import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { getOrgLocalDateString, getOrgLocalTimeString, calendarDayDiff, computeEffectivePastTimeLimitDays } from '@/lib/timeTrackingCutoff'
@@ -17,7 +15,7 @@ import { getOrgLocalDateString, getOrgLocalTimeString, calendarDayDiff, computeE
 import mongoose from 'mongoose'
 import { zonedTimeToUtc } from 'date-fns-tz'
 import { logActivity } from '@/lib/activity-logger'
-import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
+import { authenticateUserWithDocument } from '@/lib/auth-utils'
 
 
 // Super Admin, Admin, and HR can log time for any org member, on any date, unrestricted
@@ -31,7 +29,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
-    const organizationId = searchParams.get('organizationId')
     const projectId = searchParams.get('projectId')
     const taskId = searchParams.get('taskId')
     const startDate = searchParams.get('startDate')
@@ -43,38 +40,16 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
 
-    if (!organizationId) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
+    // F3: the shared sign-in check (accepts a Bearer token as well as the
+    // cookies; this route used to carry its own cookie-only copy).
+    const auth = await authenticateUserWithDocument()
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
-    const orgId = organizationId as string
-
-    // Authenticate viewer from cookies
-    const cookieStore = cookies()
-    const accessToken = cookieStore.get('accessToken')?.value
-    const refreshToken = cookieStore.get('refreshToken')?.value
-
-    if (!accessToken && !refreshToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    let viewer: any = null
-    let viewerId: string = ''
-    try {
-      if (accessToken) {
-        const decoded: any = jwt.verify(accessToken, getJwtSecret())
-        viewer = await User.findById(decoded.userId)
-      }
-    } catch { }
-    if (!viewer && refreshToken) {
-      try {
-        const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
-        viewer = await User.findById(decoded.userId)
-      } catch { }
-    }
-    if (!viewer || !viewer.isActive) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    viewerId = viewer._id.toString()
+    const viewer: any = auth.document
+    const viewerId: string = auth.user.id
+    // F2/F3: the organisation comes from the sign-in, not ?organizationId=.
+    const orgId = auth.user.organization
 
     // Build base query
     const query: any = {
@@ -82,8 +57,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Determine user scoping based on permissions and partner assignments
-    const hasViewAll = await PermissionService.hasPermission(viewerId, Permission.TIME_TRACKING_VIEW_ALL)
-    const hasViewAssigned = await PermissionService.hasPermission(viewerId, Permission.TIME_TRACKING_VIEW_ASSIGNED)
+    // Loaded once for both checks (each hasPermission call re-reads the user and projects).
+    const viewerPermissions = await PermissionService.getUserPermissions(viewerId)
+    const hasViewAll = PermissionService.hasPermissionIn(viewerPermissions, Permission.TIME_TRACKING_VIEW_ALL)
+    const hasViewAssigned = PermissionService.hasPermissionIn(viewerPermissions, Permission.TIME_TRACKING_VIEW_ASSIGNED)
 
     if (userId) {
       // Targeting a specific user
@@ -333,7 +310,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       userId,
-      organizationId,
       projectId,
       taskId,
       description,
@@ -342,7 +318,6 @@ export async function POST(request: NextRequest) {
       startDateOnly,
       duration,
       isBillable,
-      hourlyRate,
       category,
       tags,
       notes,
@@ -350,37 +325,20 @@ export async function POST(request: NextRequest) {
     } = body
     const clientTimezone = timezone || request.headers.get('x-timezone') || undefined
 
-    if (!userId || !organizationId || !projectId) {
+    if (!userId || !projectId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Authenticate requester from cookies
-    const cookieStore = cookies()
-    const accessToken = cookieStore.get('accessToken')?.value
-    const refreshToken = cookieStore.get('refreshToken')?.value
-
-    if (!accessToken && !refreshToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // F3: the shared sign-in check (accepts a Bearer token as well as the
+    // cookies; this route used to carry its own cookie-only copy).
+    const auth = await authenticateUserWithDocument()
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
-
-    let requester: any = null
-    let requesterId: string = ''
-    try {
-      if (accessToken) {
-        const decoded: any = jwt.verify(accessToken, getJwtSecret())
-        requester = await User.findById(decoded.userId)
-      }
-    } catch { }
-    if (!requester && refreshToken) {
-      try {
-        const decoded: any = jwt.verify(refreshToken, getJwtRefreshSecret())
-        requester = await User.findById(decoded.userId)
-      } catch { }
-    }
-    if (!requester || !requester.isActive) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    requesterId = requester._id.toString()
+    const requester: any = auth.document
+    const requesterId: string = auth.user.id
+    // F2/F3: the organisation comes from the sign-in, not the request body.
+    const organizationId = auth.user.organization
 
     // Verify the requester can create time entries for the specified user
     // Allow if: 1) Creating for themselves, OR 2) Is Super Admin/Admin/HR (unrestricted role)
@@ -395,6 +353,17 @@ export async function POST(request: NextRequest) {
     const project = await Project.findById(projectId)
     if (!project || !project.settings.allowTimeTracking) {
       return NextResponse.json({ error: 'Time tracking not allowed for this project' }, { status: 403 })
+    }
+    // The project must be in the caller's organisation, and anyone outside the
+    // unrestricted roles must be able to see it.
+    if (String(project.organization) !== organizationId) {
+      return NextResponse.json({ error: 'Time tracking not allowed for this project' }, { status: 403 })
+    }
+    if (!isUnrestrictedRole) {
+      const requesterPermissions = await PermissionService.getUserPermissions(requesterId)
+      if (!PermissionService.canAccessProjectIn(requesterPermissions, String(project._id))) {
+        return NextResponse.json({ error: 'Time tracking not allowed for this project' }, { status: 403 })
+      }
     }
 
     // If taskId is provided, verify task assignment for users without an unrestricted role
@@ -550,9 +519,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get user's hourly rate if not provided
+    // The person the entry is for must be in the caller's organisation.
     const user = await User.findById(userId)
-    const finalHourlyRate = hourlyRate || user?.billingRate || settings.defaultHourlyRate
+    if (!user || String(user.organization) !== organizationId) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    // hourlyRate is deliberately not read from the body: it comes from the
+    // user's record or the org settings, never from the client.
+    const finalHourlyRate = user.billingRate || settings.defaultHourlyRate
 
     const requestedDuration = duration || calculatedDuration
 

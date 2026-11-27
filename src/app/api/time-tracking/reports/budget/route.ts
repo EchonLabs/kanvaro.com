@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
+import { authenticateUser } from '@/lib/auth-utils'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
 import { TimeEntry } from '@/models/TimeEntry'
 import { User } from '@/models/User'
 import { Project } from '@/models/Project'
@@ -32,14 +35,25 @@ export async function GET(request: NextRequest) {
     try {
         await connectDB()
 
+        // F2: this route had no sign-in and trusted ?organizationId=. It shows
+        // every person's cost per project, so it needs report access plus
+        // view-all (financial:read alone is held by every role, viewers too).
+        const auth = await authenticateUser()
+        if ('error' in auth) {
+            return NextResponse.json({ error: auth.error }, { status: auth.status })
+        }
+        const organizationId = auth.user.organization
+        const permissions = await PermissionService.getUserPermissions(auth.user.id)
+        if (
+            !PermissionService.hasPermissionIn(permissions, Permission.TIME_LOG_REPORT_ACCESS) ||
+            !PermissionService.hasPermissionIn(permissions, Permission.TIME_TRACKING_VIEW_ALL)
+        ) {
+            return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+        }
+
         const { searchParams } = new URL(request.url)
-        const organizationId = searchParams.get('organizationId')
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
-
-        if (!organizationId) {
-            return NextResponse.json({ error: 'Organization ID is required' }, { status: 400 })
-        }
 
         // Build date range
         const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)

@@ -176,6 +176,17 @@ export class PermissionService {
     return userPermissions.projectPermissions.has(projectId);
   }
 
+  /**
+   * `canAccessProject` against permissions already loaded, for a project the
+   * caller has already fetched. The caller must check the project belongs to
+   * the user's organisation; this only answers "may this user see it".
+   */
+  static canAccessProjectIn(userPermissions: UserPermissions, projectId: string): boolean {
+    if (userPermissions.globalPermissions.includes(Permission.PROJECT_VIEW_ALL)) return true;
+    if (userPermissions.userRole === Role.ADMIN || userPermissions.userRole === Role.SUPER_ADMIN) return true;
+    return userPermissions.projectPermissions.has(projectId);
+  }
+
   static async canManageProject(userId: string, projectId: string): Promise<boolean> {
     return this.hasPermission(userId, Permission.PROJECT_UPDATE, projectId);
   }
