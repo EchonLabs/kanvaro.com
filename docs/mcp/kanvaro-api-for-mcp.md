@@ -7,7 +7,9 @@ This document tells you how the Kanvaro REST API behaves **after** the security 
 
 ## 1. The model in one paragraph
 
-The MCP server calls Kanvaro's existing REST API **as the user**, sending that user's Kanvaro access token as `Authorization: Bearer <token>`. Kanvaro decides what is allowed. The MCP server never decides permissions itself; it only narrows what it sends (field allow-lists) and what it passes back (response filters), per §2.3 of the decision record. If a route refuses, surface the refusal; do not retry with different identity values.
+Sign-in follows **D10** (`mcp-server/docs/decisions/D10-token-exchange.md`, contract in `mcp-server/docs/kanvaro-oauth-contract.md`): Kanvaro is the only authorization server. Claude Code signs in on Kanvaro and holds an **MCP access token**. For each call, the MCP server **exchanges** that token at Kanvaro for a short-lived **Kanvaro API token** and calls Kanvaro's existing REST API **as the user** with `Authorization: Bearer <Kanvaro API token>`.
+
+Kanvaro decides what is allowed. The MCP server never decides permissions itself; it only narrows what it sends (field allow-lists) and what it passes back (response filters), per §2.3 of the decision record. If a route refuses, surface the refusal; do not retry with different identity values.
 
 ---
 
@@ -16,27 +18,38 @@ The MCP server calls Kanvaro's existing REST API **as the user**, sending that u
 ### 2.1 Sending the token
 
 ```
-Authorization: Bearer <kanvaro access token>
+Authorization: Bearer <Kanvaro API token from the token exchange>
 ```
 
 Every route that authenticates uses `authenticateUser()` in [`src/lib/auth-utils.ts`](../../src/lib/auth-utils.ts). It accepts the Bearer header first and falls back to the browser cookies. After this branch, **every route the MCP server should call** goes through it — including the time-tracking, `auth/me`, `hr/*` and `bulk-upload` routes, which used to read only the cookie (F3).
 
-### 2.2 Token format and lifetime
+**Never forward the MCP access token to Kanvaro's API.** It is signed with Kanvaro's separate asymmetric key (K-6) and has the MCP server as its audience, so `authenticateUser()` refuses it. Only the exchanged Kanvaro API token works.
 
-| Token | Payload | Signed with | Lifetime |
+### 2.2 The tokens involved
+
+| Token | Who holds it | Format | Lifetime |
 |---|---|---|---|
-| Access | `{ userId, email, role }` | `getJwtSecret()` | 15 minutes |
-| Refresh | `{ userId, email }` | `getJwtRefreshSecret()` | 7 days |
+| **MCP access token** | Claude Code | JWT, ES256 with Kanvaro's OAuth key, `aud` = MCP server URL, `sub` = user id | 15 minutes |
+| **MCP refresh token** | Claude Code | Random, stored hashed by Kanvaro, rotated on use | 7 days |
+| **Kanvaro API token** (from the exchange) | MCP server, **in memory only** | Normal Kanvaro access token `{ userId, email, role }`, HS256 with `getJwtSecret()` | ≤ 15 min and ≤ the MCP token's remaining life; **no refresh token** |
+| Browser access / refresh cookies | The Kanvaro web app | `{ userId, email, role }` / `{ userId, email }`, `getJwtSecret()` / `getJwtRefreshSecret()` | 15 minutes / 7 days |
 
-### 2.3 Renewal — the MCP server must do it
+The MCP server stores **no user tokens** and has no encryption key (D10). Cache the Kanvaro API token by a hash of the MCP access token until it expires, and run one exchange at a time per MCP token.
 
-`authenticateUser()` refreshes an expired access token **only from the `refreshToken` cookie**. A Bearer caller has no cookie, so an expired Bearer token gets:
+### 2.3 Renewal (D10) — the MCP server does not refresh anything
+
+The MCP server **never** uses `grant_type=refresh_token`; that grant belongs to Claude Code.
+
+- **Claude Code** refreshes its own MCP access token at Kanvaro (contract §4.2).
+- **The MCP server** gets each Kanvaro API token by **token exchange** (contract §4.3): `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`, `subject_token=<MCP access token>`, client `kanvaro-mcp-server` with HTTP Basic credentials.
+- **On a `401` from Kanvaro's API** (exchanged token expired, or Kanvaro rejected it): exchange again **once** and retry the call **once**.
+- **If the exchange is refused** (`invalid_grant`: token expired or revoked, user deactivated, refresh family revoked), fail closed: return `401 invalid_token` with `resource_metadata` to Claude Code, so it signs in again.
+
+Why the re-exchange is needed: `authenticateUser()` renews an expired access token **only from the browser's `refreshToken` cookie**. A Bearer caller has no cookie, so an expired Kanvaro API token simply gets:
 
 ```json
 401 { "error": "Invalid access token" }
 ```
-
-The MCP server must renew through the **token endpoint** (`grant_type=refresh_token`, being built on the authorize-page branch) and retry once. If renewal fails, return "sign in again" to the client (flow diagram §3, steps 5–8).
 
 ### 2.4 Secrets — use the shared helper (F0)
 
@@ -47,10 +60,16 @@ import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
 ```
 
 - The refresh secret is `JWT_REFRESH_SECRET`, falling back to `REFRESH_TOKEN_SECRET` (the name production and the docker-compose files actually set).
-- In production a missing secret, or one of the placeholder values published in this repo, **throws**; auth then fails with 500 instead of accepting forgeable tokens.
-- In development a dev-only fallback is used with a warning.
+- Everywhere except `NODE_ENV=development` and `NODE_ENV=test`, a missing secret, or one of the placeholder values published in this repo, **throws**; auth then fails with 500 instead of accepting forgeable tokens. That includes staging, a mistyped value and an unset `NODE_ENV`.
+- In development and test a dev-only fallback is used with a warning.
 
-> **Token endpoint authors:** do not read `process.env.JWT_REFRESH_SECRET` directly. Production sets only `REFRESH_TOKEN_SECRET`; reading the env var yourself gives you `undefined`. Use `getJwtRefreshSecret()` so your tokens verify against the rest of Kanvaro.
+> **Authorize page and token endpoint authors (K-3 to K-5):** never read `process.env.JWT_SECRET` / `JWT_REFRESH_SECRET` directly, and never with a default. Production sets only `REFRESH_TOKEN_SECRET`, so reading `JWT_REFRESH_SECRET` yourself gives `undefined`, and `|| 'your-refresh-secret-key'` brings back the F0 forgery.
+>
+> - Checking the browser session on `/oauth/authorize` → `getJwtSecret()` / `getJwtRefreshSecret()`.
+> - Signing the exchanged Kanvaro API token (K-5) → `getJwtSecret()`, so `authenticateUser()` accepts it.
+> - The MCP access token is signed with the **separate** OAuth key (K-6), not these secrets.
+>
+> As of 26 Nov 2026, `feat/mcp-authorization-page` still reads them directly with the old defaults in `src/app/api/oauth/authorize/route.ts` (lines 17–18) and `src/lib/oauth/service.ts` (line 594). Fix this before that branch reaches any shared server: with only `REFRESH_TOKEN_SECRET` set, a forged refresh cookie would get an authorization code issued as any user.
 
 ### 2.5 Things the MCP server must never send identity in
 
@@ -177,7 +196,7 @@ Server-owned and never settable through these routes: `organization`, `createdBy
 | `GET /api/budget/:id`, `GET /api/burn-rate` | Need project access (previously `project:read`, held by everyone). |
 | `POST/PUT/DELETE /api/projects/:id/expenses` | Need `financial:create_expense` (admin, HR, PM) in addition to project access. |
 | `GET /api/projects/:id/income` | Unchanged: project access + `financial:view_income`. |
-| `GET /api/reports/financial` | Accessible projects only. Income figures are zero/empty without `financial:view_income`. |
+| `GET /api/reports/financial` | Accessible projects only. Income figures are zero/empty without `financial:view_income`. (Income was always 0 for everyone before this branch: the income query compared the organisation id as a string inside `aggregate()`.) Budget search text is matched literally. |
 
 ### 4.6 Test management (F8)
 
@@ -221,6 +240,10 @@ The MCP server must not wrap these. After this branch they are also locked down 
 | Item | Owner / note |
 |---|---|
 | **F5** — login `returnTo` open redirect and double decode | Authorize-page developer. Fix note provided separately. Affects the MCP sign-in flow directly. |
+| **Authorize-page branch reads JWT secrets directly, with defaults** | Authorize-page developer. **Blocker** for that branch; see §2.4. |
+| `GET /api/reports/gantt` has no project-access check | Signed-in users can read any project's schedule. Follow-up. |
+| `GET /api/activity` is scoped to the organisation, not the caller's projects | Team members see activity from projects they are not on. Follow-up. |
+| Search text still unescaped in `$regex` | `projects`, `stories`, `epics`, `sprints`, `backlog`, `activity`, `docs`, `templates/projects`, `templates/tasks`, `time-tracking/hr/employees`, `reports/projects`, `reports/team`. Fixed on this branch: `search`, `members`, test lists, `reports/financial` (+ export), docs search. Follow-up. |
 | `GET /api/members` permission check passes every user (`user:read` is OWN-scoped) | Deliberately left; all built-in roles may list members anyway. Matters only for custom roles. |
 | `verify-otp` has no attempt limit | 6-digit reset OTP can be brute-forced. |
 | Reports page sends `approvedBy`, route reads `assignedBy` | Approver filter silently ignored. |
@@ -233,11 +256,12 @@ The MCP server must not wrap these. After this branch they are also locked down 
 ## 7. Deploying this branch
 
 - Users are signed out once: existing refresh tokens were signed with the public default and stop verifying.
-- Every environment running with `NODE_ENV=production` (the Docker image sets it — prod **and QA**) needs `JWT_SECRET` and `JWT_REFRESH_SECRET` or `REFRESH_TOKEN_SECRET` set to real random values, or sign-in returns 500. Check inside the container without printing values:
+- Every environment whose `NODE_ENV` is anything other than `development` or `test` (the Docker image sets `production` — prod **and QA**) needs `JWT_SECRET` and `JWT_REFRESH_SECRET` or `REFRESH_TOKEN_SECRET` set to real random values, or sign-in returns 500. Check inside the container without printing values:
   ```sh
   docker exec <container> sh -c 'printenv | cut -d= -f1 | grep -E "^(JWT_SECRET|REFRESH_TOKEN_SECRET|JWT_REFRESH_SECRET|NODE_ENV)$"'
   ```
 - Local `next start` (production mode) needs a `.env.local` with those two secrets (`openssl rand -hex 32`).
+- **Merging with `feat/mcp-authorization-page`:** conflicts in `src/app/api/members/route.ts`. Keep this branch's field allow-list and role-grant checks, **and** keep that branch's `revokeAllForUser()` import and the `wasActive` → deactivated → `revokeAllForUser(member._id)` block around the save in `PUT`. Its other hits for direct `JWT_SECRET` reads are old copies of files this branch already fixed; they resolve on merge. The two new files in §2.4 do not.
 
 ---
 
