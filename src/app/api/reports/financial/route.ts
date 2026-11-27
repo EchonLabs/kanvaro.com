@@ -8,6 +8,7 @@ import { ProjectIncome } from '@/models/ProjectIncome'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { escapeRegex } from '@/lib/text/escape-regex'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { Types } from 'mongoose'
 
@@ -78,9 +79,11 @@ export async function GET(req: NextRequest) {
     let budgetQuery: any = { project: { $in: projectIds } }
     
     if (search) {
+      // Matched literally: the search text goes into $regex.
+      const pattern = escapeRegex(search)
       budgetQuery.$or = [
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } }
+        { description: { $regex: pattern, $options: 'i' } },
+        { category: { $regex: pattern, $options: 'i' } }
       ]
     }
     
@@ -118,8 +121,11 @@ export async function GET(req: NextRequest) {
       Permission.FINANCIAL_VIEW_INCOME,
       project && project !== 'all' ? String(project) : undefined
     )
+    // aggregate() does not cast strings to ObjectIds, and organizationId is a
+    // string here, so matching it as-is found no income at all: the report
+    // always showed 0 revenue.
     const incomeMatch: any = {
-      organization: organizationId,
+      organization: new Types.ObjectId(organizationId),
       project: { $in: canViewIncome ? projectIds : [] }
     }
     if (hasDateRange) {

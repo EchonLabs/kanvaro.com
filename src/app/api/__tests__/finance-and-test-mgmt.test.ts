@@ -15,7 +15,7 @@ import { ProjectRole } from '@/lib/permissions/permission-definitions'
 
 afterEach(() => jest.resetModules())
 
-const ME = { id: 'u1', organization: 'org1', role: 'team_member' }
+const ME = { id: 'u1', organization: '64b00000000000000000000f', role: 'team_member' }
 
 /** Query chain resolving to `value`, recording .find filters elsewhere. */
 const chain = (value: any): any => {
@@ -97,7 +97,7 @@ describe.each([
   it(`limits a caller without the ${modelName} read permission to their projects`, async () => {
     const { route, filters } = load(false)
     await route.GET(new NextRequest(`http://localhost/api/${path}`))
-    expect(filters[0]).toMatchObject({ organization: 'org1', project: { $in: ['p1'] } })
+    expect(filters[0]).toMatchObject({ organization: '64b00000000000000000000f', project: { $in: ['p1'] } })
   })
 
   it('refuses a project the caller does not work on', async () => {
@@ -216,6 +216,33 @@ describe('GET /api/reports/financial and its export', () => {
     await route.GET(new NextRequest('http://localhost/api/reports/financial'))
     expect(incomeMatches.length).toBeGreaterThan(0)
     for (const match of incomeMatches) expect(match.project).toEqual({ $in: [] })
+  })
+
+  it('matches income by organization as an ObjectId (aggregate does not cast strings)', async () => {
+    const { route, incomeMatches } = loadReport(['financial:view_income'])
+    await route.GET(new NextRequest('http://localhost/api/reports/financial'))
+    expect(incomeMatches.length).toBeGreaterThan(0)
+    for (const match of incomeMatches) {
+      expect(match.organization?.constructor?.name).toBe('ObjectId')
+      expect(String(match.organization)).toBe('64b00000000000000000000f')
+    }
+  })
+
+  it('report matches the budget search text literally', async () => {
+    mockAuth()
+    mockPermissions({ accessible: ['64b0000000000000000000a1'] })
+    jest.doMock('@/lib/permissions/permission-utils', () => ({ hasPermission: async () => true }))
+    const budgetFilters: any[] = []
+    jest.doMock('@/models/registry', () => ({}))
+    jest.doMock('@/models/Project', () => ({ Project: { find: () => chain([]) } }))
+    jest.doMock('@/models/BudgetEntry', () => ({
+      BudgetEntry: { find: (q: any) => { budgetFilters.push(q); return chain([]) }, aggregate: async () => [] }
+    }))
+    jest.doMock('@/models/Expense', () => ({ Expense: { aggregate: async () => [], find: () => chain([]) } }))
+    jest.doMock('@/models/ProjectIncome', () => ({ ProjectIncome: { aggregate: async () => [] } }))
+    const route = require('@/app/api/reports/financial/route')
+    await route.GET(new NextRequest('http://localhost/api/reports/financial?search=' + encodeURIComponent('a.*(')))
+    expect(budgetFilters[0].$or[0].description.$regex).toBe('a\\.\\*\\(')
   })
 
   it('export is scoped to accessible projects (it had no filter at all)', async () => {
