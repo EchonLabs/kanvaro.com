@@ -18,6 +18,22 @@ import { resolveBaseUrl } from '@/lib/request-base-url'
 import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
 import { closeCarryForwardItemsForDeletedTask } from '@/lib/standup/carry-forward-service'
 import { hoursToMinutes } from '@/lib/standup/minutes'
+import { pickFields, rejectUnlessProjectMoveAllowed } from '@/lib/api/update-fields'
+
+/**
+ * Task fields a client may change (F7). Everything else is server-owned:
+ * organization, numbering, createdBy, the estimate/poker/stand-up bookkeeping
+ * (originalEstimateMinutes, estimatedAt, standupOwner, descope fields…),
+ * reminder state, comments (own route) and test-execution links.
+ */
+const TASK_EDITABLE_FIELDS = [
+  'title', 'description', 'status', 'priority', 'type', 'category', 'isBillable',
+  'project', 'module', 'story', 'epic', 'parentTask', 'assignedTo', 'storyPoints',
+  'dueDate', 'startDate', 'estimatedHours', 'actualHours', 'position', 'sprint',
+  'labels', 'dependencies', 'attachments', 'subtasks', 'archived',
+  // Not stored: the client's last-seen updatedAt, for the concurrent-edit check.
+  'expectedVersion'
+] as const
 import { DEFAULT_TASK_STATUS_KEYS } from '@/constants/taskStatuses'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
@@ -566,7 +582,8 @@ export async function PUT(
     }
 
     const rawUpdate = await request.json()
-    const updateData: Record<string, any> = { ...rawUpdate }
+    // F7: only fields a client may edit; the body used to be spread straight in.
+    const updateData: Record<string, any> = pickFields(rawUpdate, TASK_EDITABLE_FIELDS)
     console.log('[Task PUT] Incoming payload', {
       taskId,
       receivedKeys: Object.keys(updateData)
@@ -719,11 +736,12 @@ export async function PUT(
     }
 
     // Check if user has permission to edit all tasks
-    const [hasTaskEditAll, hasProjectViewAll, canEditAssignedProjects] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TASK_EDIT_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.TASK_EDIT_ASSIGNED_PROJECTS)
-    ]);
+    // Loaded once (each hasPermission call re-reads the user and their projects;
+    // this route runs on every kanban drag).
+    const permissions = await PermissionService.getUserPermissions(userId)
+    const hasTaskEditAll = PermissionService.hasPermissionIn(permissions, Permission.TASK_EDIT_ALL)
+    const hasProjectViewAll = PermissionService.hasPermissionIn(permissions, Permission.PROJECT_VIEW_ALL)
+    const canEditAssignedProjects = PermissionService.hasPermissionIn(permissions, Permission.TASK_EDIT_ASSIGNED_PROJECTS)
 
     // Build query - if user has TASK_EDIT_ALL or PROJECT_VIEW_ALL, they can edit any task
     const taskQuery: any = {
@@ -755,6 +773,16 @@ export async function PUT(
         { status: 404 }
       )
     }
+
+    // Moving the task to another project: the target must be one the caller can
+    // access (Kanvaro never checked the target project; decision record §2.3).
+    const moveDenied = await rejectUnlessProjectMoveAllowed({
+      requestedProjectId: updateData.project,
+      currentProjectId: (currentTask.project as any)?._id?.toString() || currentTask.project?.toString(),
+      organizationId,
+      permissions
+    })
+    if (moveDenied) return moveDenied
 
     // Reject a status the task's project does not have (e.g. a drag from the
     // "All Projects" board into another project's custom column). 'backlog' is

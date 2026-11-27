@@ -34,6 +34,12 @@ jest.mock('@/lib/auth-utils', () => ({
 jest.mock('@/lib/permissions/permission-service', () => ({
   PermissionService: {
     hasPermission: jest.fn().mockResolvedValue(true),
+    // The task PUT loads permissions once and checks them in memory.
+    getUserPermissions: jest.fn().mockResolvedValue({
+      globalPermissions: [], projectPermissions: new Map(), projectRoles: new Map(), userRole: 'admin'
+    }),
+    hasPermissionIn: jest.fn().mockReturnValue(true),
+    canAccessProjectIn: jest.fn().mockReturnValue(true),
     getAccessibleProjects: jest.fn().mockResolvedValue([])
   }
 }))
@@ -171,5 +177,91 @@ describe('PUT /api/tasks/:id — Estimated Hours', () => {
 
     const task = await Task.findById(taskId).lean()
     expect(task).toMatchObject({ originalEstimateMinutes: 13 * 60, estimateMethod: 'poker' })
+  })
+})
+
+/**
+ * Decision record F7 / §2.3: the task PUT used to spread the request body into
+ * the update, so server-owned fields could be overwritten, and a project move
+ * never checked the target project.
+ */
+describe('PUT /api/tasks/:id — field allow-list and project moves', () => {
+  useMongo()
+
+  beforeAll(() => {
+    mockUserId = user
+    mockOrgId = organization
+  })
+
+  it('ignores server-owned fields in the body and still saves the editable ones', async () => {
+    await seed()
+    const stranger = new mongoose.Types.ObjectId()
+
+    const response = await save({
+      title: 'Renamed task',
+      organization: String(stranger),
+      createdBy: String(stranger),
+      standupOwner: String(stranger),
+      taskNumber: 1,
+      displayId: 'HACK-1',
+      estimateMethod: 'manual',
+      originalEstimateMinutes: 1
+    })
+    expect(response.status).toBe(200)
+
+    const task: any = await Task.findById(taskId).lean()
+    expect(task.title).toBe('Renamed task')
+    expect(String(task.organization)).toBe(String(organization))
+    expect(String(task.createdBy)).toBe(String(user))
+    expect(task.standupOwner).toBeUndefined()
+    expect(task.taskNumber).toBe(902)
+    expect(task.displayId).toBe('KAN-902')
+    expect(task.estimateMethod).toBe('poker')
+    expect(task.originalEstimateMinutes).toBe(13 * 60)
+  })
+
+  it('refuses moving the task into a project in another organisation', async () => {
+    await seed()
+    const otherOrgProject = await Project.create({
+      name: 'Someone else',
+      organization: new mongoose.Types.ObjectId(),
+      createdBy: user,
+      projectNumber: 99,
+      startDate: new Date('2026-08-01T00:00:00.000Z')
+    })
+
+    const response = await save({ project: String(otherOrgProject._id) })
+    expect(response.status).toBe(403)
+
+    const task: any = await Task.findById(taskId).lean()
+    expect(String(task.project)).toBe(String(project))
+  })
+
+  it('refuses moving the task into a project the caller cannot access', async () => {
+    await seed()
+    const hidden = await Project.create({
+      name: 'Hidden project',
+      organization,
+      createdBy: user,
+      projectNumber: 98,
+      startDate: new Date('2026-08-01T00:00:00.000Z')
+    })
+    const { PermissionService } = jest.requireMock('@/lib/permissions/permission-service')
+    PermissionService.canAccessProjectIn.mockReturnValueOnce(false)
+
+    const response = await save({ project: String(hidden._id) })
+    expect(response.status).toBe(403)
+
+    const task: any = await Task.findById(taskId).lean()
+    expect(String(task.project)).toBe(String(project))
+  })
+
+  it('still honours expectedVersion (the concurrent-edit check survives the allow-list)', async () => {
+    await seed()
+    const response = await save({ title: 'Too late', expectedVersion: '2000-01-01T00:00:00.000Z' })
+    expect(response.status).toBe(409)
+
+    const task: any = await Task.findById(taskId).lean()
+    expect(task.title).toBe('Rebuild the export pipeline')
   })
 })
