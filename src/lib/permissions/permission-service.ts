@@ -82,6 +82,18 @@ export class PermissionService {
   }
 
   /**
+   * Is `permission` actually granted to the user's role (or custom role)?
+   *
+   * Use this, not `hasPermissionIn`, when an OWN-scoped permission
+   * (`user:read`, `user:update`, …) guards data about *other* people.
+   * `hasPermissionIn` answers "may they act on their own record", which is
+   * always yes for OWN permissions, so it would let every role through.
+   */
+  static isGrantedIn(userPermissions: UserPermissions, permission: Permission): boolean {
+    return userPermissions.globalPermissions.includes(permission);
+  }
+
+  /**
    * Same check as `hasPermission`, against permissions already loaded with
    * `getUserPermissions`. Each `hasPermission` call re-reads the user and all
    * their projects, so a route needing several checks should load once and

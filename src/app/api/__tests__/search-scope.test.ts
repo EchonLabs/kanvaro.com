@@ -35,7 +35,8 @@ function load(auth: any, permissions?: any, data: { projects?: any[]; tasks?: an
     return {
       PermissionService: {
         getUserPermissions: jest.fn().mockResolvedValue(permissions),
-        hasPermissionIn: real.PermissionService.hasPermissionIn
+        hasPermissionIn: real.PermissionService.hasPermissionIn,
+        isGrantedIn: real.PermissionService.isGrantedIn
       }
     }
   })

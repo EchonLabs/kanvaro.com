@@ -11,11 +11,10 @@ import { PermissionService } from '@/lib/permissions/permission-service'
 import { Role } from '@/lib/permissions/permission-definitions'
 import { convertOpenAllocationsToCarryForward } from '@/lib/standup/carry-forward-service'
 import { canChangeRoleOf, canGrantSystemRole, canManageRoles, isAdminRole } from '@/lib/permissions/role-grant-policy'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 /** Fields the edit-member form and the project team tab send. Nothing else is saved. */
 const EDITABLE_FIELDS = ['firstName', 'lastName', 'memberId', 'isActive', 'hourlyRate', 'role'] as const
-
-const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,11 +34,14 @@ export async function GET(request: NextRequest) {
 
     // Check if user has permission to view members
     const permissions = await PermissionService.getUserPermissions(userId)
+    // user:read and user:update are OWN-scoped ("your own record"), so
+    // hasPermissionIn is always true for them; about other people they only
+    // count when the role really grants them (PR #927 review).
     const canReadTeam = PermissionService.hasPermissionIn(permissions, Permission.TEAM_READ)
-    const canReadUsers = PermissionService.hasPermissionIn(permissions, Permission.USER_READ)
+    const canReadUsers = PermissionService.isGrantedIn(permissions, Permission.USER_READ)
     // Pay rates only for people who can edit members (same rule as PUT).
     const canSeeRates =
-      PermissionService.hasPermissionIn(permissions, Permission.USER_UPDATE) &&
+      PermissionService.isGrantedIn(permissions, Permission.USER_UPDATE) &&
       PermissionService.hasPermissionIn(permissions, Permission.TEAM_EDIT)
 
     if (!canReadTeam && !canReadUsers) {
@@ -201,7 +203,8 @@ export async function PUT(request: NextRequest) {
 
     // Check if user has permission to update members (loaded once)
     const actor = await PermissionService.getUserPermissions(userId)
-    const canEditMembers = PermissionService.hasPermissionIn(actor, Permission.USER_UPDATE)
+    // OWN-scoped: must be granted to the role, not just "own record" (see GET).
+    const canEditMembers = PermissionService.isGrantedIn(actor, Permission.USER_UPDATE)
     const hasTeamEditPermission = PermissionService.hasPermissionIn(actor, Permission.TEAM_EDIT)
 
     if (!canEditMembers || !hasTeamEditPermission) {

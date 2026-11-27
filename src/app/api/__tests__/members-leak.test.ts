@@ -7,8 +7,8 @@
 import { NextRequest } from 'next/server'
 import { Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
 
-const perms = (role: Role) => ({
-  globalPermissions: [...ROLE_PERMISSIONS[role]],
+const perms = (role: Role, without: string[] = []) => ({
+  globalPermissions: ROLE_PERMISSIONS[role].filter((p) => !without.includes(p)),
   projectPermissions: new Map(),
   projectRoles: new Map(),
   userRole: role
@@ -25,7 +25,7 @@ function chain(value: any, selects: string[] = []) {
 
 afterEach(() => jest.resetModules())
 
-function load(role: Role, opts: { member?: any; userId?: string } = {}) {
+function load(role: Role, opts: { member?: any; userId?: string; without?: string[] } = {}) {
   const userId = opts.userId || 'actor'
   const userSelects: string[] = []
   const invitationSelects: string[] = []
@@ -41,9 +41,10 @@ function load(role: Role, opts: { member?: any; userId?: string } = {}) {
     const real = jest.requireActual('@/lib/permissions/permission-service')
     return {
       PermissionService: {
-        getUserPermissions: jest.fn().mockResolvedValue(perms(role)),
+        getUserPermissions: jest.fn().mockResolvedValue(perms(role, opts.without)),
         hasPermissionIn: real.PermissionService.hasPermissionIn,
-        hasPermission: jest.fn(async (_id: string, p: string) => perms(role).globalPermissions.includes(p as any))
+        isGrantedIn: real.PermissionService.isGrantedIn,
+        hasPermission: jest.fn(async (_id: string, p: string) => perms(role, opts.without).globalPermissions.includes(p as any))
       }
     }
   })
@@ -106,6 +107,33 @@ describe('GET /api/members', () => {
     expect(filter.$or[0].firstName.$regex).toBe('a\\.\\*\\(')
   })
 
+  // PR #927 review: user:read is OWN-scoped, so hasPermissionIn was always
+  // true and any role passed. It now counts only when the role grants it.
+  it('refuses a role granted neither team:read nor user:read', async () => {
+    const { route, userFind } = load(Role.VIEWER, { without: ['team:read', 'user:read'] })
+    expect((await route.GET(new NextRequest('http://localhost/x'))).status).toBe(403)
+    expect(userFind).not.toHaveBeenCalled()
+  })
+
+  it('still lists members for a role granted only user:read', async () => {
+    const { route } = load(Role.VIEWER, { without: ['team:read'] })
+    expect((await route.GET(new NextRequest('http://localhost/x'))).status).toBe(200)
+  })
+
+  it('every built-in role keeps the list (all are granted team:read)', async () => {
+    for (const role of Object.values(Role)) {
+      jest.resetModules()
+      const { route } = load(role as Role)
+      expect([role, (await route.GET(new NextRequest('http://localhost/x'))).status]).toEqual([role, 200])
+    }
+  })
+
+  it('hides pay rates from a team editor whose role lacks user:update', async () => {
+    const { route, userSelects } = load(Role.HUMAN_RESOURCE, { without: ['user:update'] })
+    await route.GET(new NextRequest('http://localhost/x'))
+    expect(userSelects[0]).toContain('-hourlyRate')
+  })
+
   it('caps an absurd page size at 10000', async () => {
     const { route } = load(Role.ADMIN)
     const res = await route.GET(new NextRequest('http://localhost/x?limit=999999999'))
@@ -149,6 +177,18 @@ describe('PUT /api/members', () => {
     const { route, member } = load(Role.HUMAN_RESOURCE, { member: teamMember })
     expect((await route.PUT(put('m1', { role: 'project_manager' }))).status).toBe(200)
     expect(member.role).toBe('project_manager')
+  })
+
+  it('refuses a team editor whose role lacks user:update (OWN scope no longer lets it through)', async () => {
+    const { route, save } = load(Role.HUMAN_RESOURCE, { member: teamMember, without: ['user:update'] })
+    expect((await route.PUT(put('m1', { firstName: 'Changed' }))).status).toBe(403)
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('refuses a role that has user:update but not team:edit (team member)', async () => {
+    const { route, save } = load(Role.TEAM_MEMBER, { member: teamMember })
+    expect((await route.PUT(put('m1', { firstName: 'Changed' }))).status).toBe(403)
+    expect(save).not.toHaveBeenCalled()
   })
 
   it('lets an admin promote someone to admin', async () => {

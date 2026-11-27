@@ -6,9 +6,8 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { Permission, Role } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { applySearchFilters, parseFilterList } from '@/lib/search/filters'
-
-/** Search text goes into $regex and new RegExp(); escape it so it matches literally. */
-const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+// Search text goes into $regex and new RegExp(); escaped so it matches literally.
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 interface SearchFilters {
   type?: string[]
@@ -570,8 +569,8 @@ export async function GET(request: NextRequest) {
     // Checked against the explicit grant: user:read is an "own"-scoped
     // permission, which hasPermissionIn treats as always held.
     const canSearchUsers =
-      permissions.globalPermissions.includes(Permission.TEAM_READ) ||
-      permissions.globalPermissions.includes(Permission.USER_READ)
+      PermissionService.isGrantedIn(permissions, Permission.TEAM_READ) ||
+      PermissionService.isGrantedIn(permissions, Permission.USER_READ)
     if (canSearchUsers && (!filters.type || filters.type.includes('user'))) {
       const userQuery = {
         organization: organizationId,
