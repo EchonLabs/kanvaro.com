@@ -78,9 +78,25 @@ export function getClient(id: string): OAuthClientConfig | null {
   return null
 }
 
+export function getJwtSecret(): string {
+  return (process.env.JWT_SECRET || '').trim() || 'your-secret-key'
+}
+
+export function getJwtRefreshSecret(): string {
+  return (
+    process.env.JWT_REFRESH_SECRET ||
+    process.env.REFRESH_TOKEN_SECRET ||
+    ''
+  ).trim() || 'your-refresh-secret-key'
+}
+
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
 export function redirectUriMatches(registered: string, requested: string): boolean {
+  if (registered.includes('#') || requested.includes('#')) {
+    return false
+  }
+
   let regUrl: URL
   let reqUrl: URL
 
@@ -91,6 +107,7 @@ export function redirectUriMatches(registered: string, requested: string): boole
     return false
   }
 
+  if (regUrl.hash !== '' || reqUrl.hash !== '') return false
   if (regUrl.protocol !== 'http:' && regUrl.protocol !== 'https:') return false
   if (reqUrl.protocol !== 'http:' && reqUrl.protocol !== 'https:') return false
   if (regUrl.username !== '' || regUrl.password !== '') return false

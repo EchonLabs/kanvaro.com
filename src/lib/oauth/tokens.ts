@@ -74,15 +74,19 @@ export interface McpAccessTokenPayload extends JwtPayload {
   iat: number
 }
 
-interface CachedSigningKey {
+interface CachedVerificationKey {
   rawPem: string
-  privateKey: crypto.KeyObject
   publicKey: crypto.KeyObject
   publicJwk: PublicJwk
   kid: string
 }
 
+interface CachedSigningKey extends CachedVerificationKey {
+  privateKey: crypto.KeyObject
+}
+
 let cachedKey: CachedSigningKey | null = null
+let cachedPreviousKey: CachedVerificationKey | null = null
 
 function loadRawPem(): string {
   const filePath = process.env.OAUTH_SIGNING_PRIVATE_KEY_FILE
@@ -102,27 +106,36 @@ function loadRawPem(): string {
   throw new OAuthConfigError('OAuth signing key is not configured')
 }
 
-export function getSigningKey(): CachedSigningKey {
-  const rawPem = loadRawPem()
-  if (cachedKey && cachedKey.rawPem === rawPem) {
-    return cachedKey
+function loadPreviousRawPem(): string | null {
+  const filePath =
+    process.env.OAUTH_PREVIOUS_SIGNING_KEY_FILE ||
+    process.env.OAUTH_SIGNING_PREVIOUS_KEY_FILE
+  if (filePath && filePath.trim()) {
+    try {
+      return fs.readFileSync(filePath.trim(), 'utf8')
+    } catch {
+      throw new OAuthConfigError('OAuth previous signing key invalid')
+    }
   }
 
-  let privateKey: crypto.KeyObject
-  try {
-    privateKey = crypto.createPrivateKey(rawPem)
-  } catch {
-    throw new OAuthConfigError('OAuth signing key invalid')
+  const inlinePem =
+    process.env.OAUTH_PREVIOUS_SIGNING_KEY ||
+    process.env.OAUTH_SIGNING_PREVIOUS_KEY
+  if (inlinePem && inlinePem.trim()) {
+    return inlinePem.replace(/\\n/g, '\n')
   }
 
+  return null
+}
+
+function buildPublicJwk(publicKey: crypto.KeyObject): { publicJwk: PublicJwk; kid: string } {
   if (
-    privateKey.asymmetricKeyType !== 'ec' ||
-    privateKey.asymmetricKeyDetails?.namedCurve !== 'prime256v1'
+    publicKey.asymmetricKeyType !== 'ec' ||
+    publicKey.asymmetricKeyDetails?.namedCurve !== 'prime256v1'
   ) {
     throw new OAuthConfigError('OAuth signing key invalid')
   }
 
-  const publicKey = crypto.createPublicKey(privateKey)
   const jwk = publicKey.export({ format: 'jwk' }) as {
     kty?: string
     crv?: string
@@ -148,13 +161,66 @@ export function getSigningKey(): CachedSigningKey {
     alg: 'ES256',
   }
 
+  return { publicJwk, kid }
+}
+
+export function getSigningKey(): CachedSigningKey {
+  const rawPem = loadRawPem()
+  if (cachedKey && cachedKey.rawPem === rawPem) {
+    return cachedKey
+  }
+
+  let privateKey: crypto.KeyObject
+  try {
+    privateKey = crypto.createPrivateKey(rawPem)
+  } catch {
+    throw new OAuthConfigError('OAuth signing key invalid')
+  }
+
+  if (
+    privateKey.asymmetricKeyType !== 'ec' ||
+    privateKey.asymmetricKeyDetails?.namedCurve !== 'prime256v1'
+  ) {
+    throw new OAuthConfigError('OAuth signing key invalid')
+  }
+
+  const publicKey = crypto.createPublicKey(privateKey)
+  const { publicJwk, kid } = buildPublicJwk(publicKey)
+
   cachedKey = { rawPem, privateKey, publicKey, publicJwk, kid }
   return cachedKey
 }
 
-export function getPublicJwks(): { keys: [PublicJwk] } {
-  const { publicJwk } = getSigningKey()
-  return { keys: [publicJwk] }
+export function getPreviousVerificationKey(): CachedVerificationKey | null {
+  const rawPem = loadPreviousRawPem()
+  if (!rawPem) {
+    cachedPreviousKey = null
+    return null
+  }
+
+  if (cachedPreviousKey && cachedPreviousKey.rawPem === rawPem) {
+    return cachedPreviousKey
+  }
+
+  let publicKey: crypto.KeyObject
+  try {
+    publicKey = crypto.createPublicKey(rawPem)
+  } catch {
+    throw new OAuthConfigError('OAuth previous signing key invalid')
+  }
+
+  const { publicJwk, kid } = buildPublicJwk(publicKey)
+  cachedPreviousKey = { rawPem, publicKey, publicJwk, kid }
+  return cachedPreviousKey
+}
+
+export function getPublicJwks(): { keys: PublicJwk[] } {
+  const primary = getSigningKey()
+  const previous = getPreviousVerificationKey()
+  if (previous && previous.kid !== primary.kid) {
+    return { keys: [primary.publicJwk, previous.publicJwk] }
+  }
+  return { keys: [primary.publicJwk] }
 }
 
 export function signMcpAccessToken(params: {
@@ -177,6 +243,11 @@ export function signMcpAccessToken(params: {
     {
       algorithm: 'ES256',
       keyid: kid,
+      header: {
+        alg: 'ES256',
+        typ: 'at+jwt',
+        kid,
+      },
       issuer,
       audience: params.resource,
       expiresIn: ACCESS_TOKEN_TTL,
@@ -191,16 +262,32 @@ export function verifyMcpAccessToken(
   token: string,
   options?: { ignoreExpiration?: boolean }
 ): McpAccessTokenPayload {
-  const { publicKey, kid } = getSigningKey()
+  const primary = getSigningKey()
+  const previous = getPreviousVerificationKey()
   const issuer = getIssuer()
   const resource = getMcpResource()
 
   const decoded = jwt.decode(token, { complete: true })
-  if (!decoded || typeof decoded !== 'object' || !decoded.header || decoded.header.kid !== kid) {
+  if (!decoded || typeof decoded !== 'object' || !decoded.header) {
+    throw new Error('Invalid token header')
+  }
+
+  if (decoded.header.typ !== 'at+jwt') {
+    throw new Error('Invalid token typ')
+  }
+
+  let verificationKey: crypto.KeyObject | null = null
+  if (decoded.header.kid === primary.kid) {
+    verificationKey = primary.publicKey
+  } else if (previous && decoded.header.kid === previous.kid) {
+    verificationKey = previous.publicKey
+  }
+
+  if (!verificationKey) {
     throw new Error('Invalid token kid')
   }
 
-  const verified = jwt.verify(token, publicKey, {
+  const verified = jwt.verify(token, verificationKey, {
     algorithms: ['ES256'],
     issuer,
     audience: resource,
