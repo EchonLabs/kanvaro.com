@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
+import { authenticateUser } from '@/lib/auth-utils'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { resolveReportUserFilter } from '@/lib/time-tracking-report-scope'
 import { TimeEntry } from '@/models/TimeEntry'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
@@ -47,8 +51,21 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB()
 
+    // F2: this route had no sign-in and trusted ?organizationId= and ?userId=.
+    const auth = await authenticateUser()
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+    const viewerId = auth.user.id
+    const organizationId = auth.user.organization
+
+    // Same gate as the reports page; loaded once for the scoping below too.
+    const permissions = await PermissionService.getUserPermissions(viewerId)
+    if (!PermissionService.hasPermissionIn(permissions, Permission.TIME_LOG_REPORT_ACCESS)) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+
     const { searchParams } = new URL(request.url)
-    const organizationId = searchParams.get('organizationId')
     const projectId = searchParams.get('projectId')
     const userId = searchParams.get('userId')
     const assignedBy = searchParams.get('assignedBy')
@@ -57,10 +74,6 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate')
     const reportType = searchParams.get('reportType') || 'summary'
     const format = (searchParams.get('format') || 'json').toLowerCase()
-
-    if (!organizationId) {
-      return NextResponse.json({ error: 'Organization ID is required' }, { status: 400 })
-    }
 
     const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Default to last 30 days
     const end = endDate ? new Date(endDate) : new Date()
@@ -80,7 +93,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (projectId) baseQuery.project = projectId
-    if (userId) baseQuery.user = userId
+    const userFilter = await resolveReportUserFilter({
+      permissions,
+      viewerId,
+      organizationId,
+      requestedUserId: userId
+    })
+    if (userFilter === 'forbidden') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    if (userFilter) baseQuery.user = userFilter
     if (assignedBy) {
       // Only include entries where approvedBy is set to assignedBy (exclude auto-approved)
       baseQuery.approvedBy = assignedBy

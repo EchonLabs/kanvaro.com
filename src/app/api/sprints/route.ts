@@ -9,6 +9,7 @@ import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { EmailService } from '@/lib/email/EmailService'
 import { logActivity } from '@/lib/activity-logger'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 // Helper function to send sprint assignment email to team members
 async function sendSprintAssignmentEmails(
@@ -164,6 +165,8 @@ export async function GET(request: NextRequest) {
     const wantsAll = searchParams.get('all') === 'true'
     const PAGE_SIZE = wantsAll ? 500 : Math.min(limit, 100)
     const search = searchParams.get('search') || ''
+    // Used as a regex below: escaped so the text is matched literally.
+    const searchPattern = escapeRegex(search || '')
     const status = searchParams.get('status') || ''
     const projectFilter = searchParams.get('project') || ''
     const countOnly = searchParams.get('countOnly') === 'true'
@@ -206,8 +209,8 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       filters.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
+        { name: { $regex: searchPattern, $options: 'i' } },
+        { description: { $regex: searchPattern, $options: 'i' } },
       ]
     }
 

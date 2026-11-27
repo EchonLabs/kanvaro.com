@@ -6,6 +6,14 @@ import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { pickFields, rejectUnlessProjectMoveAllowed } from '@/lib/api/update-fields'
+
+/** Epic fields a client may change (F7). createdBy and completedAt stay server-side. */
+const EPIC_EDITABLE_FIELDS = [
+  'title', 'description', 'project', 'assignedTo', 'status', 'priority',
+  'storyPoints', 'estimatedHours', 'actualHours', 'startDate', 'dueDate',
+  'tags', 'attachments', 'archived'
+] as const
 
 export async function GET(
   request: NextRequest,
@@ -141,14 +149,16 @@ export async function PUT(
     const organizationId = user.organization
     const epicId = params.id
 
-    const updateData = await request.json()
+    // F7: only fields a client may edit (the body used to go straight to the database).
+    const updateData = pickFields(await request.json(), EPIC_EDITABLE_FIELDS)
 
     const existingEpic = await Epic.findById(epicId)
-      .populate('project', 'name')
+      .populate('project', 'name organization')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
 
-    if (!existingEpic) {
+    const epicOrganization = (existingEpic?.project as any)?.organization
+    if (!existingEpic || (epicOrganization && String(epicOrganization) !== String(organizationId))) {
       return NextResponse.json(
         { error: 'Epic not found or unauthorized' },
         { status: 404 }
@@ -169,6 +179,18 @@ console.log('canEditEpic',canEditEpic);
         { error: 'You do not have permission to edit this epic' },
         { status: 403 }
       )
+    }
+
+    // Moving the epic to another project: the target must be one the caller can access.
+    const currentProjectId = (existingEpic.project as any)?._id?.toString()
+    if (updateData.project !== undefined && String(updateData.project) !== currentProjectId) {
+      const moveDenied = await rejectUnlessProjectMoveAllowed({
+        requestedProjectId: updateData.project,
+        currentProjectId,
+        organizationId,
+        permissions: await PermissionService.getUserPermissions(userId)
+      })
+      if (moveDenied) return moveDenied
     }
 
     const epic = await Epic.findByIdAndUpdate(

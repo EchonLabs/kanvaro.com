@@ -9,6 +9,7 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { Mail, TestTube, Save, AlertCircle, CheckCircle, Loader2, Server, Cloud, Ban } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
 import { cn } from '@/lib/utils'
+import { SECRET_REENTRY_ERROR } from '@/lib/settings/secret-mask'
 
 const PROVIDERS = [
   {
@@ -137,7 +138,10 @@ export function EmailSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-      if (!response.ok) throw new Error('Failed to update email settings')
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}))
+        throw new Error(result?.error === SECRET_REENTRY_ERROR ? result.error : 'Failed to update email settings')
+      }
       savedConfig.current = { ...formData }
       notifySuccess({ title: 'Email Settings Updated', message: 'Email configuration has been updated successfully' })
     } catch (error) {

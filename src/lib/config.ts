@@ -37,7 +37,6 @@ export function loadConfig(): AppConfig {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const configData = fs.readFileSync(CONFIG_FILE, 'utf8')
-      console.log('configData', configData)
       return JSON.parse(configData)
     }
   } catch (error) {

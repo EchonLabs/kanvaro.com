@@ -113,8 +113,11 @@ export default function GanttReportPage() {
         setProjects(Array.isArray(d) ? d : (d?.data && Array.isArray(d.data) ? d.data : []))
       }
       if (ar.ok) {
+        // /api/members answers { data: { members: [...] } }; reading `data` as
+        // the list left this dropdown empty, so the filter could not be used.
         const d = await ar.json()
-        setAssignees(Array.isArray(d) ? d : (d?.data && Array.isArray(d.data) ? d.data : []))
+        const list = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : d?.data?.members
+        setAssignees(Array.isArray(list) ? list : [])
       }
     } catch (e) { console.error('Failed to load filter options:', e) }
   }
@@ -403,7 +406,9 @@ export default function GanttReportPage() {
                         {filteredAssignees.length === 0
                           ? <div className="px-2 py-1 text-[12px] text-[var(--apple-tertiary-label)]">No matching assignees</div>
                           : filteredAssignees.map(a => (
-                            <SelectItem key={a._id} value={a._id} className="text-[13px]">{a.name}</SelectItem>
+                            <SelectItem key={a._id} value={a._id} className="text-[13px]">
+                              {a.name || `${a.firstName || ''} ${a.lastName || ''}`.trim() || a.email}
+                            </SelectItem>
                           ))
                         }
                       </div>

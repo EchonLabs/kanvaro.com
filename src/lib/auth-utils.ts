@@ -2,9 +2,7 @@ import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 import jwt from 'jsonwebtoken'
 import { cookies, headers } from 'next/headers'
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
+import { getJwtSecret, getJwtRefreshSecret } from '@/lib/auth/jwt-secrets'
 
 /**
  * The authenticated caller, as every route sees them.
@@ -36,7 +34,24 @@ export async function withAuth(request: any, handler: (user: AuthUser) => Promis
 }
 
 export async function authenticateUser(): Promise<{ user: AuthUser } | { error: string; status: number }> {
+  const result = await authenticateUserWithDocument()
+  return 'error' in result ? result : { user: result.user }
+}
+
+/**
+ * `authenticateUser`, plus the user document it already loaded. For routes
+ * that need more of the user than `AuthUser` (GET /api/auth/me), so they don't
+ * load the same user a second time.
+ */
+export async function authenticateUserWithDocument(): Promise<
+  { user: AuthUser; document: any } | { error: string; status: number }
+> {
   try {
+    // Read both secrets first: a misconfigured production server must surface
+    // here (logged, 500), not be swallowed by the token fallback logic below.
+    getJwtSecret()
+    getJwtRefreshSecret()
+
     await connectDB()
 
     const cookieStore = cookies()
@@ -58,13 +73,15 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
     }
 
     let userData = null
+    let document: any = null
 
     // Try to verify access token first
     if (effectiveAccessToken) {
       try {
-        const decoded = jwt.verify(effectiveAccessToken, JWT_SECRET) as any
+        const decoded = jwt.verify(effectiveAccessToken, getJwtSecret()) as any
         const user = await User.findById(decoded.userId)
         if (user && user.isActive) {
+          document = user
           userData = {
             id: user._id.toString(),
             organization: user.organization?.toString(),
@@ -76,13 +93,14 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
         // Access token is invalid, try refresh token
         if (refreshToken) {
           try {
-            const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any
+            const decoded = jwt.verify(refreshToken, getJwtRefreshSecret()) as any
             const user = await User.findById(decoded.userId)
             if (user && user.isActive) {
+              document = user
               // Create new access token
               const newAccessToken = jwt.sign(
                 { userId: user._id, email: user.email, role: user.role },
-                JWT_SECRET,
+                getJwtSecret(),
                 { expiresIn: '15m' }
               )
 
@@ -115,13 +133,14 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
     } else if (refreshToken) {
       // Only refresh token available
       try {
-        const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any
+        const decoded = jwt.verify(refreshToken, getJwtRefreshSecret()) as any
         const user = await User.findById(decoded.userId)
         if (user && user.isActive) {
+          document = user
           // Create new access token
           const newAccessToken = jwt.sign(
             { userId: user._id, email: user.email, role: user.role },
-            JWT_SECRET,
+            getJwtSecret(),
             { expiresIn: '15m' }
           )
 
@@ -149,7 +168,7 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
       return { error: 'User not found or inactive', status: 401 }
     }
 
-    return { user: userData }
+    return { user: userData, document }
   } catch (error) {
     console.error('Authentication error:', error)
     return { error: 'Internal server error', status: 500 }

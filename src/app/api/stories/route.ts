@@ -9,6 +9,7 @@ import { Sprint } from '@/models/Sprint'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,6 +41,8 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const search = searchParams.get('search') || ''
+    // Used as a regex below: escaped so the text is matched literally.
+    const searchPattern = escapeRegex(search || '')
     const projectId = searchParams.get('projectId')
     const epicId = searchParams.get('epicId')
     const status = searchParams.get('status')
@@ -113,8 +116,8 @@ export async function GET(request: NextRequest) {
     // Full-text search across title and description
     if (search) {
       filters.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { title: { $regex: searchPattern, $options: 'i' } },
+        { description: { $regex: searchPattern, $options: 'i' } }
       ]
     }
 

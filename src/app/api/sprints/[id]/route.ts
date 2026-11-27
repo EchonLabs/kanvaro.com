@@ -18,6 +18,17 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { assertTransition, type SprintState } from '@/lib/standup/sprint-states'
 import { standupStrings } from '@/lib/standup/strings'
 import { logActivity } from '@/lib/activity-logger'
+import { pickFields, rejectUnlessProjectMoveAllowed } from '@/lib/api/update-fields'
+
+/**
+ * Sprint fields a client may change (F7). Lifecycle and planning fields
+ * (actualStartDate, actualEndDate, activePlanningSession, plannedAt,
+ * planningWaiver, health warnings…) are set only by their own endpoints.
+ */
+const SPRINT_EDITABLE_FIELDS = [
+  'name', 'description', 'status', 'startDate', 'endDate', 'goal', 'capacity',
+  'velocity', 'plannedVelocity', 'project', 'teamMembers', 'tasks', 'stories', 'archived'
+] as const
 
 export async function GET(
   request: NextRequest,
@@ -291,7 +302,8 @@ export async function PUT(
     const organizationId = user.organization
     const sprintId = params.id
 
-    const updateData = await request.json()
+    // F7: only fields a client may edit (the body used to be spread straight into the update).
+    const updateData: Record<string, any> = pickFields(await request.json(), SPRINT_EDITABLE_FIELDS)
 
     // Update sprint by id only (visibility/auth policy relaxed for PUT by id)
     const existingSprint = await Sprint.findById(sprintId)
@@ -327,6 +339,17 @@ export async function PUT(
         { error: 'You do not have permission to edit this sprint' },
         { status: 403 }
       )
+    }
+
+    // Moving the sprint to another project: the target must be one the caller can access.
+    if (updateData.project !== undefined && String(updateData.project) !== sprintProjectId) {
+      const moveDenied = await rejectUnlessProjectMoveAllowed({
+        requestedProjectId: updateData.project,
+        currentProjectId: sprintProjectId,
+        organizationId,
+        permissions: await PermissionService.getUserPermissions(userId)
+      })
+      if (moveDenied) return moveDenied
     }
 
     const updatePayload: any = { ...updateData }

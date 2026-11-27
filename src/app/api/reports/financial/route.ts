@@ -7,6 +7,8 @@ import { Expense } from '@/models/Expense'
 import { ProjectIncome } from '@/models/ProjectIncome'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { escapeRegex } from '@/lib/text/escape-regex'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { Types } from 'mongoose'
 
@@ -50,11 +52,21 @@ export async function GET(req: NextRequest) {
       is_deleted: { $ne: true }
     }
 
+    // F8: financial:read is held by every role, so this report used to show
+    // every project's finances to anyone. It now covers only projects the
+    // caller can access (admins, HR and PMs see all of them, as before).
+    const accessibleProjectIds = (await PermissionService.getAccessibleProjects(authResult.user.id)).map(String)
+
     if (project && project !== 'all') {
       if (!Types.ObjectId.isValid(project)) {
         return NextResponse.json({ error: 'Invalid project filter' }, { status: 400 })
       }
+      if (!accessibleProjectIds.includes(String(project))) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      }
       projectQuery._id = new Types.ObjectId(project)
+    } else {
+      projectQuery._id = { $in: accessibleProjectIds.map((id) => new Types.ObjectId(id)) }
     }
 
     const projects = await Project.find(projectQuery)
@@ -67,9 +79,11 @@ export async function GET(req: NextRequest) {
     let budgetQuery: any = { project: { $in: projectIds } }
     
     if (search) {
+      // Matched literally: the search text goes into $regex.
+      const pattern = escapeRegex(search)
       budgetQuery.$or = [
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } }
+        { description: { $regex: pattern, $options: 'i' } },
+        { category: { $regex: pattern, $options: 'i' } }
       ]
     }
     
@@ -99,7 +113,21 @@ export async function GET(req: NextRequest) {
       expenseMatch.expenseDate = { $gte: start, $lte: end }
     }
 
-    const incomeMatch: any = { organization: organizationId, project: { $in: projectIds } }
+    // Income needs financial:view_income, as GET /api/projects/:id/income does.
+    // Without it the income query matches nothing, so every income figure in
+    // the report (totals, trends, revenue sources) comes back as zero/empty.
+    const canViewIncome = await PermissionService.hasPermission(
+      authResult.user.id,
+      Permission.FINANCIAL_VIEW_INCOME,
+      project && project !== 'all' ? String(project) : undefined
+    )
+    // aggregate() does not cast strings to ObjectIds, and organizationId is a
+    // string here, so matching it as-is found no income at all: the report
+    // always showed 0 revenue.
+    const incomeMatch: any = {
+      organization: new Types.ObjectId(organizationId),
+      project: { $in: canViewIncome ? projectIds : [] }
+    }
     if (hasDateRange) {
       incomeMatch.createdAt = { $gte: start, $lte: end }
     }

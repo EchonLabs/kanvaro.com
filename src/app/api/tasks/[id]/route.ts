@@ -5,7 +5,8 @@ import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { Sprint } from '@/models/Sprint'
-import '@/models/Story'
+import { Story } from '@/models/Story'
+import { Epic } from '@/models/Epic'
 import { authenticateUser } from '@/lib/auth-utils'
 import { CompletionService } from '@/lib/completion-service'
 import { notificationService } from '@/lib/notification-service'
@@ -18,6 +19,27 @@ import { resolveBaseUrl } from '@/lib/request-base-url'
 import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
 import { closeCarryForwardItemsForDeletedTask } from '@/lib/standup/carry-forward-service'
 import { hoursToMinutes } from '@/lib/standup/minutes'
+import {
+  pickFields,
+  refId,
+  rejectLinksOutsideProject,
+  rejectUnlessProjectMoveAllowed
+} from '@/lib/api/update-fields'
+
+/**
+ * Task fields a client may change (F7). Everything else is server-owned:
+ * organization, numbering, createdBy, the estimate/poker/stand-up bookkeeping
+ * (originalEstimateMinutes, estimatedAt, standupOwner, descope fields…),
+ * reminder state, comments (own route) and test-execution links.
+ */
+const TASK_EDITABLE_FIELDS = [
+  'title', 'description', 'status', 'priority', 'type', 'category', 'isBillable',
+  'project', 'module', 'story', 'epic', 'parentTask', 'assignedTo', 'storyPoints',
+  'dueDate', 'startDate', 'estimatedHours', 'actualHours', 'position', 'sprint',
+  'labels', 'dependencies', 'attachments', 'subtasks', 'archived',
+  // Not stored: the client's last-seen updatedAt, for the concurrent-edit check.
+  'expectedVersion'
+] as const
 import { DEFAULT_TASK_STATUS_KEYS } from '@/constants/taskStatuses'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
@@ -566,7 +588,8 @@ export async function PUT(
     }
 
     const rawUpdate = await request.json()
-    const updateData: Record<string, any> = { ...rawUpdate }
+    // F7: only fields a client may edit; the body used to be spread straight in.
+    const updateData: Record<string, any> = pickFields(rawUpdate, TASK_EDITABLE_FIELDS)
     console.log('[Task PUT] Incoming payload', {
       taskId,
       receivedKeys: Object.keys(updateData)
@@ -719,11 +742,12 @@ export async function PUT(
     }
 
     // Check if user has permission to edit all tasks
-    const [hasTaskEditAll, hasProjectViewAll, canEditAssignedProjects] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TASK_EDIT_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.TASK_EDIT_ASSIGNED_PROJECTS)
-    ]);
+    // Loaded once (each hasPermission call re-reads the user and their projects;
+    // this route runs on every kanban drag).
+    const permissions = await PermissionService.getUserPermissions(userId)
+    const hasTaskEditAll = PermissionService.hasPermissionIn(permissions, Permission.TASK_EDIT_ALL)
+    const hasProjectViewAll = PermissionService.hasPermissionIn(permissions, Permission.PROJECT_VIEW_ALL)
+    const canEditAssignedProjects = PermissionService.hasPermissionIn(permissions, Permission.TASK_EDIT_ASSIGNED_PROJECTS)
 
     // Build query - if user has TASK_EDIT_ALL or PROJECT_VIEW_ALL, they can edit any task
     const taskQuery: any = {
@@ -755,6 +779,42 @@ export async function PUT(
         { status: 404 }
       )
     }
+
+    // Moving the task to another project: the target must be one the caller can
+    // access (Kanvaro never checked the target project; decision record §2.3).
+    const moveDenied = await rejectUnlessProjectMoveAllowed({
+      requestedProjectId: updateData.project,
+      currentProjectId: (currentTask.project as any)?._id?.toString() || currentTask.project?.toString(),
+      organizationId,
+      permissions
+    })
+    if (moveDenied) return moveDenied
+
+    // Links must stay inside the task's project. Only links this request adds
+    // or changes are checked (all submitted ones when the task moves project),
+    // so a task with older links can still be saved.
+    const currentProjectId = refId(currentTask.project)
+    const effectiveProjectId = refId(updateData.project) || currentProjectId
+    const projectChanges = effectiveProjectId !== currentProjectId
+    const changedLink = (field: 'story' | 'epic' | 'parentTask' | 'sprint') => {
+      if (!Object.prototype.hasOwnProperty.call(updateData, field)) return []
+      const next = refId(updateData[field])
+      return next && (projectChanges || next !== refId((currentTask as any)[field])) ? [next] : []
+    }
+    const currentDependencies = new Set(
+      (Array.isArray(currentTask.dependencies) ? currentTask.dependencies : []).map(refId)
+    )
+    const addedDependencies = Array.isArray(updateData.dependencies)
+      ? updateData.dependencies.map(refId).filter((id: string) => projectChanges || !currentDependencies.has(id))
+      : []
+    const linkDenied = await rejectLinksOutsideProject(effectiveProjectId, [
+      { label: 'story', model: Story, ids: changedLink('story') },
+      { label: 'epic', model: Epic, ids: changedLink('epic') },
+      { label: 'parent task', model: Task, ids: changedLink('parentTask') },
+      { label: 'sprint', model: Sprint, ids: changedLink('sprint') },
+      { label: 'dependency', model: Task, ids: addedDependencies }
+    ])
+    if (linkDenied) return linkDenied
 
     // Reject a status the task's project does not have (e.g. a drag from the
     // "All Projects" board into another project's custom column). 'backlog' is

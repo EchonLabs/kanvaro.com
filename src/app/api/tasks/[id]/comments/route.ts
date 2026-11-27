@@ -55,6 +55,33 @@ const sanitizeAttachments = (raw: unknown, userId: string) => {
     }>
 }
 
+/**
+ * Editing or deleting a comment: it must belong to the caller's organisation,
+ * and the caller must be its author or hold task:update on the task's project.
+ *
+ * The old check only refused when the comment was in another organisation
+ * ("not author AND no task:update AND different org"), so inside the
+ * organisation anyone signed in could edit or delete anyone's comment. It also
+ * passed the task id where the project id belongs (decision record F6).
+ */
+async function rejectUnlessCanModifyComment(
+  userId: string,
+  organizationId: string,
+  task: { organization?: any; project?: any },
+  comment: { author?: any }
+): Promise<NextResponse | null> {
+  if (task.organization && organizationId && task.organization.toString() !== organizationId.toString()) {
+    return NextResponse.json({ error: 'Access denied to task' }, { status: 403 })
+  }
+  if (comment.author?.toString() === userId.toString()) return null
+
+  const permissions = await PermissionService.getUserPermissions(userId)
+  const projectId = task.project ? String(task.project) : undefined
+  if (PermissionService.hasPermissionIn(permissions, Permission.TASK_UPDATE, projectId)) return null
+
+  return NextResponse.json({ error: 'You can only change your own comments' }, { status: 403 })
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -126,15 +153,25 @@ export async function POST(
       )
     }
 
-    const [canTaskViewAll, canProjectViewAll, canTaskUpdate] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.TASK_UPDATE, taskId)
-    ])
+    // F6: project-scoped checks must receive the task's PROJECT id. They used to
+    // receive the task id, so project members could never pass them and only
+    // the assignee or creator could comment. Permissions are loaded once.
+    const projectId = task.project ? String(task.project) : undefined
+    const permissions = await PermissionService.getUserPermissions(userId)
+    const canTaskViewAll = PermissionService.hasPermissionIn(permissions, Permission.TASK_VIEW_ALL)
+    const canProjectViewAll = PermissionService.hasPermissionIn(permissions, Permission.PROJECT_VIEW_ALL)
+    const canTaskUpdate = PermissionService.hasPermissionIn(permissions, Permission.TASK_UPDATE, projectId)
+    // task:manage_comments is the comment permission. Team members hold it
+    // organisation-wide, so it only counts on a project the caller can access;
+    // otherwise anyone could comment on tasks in projects they cannot see.
+    const canManageComments =
+      !!projectId &&
+      PermissionService.hasPermissionIn(permissions, Permission.TASK_MANAGE_COMMENTS, projectId) &&
+      PermissionService.canAccessProjectIn(permissions, projectId)
     const isAssignee = Array.isArray(task.assignedTo) && task.assignedTo.some(assignee => assignee.user?.toString() === userId.toString())
     const isCreator = task.createdBy && task.createdBy.toString() === userId
 
-    if (!canTaskViewAll && !canProjectViewAll && !canTaskUpdate && !isAssignee && !isCreator) {
+    if (!canTaskViewAll && !canProjectViewAll && !canTaskUpdate && !canManageComments && !isAssignee && !isCreator) {
       return NextResponse.json(
         { error: 'Insufficient permissions to comment on this task' },
         { status: 403 }
@@ -369,9 +406,10 @@ export async function PATCH(
     }
 
     const task = await Task.findById(taskId)
-      .select('organization comments._id comments.author comments.parentCommentId')
+      .select('organization project comments._id comments.author comments.parentCommentId')
       .lean<{
         organization?: any
+        project?: any
         comments?: Array<{ _id?: any; author?: any; parentCommentId?: any }>
       }>()
       .exec()
@@ -382,13 +420,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
     }
 
-    const isAuthor = comment.author?.toString() === userId.toString()
-    const canTaskUpdate = await PermissionService.hasPermission(userId.toString(), Permission.TASK_UPDATE, taskId)
-
-    // Allow author or TASK_UPDATE even if org mismatch; otherwise enforce org
-    if (!isAuthor && !canTaskUpdate && task.organization && organizationId && task.organization.toString() !== organizationId.toString()) {
-      return NextResponse.json({ error: 'Access denied to task' }, { status: 403 })
-    }
+    const denied = await rejectUnlessCanModifyComment(userId, organizationId, task, comment)
+    if (denied) return denied
 
     const now = new Date()
     const result = await Task.updateOne(
@@ -455,9 +488,10 @@ export async function DELETE(
     }
 
     const task = await Task.findById(taskId)
-      .select('organization comments._id comments.author')
+      .select('organization project comments._id comments.author')
       .lean<{
         organization?: any
+        project?: any
         comments?: Array<{ _id?: any; author?: any }>
       }>()
       .exec()
@@ -468,13 +502,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
     }
 
-    const isAuthor = comment.author?.toString() === userId.toString()
-    const canTaskUpdate = await PermissionService.hasPermission(userId.toString(), Permission.TASK_UPDATE, taskId)
-
-    // Allow author or TASK_UPDATE even if org mismatch; otherwise enforce org
-    if (!isAuthor && !canTaskUpdate && task.organization && organizationId && task.organization.toString() !== organizationId.toString()) {
-      return NextResponse.json({ error: 'Access denied to task' }, { status: 403 })
-    }
+    const denied = await rejectUnlessCanModifyComment(userId, organizationId, task, comment)
+    if (denied) return denied
 
     const result = await Task.updateOne(
       { _id: taskId },

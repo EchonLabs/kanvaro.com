@@ -7,6 +7,7 @@ import { TimeEntry } from '@/models/TimeEntry'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,6 +26,8 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const search = searchParams.get('search')
+    // Used as a regex below: escaped so the text is matched literally.
+    const searchPattern = escapeRegex(search || '')
     const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
@@ -36,8 +39,8 @@ export async function GET(req: NextRequest) {
     
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { name: { $regex: searchPattern, $options: 'i' } },
+        { description: { $regex: searchPattern, $options: 'i' } }
       ]
     }
     

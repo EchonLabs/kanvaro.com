@@ -185,10 +185,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const orgId = auth.user.organization
     const currentTask = auth.task
-    const targetTask = await Task.findOne({ _id: targetTaskId, organization: orgId }).select('_id displayId title status')
+    const targetTask = await Task.findOne({ _id: targetTaskId, organization: orgId }).select('_id displayId title status project')
 
     if (!targetTask) {
       return NextResponse.json({ error: 'Target task not found' }, { status: 404 })
+    }
+
+    // Dependencies stay inside one project (PR #927 review): the other task
+    // must be in this task's project, which the caller is known to reach.
+    if (!currentTask.project || String(targetTask.project) !== String(currentTask.project)) {
+      return NextResponse.json(
+        { error: 'The linked dependency must be in the same project as this item' },
+        { status: 400 }
+      )
     }
 
     if (['done', 'cancelled'].includes(targetTask.status) || ['done', 'cancelled'].includes(currentTask.status)) {

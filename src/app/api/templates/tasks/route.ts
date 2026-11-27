@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db-config'
 import { TaskTemplate } from '@/models/TaskTemplate'
 import '@/models/User' // Ensure User model is registered for populate('createdBy')
 import { authenticateUser } from '@/lib/auth-utils'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,6 +17,8 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get('category')
     const isPublic = searchParams.get('isPublic')
     const search = searchParams.get('search')
+    // Used as a regex below: escaped so the text is matched literally.
+    const searchPattern = escapeRegex(search || '')
 
     if (!organizationId) {
       return NextResponse.json({ error: 'Organization ID required' }, { status: 400 })
@@ -40,9 +43,9 @@ export async function GET(req: NextRequest) {
 
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { tags: { $in: [new RegExp(search, 'i')] } }
+        { name: { $regex: searchPattern, $options: 'i' } },
+        { description: { $regex: searchPattern, $options: 'i' } },
+        { tags: { $in: [new RegExp(searchPattern, 'i')] } }
       ]
     }
 

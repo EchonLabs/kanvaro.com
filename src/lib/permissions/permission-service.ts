@@ -78,6 +78,32 @@ export class PermissionService {
     projectId?: string
   ): Promise<boolean> {
     const userPermissions = await this.getUserPermissions(userId);
+    return this.hasPermissionIn(userPermissions, permission, projectId);
+  }
+
+  /**
+   * Is `permission` actually granted to the user's role (or custom role)?
+   *
+   * Use this, not `hasPermissionIn`, when an OWN-scoped permission
+   * (`user:read`, `user:update`, …) guards data about *other* people.
+   * `hasPermissionIn` answers "may they act on their own record", which is
+   * always yes for OWN permissions, so it would let every role through.
+   */
+  static isGrantedIn(userPermissions: UserPermissions, permission: Permission): boolean {
+    return userPermissions.globalPermissions.includes(permission);
+  }
+
+  /**
+   * Same check as `hasPermission`, against permissions already loaded with
+   * `getUserPermissions`. Each `hasPermission` call re-reads the user and all
+   * their projects, so a route needing several checks should load once and
+   * use this.
+   */
+  static hasPermissionIn(
+    userPermissions: UserPermissions,
+    permission: Permission,
+    projectId?: string
+  ): boolean {
     const scope = getPermissionScope(permission);
 
     switch (scope) {
@@ -159,6 +185,17 @@ export class PermissionService {
     }
 
     // Check if user has access to this specific project
+    return userPermissions.projectPermissions.has(projectId);
+  }
+
+  /**
+   * `canAccessProject` against permissions already loaded, for a project the
+   * caller has already fetched. The caller must check the project belongs to
+   * the user's organisation; this only answers "may this user see it".
+   */
+  static canAccessProjectIn(userPermissions: UserPermissions, projectId: string): boolean {
+    if (userPermissions.globalPermissions.includes(Permission.PROJECT_VIEW_ALL)) return true;
+    if (userPermissions.userRole === Role.ADMIN || userPermissions.userRole === Role.SUPER_ADMIN) return true;
     return userPermissions.projectPermissions.has(projectId);
   }
 

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
+import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
 import { ActiveTimer, IActiveTimer } from '@/models/ActiveTimer'
 import { TimeEntry } from '@/models/TimeEntry'
 import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
@@ -22,12 +24,15 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB()
     
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-    const organizationId = searchParams.get('organizationId')
-    if (!userId || !organizationId) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
+    // F2: the user and organisation come from the sign-in, never from the
+    // request. This route used to trust userId/organizationId sent by anyone.
+    const auth = await authenticateUser()
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
+    const userId = auth.user.id
+    const organizationId = auth.user.organization
+    const { searchParams } = new URL(request.url)
 
     // Get active timer for user
     const activeTimer = await ActiveTimer.findOne({
@@ -90,11 +95,20 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json()
     
-    const { userId, organizationId, projectId, taskId, description, category, tags, isBillable, hourlyRate, timezone } = body
+    // F2: the user and organisation come from the sign-in, never from the
+    // request. This route used to trust userId/organizationId sent by anyone.
+    const auth = await authenticateUser()
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+    const userId = auth.user.id
+    const organizationId = auth.user.organization
+    // hourlyRate is deliberately not read from the body: the rate comes from
+    // the user's record or the org settings, never from the client.
+    const { projectId, taskId, description, category, tags, isBillable, timezone } = body
     const clientTimezone = timezone || request.headers.get('x-timezone') || undefined
 
-    if (!userId || !organizationId || !projectId) {
-   
+    if (!projectId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -111,6 +125,14 @@ export async function POST(request: NextRequest) {
     // Get project and check if time tracking is allowed
     const project = await Project.findById(projectId)
     if (!project || !project.settings.allowTimeTracking) {
+      return NextResponse.json({ error: 'Time tracking not allowed for this project' }, { status: 403 })
+    }
+    // The project must be in the caller's organisation and visible to them.
+    if (String(project.organization) !== organizationId) {
+      return NextResponse.json({ error: 'Time tracking not allowed for this project' }, { status: 403 })
+    }
+    const callerPermissions = await PermissionService.getUserPermissions(userId)
+    if (!PermissionService.canAccessProjectIn(callerPermissions, String(project._id))) {
       return NextResponse.json({ error: 'Time tracking not allowed for this project' }, { status: 403 })
     }
 
@@ -196,7 +218,7 @@ export async function POST(request: NextRequest) {
 
     // Get user's hourly rate
     const userForRate = await User.findById(userId)
-    const finalHourlyRate = hourlyRate || userForRate?.billingRate || settings.defaultHourlyRate
+    const finalHourlyRate = userForRate?.billingRate || settings.defaultHourlyRate
 
     const startTime = new Date()
 
@@ -281,9 +303,17 @@ export async function PUT(request: NextRequest) {
     await connectDB()
     
     const body = await request.json()
-    const { userId, organizationId, action, description, category, tags, timezone } = body
+    // F2: the user and organisation come from the sign-in, never from the
+    // request. This route used to trust userId/organizationId sent by anyone.
+    const auth = await authenticateUser()
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+    const userId = auth.user.id
+    const organizationId = auth.user.organization
+    const { action, description, category, tags, timezone } = body
 
-    if (!userId || !organizationId || !action) {
+    if (!action) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 

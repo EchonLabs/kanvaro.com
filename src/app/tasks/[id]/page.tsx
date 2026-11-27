@@ -3012,6 +3012,7 @@ export default function TaskDetailPage() {
             {/* Task Dependencies */}
             <TaskDependencies
               taskId={task._id}
+              projectId={task.project as any}
               taskStatus={task.status}
               initialBlockedBy={task.dependencies || []}
               initialBlocking={task.blockingTasks || []}

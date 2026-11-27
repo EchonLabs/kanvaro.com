@@ -6,6 +6,7 @@ import { Sprint } from '@/models/Sprint'
 import { TimeEntry } from '@/models/TimeEntry'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function GET(req: NextRequest) {
@@ -28,8 +29,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 })
     }
 
-    // Check if user has access to this project
-    const hasAccess = await hasPermission(authResult.user.id, Permission.PROJECT_READ, projectId)
+    // Check if user has access to this project. F8: project:read is held
+    // globally by every role, so it never limited this; use project access.
+    const hasAccess = await PermissionService.canAccessProject(authResult.user.id, projectId)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }

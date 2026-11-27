@@ -1332,6 +1332,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated, on
                 <div className="pt-4 border-t border-[var(--apple-separator)]">
                   <TaskDependencies
                     taskId={task._id}
+                    projectId={task.project as any}
                     taskStatus={formData.status || task.status}
                     initialBlockedBy={draftBlockedBy}
                     initialBlocking={draftBlocking}

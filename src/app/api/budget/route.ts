@@ -5,6 +5,7 @@ import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function GET(req: NextRequest) {
@@ -24,7 +25,10 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10')
 
     let query: any = {}
-    
+
+    // F8: project:read is held globally by every role (viewers and clients
+    // too), so it limited nothing, and with no projectId this listed every
+    // budget entry in the database. Reads now follow project access.
     if (projectId) {
       // Check if user has access to this project
       const project = await Project.findById(projectId)
@@ -32,12 +36,14 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Project not found' }, { status: 404 })
       }
 
-      const hasAccess = await hasPermission(authResult.user.id, Permission.PROJECT_READ, projectId)
+      const hasAccess = await PermissionService.canAccessProject(authResult.user.id, projectId)
       if (!hasAccess) {
         return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
       }
 
       query.project = projectId
+    } else {
+      query.project = { $in: await PermissionService.getAccessibleProjects(authResult.user.id) }
     }
 
     if (category) {

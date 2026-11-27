@@ -32,6 +32,7 @@ function buildProjectRoles(teamMembers: unknown, assignedBy: string) {
 const pendingRequests = new Map<string, Promise<any>>()
 import { Counter } from '@/models/Counter'
 import { apiBaseUrl } from 'next-auth/client/_utils'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,6 +63,8 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '1000')
     const search = searchParams.get('search') || ''
+    // Used as a regex below: escaped so the text is matched literally.
+    const searchPattern = escapeRegex(search || '')
     const status = searchParams.get('status') || ''
     const priority = searchParams.get('priority') || ''
 
@@ -73,8 +76,8 @@ export async function GET(request: NextRequest) {
     
     if (search) {
       filters.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { name: { $regex: searchPattern, $options: 'i' } },
+        { description: { $regex: searchPattern, $options: 'i' } }
       ]
     }
     

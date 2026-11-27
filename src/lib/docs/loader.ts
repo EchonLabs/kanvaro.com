@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { DocNode, DocFrontmatter, DocsIndex, SearchIndexItem, DocHeading, Audience, Category, Visibility } from './types';
+import { escapeRegex } from '@/lib/text/escape-regex';
 
 const DOCS_PATH = path.join(process.cwd(), 'docs');
 const CACHE_KEY = 'docs-index-cache';
@@ -327,7 +328,9 @@ export class DocsLoader {
       let matches = 0;
 
       for (const term of searchTerms) {
-        const termMatches = (searchableText.match(new RegExp(term, 'gi')) || []).length;
+        // Escaped: the term comes from the user's search text, so "(" or ".*"
+        // must match literally instead of throwing or matching everything.
+        const termMatches = (searchableText.match(new RegExp(escapeRegex(term), 'gi')) || []).length;
         if (termMatches > 0) {
           matches += termMatches;
 

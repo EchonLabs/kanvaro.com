@@ -1,9 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rejectUnlessSetupOrPermission } from '@/lib/setup-guard'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import {
+  AZURE_DESTINATION,
+  SECRET_MASK,
+  SECRET_REENTRY_ERROR,
+  SMTP_DESTINATION,
+  resolveSecret,
+  sameDestination
+} from '@/lib/settings/secret-mask'
+import connectDB from '@/lib/db-config'
+import { Organization } from '@/models/Organization'
 import nodemailer from 'nodemailer'
 
 export async function POST(request: NextRequest) {
   try {
+    const denied = await rejectUnlessSetupOrPermission(Permission.SETTINGS_MANAGE_EMAIL)
+    if (denied) return denied
+
     const { provider, smtp, azure } = await request.json()
+
+    // The Settings page shows stored secrets as a placeholder. Swap in the
+    // stored value, but only when testing the same server and account it was
+    // saved for: the test logs in to whatever host the caller names, so the
+    // mask plus a host the caller controls would hand them the real password.
+    const sendsMask =
+      (provider === 'smtp' && smtp?.password === SECRET_MASK) ||
+      (provider === 'azure' && azure?.clientSecret === SECRET_MASK)
+    if (sendsMask) {
+      await connectDB()
+      const org = (await Organization.findOne({}).select('emailConfig').lean()) as any
+      const stored = org?.emailConfig || {}
+      const resolved =
+        provider === 'smtp'
+          ? resolveSecret(smtp.password, stored.smtp?.password, sameDestination(smtp, stored.smtp, SMTP_DESTINATION))
+          : resolveSecret(azure.clientSecret, stored.azure?.clientSecret, sameDestination(azure, stored.azure, AZURE_DESTINATION))
+      if ('reenter' in resolved) {
+        return NextResponse.json({ error: SECRET_REENTRY_ERROR }, { status: 400 })
+      }
+      if (provider === 'smtp') smtp.password = resolved.value
+      else azure.clientSecret = resolved.value
+    }
 
     if (provider === 'smtp') {
       // Trim all input values to remove any whitespace

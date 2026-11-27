@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
+import { rejectUnlessDevAdmin } from '@/lib/debug-guard'
 import fs from 'fs'
 import path from 'path'
 
 export async function POST() {
   try {
+    const denied = await rejectUnlessDevAdmin()
+    if (denied) return denied
+
     const configFile = path.join(process.cwd(), 'config.json')
     
     // Delete the config file if it exists

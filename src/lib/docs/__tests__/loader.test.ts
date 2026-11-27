@@ -172,8 +172,15 @@ More content here.
 
     it('should return empty array for no matches', async () => {
       const results = await DocsLoader.searchDocs('non-existent');
-      
+
       expect(results).toHaveLength(0);
+    });
+
+    it('treats regex characters in the query literally instead of throwing', async () => {
+      // The search text used to go into new RegExp() unescaped: "(" threw and
+      // ".*" matched everything.
+      await expect(DocsLoader.searchDocs('.*(')).resolves.toHaveLength(0);
+      await expect(DocsLoader.searchDocs('.*')).resolves.toHaveLength(0);
     });
 
     it('should filter by visibility', async () => {

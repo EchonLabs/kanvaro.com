@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
+import { rejectUnlessDevAdmin } from '@/lib/debug-guard'
 import { hasDatabaseConfig, getDatabaseConfig } from '@/lib/db-config'
 import { loadConfig } from '@/lib/config'
 
 export async function GET() {
   try {
+    const denied = await rejectUnlessDevAdmin()
+    if (denied) return denied
+
     console.log('Checking database configuration...')
     
     const hasConfig = await hasDatabaseConfig()

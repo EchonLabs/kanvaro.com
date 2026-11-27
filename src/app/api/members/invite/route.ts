@@ -13,6 +13,7 @@ import { formatDisplayName } from '@/lib/email/email-branding'
 import mongoose from 'mongoose'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { canGrantSystemRole, canWorkWithCustomRole } from '@/lib/permissions/role-grant-policy'
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,10 +65,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has permission to invite members
-    const [hasTeamInvite, hasUserInvite] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TEAM_INVITE),
-      PermissionService.hasPermission(userId, Permission.USER_INVITE)
-    ])
+    // Loaded once: used for the invite check and the role-grant checks below.
+    const actor = await PermissionService.getUserPermissions(userId)
+    const hasTeamInvite = PermissionService.hasPermissionIn(actor, Permission.TEAM_INVITE)
+    const hasUserInvite = PermissionService.hasPermissionIn(actor, Permission.USER_INVITE)
 
     if (!hasTeamInvite && !hasUserInvite) {
       return NextResponse.json(
@@ -129,11 +130,21 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // F11: a non-admin cannot invite someone into permissions they lack.
+      const grant = canWorkWithCustomRole(actor, customRole.permissions || [])
+      if (!grant.ok) {
+        return NextResponse.json({ error: grant.error }, { status: 403 })
+      }
+
       customRoleId = customRole._id as mongoose.Types.ObjectId
       invitationRole = 'team_member' // Use default role when custom role is set
       roleDisplayName = customRole.name
     } else if (systemRoles.includes(role)) {
-      // It's a system role
+      // It's a system role. F11: only admins can invite an admin.
+      const grant = canGrantSystemRole(actor, role)
+      if (!grant.ok) {
+        return NextResponse.json({ error: grant.error }, { status: 403 })
+      }
       invitationRole = role
       // Map system role to display name
       const roleNameMap: Record<string, string> = {

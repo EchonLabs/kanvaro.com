@@ -6,6 +6,20 @@ import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { Sprint } from '@/models/Sprint'
+import {
+  pickFields,
+  refId,
+  rejectLinksOutsideProject,
+  rejectUnlessProjectMoveAllowed
+} from '@/lib/api/update-fields'
+
+/** Story fields a client may change (F7). createdBy and completedAt stay server-side. */
+const STORY_EDITABLE_FIELDS = [
+  'title', 'description', 'acceptanceCriteria', 'project', 'epic', 'assignedTo',
+  'status', 'priority', 'storyPoints', 'estimatedHours', 'actualHours', 'sprint',
+  'startDate', 'dueDate', 'tags', 'attachments', 'archived'
+] as const
 
 export async function GET(
   request: NextRequest,
@@ -122,14 +136,17 @@ export async function PUT(
     const organizationId = user.organization
     const storyId = params.id
 
-    const updateData = await request.json()
+    // F7: only fields a client may edit; the body used to go straight to
+    // findByIdAndUpdate, so createdBy, completedAt or anything else could be set.
+    const updateData = pickFields(await request.json(), STORY_EDITABLE_FIELDS)
 
     // Only fetch essential data for permission check and update validation
     const existingStory = await Story.findById(storyId)
-      .populate('project', '_id')
+      .populate('project', '_id organization')
       .populate('createdBy', '_id')
 
-    if (!existingStory) {
+    const storyOrganization = (existingStory?.project as any)?.organization
+    if (!existingStory || (storyOrganization && String(storyOrganization) !== String(organizationId))) {
       return NextResponse.json(
         { error: 'Story not found or unauthorized' },
         { status: 404 }
@@ -148,6 +165,33 @@ export async function PUT(
         { status: 403 }
       )
     }
+
+    // Moving the story to another project: the target must be one the caller can access.
+    const currentProjectId = (existingStory.project as any)?._id?.toString()
+    if (updateData.project !== undefined && String(updateData.project) !== currentProjectId) {
+      const moveDenied = await rejectUnlessProjectMoveAllowed({
+        requestedProjectId: updateData.project,
+        currentProjectId,
+        organizationId,
+        permissions: await PermissionService.getUserPermissions(userId)
+      })
+      if (moveDenied) return moveDenied
+    }
+
+    // The story's epic and sprint must be in the story's project. Only links
+    // this request adds or changes are checked (all submitted ones on a move).
+    const effectiveProjectId = refId(updateData.project) || currentProjectId || ''
+    const projectChanges = effectiveProjectId !== currentProjectId
+    const changedLink = (field: 'epic' | 'sprint') => {
+      if (!Object.prototype.hasOwnProperty.call(updateData, field)) return []
+      const next = refId(updateData[field])
+      return next && (projectChanges || next !== refId((existingStory as any)[field])) ? [next] : []
+    }
+    const linkDenied = await rejectLinksOutsideProject(effectiveProjectId, [
+      { label: 'epic', model: Epic, ids: changedLink('epic') },
+      { label: 'sprint', model: Sprint, ids: changedLink('sprint') }
+    ])
+    if (linkDenied) return linkDenied
 
     const story: any = await Story.findByIdAndUpdate(
       storyId,

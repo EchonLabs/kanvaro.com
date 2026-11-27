@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
+import { rejectUnlessDevAdmin } from '@/lib/debug-guard'
 import connectDB from '@/lib/db-config'
 import mongoose from 'mongoose'
 
 export async function GET() {
   try {
+    const denied = await rejectUnlessDevAdmin()
+    if (denied) return denied
+
     console.log('Checking database health...')
     
     const db = await connectDB()

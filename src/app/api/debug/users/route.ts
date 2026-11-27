@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
+import { rejectUnlessDevAdmin } from '@/lib/debug-guard'
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 
 export async function GET() {
   try {
+    const denied = await rejectUnlessDevAdmin()
+    if (denied) return denied
+
     const db = await connectDB()
     console.log('Database connection state:', db.connection.readyState)
     

@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 import { Currency } from '@/models/Currency'
 import { saveDatabaseConfig } from '@/lib/config'
 import connectDB from '@/lib/db-config'
+import { rejectIfSetupCompleted } from '@/lib/setup-guard'
 
 // Currency data for seeding
 const currencyData = [
@@ -71,6 +72,9 @@ async function seedCurrencies() {
 
 export async function POST(request: NextRequest) {
   try {
+    const locked = await rejectIfSetupCompleted()
+    if (locked) return locked
+
     const config = await request.json()
     
     // For MongoDB, we don't actually "create" a database in the traditional sense
@@ -94,11 +98,7 @@ export async function POST(request: NextRequest) {
       uri = `mongodb://${host}:${port}/${config.database}`
     }
     
-    console.log('=== DATABASE CONNECTION DEBUG ===')
-    console.log('Original config:', config)
     console.log('Host conversion - original:', config.host, 'converted:', host)
-    console.log('Final URI:', uri)
-    console.log('=== END DEBUG ===')
     
     // Save database configuration first so connectDB can use it
     console.log('Saving database configuration to config file...')

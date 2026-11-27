@@ -3,8 +3,11 @@ import connectDB from '@/lib/db-config'
 import { User, Project, Task, Story, Epic, Sprint } from '@/models'
 import { DocsLoader } from '@/lib/docs/loader'
 import { authenticateUser } from '@/lib/auth-utils'
-import { Permission } from '@/lib/permissions/permission-definitions'
+import { Permission, Role } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
 import { applySearchFilters, parseFilterList } from '@/lib/search/filters'
+// Search text goes into $regex and new RegExp(); escaped so it matches literally.
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 interface SearchFilters {
   type?: string[]
@@ -135,7 +138,7 @@ function generateHighlights(query: string, text: string): string[] {
   const highlights: string[] = []
   
   for (const word of queryWords) {
-    const regex = new RegExp(`(${word})`, 'gi')
+    const regex = new RegExp(`(${escapeRegex(word)})`, 'gi')
     if (regex.test(text)) {
       highlights.push(word)
     }
@@ -193,8 +196,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
 
     const query = (searchParams.get('q') || '').trim()
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const offset = parseInt(searchParams.get('offset') || '0')
+    // Server-side ceiling: the search panel asks for 20.
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '20') || 20))
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0') || 0)
     const sortBy = searchParams.get('sortBy') || 'score'
     const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc'
     const includeArchived = searchParams.get('includeArchived') === 'true'
@@ -207,9 +211,15 @@ export async function GET(request: NextRequest) {
       project: parseFilterList(searchParams.get('project'))
     }
 
-    // Authenticate user for documentation search
+    // F4: search used to answer signed-out callers with projects, tasks and
+    // users. It now needs a sign-in and only returns what the caller can see.
     const auth = await authenticateUser()
-    const hasDocSearchPermission = auth && !('error' in auth) // Any authenticated user can search docs
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+    const viewerId = auth.user.id
+    const organizationId = auth.user.organization
+    const hasDocSearchPermission = true // any signed-in user can search docs
 
     const isProjectNumber = /^\d+$/.test(query)
     const isTaskDisplayId = /^\d+\.\d+$/.test(query)
@@ -233,12 +243,33 @@ export async function GET(request: NextRequest) {
     await connectDB()
     
     const { searchText, filters } = parseQuery(query)
+    // Escaped copy for $regex only; scoring and highlights use the plain text.
+    const searchPattern = escapeRegex(searchText)
     const results: SearchResult[] = []
+
+    // Which projects the caller can see: every project in the organisation for
+    // admins and project:view_all, otherwise the projects in their (already
+    // loaded) permissions. One query also gives the project names for display.
+    const permissions = await PermissionService.getUserPermissions(viewerId)
+    const seesAllProjects =
+      permissions.userRole === Role.ADMIN ||
+      permissions.userRole === Role.SUPER_ADMIN ||
+      PermissionService.hasPermissionIn(permissions, Permission.PROJECT_VIEW_ALL)
+    const scopedProjects = (await Project.find(
+      seesAllProjects
+        ? { organization: organizationId }
+        : { _id: { $in: Array.from(permissions.projectPermissions.keys()) }, organization: organizationId },
+      'name'
+    ).lean()) as any[]
+    const projectNameMap = new Map<string, string>()
+    scopedProjects.forEach((p: any) => projectNameMap.set(String(p._id), p.name || String(p._id)))
+    const projectIds = Array.from(projectNameMap.keys())
+    const inScope = { $in: projectIds }
 
     // Fast path: exact ID searches
     if (isProjectNumber) {
       const pn = parseInt(query, 10)
-      const projects = await Project.find({ projectNumber: pn }).lean()
+      const projects = await Project.find({ projectNumber: pn, _id: inScope }).lean()
       for (const project of projects) {
         results.push({
           id: (project._id as any).toString(),
@@ -265,7 +296,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (isTaskDisplayId) {
-      const tasks = await Task.find({ displayId: query }).lean()
+      const tasks = await Task.find({ displayId: query, project: inScope }).lean()
       for (const task of tasks) {
         results.push({
           id: (task._id as any).toString(),
@@ -296,9 +327,10 @@ export async function GET(request: NextRequest) {
     // Search Projects
     if (!filters.type || filters.type.includes('project')) {
       const projectQuery: any = {
+        _id: inScope,
         $or: [
-          { name: { $regex: searchText, $options: 'i' } },
-          { description: { $regex: searchText, $options: 'i' } }
+          { name: { $regex: searchPattern, $options: 'i' } },
+          { description: { $regex: searchPattern, $options: 'i' } }
         ]
       }
       
@@ -332,19 +364,17 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Preload user and project names for display
-    const [allUsers, allProjects] = await Promise.all([
-      User.find({}, 'firstName lastName email').lean(),
-      Project.find({}, 'name').lean()
-    ])
+    // User names for task/story/epic assignees: only the caller's organisation
+    // (this used to load every user and every project in the database), and
+    // only when those result types can appear.
+    const needsUserNames = !filters.type || ['task', 'story', 'epic'].some((t) => filters.type!.includes(t))
+    const orgUsers = needsUserNames
+      ? ((await User.find({ organization: organizationId }, 'firstName lastName email').lean()) as any[])
+      : []
     const userNameMap = new Map<string, string>()
-    allUsers.forEach((u: any) => {
+    orgUsers.forEach((u: any) => {
       const name = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email || ''
       userNameMap.set((u._id as any).toString(), name || (u._id as any).toString())
-    })
-    const projectNameMap = new Map<string, string>()
-    allProjects.forEach((p: any) => {
-      projectNameMap.set((p._id as any).toString(), p.name || (p._id as any).toString())
     })
     const getUserName = (id?: any) => {
       if (!id) return undefined
@@ -360,9 +390,10 @@ export async function GET(request: NextRequest) {
     // Search Tasks
     if (!filters.type || filters.type.includes('task')) {
       const taskQuery: any = {
+        project: inScope,
         $or: [
-          { title: { $regex: searchText, $options: 'i' } },
-          { description: { $regex: searchText, $options: 'i' } }
+          { title: { $regex: searchPattern, $options: 'i' } },
+          { description: { $regex: searchPattern, $options: 'i' } }
         ]
       }
       
@@ -410,9 +441,10 @@ export async function GET(request: NextRequest) {
     // Search Stories
     if (!filters.type || filters.type.includes('story')) {
       const storyQuery: any = {
+        project: inScope,
         $or: [
-          { title: { $regex: searchText, $options: 'i' } },
-          { description: { $regex: searchText, $options: 'i' } }
+          { title: { $regex: searchPattern, $options: 'i' } },
+          { description: { $regex: searchPattern, $options: 'i' } }
         ]
       }
       
@@ -452,9 +484,10 @@ export async function GET(request: NextRequest) {
     // Search Epics
     if (!filters.type || filters.type.includes('epic')) {
       const epicQuery: any = {
+        project: inScope,
         $or: [
-          { title: { $regex: searchText, $options: 'i' } },
-          { description: { $regex: searchText, $options: 'i' } }
+          { title: { $regex: searchPattern, $options: 'i' } },
+          { description: { $regex: searchPattern, $options: 'i' } }
         ]
       }
       
@@ -494,9 +527,10 @@ export async function GET(request: NextRequest) {
     // Search Sprints
     if (!filters.type || filters.type.includes('sprint')) {
       const sprintQuery: any = {
+        project: inScope,
         $or: [
-          { name: { $regex: searchText, $options: 'i' } },
-          { description: { $regex: searchText, $options: 'i' } }
+          { name: { $regex: searchPattern, $options: 'i' } },
+          { description: { $regex: searchPattern, $options: 'i' } }
         ]
       }
 
@@ -531,13 +565,20 @@ export async function GET(request: NextRequest) {
     }
     
     // Search Users
-    if (!filters.type || filters.type.includes('user')) {
+    // People only for callers who may list them, and only in their organisation.
+    // Checked against the explicit grant: user:read is an "own"-scoped
+    // permission, which hasPermissionIn treats as always held.
+    const canSearchUsers =
+      PermissionService.isGrantedIn(permissions, Permission.TEAM_READ) ||
+      PermissionService.isGrantedIn(permissions, Permission.USER_READ)
+    if (canSearchUsers && (!filters.type || filters.type.includes('user'))) {
       const userQuery = {
+        organization: organizationId,
         $or: [
-          { firstName: { $regex: searchText, $options: 'i' } },
-          { lastName: { $regex: searchText, $options: 'i' } },
-          { email: { $regex: searchText, $options: 'i' } },
-          { role: { $regex: searchText, $options: 'i' } }
+          { firstName: { $regex: searchPattern, $options: 'i' } },
+          { lastName: { $regex: searchPattern, $options: 'i' } },
+          { email: { $regex: searchPattern, $options: 'i' } },
+          { role: { $regex: searchPattern, $options: 'i' } }
         ]
       }
       
