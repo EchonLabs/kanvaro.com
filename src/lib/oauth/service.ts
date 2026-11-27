@@ -193,8 +193,19 @@ export function authenticateClient(
   }
 
   if (client.type === 'confidential') {
-    const expectedHash = process.env.OAUTH_MCP_SERVER_CLIENT_SECRET_HASH || ''
-    if (!clientSecret || !expectedHash || !safeEqualHex(sha256Hex(clientSecret), expectedHash)) {
+    const expectedHash = (process.env.OAUTH_MCP_SERVER_CLIENT_SECRET_HASH || '').trim().toLowerCase();
+    if (!/^[0-9a-fA-F]{64}$/.test(expectedHash)) {
+      console.error(
+        'OAuth config error: OAUTH_MCP_SERVER_CLIENT_SECRET_HASH is missing or not a 64-character hex string'
+      )
+      throw new OAuthError(
+        'invalid_client',
+        'Invalid client credentials',
+        401,
+        INVALID_CLIENT_HEADERS
+      )
+    }
+    if (!clientSecret || !safeEqualHex(sha256Hex(clientSecret), expectedHash)) {
       throw new OAuthError(
         'invalid_client',
         'Invalid client credentials',
