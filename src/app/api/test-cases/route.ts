@@ -5,6 +5,7 @@ import { TestCase, TestSuite, Project } from '@/models'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasTestPermission } from '@/lib/permissions/test-permission-helper'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { resolveTestListProjectFilter, escapeRegex } from '@/lib/test-management-scope'
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,8 +28,16 @@ export async function GET(req: NextRequest) {
 
     let query: any = { organization: authResult.user.organization }
 
-    if (projectId) {
-      query.project = projectId
+    // F8: this list checked no permission. Without test_case:read it is now
+    // limited to projects where the caller works (see test-management-scope).
+    const scope = await resolveTestListProjectFilter({
+      user: authResult.user,
+      readPermission: Permission.TEST_CASE_READ,
+      requestedProjectId: projectId
+    })
+    if ('error' in scope) return scope.error
+    if (scope.filter) {
+      query.project = scope.filter
     }
 
     if (testSuiteId) {
@@ -48,10 +57,11 @@ export async function GET(req: NextRequest) {
     }
 
     if (search) {
+      const pattern = escapeRegex(search)
       query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { tags: { $in: [new RegExp(search, 'i')] } }
+        { title: { $regex: pattern, $options: 'i' } },
+        { description: { $regex: pattern, $options: 'i' } },
+        { tags: { $in: [new RegExp(pattern, 'i')] } }
       ]
     }
 

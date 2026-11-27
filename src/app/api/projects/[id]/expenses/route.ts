@@ -103,6 +103,16 @@ export async function POST(
       )
     }
 
+    // F8: writing expenses (money) needs financial:create_expense, the same
+    // roles the project page shows Add/Delete Expense to. Project access alone
+    // let project viewers and clients create, edit and delete expenses.
+    if (!(await PermissionService.hasPermission(user.id, Permission.FINANCIAL_CREATE_EXPENSE, projectId))) {
+      return NextResponse.json(
+        { error: 'You do not have permission to manage expenses' },
+        { status: 403 }
+      )
+    }
+
     // Find project to check expense tracking setting
     const project = await Project.findById(projectId)
     if (!project) {
@@ -237,6 +247,16 @@ export async function PUT(
     if (!canAccessProject) {
       return NextResponse.json(
         { error: 'Access denied to project' },
+        { status: 403 }
+      )
+    }
+
+    // F8: writing expenses (money) needs financial:create_expense, the same
+    // roles the project page shows Add/Delete Expense to. Project access alone
+    // let project viewers and clients create, edit and delete expenses.
+    if (!(await PermissionService.hasPermission(user.id, Permission.FINANCIAL_CREATE_EXPENSE, projectId))) {
+      return NextResponse.json(
+        { error: 'You do not have permission to manage expenses' },
         { status: 403 }
       )
     }
@@ -377,6 +397,16 @@ export async function DELETE(
     if (!canAccessProject) {
       return NextResponse.json(
         { error: 'Access denied to project' },
+        { status: 403 }
+      )
+    }
+
+    // F8: writing expenses (money) needs financial:create_expense, the same
+    // roles the project page shows Add/Delete Expense to. Project access alone
+    // let project viewers and clients create, edit and delete expenses.
+    if (!(await PermissionService.hasPermission(user.id, Permission.FINANCIAL_CREATE_EXPENSE, projectId))) {
+      return NextResponse.json(
+        { error: 'You do not have permission to manage expenses' },
         { status: 403 }
       )
     }

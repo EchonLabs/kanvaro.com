@@ -5,6 +5,8 @@ import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 export async function GET(req: NextRequest) {
   try {
@@ -29,16 +31,25 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    // Build query same as data endpoint
-    const budgetQuery: any = {}
+    // F8: this query had no organisation or project filter, so it exported every
+    // budget entry in the database. Scope it to projects the caller can access,
+    // as GET /api/reports/financial now does, and match the search literally.
+    const accessibleProjectIds = (await PermissionService.getAccessibleProjects(authResult.user.id)).map(String)
+    const budgetQuery: any = { project: { $in: accessibleProjectIds } }
     if (search) {
+      const pattern = escapeRegex(search)
       budgetQuery.$or = [
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
+        { description: { $regex: pattern, $options: 'i' } },
+        { category: { $regex: pattern, $options: 'i' } },
       ]
     }
     if (category && category !== 'all') budgetQuery.category = category
-    if (project && project !== 'all') budgetQuery.project = project
+    if (project && project !== 'all') {
+      if (!accessibleProjectIds.includes(project)) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      }
+      budgetQuery.project = project
+    }
     if (startDate && endDate) {
       budgetQuery.addedAt = {
         $gte: new Date(startDate),

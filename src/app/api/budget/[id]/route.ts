@@ -4,6 +4,7 @@ import { BudgetEntry } from '@/models/BudgetEntry'
 import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -24,8 +25,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: 'Budget entry not found' }, { status: 404 })
     }
 
-    // Check if user has access to this project
-    const hasAccess = await hasPermission(authResult.user.id, Permission.PROJECT_READ, budgetEntry.project._id.toString())
+    // Check if user has access to this project. F8: project:read is held
+    // globally by every role, so it never limited this; use project access.
+    const hasAccess = await PermissionService.canAccessProject(authResult.user.id, budgetEntry.project._id.toString())
     if (!hasAccess) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
