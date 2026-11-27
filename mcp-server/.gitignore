@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+
+# Kanvaro's root .gitignore ignores .dockerignore files; this package needs its own.
+!.dockerignore

@@ -1,0 +1,15 @@
+# Only package files and src/ are needed to build the image.
+node_modules
+dist
+coverage
+test
+tools
+docs
+scripts
+.env
+.env.*
+*.log
+.git
+.github
+Dockerfile
+.dockerignore
