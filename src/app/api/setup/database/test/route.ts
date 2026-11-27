@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { rejectUnlessSetupOrPermission } from '@/lib/setup-guard'
+import { checkSetupOrPermission } from '@/lib/setup-guard'
 import { Permission } from '@/lib/permissions/permission-definitions'
-import { unmaskSecret } from '@/lib/settings/secret-mask'
+import { SECRET_MASK, SECRET_REENTRY_ERROR, resolveSecret, sameDestination } from '@/lib/settings/secret-mask'
 import mongoose from 'mongoose'
+
+/** Where MONGODB_PASSWORD belongs: the values GET /api/settings/database shows. */
+function storedDatabaseDestination() {
+  return {
+    host: process.env.MONGODB_HOST || 'localhost',
+    port: process.env.MONGODB_PORT || '27017',
+    username: process.env.MONGODB_USERNAME || '',
+    authSource: process.env.MONGODB_AUTH_SOURCE || 'admin'
+  }
+}
+const DATABASE_DESTINATION = { host: ['host'], exact: ['port', 'username', 'authSource'] }
 
 async function checkExistingData(db: any) {
   const existingData: any = {
@@ -74,13 +85,33 @@ async function checkExistingData(db: any) {
 
 export async function POST(request: NextRequest) {
   try {
-    const denied = await rejectUnlessSetupOrPermission(Permission.SETTINGS_MANAGE_DATABASE)
+    const { denied, setupCompleted } = await checkSetupOrPermission(Permission.SETTINGS_MANAGE_DATABASE)
     if (denied) return denied
 
     const config = await request.json()
     // The Settings page shows the stored password as a placeholder; test with
-    // the real one (the same source GET /api/settings/database masks).
-    config.password = unmaskSecret(config.password, process.env.MONGODB_PASSWORD)
+    // the real one (the same source GET /api/settings/database masks), but
+    // only against the server and account it belongs to. Otherwise a caller
+    // could send the mask plus their own host and capture a login handshake
+    // with the real password. Before setup the mask is never issued and this
+    // route is open to anyone, so the stored password is never used then.
+    const passwordUnchanged = config.password === SECRET_MASK || config.password === undefined
+    if (passwordUnchanged && !setupCompleted) {
+      if (config.password === SECRET_MASK) {
+        return NextResponse.json({ error: SECRET_REENTRY_ERROR }, { status: 400 })
+      }
+      // Omitted before setup: test without a password, as before.
+    } else {
+      const resolved = resolveSecret(
+        config.password,
+        process.env.MONGODB_PASSWORD,
+        sameDestination(config, storedDatabaseDestination(), DATABASE_DESTINATION)
+      )
+      if ('reenter' in resolved) {
+        return NextResponse.json({ error: SECRET_REENTRY_ERROR }, { status: 400 })
+      }
+      config.password = resolved.value
+    }
     
     // Test MongoDB connection
     // Always convert localhost to mongodb service name since we always run in Docker

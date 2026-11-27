@@ -5,7 +5,16 @@ import { Organization } from '@/models/Organization'
 import { authenticateUser } from '@/lib/auth-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
-import { maskEmailConfig, unmaskSecret } from '@/lib/settings/secret-mask'
+import {
+  AZURE_DESTINATION,
+  SECRET_REENTRY_ERROR,
+  SMTP_DESTINATION,
+  maskEmailConfig,
+  resolveSecret,
+  sameDestination
+} from '@/lib/settings/secret-mask'
+
+class SecretReentryError extends Error {}
 
 const EMPTY_CONFIG = {
   provider: 'smtp',
@@ -80,28 +89,50 @@ export async function PUT(request: NextRequest) {
     const stored = current.emailConfig || {}
     const smtp = body?.smtp || {}
     const azure = body?.azure || {}
+    const provider = body?.provider
 
-    // Only known fields are saved. A secret sent back as the placeholder keeps
-    // the stored value, so saving the form never wipes a password.
-    const emailConfig = {
-      provider: body?.provider,
-      smtp: {
-        host: str(smtp.host),
-        port: Number(smtp.port) || 587,
-        secure: smtp.secure === true,
-        username: str(smtp.username),
-        password: unmaskSecret(smtp.password, stored.smtp?.password),
-        fromEmail: str(smtp.fromEmail),
-        fromName: str(smtp.fromName)
-      },
-      azure: {
-        clientId: str(azure.clientId),
-        clientSecret: unmaskSecret(azure.clientSecret, stored.azure?.clientSecret),
-        tenantId: str(azure.tenantId),
-        connectionString: unmaskSecret(azure.connectionString, stored.azure?.connectionString),
-        fromEmail: str(azure.fromEmail),
-        fromName: str(azure.fromName)
+    // A secret sent back as the placeholder (or left out) keeps the stored
+    // value, so saving the form never wipes a password, but only while the
+    // server and account are unchanged. Otherwise the next email would send
+    // the stored secret to the new host. For the provider being saved that is
+    // an error the user sees; the other provider's secret is just cleared.
+    const sameSmtp = sameDestination(smtp, stored.smtp, SMTP_DESTINATION)
+    const sameAzure = sameDestination(azure, stored.azure, AZURE_DESTINATION)
+    const secret = (submitted: unknown, storedValue: unknown, same: boolean, active: boolean) => {
+      const resolved = resolveSecret(submitted, storedValue, same)
+      if ('value' in resolved) return resolved.value
+      if (active) throw new SecretReentryError()
+      return ''
+    }
+
+    let emailConfig
+    try {
+      // Only known fields are saved.
+      emailConfig = {
+        provider,
+        smtp: {
+          host: str(smtp.host),
+          port: Number(smtp.port) || 587,
+          secure: smtp.secure === true,
+          username: str(smtp.username),
+          password: secret(smtp.password, stored.smtp?.password, sameSmtp, provider === 'smtp'),
+          fromEmail: str(smtp.fromEmail),
+          fromName: str(smtp.fromName)
+        },
+        azure: {
+          clientId: str(azure.clientId),
+          clientSecret: secret(azure.clientSecret, stored.azure?.clientSecret, sameAzure, provider === 'azure'),
+          tenantId: str(azure.tenantId),
+          connectionString: secret(azure.connectionString, stored.azure?.connectionString, sameAzure, provider === 'azure'),
+          fromEmail: str(azure.fromEmail),
+          fromName: str(azure.fromName)
+        }
       }
+    } catch (error) {
+      if (error instanceof SecretReentryError) {
+        return NextResponse.json({ error: SECRET_REENTRY_ERROR }, { status: 400 })
+      }
+      throw error
     }
 
     const organization = (await Organization.findByIdAndUpdate(

@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Database, TestTube, Save, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
+import { SECRET_REENTRY_ERROR } from '@/lib/settings/secret-mask'
+
+const DEFAULT_TEST_ERROR = 'Failed to connect to database. Please check your configuration.'
 
 function FormField({ label, htmlFor, children }: {
   label: string; htmlFor?: string; children: React.ReactNode
@@ -73,10 +76,13 @@ export function DatabaseSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-      if (!response.ok) throw new Error('Database connection test failed')
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}))
+        throw new Error(result?.error === SECRET_REENTRY_ERROR ? result.error : DEFAULT_TEST_ERROR)
+      }
       notifySuccess({ title: 'Database Test Successful', message: 'Database connection is working correctly' })
-    } catch {
-      notifyError({ title: 'Database Test Failed', message: 'Failed to connect to database. Please check your configuration.' })
+    } catch (error) {
+      notifyError({ title: 'Database Test Failed', message: error instanceof Error ? error.message : DEFAULT_TEST_ERROR })
     } finally {
       setTesting(false)
     }
