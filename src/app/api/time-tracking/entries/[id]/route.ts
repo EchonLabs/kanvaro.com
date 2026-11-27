@@ -14,8 +14,10 @@ async function getAuthenticatedUser(): Promise<{ id: string; role: string; organ
   return 'error' in auth ? null : auth.user
 }
 
-// Same list as POST /api/time-tracking/entries: the only roles that may set an
-// entry's hourly rate. Everyone else's rate comes from their user record.
+// The only roles that may change an existing entry's hourly rate. New entries
+// never take a rate from the client: POST /api/time-tracking/entries always
+// uses the person's billing rate or the organisation default (no screen sends
+// one on create).
 const RATE_EDIT_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
 /**
