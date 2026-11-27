@@ -5,8 +5,10 @@ import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import '@/models/Sprint'
-import '@/models/Story'
+import { Story } from '@/models/Story'
+import { Epic } from '@/models/Epic'
 import { authenticateUser } from '@/lib/auth-utils'
+import { rejectLinksOutsideProject } from '@/lib/api/update-fields'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { notificationService } from '@/lib/notification-service'
@@ -816,6 +818,14 @@ export async function POST(request: NextRequest) {
     const normalizedStory = typeof story === 'string' && story.trim() !== '' ? story.trim() : undefined
     const normalizedEpic = typeof epic === 'string' && epic.trim() !== '' ? epic.trim() : undefined
     const normalizedParentTask = typeof parentTask === 'string' && parentTask.trim() !== '' ? parentTask.trim() : undefined
+
+    // Story, epic and parent task must be in the new task's own project.
+    const linkDenied = await rejectLinksOutsideProject(String(projectDoc._id), [
+      { label: 'story', model: Story, ids: [normalizedStory] },
+      { label: 'epic', model: Epic, ids: [normalizedEpic] },
+      { label: 'parent task', model: Task, ids: [normalizedParentTask] }
+    ])
+    if (linkDenied) return linkDenied
 
     // Increment counter to get next task number
     // If task save fails later, we'll decrement it back to prevent gaps

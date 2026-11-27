@@ -5,7 +5,8 @@ import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { Sprint } from '@/models/Sprint'
-import '@/models/Story'
+import { Story } from '@/models/Story'
+import { Epic } from '@/models/Epic'
 import { authenticateUser } from '@/lib/auth-utils'
 import { CompletionService } from '@/lib/completion-service'
 import { notificationService } from '@/lib/notification-service'
@@ -18,7 +19,12 @@ import { resolveBaseUrl } from '@/lib/request-base-url'
 import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
 import { closeCarryForwardItemsForDeletedTask } from '@/lib/standup/carry-forward-service'
 import { hoursToMinutes } from '@/lib/standup/minutes'
-import { pickFields, rejectUnlessProjectMoveAllowed } from '@/lib/api/update-fields'
+import {
+  pickFields,
+  refId,
+  rejectLinksOutsideProject,
+  rejectUnlessProjectMoveAllowed
+} from '@/lib/api/update-fields'
 
 /**
  * Task fields a client may change (F7). Everything else is server-owned:
@@ -783,6 +789,32 @@ export async function PUT(
       permissions
     })
     if (moveDenied) return moveDenied
+
+    // Links must stay inside the task's project. Only links this request adds
+    // or changes are checked (all submitted ones when the task moves project),
+    // so a task with older links can still be saved.
+    const currentProjectId = refId(currentTask.project)
+    const effectiveProjectId = refId(updateData.project) || currentProjectId
+    const projectChanges = effectiveProjectId !== currentProjectId
+    const changedLink = (field: 'story' | 'epic' | 'parentTask' | 'sprint') => {
+      if (!Object.prototype.hasOwnProperty.call(updateData, field)) return []
+      const next = refId(updateData[field])
+      return next && (projectChanges || next !== refId((currentTask as any)[field])) ? [next] : []
+    }
+    const currentDependencies = new Set(
+      (Array.isArray(currentTask.dependencies) ? currentTask.dependencies : []).map(refId)
+    )
+    const addedDependencies = Array.isArray(updateData.dependencies)
+      ? updateData.dependencies.map(refId).filter((id: string) => projectChanges || !currentDependencies.has(id))
+      : []
+    const linkDenied = await rejectLinksOutsideProject(effectiveProjectId, [
+      { label: 'story', model: Story, ids: changedLink('story') },
+      { label: 'epic', model: Epic, ids: changedLink('epic') },
+      { label: 'parent task', model: Task, ids: changedLink('parentTask') },
+      { label: 'sprint', model: Sprint, ids: changedLink('sprint') },
+      { label: 'dependency', model: Task, ids: addedDependencies }
+    ])
+    if (linkDenied) return linkDenied
 
     // Reject a status the task's project does not have (e.g. a drag from the
     // "All Projects" board into another project's custom column). 'backlog' is

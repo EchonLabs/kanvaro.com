@@ -6,7 +6,13 @@ import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
-import { pickFields, rejectUnlessProjectMoveAllowed } from '@/lib/api/update-fields'
+import { Sprint } from '@/models/Sprint'
+import {
+  pickFields,
+  refId,
+  rejectLinksOutsideProject,
+  rejectUnlessProjectMoveAllowed
+} from '@/lib/api/update-fields'
 
 /** Story fields a client may change (F7). createdBy and completedAt stay server-side. */
 const STORY_EDITABLE_FIELDS = [
@@ -171,6 +177,21 @@ export async function PUT(
       })
       if (moveDenied) return moveDenied
     }
+
+    // The story's epic and sprint must be in the story's project. Only links
+    // this request adds or changes are checked (all submitted ones on a move).
+    const effectiveProjectId = refId(updateData.project) || currentProjectId || ''
+    const projectChanges = effectiveProjectId !== currentProjectId
+    const changedLink = (field: 'epic' | 'sprint') => {
+      if (!Object.prototype.hasOwnProperty.call(updateData, field)) return []
+      const next = refId(updateData[field])
+      return next && (projectChanges || next !== refId((existingStory as any)[field])) ? [next] : []
+    }
+    const linkDenied = await rejectLinksOutsideProject(effectiveProjectId, [
+      { label: 'epic', model: Epic, ids: changedLink('epic') },
+      { label: 'sprint', model: Sprint, ids: changedLink('sprint') }
+    ])
+    if (linkDenied) return linkDenied
 
     const story: any = await Story.findByIdAndUpdate(
       storyId,

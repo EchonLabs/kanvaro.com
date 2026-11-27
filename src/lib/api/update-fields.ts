@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import mongoose, { type Model } from 'mongoose'
 import { Project } from '@/models/Project'
 import { PermissionService, type UserPermissions } from '@/lib/permissions/permission-service'
 
@@ -49,6 +50,52 @@ export async function rejectUnlessProjectMoveAllowed(args: {
       { error: 'You cannot move this item to that project' },
       { status: 403 }
     )
+  }
+  return null
+}
+
+/** A reference as a string id: accepts an id, an ObjectId or a populated `{ _id }`. */
+export function refId(value: unknown): string {
+  if (value === undefined || value === null || value === '') return ''
+  if (typeof value === 'object' && '_id' in (value as any)) return String((value as any)._id)
+  return String(value)
+}
+
+export interface ProjectLink {
+  /** Shown in the error, e.g. "story". */
+  label: string
+  model: Model<any>
+  /** The ids being linked in this request (only new or changed links). */
+  ids: unknown[]
+}
+
+/**
+ * Linked items (a task's story, epic, sprint, parent task and dependencies;
+ * a story's epic and sprint) must be in the same project as the item that
+ * links to them. Kanvaro only checked the item itself, so a link could point
+ * into a project the caller cannot see (PR #927 review, decided: same project).
+ *
+ * Callers pass only the links this request adds or changes, so an item whose
+ * older links predate this rule can still be saved. Returns a 400 response,
+ * or null when every link is in `projectId`.
+ */
+export async function rejectLinksOutsideProject(
+  projectId: string,
+  links: ProjectLink[]
+): Promise<NextResponse | null> {
+  for (const link of links) {
+    const ids = Array.from(new Set(link.ids.map(refId).filter(Boolean)))
+    if (ids.length === 0) continue
+
+    const reject = () =>
+      NextResponse.json(
+        { error: `The linked ${link.label} must be in the same project as this item` },
+        { status: 400 }
+      )
+
+    if (!projectId || !ids.every((id) => mongoose.Types.ObjectId.isValid(id))) return reject()
+    const inProject = await link.model.countDocuments({ _id: { $in: ids }, project: projectId })
+    if (inProject !== ids.length) return reject()
   }
   return null
 }
