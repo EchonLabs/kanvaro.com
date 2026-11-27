@@ -3,6 +3,7 @@ import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 import { Role } from '@/lib/permissions/permission-definitions'
 import { authenticateUserWithDocument } from '@/lib/auth-utils'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 const UNRESTRICTED_TIME_LOG_ROLES: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HUMAN_RESOURCE]
 
@@ -37,7 +38,8 @@ export async function GET(request: NextRequest) {
 
     // Add search filter if provided
     if (search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i')
+      // Escaped so the text is matched literally.
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i')
       query.$or = [
         { firstName: searchRegex },
         { lastName: searchRegex },

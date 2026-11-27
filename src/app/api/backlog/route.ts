@@ -8,6 +8,7 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import '@/models/Sprint'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 const PRIORITY_WEIGHT: Record<string, number> = {
   critical: 4,
@@ -320,6 +321,8 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = Math.max(1, parseInt(searchParams.get('limit') || '10'))
     const search = searchParams.get('search')?.trim() || ''
+    // Used as a regex below: escaped so the text is matched literally.
+    const searchPattern = escapeRegex(search || '')
     const type = searchParams.get('type') || '' // optional: 'task' | 'story' | 'epic'
     const priority = searchParams.get('priority') || ''
     const status = searchParams.get('status') || ''
@@ -341,8 +344,8 @@ export async function GET(request: NextRequest) {
     const searchFilter = search
       ? {
           $or: [
-            { title: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } }
+            { title: { $regex: searchPattern, $options: 'i' } },
+            { description: { $regex: searchPattern, $options: 'i' } }
           ]
         }
       : {}
@@ -350,9 +353,9 @@ export async function GET(request: NextRequest) {
     const taskSearchFilter = search
       ? {
           $or: [
-            { title: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
-            { displayId: { $regex: search, $options: 'i' } },
+            { title: { $regex: searchPattern, $options: 'i' } },
+            { description: { $regex: searchPattern, $options: 'i' } },
+            { displayId: { $regex: searchPattern, $options: 'i' } },
             ...(!isNaN(Number(search)) ? [{ taskNumber: Number(search) }] : [])
           ]
         }

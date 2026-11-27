@@ -7,6 +7,7 @@ import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { escapeRegex } from '@/lib/text/escape-regex'
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,6 +26,8 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const search = searchParams.get('search')
+    // Used as a regex below: escaped so the text is matched literally.
+    const searchPattern = escapeRegex(search || '')
     const department = searchParams.get('department')
     const role = searchParams.get('role')
     const startDate = searchParams.get('startDate')
@@ -37,9 +40,9 @@ export async function GET(req: NextRequest) {
     
     if (search) {
       userQuery.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { firstName: { $regex: searchPattern, $options: 'i' } },
+        { lastName: { $regex: searchPattern, $options: 'i' } },
+        { email: { $regex: searchPattern, $options: 'i' } }
       ]
     }
     
