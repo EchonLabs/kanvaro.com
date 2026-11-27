@@ -56,6 +56,8 @@ export interface DependencyTask {
 
 interface TaskDependenciesProps {
   taskId?: string
+  /** The task's project (id or populated object). Only its tasks are offered: links must stay in one project. */
+  projectId?: string | { _id?: string } | null
   taskStatus?: string
   initialBlockedBy?: DependencyTask[]
   initialBlocking?: DependencyTask[]
@@ -151,7 +153,9 @@ export function TaskDependencies({
   readOnly = false,
   staged = false,
   onChange,
+  projectId,
 }: TaskDependenciesProps) {
+  const projectFilter = typeof projectId === 'string' ? projectId : projectId?._id ? String(projectId._id) : ''
   const { success: notifySuccess, error: notifyError } = useNotify()
 
   const isCurrentTaskCompleted = Boolean(taskStatus && ['done', 'cancelled'].includes(taskStatus))
@@ -235,9 +239,10 @@ export function TaskDependencies({
     searchTimeoutRef.current = setTimeout(async () => {
       setIsSearching(true)
       try {
+        const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : ''
         const url = trimmed
-          ? `/api/tasks?search=${encodeURIComponent(trimmed)}&limit=10&minimal=true`
-          : `/api/tasks?limit=10&minimal=true`
+          ? `/api/tasks?search=${encodeURIComponent(trimmed)}&limit=10&minimal=true${projectParam}`
+          : `/api/tasks?limit=10&minimal=true${projectParam}`
         const res = await fetch(url)
         if (res.ok) {
           const json = await res.json()
@@ -269,7 +274,7 @@ export function TaskDependencies({
         clearTimeout(searchTimeoutRef.current)
       }
     }
-  }, [searchQuery, isAddOpen, relationshipType, taskId])
+  }, [searchQuery, isAddOpen, relationshipType, taskId, projectFilter])
 
   // Single-link dependency handler
   const handleAddSingle = async (targetTask: any) => {

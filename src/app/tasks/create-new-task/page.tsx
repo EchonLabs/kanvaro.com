@@ -1248,6 +1248,7 @@ export default function CreateTaskPage() {
               {/* Dependencies Section */}
               <div className="pt-6 mt-6 border-t border-muted">
                 <TaskDependencies
+                  projectId={formData.project}
                   taskStatus="backlog"
                   initialBlockedBy={draftBlockedBy}
                   initialBlocking={draftBlocking}

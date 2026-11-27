@@ -1584,6 +1584,7 @@ export default function EditTaskPage() {
 
             <TaskDependencies
               taskId={taskId}
+              projectId={task?.project as any}
               taskStatus={task?.status}
               initialBlockedBy={taskDependencies}
               initialBlocking={taskBlocking}
