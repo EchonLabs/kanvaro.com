@@ -102,6 +102,7 @@ function classify(err: unknown): TokenError {
     err instanceof errors.JWSInvalid ||
     err instanceof errors.JWSSignatureVerificationFailed ||
     err instanceof errors.JWKSNoMatchingKey ||
+    err instanceof errors.JWKSMultipleMatchingKeys ||
     err instanceof errors.JOSEAlgNotAllowed ||
     err instanceof errors.JOSENotSupported
   ) {

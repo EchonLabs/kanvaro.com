@@ -53,6 +53,11 @@ describe('response filter', () => {
     expect(out).toContain('ada@example.com')
   })
 
+  it('removes any token, secret or credential field, e.g. an invitation token', () => {
+    expect(filterResponse([{ email: 'a@x', token: 'inv-secret', refreshToken: 'r', clientSecret: 's', credentials: 'c' }], true)).toEqual([{ email: 'a@x' }])
+    expect(filterResponse({ token: 'inv-secret' }, { token: true })).toEqual({})
+  })
+
   it('keeps rates only for finance tools', () => {
     expect(filterResponse({ hourlyRate: 90, billingRate: 120 }, true, { allowRates: true })).toEqual({ hourlyRate: 90, billingRate: 120 })
     expect(filterResponse({ hourlyRate: 90, billingRate: 120 }, true)).toEqual({})
@@ -93,6 +98,18 @@ describe('size cap', () => {
 })
 
 describe('rate limiter', () => {
+  it('frees ended windows when full, without resetting users still inside a window', () => {
+    let t = 0
+    const limiter = createRateLimiter({ readsPerMinute: 1, now: () => t })
+    for (let i = 0; i < 9_999; i++) limiter.take(`old-${i}`, 'read')
+    t = 50_000
+    expect(limiter.take('busy', 'read')).toBe(0) // 10,000 windows now
+    t = 70_000 // the 9,999 old windows have ended; 'busy' has 40 s left
+    expect(limiter.take('newcomer', 'read')).toBe(0) // full → sweep
+    expect(limiter.take('busy', 'read')).toBe(40) // not reset by the sweep
+  })
+
+
   it('allows the per-minute budget per user and bucket, then says how long to wait', () => {
     let t = 0
     const limiter = createRateLimiter({ readsPerMinute: 3, writesPerMinute: 1, now: () => t })

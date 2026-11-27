@@ -31,7 +31,7 @@ export function createRateLimiter(opts: RateLimits = {}): RateLimiter {
       const t = now()
       let w = windows.get(key)
       if (!w || t - w.start >= 60_000) {
-        if (windows.size >= 10_000) windows.clear() // bound memory
+        if (windows.size >= MAX_WINDOWS) sweep(windows, t)
         w = { start: t, count: 0 }
         windows.set(key, w)
       }
@@ -40,6 +40,17 @@ export function createRateLimiter(opts: RateLimits = {}): RateLimiter {
       return 0
     },
   }
+}
+
+const MAX_WINDOWS = 10_000
+
+/**
+ * Bounds memory: drops windows that have ended. Only if every window is still current (a flood
+ * of 10,000 users or addresses in one minute) is everything dropped, as a last resort.
+ */
+export function sweep(windows: Map<string, { start: number }>, now: number): void {
+  for (const [key, w] of windows) if (now - w.start >= 60_000) windows.delete(key)
+  if (windows.size >= MAX_WINDOWS) windows.clear()
 }
 
 /** About 100 KB of JSON per result: enough for a page of 100 items, small enough for the AI. */

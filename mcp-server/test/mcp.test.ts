@@ -7,7 +7,7 @@ import { createApp, finishApp } from '../src/http/app.js'
 import type { RunningServer } from '../src/http/server.js'
 import { startServer } from '../src/http/server.js'
 import { createLogger } from '../src/log.js'
-import { allowedHostnames, allowedOriginHostnames, createMcpEndpoint, mountMcp } from '../src/mcp/server.js'
+import { allowedHostnames, createMcpEndpoint, mountMcp } from '../src/mcp/server.js'
 
 const ok = () => Promise.resolve()
 let running: RunningServer | undefined
@@ -102,6 +102,12 @@ describe('MCP endpoint security', () => {
     expect(await rawPost(await serve(), { Origin: 'https://evil.example' }, initialize)).toBe(403)
   })
 
+  it('rejects an Origin with the right host but another scheme or port', async () => {
+    const url = await serve(['https://app.example.com'])
+    expect(await rawPost(url, { Origin: 'http://app.example.com' }, initialize)).toBe(403)
+    expect(await rawPost(url, { Origin: 'https://app.example.com:8443' }, initialize)).toBe(403)
+  })
+
   it('accepts an allowed browser Origin', async () => {
     expect(await rawPost(await serve(['https://app.example.com']), { Origin: 'https://app.example.com' }, initialize)).toBe(200)
   })
@@ -117,8 +123,5 @@ describe('allow-lists', () => {
   })
   it('adds the localhost names when listening on loopback', () => {
     expect(allowedHostnames('https://mcp.example.com', '127.0.0.1')).toEqual(['mcp.example.com', 'localhost', '127.0.0.1', '[::1]'])
-  })
-  it('turns allowed origins into host names', () => {
-    expect(allowedOriginHostnames(['https://a.example.com', 'http://a.example.com:8080', 'https://b.example.com'])).toEqual(['a.example.com', 'b.example.com'])
   })
 })

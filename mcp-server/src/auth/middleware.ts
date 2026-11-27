@@ -12,7 +12,7 @@
  *   Kanvaro keys unreachable       → 503  Retry-After                     audit: token.check_failed
  *   exchange refused (access ended) → 401  … error="invalid_token"         audit: exchange.refused
  *   exchange failed / misconfigured → 503  Retry-After                     audit: exchange.failed
- *   first exchange of a session    → continue                             audit: session.exchange
+ *   first exchange for a token     → continue                             audit: session.exchange
  *
  * A 401 makes clients such as Claude Code refresh their token or sign in again; a 503 does
  * not, so an outage never pushes users through sign-in.
@@ -134,7 +134,8 @@ export function requireKanvaroExchange(opts: ExchangeOptions): RequestHandler {
 
     opts.exchanger.exchangeWithInfo(mcp).then(
       ({ kanvaro, first }) => {
-        // First exchange of this session only; the once-a-minute re-checks are not audited.
+        // First exchange for this MCP access token: at sign-in and after each refresh (the
+        // token is the cache key). The once-a-minute re-checks are not audited.
         if (first) void audit.record({ ...base, action: 'session.exchange', outcome: 'ok' })
         runSignedIn({ requestId, ...(req.ip ? { ip: req.ip } : {}), mcp, kanvaro, exchanger: opts.exchanger }, () => next())
       },

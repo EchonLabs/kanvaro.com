@@ -38,6 +38,17 @@ const verifyLocal = (token: string) => createTokenVerifier({ issuer: ISS, audien
 const kindOf = async (p: Promise<unknown>) => p.then(() => 'ok', (e: unknown) => (e instanceof TokenError ? e.kind : 'other'))
 
 describe('token verifier', () => {
+  it('refuses a token without a key id while two keys are published (rotation) — not an outage', async () => {
+    const [a, b] = await Promise.all([generateKeyPair('ES256'), generateKeyPair('ES256')])
+    const rotating = createLocalJWKSet({ keys: [
+      { ...(await exportJWK(a.publicKey)), kid: 'old', alg: 'ES256' },
+      { ...(await exportJWK(b.publicKey)), kid: 'new', alg: 'ES256' },
+    ] })
+    const token = await new SignJWT({ iss: ISS, aud: AUD, sub: 'u1', client_id: 'kanvaro-claude-code', scope: 'kanvaro', jti: 'j1' })
+      .setProtectedHeader({ alg: 'ES256', typ: 'at+jwt' }).setIssuedAt().setExpirationTime('15m').sign(b.privateKey)
+    expect(await kindOf(createTokenVerifier({ issuer: ISS, audience: AUD, keys: rotating })(token))).toBe('invalid_token')
+  })
+
   it('accepts a valid token and returns the user, client, scopes and expiry', async () => {
     const v = await verifyLocal(await sign({}))
     expect(v).toMatchObject({ userId: 'u1', clientId: 'kanvaro-claude-code', scopes: ['kanvaro'], jti: 'j1' })

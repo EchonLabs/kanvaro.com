@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { REDACTED, createLogger, isSensitiveKey, requestIdFrom, sanitize, scrubString } from '../src/log.js'
+import { REDACTED, clientRequestIdFrom, createLogger, isSensitiveKey, newRequestId, sanitize, scrubString } from '../src/log.js'
 import type { LogLevel } from '../src/log.js'
 
 const JWT = 'eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJ1MSIsImF1ZCI6Im1jcCJ9.c2lnbmF0dXJlLXZhbHVlLWhlcmU'
@@ -22,7 +22,7 @@ describe('secrets never reach the log output', () => {
       exchange: { response: { body: { access_token: 'tok-access-111', refresh_token: 'tok-refresh-222' } } },
       config: { kanvaro: { clientSecret: 'client-secret-333' }, database: { uri: 'mongodb://mcp:db-pass-555@db:27017/kanvaro_mcp' } },
       user: { password: 'p@ssw0rd-444', passwordResetOtp: 'otp-777' },
-      tool: { input: { confirm: 'confirm-888', code: 'code-666' } },
+      tool: { input: { confirm: 'confirm-888', authorizationCode: 'code-666' } },
       deep: { a: { b: { c: { d: { subjectToken: JWT } } } } },
       list: [{ token: 'tok-access-111' }],
     }, 'exchanged token')
@@ -65,7 +65,7 @@ describe('secrets never reach the log output', () => {
 })
 
 describe('sensitive key names', () => {
-  it.each(['authorization', 'Authorization', 'cookie', 'set-cookie', 'access_token', 'refreshToken', 'subject_token', 'client_secret', 'clientSecret', 'password', 'passwordResetOtp', 'code', 'code_verifier', 'confirm', 'x-api-key', 'kanvaroToken'])('treats %s as sensitive', key => {
+  it.each(['authorization', 'Authorization', 'cookie', 'set-cookie', 'access_token', 'refreshToken', 'subject_token', 'client_secret', 'clientSecret', 'password', 'passwordResetOtp', 'authorization_code', 'code_verifier', 'confirm', 'x-api-key', 'kanvaroToken'])('treats %s as sensitive', key => {
     expect(isSensitiveKey(key)).toBe(true)
   })
   it.each(['userId', 'projectId', 'status', 'title', 'requestId', 'tokenType', 'clientId', 'description'])('keeps %s', key => {
@@ -98,9 +98,22 @@ describe('log lines', () => {
   })
 })
 
-describe('requestIdFrom', () => {
-  it('keeps a short, plain id', () => expect(requestIdFrom('req-42.a_b:c')).toBe('req-42.a_b:c'))
-  it.each([undefined, '', 'x'.repeat(65), 'line\nbreak', 'has space', '{"json":1}', ['array']])('replaces %j with a new UUID', value => {
-    expect(requestIdFrom(value)).toMatch(/^[0-9a-f-]{36}$/)
+describe('request ids', () => {
+  it('makes a new UUID per request', () => {
+    expect(newRequestId()).toMatch(/^[0-9a-f-]{36}$/)
+    expect(newRequestId()).not.toBe(newRequestId())
+  })
+  it('keeps a short, plain caller id for the logs', () => expect(clientRequestIdFrom('req-42.a_b:c')).toBe('req-42.a_b:c'))
+  it.each([undefined, '', 'x'.repeat(65), 'line\nbreak', 'has space', '{"json":1}', ['array']])('drops the caller id %j', value => {
+    expect(clientRequestIdFrom(value)).toBeUndefined()
+  })
+})
+
+describe('codes are not secrets', () => {
+  it('keeps outcome codes, error codes and session names', () => {
+    expect(sanitize({ code: 'forbidden 403', session: 'abc', err: { code: 'ECONNREFUSED' } })).toEqual({ code: 'forbidden 403', session: 'abc', err: { code: 'ECONNREFUSED' } })
+  })
+  it('still scrubs an OAuth code in a URL', () => {
+    expect(scrubString('/callback?code=abc123&state=x')).toBe(`/callback?code=${REDACTED}&state=x`)
   })
 })

@@ -1,8 +1,8 @@
 /**
  * Express application (task 1.7).
  *
- * - Every request gets a request id (kept from X-Request-Id if plain, else new), returned
- *   in the X-Request-Id response header and carried on its log lines.
+ * - Every request gets its own request id, returned in the X-Request-Id response header and
+ *   carried on its log lines. A caller's X-Request-Id is logged as clientRequestId, never reused.
  * - Security headers on every response; no X-Powered-By.
  * - One access-log line per request: method, path (never the query string, which could
  *   hold codes or tokens), status, duration.
@@ -13,7 +13,7 @@
 import express from 'express'
 import type { Express, NextFunction, Request, Response } from 'express'
 import type { Logger } from '../log.js'
-import { requestIdFrom } from '../log.js'
+import { clientRequestIdFrom, newRequestId } from '../log.js'
 import type { ReadinessChecks } from './health.js'
 import { runChecks } from './health.js'
 
@@ -40,11 +40,13 @@ export function createApp(deps: AppDeps): Express {
   app.disable('x-powered-by')
   app.set('trust proxy', deps.trustProxy)
 
-  // Request context: id + child logger.
+  // Request context: our own id (never the caller's, which could collide with another
+  // user's audit entries) + child logger. A plain caller id is logged alongside.
   app.use((req: Request, res: Response, next: NextFunction) => {
-    const requestId = requestIdFrom(req.get('x-request-id'))
+    const requestId = newRequestId()
+    const clientRequestId = clientRequestIdFrom(req.get('x-request-id'))
     res.locals.requestId = requestId
-    res.locals.log = deps.log.child({ requestId })
+    res.locals.log = deps.log.child({ requestId, ...(clientRequestId ? { clientRequestId } : {}) })
     res.setHeader('X-Request-Id', requestId)
     next()
   })

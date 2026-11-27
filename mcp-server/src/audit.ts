@@ -6,7 +6,8 @@
  * period through the TTL index (1.3).
  *
  * Sign-in events written here:
- *   session.exchange     the first token exchange of a session (who connected, when)
+ *   session.exchange     the first exchange for an MCP access token: once at sign-in, then
+ *                        again after each token refresh (about every 15 minutes in use)
  *   token.rejected       an invalid, expired or under-scoped token
  *   exchange.refused     Kanvaro says the user's access has ended
  *   exchange.failed      Kanvaro unreachable, or our client credentials rejected
@@ -18,6 +19,7 @@
 import type { Collection } from 'mongodb'
 import type { AuditLogDoc } from './db/types.js'
 import type { Logger } from './log.js'
+import { sweep } from './tools/limits.js'
 
 export type AuditEntry = Omit<AuditLogDoc, '_id' | 'at'>
 
@@ -54,9 +56,9 @@ export function createAuditLog(collection: Collection<AuditLogDoc>, log: Logger,
       const t = now()
       let w = windows.get(key)
       if (!w || t - w.start >= 60_000) {
+        if (windows.size >= 10_000) sweep(windows, t) // bound memory under a wide flood
         w = { start: t, count: 0 }
         windows.set(key, w)
-        if (windows.size > 10_000) windows.clear() // bound memory under a wide flood
       }
       if (++w.count > perMinute) {
         log.warn({ action: entry.action, ip: entry.ip }, 'audit entry skipped (rate cap)')

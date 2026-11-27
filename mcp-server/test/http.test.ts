@@ -89,9 +89,9 @@ describe('every response', () => {
     expect(res.headers.get('x-powered-by')).toBeNull()
   })
 
-  it('keeps a plain X-Request-Id and replaces an unsafe one', async () => {
+  it('always uses its own request id, never the caller id', async () => {
     const url = await serve(setup().app)
-    expect((await fetch(`${url}/health`, { headers: { 'X-Request-Id': 'abc-123' } })).headers.get('x-request-id')).toBe('abc-123')
+    expect((await fetch(`${url}/health`, { headers: { 'X-Request-Id': 'abc-123' } })).headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/)
     expect((await fetch(`${url}/health`, { headers: { 'X-Request-Id': '{"x":1}' } })).headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/)
   })
 
@@ -105,7 +105,8 @@ describe('every response', () => {
     const { app, text } = setup(undefined, a => a.get('/boom', () => { throw new Error('crash with Bearer tok-access-111') }))
     const res = await fetch(`${await serve(app)}/boom`, { headers: { 'X-Request-Id': 'r-500' } })
     expect(res.status).toBe(500)
-    expect(await res.json()).toEqual({ error: 'internal_error', requestId: 'r-500' })
+    expect(await res.json()).toEqual({ error: 'internal_error', requestId: res.headers.get('x-request-id') })
+    expect(res.headers.get('x-request-id')).not.toBe('r-500')
     expect(text()).toContain('request failed')
     expect(text()).not.toContain('tok-access-111')
   })
@@ -116,7 +117,8 @@ describe('access log', () => {
     const { app, logs } = setup()
     await fetch(`${await serve(app)}/nope?code=secret-code-1`, { headers: { 'X-Request-Id': 'r-log' } })
     const line = logs().find(l => l.msg === 'request')
-    expect(line).toMatchObject({ method: 'GET', path: '/nope', status: 404, requestId: 'r-log', level: 'info' })
+    expect(line).toMatchObject({ method: 'GET', path: '/nope', status: 404, clientRequestId: 'r-log', level: 'info' })
+    expect(line?.requestId).toMatch(/^[0-9a-f-]{36}$/)
     expect(JSON.stringify(logs())).not.toContain('secret-code-1')
   })
 

@@ -5,9 +5,12 @@
  * that, some fields are removed everywhere, whatever the shape says:
  *   - passwords and password-reset codes (Kanvaro finding F1);
  *   - rates (hourly, billing), unless the tool is a finance tool;
- *   - API keys and Mongo internals (__v, counters).
+ *   - API keys and Mongo internals (__v, counters);
+ *   - any key the log redaction treats as secret: `token`, `*Token`, `*Secret`, `*Password`,
+ *     `*Credential(s)`, OTPs and the like (e.g. an invitation's `token`).
  * User objects are reduced to id, name, email and role.
  */
+import { isSensitiveKey } from '../log.js'
 
 /**
  * Which fields to keep.
@@ -92,7 +95,7 @@ function reduceUser(value: unknown): unknown {
 }
 
 function isRemoved(key: string, rates: boolean): boolean {
-  return ALWAYS_REMOVED.has(key) || (!rates && RATES.has(key))
+  return ALWAYS_REMOVED.has(key) || isSensitiveKey(key) || (!rates && RATES.has(key))
 }
 
 function stringOf(v: unknown): string | undefined {

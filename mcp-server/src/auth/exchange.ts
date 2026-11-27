@@ -60,7 +60,8 @@ export interface TokenExchanger {
   /**
    * Same as exchange(), plus: `fresh` — THIS call started a new exchange with Kanvaro (not
    * served from cache, not joining one already running); `first` — it is also the first
-   * successful exchange seen for this MCP token (a new session). Used for auditing.
+   * successful exchange seen for this MCP access token — at sign-in, and again after each
+   * token refresh, since the token is the cache key. Used for auditing.
    */
   exchangeWithInfo(mcp: VerifiedToken): Promise<{ kanvaro: KanvaroToken; fresh: boolean; first: boolean }>
   /** Drops the cached Kanvaro token (e.g. after Kanvaro answered 401). */

@@ -6,8 +6,8 @@
  *    only covers fixed paths, so a nested object could slip through).
  * 2. Every string — messages, values, error messages and stacks — is scrubbed of
  *    Bearer/Basic credentials, JWTs, passwords inside URLs and token query parameters.
- * 3. Request ids from callers are accepted only if short and plain, otherwise replaced,
- *    so nobody can inject text into the logs.
+ * 3. Every request gets its own id. A caller's X-Request-Id is logged separately, and only
+ *    if short and plain, so nobody can inject text or reuse another request's id.
  */
 import { randomUUID } from 'node:crypto'
 import { pino } from 'pino'
@@ -20,12 +20,15 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 export const REDACTED = '[redacted]'
 const MAX_DEPTH = 8
 
-/** Exact key names (compared lower-case, without "-" and "_"). */
+/**
+ * Exact key names (compared lower-case, without "-" and "_"). Not plain `code` or `session`:
+ * those are error codes and outcome codes, and OAuth codes in URLs are caught by the string rules.
+ */
 const SENSITIVE_KEYS = new Set([
   'authorization', 'proxyauthorization', 'cookie', 'setcookie',
-  'password', 'passwd', 'pwd', 'secret', 'code', 'codeverifier', 'codechallenge',
+  'password', 'passwd', 'pwd', 'secret', 'authorizationcode', 'authcode', 'codeverifier', 'codechallenge',
   'otp', 'passwordresetotp', 'apikey', 'xapikey', 'confirm', 'confirmation', 'confirmationcode',
-  'privatekey', 'clientassertion', 'assertion', 'jwt', 'session', 'sessionid',
+  'privatekey', 'clientassertion', 'assertion', 'jwt', 'sessionid',
 ])
 /** Keys ending like this are sensitive too: accessToken, refresh_token, clientSecret, … */
 const SENSITIVE_SUFFIXES = ['token', 'secret', 'password', 'credential', 'credentials']
@@ -110,7 +113,12 @@ export function createLogger(config: LoggerConfig = {}): Logger {
 
 const REQUEST_ID = /^[A-Za-z0-9._:-]{1,64}$/
 
-/** Keeps a caller's request id only if it is short and plain; otherwise makes a new one. */
-export function requestIdFrom(header: unknown): string {
-  return typeof header === 'string' && REQUEST_ID.test(header) ? header : randomUUID()
+/** A new id for one request. Used in logs, audit entries and calls to Kanvaro. */
+export function newRequestId(): string {
+  return randomUUID()
+}
+
+/** A caller's X-Request-Id, for logs only: kept if short and plain, otherwise dropped. */
+export function clientRequestIdFrom(header: unknown): string | undefined {
+  return typeof header === 'string' && REQUEST_ID.test(header) ? header : undefined
 }

@@ -10,7 +10,7 @@
  *   next to the built-in `ping`.
  * - Sign-in (Phase 3) passes the verified token as `authInfo`; the factory receives it.
  */
-import { hostHeaderValidation, originValidation } from '@modelcontextprotocol/express'
+import { hostHeaderValidation } from '@modelcontextprotocol/express'
 import { toNodeHandler } from '@modelcontextprotocol/node'
 import type { McpHttpHandler, McpRequestContext } from '@modelcontextprotocol/server'
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
@@ -100,9 +100,21 @@ export function allowedHostnames(publicBaseUrl: string, host: string): string[] 
   return [...names]
 }
 
-/** Origin host names accepted from browsers. Requests without an Origin (e.g. Claude Code) always pass. */
-export function allowedOriginHostnames(allowedOrigins: readonly string[]): string[] {
-  return [...new Set(allowedOrigins.map(o => new URL(o).hostname))]
+/**
+ * Browser Origin check: the whole origin (scheme, host and port) must match one in the config.
+ * The SDK's originValidation compares host names only, so http://host:8080 would pass for
+ * https://host. Requests without an Origin (e.g. Claude Code) always pass.
+ */
+export function originCheck(allowedOrigins: readonly string[]): RequestHandler {
+  const allowed = new Set(allowedOrigins.map(o => new URL(o).origin))
+  return (req: Request, res: Response, next: NextFunction) => {
+    const origin = req.headers.origin
+    if (origin === undefined || allowed.has(origin)) {
+      next()
+      return
+    }
+    res.status(403).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Origin not allowed' }, id: null })
+  }
 }
 
 /** Mounts the MCP endpoint on the app. Call before finishApp(). */
@@ -114,7 +126,7 @@ export function mountMcp(app: Express, handler: McpHttpHandler, opts: MountOptio
   app.all(
     MCP_PATH,
     hostHeaderValidation(allowedHostnames(opts.publicBaseUrl, opts.host)),
-    originValidation(allowedOriginHostnames(opts.allowedOrigins)),
+    originCheck(opts.allowedOrigins),
     opts.authenticate,
     (req: Request, res: Response, next: NextFunction) => {
       node(req, res).catch((err: unknown) => {
