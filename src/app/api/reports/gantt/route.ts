@@ -27,6 +27,10 @@ export async function GET(req: NextRequest) {
     // Only tasks in the caller's organisation and in projects they can see.
     // This route had no check at all: without projectId it returned every task
     // in the database, and with one any project's tasks and sprints.
+    if (assigneeId && !mongoose.Types.ObjectId.isValid(assigneeId)) {
+      return NextResponse.json({ error: 'Invalid assignee' }, { status: 400 })
+    }
+
     const permissions = await PermissionService.getUserPermissions(authResult.user.id)
     const scope = projectScopeOf(permissions)
 

@@ -16,7 +16,7 @@ import { ActivityLog } from '@/models/ActivityLog'
 import { Project } from '@/models/Project'
 import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
-import '@/models/User' // the activity route populates `user`
+import { User } from '@/models/User' // also needed: the routes populate users
 
 import { useMongo } from '@/lib/standup/__tests__/helpers/mongo'
 
@@ -61,6 +61,8 @@ const as = (role: string, projects: string[] = []) => {
 let mine: any
 let notMine: any
 let foreign: any
+const ana = new mongoose.Types.ObjectId()
+const ben = new mongoose.Types.ObjectId()
 
 async function seed() {
   const creator = new mongoose.Types.ObjectId()
@@ -70,12 +72,22 @@ async function seed() {
   notMine = await project('Not mine', mockOrg, 2)
   foreign = await project('Other org', otherOrg, 3)
 
+  // Assignments store only the user id; names come from the user records.
+  for (const [_id, firstName, lastName] of [[ana, 'Ana', 'Silva'], [ben, 'Ben', 'Okafor']] as const) {
+    await User.create({
+      _id, firstName, lastName, email: `${firstName.toLowerCase()}@example.test`,
+      password: 'hashed', role: 'team_member', organization: mockOrg
+    })
+  }
+  const anaAssignment = { user: ana }
+
   let n = 1
   for (const p of [mine, notMine, foreign]) {
     await Task.create({
       title: `${p.name} task`, organization: p.organization, project: p._id, createdBy: creator,
       taskNumber: n, displayId: `T-${n++}`, status: 'todo',
-      startDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05')
+      startDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05'),
+      assignedTo: p === mine ? [anaAssignment, { user: ben }] : p === notMine ? [anaAssignment] : []
     })
     await Sprint.create({
       name: `${p.name} sprint`, organization: p.organization, project: p._id, createdBy: creator,
@@ -146,6 +158,29 @@ describe('read tools are scoped to what the caller can see', () => {
     it('returns the tasks and sprints of a project the caller is on', async () => {
       as('team_member', [String(mine._id)])
       expect(await ganttTitles(`?projectId=${mine._id}`)).toEqual({ status: 200, titles: ['Mine sprint', 'Mine task'] })
+    })
+
+    // PR #927 follow-up: the filter compared the assignedTo list itself to the
+    // id, so choosing an assignee always gave an empty chart.
+    it('filters by assignee (assignedTo.user), still within the caller\'s projects', async () => {
+      as('team_member', [String(mine._id)])
+      expect(await ganttTitles(`?assigneeId=${ana}`)).toEqual({ status: 200, titles: ['Mine task'] })
+      as('admin')
+      expect(await ganttTitles(`?assigneeId=${ana}`)).toEqual({ status: 200, titles: ['Mine task', 'Not mine task'] })
+      expect(await ganttTitles(`?assigneeId=${ben}`)).toEqual({ status: 200, titles: ['Mine task'] })
+      expect(await ganttTitles(`?assigneeId=${new mongoose.Types.ObjectId()}`)).toEqual({ status: 200, titles: [] })
+    })
+
+    it('rejects a malformed assignee id instead of failing with a 500', async () => {
+      as('admin')
+      expect((await ganttTitles('?assigneeId=not-an-id')).status).toBe(400)
+    })
+
+    it('shows every assignee\'s name (it was always blank: it read a `name` field users do not have)', async () => {
+      as('team_member', [String(mine._id)])
+      const res = await gantt(new NextRequest(`http://localhost/api/reports/gantt?projectId=${mine._id}`))
+      const task = (await res.json()).tasks.find((t: any) => t.title === 'Mine task')
+      expect(task.assignee).toBe('Ana Silva, Ben Okafor')
     })
 
     it('a sprint filter cannot reach into a project the caller is not on', async () => {

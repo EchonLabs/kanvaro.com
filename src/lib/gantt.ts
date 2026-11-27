@@ -25,6 +25,19 @@ export interface GanttData {
 }
 
 /**
+ * "Ana Silva, Ben Okafor" from a task's assignedTo list, with `assignedTo.user`
+ * populated (the Task schema stores only the user id and rate per entry, not
+ * names). Undefined when nobody is assigned.
+ */
+function assigneeNames(assignedTo: unknown): string | undefined {
+  if (!Array.isArray(assignedTo)) return undefined
+  const names = assignedTo
+    .map((entry: any) => `${entry?.user?.firstName || ''} ${entry?.user?.lastName || ''}`.trim())
+    .filter(Boolean)
+  return names.length > 0 ? names.join(', ') : undefined
+}
+
+/**
  * What the caller may see. Tasks are always limited to their organisation;
  * `projectIds` (when set) further limits them to those projects. Without a
  * scope the query used to return every task in the database.
@@ -47,7 +60,8 @@ export async function generateGanttData(
   if (projectId) query.project = projectId
   else if (scope.projectIds) query.project = { $in: scope.projectIds }
   if (sprintId) query.sprint = sprintId
-  if (assigneeId) query.assignedTo = assigneeId
+  // assignedTo is a list of { user, firstName, lastName, … }; match the user id.
+  if (assigneeId) query['assignedTo.user'] = assigneeId
   if (startDate || endDate) {
     query.startDate = {}
     if (startDate) query.startDate.$gte = startDate
@@ -56,7 +70,7 @@ export async function generateGanttData(
 
   // Get tasks
   const tasks = await Task.find(query)
-    .populate('assignedTo', 'name')
+    .populate('assignedTo.user', 'firstName lastName')
     .populate('project', 'name')
     .populate('sprint', 'name')
     .sort({ startDate: 1 })
@@ -93,7 +107,7 @@ export async function generateGanttData(
         type: 'task',
         status: task.status,
         priority: task.priority,
-        assignee: task.assignedTo?.name,
+        assignee: assigneeNames(task.assignedTo),
         project: task.project?.name,
         sprint: task.sprint?.name
       })
