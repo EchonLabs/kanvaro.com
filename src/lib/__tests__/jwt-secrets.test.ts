@@ -62,6 +62,35 @@ describe('jwt secrets in production', () => {
   })
 })
 
+describe('jwt secrets outside development and test (review point 4)', () => {
+  it.each(['staging', 'prod', 'qa', 'Production'])('refuses a missing secret when NODE_ENV=%s', (env) => {
+    const s = load({ NODE_ENV: env })
+    expect(() => s.getJwtSecret()).toThrow(/not set/)
+    expect(() => s.getJwtRefreshSecret()).toThrow(/not set/)
+  })
+
+  it('refuses a missing secret when NODE_ENV is unset', () => {
+    const s = load({})
+    expect(() => s.getJwtSecret()).toThrow(/not set/)
+  })
+
+  it('refuses a published placeholder when NODE_ENV=staging', () => {
+    const s = load({ NODE_ENV: 'staging', JWT_SECRET: 'your-secret-key' })
+    expect(s.getJwtSecret).toThrow(/published placeholder/)
+  })
+
+  it('uses a configured secret when NODE_ENV=staging', () => {
+    const s = load({ NODE_ENV: 'staging', JWT_SECRET: 'real-' + 'x'.repeat(30) })
+    expect(s.getJwtSecret()).toBe('real-' + 'x'.repeat(30))
+  })
+
+  it('still falls back under NODE_ENV=test', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const s = load({ NODE_ENV: 'test' })
+    expect(s.getJwtSecret()).toMatch(/dev-only/)
+  })
+})
+
 describe('jwt secrets in development', () => {
   it('falls back to a dev-only value, never the old public default, and warns once', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})

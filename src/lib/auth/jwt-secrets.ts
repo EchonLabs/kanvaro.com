@@ -10,10 +10,13 @@
  * Rules:
  * - Refresh secret: `JWT_REFRESH_SECRET`, else `REFRESH_TOKEN_SECRET` (the name
  *   the shipped docker-compose files and env.example use).
- * - Production: a missing secret, or one of the placeholder values published in
- *   this repo's docs and examples, throws. Auth then fails closed with a 500
- *   instead of accepting forgeable tokens.
- * - Development: falls back to a dev-only value and warns once.
+ * - Strict everywhere except `NODE_ENV=development` and `NODE_ENV=test`: a
+ *   missing secret, or one of the placeholder values published in this repo's
+ *   docs and examples, throws. Auth then fails closed with a 500 instead of
+ *   accepting forgeable tokens. This covers production and anything else
+ *   (staging, a typo, NODE_ENV unset), so a misconfigured server can never
+ *   quietly sign tokens with the fallback.
+ * - Development and test: fall back to a dev-only value and warn once.
  *
  * Secrets are read when a token is signed or verified, never at import time,
  * so `next build` works without them.
@@ -42,11 +45,14 @@ const DEV_FALLBACK = {
 
 const warned = new Set<string>()
 
+/** The only environments allowed to use DEV_FALLBACK. Everything else is strict. */
+const FALLBACK_ENVIRONMENTS = new Set(['development', 'test'])
+
 function resolve(kind: 'access' | 'refresh', names: string[]): string {
   const value = names.map((name) => process.env[name]?.trim()).find(Boolean)
   const label = names.join(' or ')
 
-  if (process.env.NODE_ENV === 'production') {
+  if (!FALLBACK_ENVIRONMENTS.has(process.env.NODE_ENV || '')) {
     if (!value) {
       throw new Error(`${label} is not set. Refusing to sign or verify tokens.`)
     }
@@ -60,7 +66,7 @@ function resolve(kind: 'access' | 'refresh', names: string[]): string {
 
   if (!warned.has(kind)) {
     warned.add(kind)
-    console.warn(`[auth] ${label} is not set; using a development-only fallback. This would fail in production.`)
+    console.warn(`[auth] ${label} is not set; using a development-only fallback. Any NODE_ENV other than development/test would refuse this.`)
   }
   return DEV_FALLBACK[kind]
 }
