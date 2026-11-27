@@ -9,6 +9,15 @@ function buildLoginRedirectUrl(authorizePathWithSearch: string): string {
   return `/login?returnTo=${encodeURIComponent(authorizePathWithSearch)}`
 }
 
+function isHttpRedirectUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 interface ConsentData {
   client: {
     id: string
@@ -68,18 +77,10 @@ function OAuthAuthorizeContent() {
         if (cancelled) return
 
         if (response.status === 400 || data.validParams === false) {
-          if (typeof data.redirectUrl === 'string') {
-            try {
-              const parsed = new URL(data.redirectUrl)
-              const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
-              if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && isLoopback) {
-                setStatus('redirecting')
-                window.location.href = data.redirectUrl
-                return
-              }
-            } catch {
-              // Fall through to showing error page
-            }
+          if (typeof data.redirectUrl === 'string' && isHttpRedirectUrl(data.redirectUrl)) {
+            setStatus('redirecting')
+            window.location.href = data.redirectUrl
+            return
           }
           setErrorMessage(data.error || 'Invalid authorization request parameters.')
           setStatus('error')
@@ -149,19 +150,8 @@ function OAuthAuthorizeContent() {
         return
       }
 
-      // Defense-in-depth: Ensure the returned redirectUrl is strictly a valid loopback URI
-      let isSafeRedirect = false
-      try {
-        const parsed = new URL(data.redirectUrl)
-        const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
-        if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && isLoopback) {
-          isSafeRedirect = true
-        }
-      } catch {
-        isSafeRedirect = false
-      }
-
-      if (!isSafeRedirect) {
+      // verify http(s) scheme on the client before navigating.
+      if (typeof data.redirectUrl !== 'string' || !isHttpRedirectUrl(data.redirectUrl)) {
         setErrorMessage('Unsafe redirect destination received.')
         setStatus('error')
         setSubmitting(false)
