@@ -21,22 +21,30 @@ export interface SetupState {
  * least one user. The second half keeps the wizard reachable when config.json
  * survives but the database was wiped. `/api/setup/status` and the setup-route
  * lock both use this, so the wizard and the lock can never disagree.
+ *
+ * It fails closed: when config.json says setup is done but the user count
+ * cannot be read (database restarting, timeout, pool exhausted), setup stays
+ * completed. Only a count that really returns 0 reopens the wizard. Otherwise
+ * a database hiccup would unlock the signed-out setup routes, and anyone could
+ * repoint config.json at their own database and create an admin there.
  */
 export async function getSetupState(): Promise<SetupState> {
   const config = loadConfig()
 
   let hasUsers = false
+  let userCountUnknown = false
   if (config.setupCompleted) {
     try {
       await connectDB()
       hasUsers = (await User.estimatedDocumentCount()) > 0
     } catch (error) {
-      console.error('Setup state: database unreachable, treating as no users:', error)
+      userCountUnknown = true
+      console.error('Setup state: database unreachable, keeping setup locked:', error)
     }
   }
 
   return {
-    setupCompleted: config.setupCompleted && hasUsers,
+    setupCompleted: !!config.setupCompleted && (hasUsers || userCountUnknown),
     hasConfig: !!config.database,
     hasUsers,
     organizationId: config.organizationId
@@ -62,20 +70,28 @@ export async function rejectIfSetupCompleted(): Promise<NextResponse | null> {
 /**
  * For setup routes the Settings pages also use after setup (connection tests):
  * open during setup, afterwards only for a signed-in user holding `permission`.
- * Returns an error response, or null when the route may proceed.
+ * `denied` is an error response, or null when the route may proceed;
+ * `setupCompleted` tells the route which of the two cases it is in.
  */
-export async function rejectUnlessSetupOrPermission(
+export async function checkSetupOrPermission(
   permission: Permission
-): Promise<NextResponse | null> {
+): Promise<{ denied: NextResponse | null; setupCompleted: boolean }> {
   const { setupCompleted } = await getSetupState()
-  if (!setupCompleted) return null
+  if (!setupCompleted) return { denied: null, setupCompleted }
 
   const auth = await authenticateUser()
   if ('error' in auth) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status })
+    return { denied: NextResponse.json({ error: auth.error }, { status: auth.status }), setupCompleted }
   }
   if (!(await PermissionService.hasPermission(auth.user.id, permission))) {
-    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    return { denied: NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }), setupCompleted }
   }
-  return null
+  return { denied: null, setupCompleted }
+}
+
+/** `checkSetupOrPermission` for routes that only need the error response. */
+export async function rejectUnlessSetupOrPermission(
+  permission: Permission
+): Promise<NextResponse | null> {
+  return (await checkSetupOrPermission(permission)).denied
 }

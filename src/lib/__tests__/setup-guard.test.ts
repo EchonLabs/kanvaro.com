@@ -47,6 +47,40 @@ describe('getSetupState', () => {
     estimatedDocumentCount.mockResolvedValue(3)
     expect((await getSetupState()).setupCompleted).toBe(true)
   })
+
+  it('stays completed (fails closed) when the user count throws', async () => {
+    loadConfig.mockReturnValue({ setupCompleted: true })
+    estimatedDocumentCount.mockRejectedValue(new Error('MongoNetworkError: connection reset'))
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    const state = await getSetupState()
+    errorSpy.mockRestore()
+    expect(state.setupCompleted).toBe(true)
+    expect(state.hasUsers).toBe(false)
+  })
+
+  it('stays not completed when config says not completed, even if the DB would throw', async () => {
+    loadConfig.mockReturnValue({ setupCompleted: false })
+    estimatedDocumentCount.mockRejectedValue(new Error('down'))
+    expect((await getSetupState()).setupCompleted).toBe(false)
+  })
+})
+
+describe('setup lock during a database outage', () => {
+  beforeEach(() => {
+    loadConfig.mockReturnValue({ setupCompleted: true })
+    estimatedDocumentCount.mockRejectedValue(new Error('timeout'))
+    jest.spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => (console.error as jest.Mock).mockRestore())
+
+  it('rejectIfSetupCompleted still returns 403 (setup/complete and database/create stay locked)', async () => {
+    expect(await rejectIfSetupCompleted()).toMatchObject({ status: 403 })
+  })
+
+  it('rejectUnlessSetupOrPermission still requires sign-in', async () => {
+    authenticateUser.mockResolvedValue({ error: 'No authentication tokens', status: 401 })
+    expect(await rejectUnlessSetupOrPermission(PERM)).toMatchObject({ status: 401 })
+  })
 })
 
 describe('rejectIfSetupCompleted', () => {
